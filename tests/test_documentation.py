@@ -67,9 +67,9 @@ class MyCompositions(unittest.TestCase):
         document.add_paragraph("A subheading", style="Heading 2")
         document.add_paragraph("A subheading of a Subheading", style="Heading 3")
         document.add_page_break()
-        document.add_paragraph("Local Analyses", style="Appendix")
-        document.add_paragraph("ULS", style="Appendix X.1")
-        document.add_paragraph("Lower Joint", style="Appendix X.1.1")
+        document.add_paragraph("My Appendix", style="Appendix")
+        document.add_paragraph("A subheading of my app", style="Appendix X.1")
+        document.add_paragraph("A subheading of a subheading in my app", style="Appendix X.1.1")
         os.makedirs(test_dir, exist_ok=True)
         document.save(test_dir / "my_demo.docx")
 
