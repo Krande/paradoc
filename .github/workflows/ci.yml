@@ -54,8 +54,10 @@ jobs:
           environment-file: conda/environment.yml
 
       - name: build and test conda package
+        env:
+          ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
         shell: bash -l {0}
-        run: conda-build -c krande -c conda-forge conda --python=${{ matrix.pyver.distver }}
+        run: conda-build -c krande -c conda-forge conda --python=${{ matrix.pyver.distver }} --token=$ANACONDA_TOKEN --user krande --override-channels --croot /home/runner/work/_build
 
 
 
