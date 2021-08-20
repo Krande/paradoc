@@ -2,7 +2,6 @@ import logging
 import os
 import pathlib
 import re
-from decimal import ROUND_HALF_EVEN, Decimal
 
 import pypandoc
 from docx import Document
@@ -27,119 +26,6 @@ def func_to_eq(func):
     return equation, params
 
 
-def func_eq_params(func):
-    """
-    Returns the string defined after the :equation: marker
-
-    :param func:
-    :return:
-    """
-    eq_str = "".join([l.replace(":equation:", "") for l in func.__doc__.splitlines() if ":equation:" in l]).strip()
-
-    var_map = {}
-    params = [":param ", ":eq_param "]
-    for l in func.__doc__.splitlines():
-        for par in params:
-            if par in l:
-                l_1 = l.replace(par, "")
-                l_s = l_1.split(":")
-                var = l_s[0].strip()
-                desc = l_s[1].strip()
-                if var.lower() in eq_str.lower():
-                    start = eq_str.lower().index(var.lower())
-                    new_str = eq_str[start : start + len(var)]
-                    var_map[new_str] = desc
-                else:
-                    if par == ":eq_param ":
-                        var_map[var] = desc
-    return var_map
-
-
-def roundoff(x, precision=6):
-    """
-
-    :param x: Number
-    :param precision: Number precision
-    :return:
-    """
-    xout = float(Decimal(float(x)).quantize(Decimal("." + precision * "0" + "1"), rounding=ROUND_HALF_EVEN))
-    return xout if abs(xout) != 0.0 else 0.0
-
-
-def extract_ref(document):
-    """
-    Extract all references from report.
-
-    TO-DO: Should use this on more example
-
-    :param document:
-    :return: Reference Dictionary
-    """
-    ref_dict = {"regulations": {}, "company": {}, "project": {}}
-    table = document.tables[6]
-    num = 1
-    for row in table.rows[1:]:
-        ref_dict["regulations"][row.cells[0].text] = {
-            "title": row.cells[1].text,
-            "rev": row.cells[2].text,
-            "ref": "/{}/".format(num),
-        }
-        num += 1
-    table = document.tables[7]
-    for row in table.rows[1:]:
-        ref_dict["company"][row.cells[0].text] = {
-            "title": row.cells[1].text,
-            "rev": row.cells[2].text,
-            "ref": "/{}/".format(num),
-        }
-        num += 1
-    table = document.tables[8]
-    for row in table.rows[1:]:
-        ref_dict["project"][row.cells[0].text] = {
-            "title": row.cells[1].text,
-            "rev": row.cells[2].text,
-            "ref": "/{}/".format(num),
-        }
-        num += 1
-    return ref_dict
-
-
-def extract_head(document):
-    doc_contents = []
-    for par in document.paragraphs:
-        if "heading" in par.style.name.lower():
-            if par.style.name == "Heading 1":
-                doc_contents.append({"level": 1, "heading": par.text})
-            elif par.style.name == "Heading 2":
-                doc_contents.append({"level": 2, "heading": par.text})
-            elif par.style.name == "Heading 3":
-                doc_contents.append({"level": 3, "heading": par.text})
-            elif par.style.name == "Heading 4":
-                doc_contents.append({"level": 4, "heading": par.text})
-    return doc_contents
-
-
-def extract_ref_from_par(document):
-    """
-
-    :param document:
-    :return:
-    """
-    curr_head = ""
-    for par in document.paragraphs:
-        if "heading" in par.style.name.lower():
-            curr_head = par.text
-        else:
-            for i in range(1, 30):
-                if "/{}/".format(i) in par.text:
-                    print(40 * "-")
-                    print("{} contains ref to /{}/".format(curr_head, i))
-                    print("\n")
-                    print(par.text)
-                    print(40 * "-")
-                    print("\n")
-
-
 def close_word_docs_by_name(names):
     """
 
@@ -162,34 +48,6 @@ def close_word_docs_by_name(names):
         print(f"No Word docs named {names} found to be open. Ending Word Application COM session")
 
     word.Quit()
-
-
-def process_latex(e):
-    """
-
-    :param e:
-    :return:
-
-    Copied function from https://github.com/javiljoen/tex2mathml
-    """
-
-    while e.startswith("$"):
-        e = e[1:]
-
-    while e.endswith("$"):
-        e = e[:-1]
-
-    e = e.replace(r"\operatorname", "")
-    e = e.replace(r"\displaystyle", "")
-    e = e.replace(r"\nonumber", "")
-    e = e.replace("&", "")
-    e = e.replace(r"\!", "")
-    e = re.sub(r"([^\\])\$", "\\1", e)
-    e = re.sub(r"\\mbox{([^}]*)}", '"\\1"', e)
-    e = re.sub(r"\\mathrm{([^}]*)}", '"\\1"', e)
-    e = re.sub(r"\\begin{.*}", "", e)
-    e = re.sub(r"\\end{.*}", "", e)
-    return e
 
 
 def add_table_reference(paragraph, seq=" SEQ Table \\* ARABIC \\s 1"):
