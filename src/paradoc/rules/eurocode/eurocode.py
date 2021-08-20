@@ -5,7 +5,7 @@ from collections import OrderedDict
 
 import numpy as np
 
-from ..utils import roundoff
+from paradoc.utils import roundoff
 
 
 class Bolt(object):

@@ -767,3 +767,17 @@ def get_list_of_files(dir_path, file_ext=None, strict=False):
             logging.info(msg)
 
     return all_files
+
+
+def closest_val_in_dict(val, dct):
+    """
+    When mapping using a dictionary and value do not match with the keys in the dictionary.
+    :param val: Value a number, usually float
+    :param dct: Dictionary with number keys (int or float)
+    :return: Dictionary-value corresponding to the keys nearest the input value
+    """
+    import numpy as np
+
+    table_looksups = np.array(list(dct))
+    dct_index = table_looksups[np.abs(table_looksups - val).argmin()]
+    return dct[dct_index]

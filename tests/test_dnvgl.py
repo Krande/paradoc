@@ -1,7 +1,7 @@
 import unittest
 
-from paradoc.rules.dnvgl.c208 import local_yield_check
-from paradoc.rules.dnvgl.c203 import alloweable_stress_range
+from paradoc.rules.dnv.c203 import alloweable_stress_range
+from paradoc.rules.dnv.c208 import local_yield_check
 from paradoc.utils import func_to_eq
 
 

@@ -3,7 +3,7 @@ import os
 import pathlib
 import unittest
 
-from paradoc.rules.eurocode import Bolt
+from paradoc.rules.eurocode.eurocode import Bolt
 
 logging.basicConfig(level=logging.INFO)
 
