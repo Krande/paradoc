@@ -1,0 +1,2 @@
+# paradoc
+Parametric documentation
