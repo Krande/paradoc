@@ -1,0 +1,15 @@
+#title: "A sample document"
+#subtitle: "A subtitle"
+#author: "Kristoffer H. Andersen"
+lang: en-GB
+autoSectionLabels: True
+#numberSections: true
+sectionsDepth: -1
+chapDelim: "-"
+chapters: true
+linkReferences: true
+nameInLink: true
+figPrefix: "Figure"
+tblPrefix: "Table"
+header-includes:
+    - "\\newcommand{\\pcdoc}{Pandoc-crossref documentation}"
