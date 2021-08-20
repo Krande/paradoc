@@ -1,0 +1,50 @@
+{% set name = "paradoc" %}
+{% set version = "0.0.1" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  path: ../
+
+build:
+  number: 0
+  script: "{{ PYTHON }} -m pip install . -vv"
+#  preserve_egg_dir: True
+
+requirements:
+  build:
+    - python
+  run:
+    - python
+    - pandoc
+    - pandoc-crossref
+    - pypandoc
+    - python-docx
+    - docxcompose
+    - numpy
+    - pandas
+    - tabulate
+    - svgwrite
+test:
+  source_files:
+    - tests
+    - files
+  requires:
+    - pytest
+    - pytest-cov
+  commands:
+    - cd tests
+    - pytest
+
+about:
+  home: https://github.com/krande/adapy
+  license: "GNU General Public v3 (GPLv3)"
+  license_family: GPL3
+  summary: "A python library for structural analysis and design"
+  doc_url: https://adapy.readthedocs.io/en/latest/
+
+extra:
+  recipe-maintainers:
+    - Krande

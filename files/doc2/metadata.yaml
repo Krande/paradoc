@@ -1,0 +1,11 @@
+#title: "A sample document"
+#subtitle: "A subtitle"
+#author: "Kristoffer H. Andersen"
+lang: en-GB
+#sectionsDepth: -1
+#chapDelim: "-"
+#chapters: true
+linkReferences: true
+nameInLink: true
+figPrefix: "Figure"
+tblPrefix: "Table"
