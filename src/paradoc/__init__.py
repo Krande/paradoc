@@ -59,9 +59,20 @@ class OneDoc:
         "Heading 4": "Appendix X.1.1.1",
     }
 
-    def __init__(self, source_dir=None, export_format="docx", clean_build_dir=True, create_dirs=True, **kwargs):
+    def __init__(
+        self,
+        source_dir=None,
+        export_format="docx",
+        main_prefix="00-main",
+        app_prefix="01-app",
+        clean_build_dir=True,
+        create_dirs=True,
+        **kwargs,
+    ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
         self.work_dir = kwargs.get("work_dir", self.source_dir)
+        self._main_prefix = main_prefix
+        self._app_prefix = app_prefix
         self.export_format = export_format
         self.variables = dict()
         self.tables = dict()
@@ -87,11 +98,11 @@ class OneDoc:
         self.md_files_main = []
         self.md_files_app = []
 
-        report_dir = self.source_dir / "report"
+        report_dir = self.source_dir / main_prefix
         os.makedirs(report_dir, exist_ok=True)
 
         for md_file in get_list_of_files(report_dir, ".md"):
-            is_appendix = True if "01-app" in md_file else False
+            is_appendix = True if app_prefix in md_file else False
             md_file = pathlib.Path(md_file)
             new_file = self.build_dir / md_file.relative_to(report_dir).with_suffix(".docx")
             build_file = self.build_dir / md_file.relative_to(report_dir)
@@ -121,7 +132,7 @@ class OneDoc:
         :param auto_open:
         :param metadata_file:
         """
-        dest_file = (self.dist_dir / output_name).with_suffix(f".{self.export_format}")
+        dest_file = (self.dist_dir / output_name).with_suffix(f".{self.export_format}").resolve().absolute()
 
         logging.debug(f'Compiling report to "{dest_file}"')
         os.makedirs(self.build_dir, exist_ok=True)
@@ -216,11 +227,11 @@ class OneDoc:
 
     @property
     def main_dir(self):
-        return self.work_dir / "report/00-main"
+        return self.work_dir / "report" / self._main_prefix
 
     @property
     def app_dir(self):
-        return self.work_dir / "report/01-app"
+        return self.work_dir / "report" / self._app_prefix
 
     @property
     def build_dir(self):
