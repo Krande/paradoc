@@ -70,7 +70,7 @@ class OneDoc:
         **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
-        self.work_dir = kwargs.get("work_dir", pathlib.Path('').resolve().absolute())
+        self.work_dir = kwargs.get("work_dir", pathlib.Path("").resolve().absolute())
         self._main_prefix = main_prefix
         self._app_prefix = app_prefix
         self.export_format = export_format

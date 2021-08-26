@@ -1,18 +1,17 @@
 import logging
 import os
-
 import unittest
 
 import pypandoc
+from common import files_dir, test_dir
 from docx import Document
 
 from paradoc import MY_DOCX_TMPL, OneDoc
 from paradoc.utils import convert_markdown
-from common import files_dir, test_dir
+
 # Miktex installer https://miktex.org/download
 
 logging.basicConfig(level=logging.INFO)
-
 
 
 auto_open = os.getenv("AUTO_OPEN", False)
