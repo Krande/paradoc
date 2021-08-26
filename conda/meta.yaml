@@ -27,6 +27,7 @@ requirements:
     - pandas
     - tabulate
     - svgwrite
+    - pytexit
 test:
   source_files:
     - tests

@@ -55,12 +55,17 @@ jobs:
           python-version: ${{ matrix.pyver.distver }}
           environment-file: conda/environment.yml
 
-      - name: build and test conda package
+      - name: build, test and upload conda package
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
         shell: bash -l {0}
         run: |
           conda-build -c krande -c conda-forge conda --python=${{ matrix.pyver.distver }} --token=$ANACONDA_TOKEN --user krande --override-channels
 
+      - name: build and test conda package
+        shell: bash -l {0}
+        run: |
+          conda-build -c krande -c conda-forge conda --python=${{ matrix.pyver.distver }} --override-channels
 
 
