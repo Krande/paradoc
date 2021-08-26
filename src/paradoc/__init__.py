@@ -70,7 +70,7 @@ class OneDoc:
         **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
-        self.work_dir = kwargs.get("work_dir", self.source_dir)
+        self.work_dir = kwargs.get("work_dir", pathlib.Path("").resolve().absolute())
         self._main_prefix = main_prefix
         self._app_prefix = app_prefix
         self.export_format = export_format
@@ -227,16 +227,16 @@ class OneDoc:
 
     @property
     def main_dir(self):
-        return self.work_dir / "report" / self._main_prefix
+        return self.source_dir / self._main_prefix
 
     @property
     def app_dir(self):
-        return self.work_dir / "report" / self._app_prefix
+        return self.source_dir / self._app_prefix
 
     @property
     def build_dir(self):
-        return self.work_dir / "_build"
+        return self.work_dir / "temp" / "_build"
 
     @property
     def dist_dir(self):
-        return self.work_dir / "_dist"
+        return self.work_dir / "temp" / "_dist"
