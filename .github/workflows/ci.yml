@@ -65,6 +65,7 @@ jobs:
           conda-build -c krande -c conda-forge conda --python=${{ matrix.pyver.distver }} --token=$ANACONDA_TOKEN --user krande --override-channels
 
       - name: build and test conda package
+        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
         shell: bash -l {0}
         run: |
           conda-build -c krande -c conda-forge conda --python=${{ matrix.pyver.distver }} --override-channels
