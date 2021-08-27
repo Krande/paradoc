@@ -76,7 +76,7 @@ class OneDoc:
         self.export_format = export_format
         self.variables = dict()
         self.tables = dict()
-        self.functions = dict()
+        self.equations = dict()
 
         # Style info: https://python-docx.readthedocs.io/en/latest/user/styles-using.html
         self.table_format = kwargs.get("table_format", "Grid Table 1 Light")
@@ -132,6 +132,8 @@ class OneDoc:
         :param auto_open:
         :param metadata_file:
         """
+        from .utils import variable_sub
+
         dest_file = (self.dist_dir / output_name).with_suffix(f".{self.export_format}").resolve().absolute()
 
         logging.debug(f'Compiling report to "{dest_file}"')
@@ -145,15 +147,9 @@ class OneDoc:
             # Substitute parameters/tables in the creation of the document
             with open(md_file, "r") as f:
                 tmp_md_doc = f.read()
-                for key, table in self.tables.items():
-                    key_str = f"{{{{__{key}__}}}}"
-                    if key_str in tmp_md_doc:
-                        tmp_md_doc = tmp_md_doc.replace(key_str, table)
-
-                for key, value in self.variables.items():
-                    key_str = f"{{{{__{key}__}}}}"
-                    if key_str in tmp_md_doc:
-                        tmp_md_doc = tmp_md_doc.replace(key_str, str(value))
+                tmp_md_doc = variable_sub(tmp_md_doc, self.tables)
+                tmp_md_doc = variable_sub(tmp_md_doc, self.variables)
+                tmp_md_doc = variable_sub(tmp_md_doc, self.equations)
 
             with open(mdf.build_file, "w") as f:
                 f.write(tmp_md_doc)

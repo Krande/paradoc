@@ -1,9 +1,9 @@
 {% set name = "paradoc" %}
-{% set version = "0.0.1" %}
+{% set data = load_setup_py_data() %}
 
 package:
   name: "{{ name|lower }}"
-  version: "{{ version }}"
+  version: {{ data.get('version') }}
 
 source:
   path: ../
