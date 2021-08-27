@@ -5,9 +5,21 @@
 [![Anaconda-Server Badge](https://anaconda.org/krande/paradoc/badges/platforms.svg)](https://anaconda.org/krande/paradoc)
 [![Anaconda-Server Badge](https://anaconda.org/krande/paradoc/badges/downloads.svg)](https://anaconda.org/krande/paradoc)
 
-A python library for parametric documentation
+A python library for parametric documentation based on markdown and pandoc. `paradoc` brings
+some additional functionality to ensure improved end-formatting for .docx exports and integrating 
+variable substitution. Use `{{__variable__}}` in your markdown files to insert any text prior to running pandoc.
 
-This is still very early in development so expect things to break.
+Install using
+
+```
+conda install -c krande -c conda-forge paradoc
+```
+
+Note! This is still very early in development so expect things to break.
+
+
+## Usage
+ 
 
 
 ## For developers

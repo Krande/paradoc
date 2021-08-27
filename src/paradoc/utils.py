@@ -2,6 +2,7 @@ import logging
 import os
 import pathlib
 import re
+import traceback
 
 import pypandoc
 from docx import Document
@@ -557,12 +558,27 @@ def fix_headers_after_compose(doc):
 
 
 def open_word_win32():
+    import sys
+
+    if sys.platform != "win32":
+        return
+
     try:
         import win32com.client
 
         word = win32com.client.DispatchEx("Word.Application")
+    except (ModuleNotFoundError, ImportError):
+        logging.error(
+            "Ensure you have you have win32com installed. "
+            'Use "conda install -c conda-forge pywin32" to install. '
+            f"{traceback.format_exc()}"
+        )
+        return None
     except BaseException as e:
-        logging.error(f"Unable to find COM connection to Word application. Is Word installed? {e}")
+        logging.error(
+            "Probably unable to find COM connection to Word application. "
+            f"Is Word installed? {traceback.format_exc()}, {e}"
+        )
         return None
     return word
 
@@ -627,18 +643,41 @@ def get_list_of_files(dir_path, file_ext=None, strict=False):
     return all_files
 
 
-def equation_compiler(f, print_latex=False, print_formula=False):
+def basic_equation_compiler(f, print_latex=False, print_formula=False):
     from inspect import getsourcelines
 
-    try:
-        import pytexit
-    except ModuleNotFoundError as e:
-        raise ModuleNotFoundError(
-            "To use the equation compiler you will need to install pytexit first.\n"
-            'Use "pip install pytexit"\n\n'
-            f'Original error message: "{e}"'
-        )
+    import pytexit
 
     lines = getsourcelines(f)
-    final_line = lines[0][-1]
-    return pytexit.py2tex(final_line.replace("return ", ""), print_latex=print_latex, print_formula=print_formula)
+    eq_latex = ""
+    matches = ("def", "return", '"')
+    dots = 0
+    for line in lines[0]:
+        if any(x in line for x in matches):
+            dots += line.count('"')
+            dots += line.count("'")
+            continue
+        if dots >= 6 or dots == 0:
+            eq_latex += pytexit.py2tex(line, print_latex=print_latex, print_formula=print_formula) + "\n"
+
+    return eq_latex
+
+
+def variable_sub(md_doc_str, variable_dict):
+    for key, value in variable_dict.items():
+        key_str = f"{{{{__{key}__}}}}"
+        if key_str in md_doc_str:
+            md_doc_str = md_doc_str.replace(key_str, str(value))
+    return md_doc_str
+
+
+def make_df(inputs, header, func):
+    import pandas as pd
+
+    res_matrix = [header]
+    for var in inputs:
+        res_matrix.append((*var, func(*var)))
+    df = pd.DataFrame(res_matrix)
+    df.columns = df.iloc[0]
+    df = df.drop(df.index[0])
+    return df
