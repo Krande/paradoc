@@ -98,14 +98,11 @@ class OneDoc:
         self.md_files_main = []
         self.md_files_app = []
 
-        report_dir = self.source_dir / main_prefix
-        os.makedirs(report_dir, exist_ok=True)
-
-        for md_file in get_list_of_files(report_dir, ".md"):
+        for md_file in get_list_of_files(self.source_dir, ".md"):
             is_appendix = True if app_prefix in md_file else False
             md_file = pathlib.Path(md_file)
-            new_file = self.build_dir / md_file.relative_to(report_dir).with_suffix(".docx")
-            build_file = self.build_dir / md_file.relative_to(report_dir)
+            new_file = self.build_dir / md_file.relative_to(self.source_dir).with_suffix(".docx")
+            build_file = self.build_dir / md_file.relative_to(self.source_dir)
 
             md_file = MdFile(
                 path=md_file,

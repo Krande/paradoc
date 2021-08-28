@@ -1,19 +1,11 @@
 # A List of functions
 
-Here is a basic function
+Here are two basic function @eq:equation1 and @eq:equation2:
 
-{{__my_equation__}}
+{{__my_equation__}} {#eq:equation1}
 
 And here is a small edit of that function
 
-{{__my_equation_2__}}
+{{__my_equation_2__}} {#eq:equation2}
 
-And here is a table from running the equation in a for loop:
 
-From Equation 1
-
-{{__results__}}
-
-From Equation 2
-
-{{__results_2__}}
