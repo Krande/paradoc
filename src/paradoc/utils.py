@@ -374,7 +374,7 @@ def apply_custom_styles_to_docx(doc, doc_format=None, style_doc=None):
 
     for block in iter_block_items(doc):
         if type(block) == Paragraph:
-            if prev_table:
+            if prev_table and len(block.runs) > 0:
                 block.runs[0].text = "\n" + block.runs[0].text
                 prev_table = False
                 block.paragraph_format.space_before = None
