@@ -8,6 +8,7 @@ import pypandoc
 from docx import Document
 from docxcompose.composer import Composer
 
+from .formatting import TableFormat
 from .utils import close_word_docs_by_name, docx_update, get_list_of_files
 
 MY_DOCX_TMPL = pathlib.Path(__file__).resolve().absolute().parent / "resources" / "template.docx"
@@ -42,8 +43,8 @@ class OneDoc:
     default_app_map = {
         "Heading 1": "Appendix",
         "Heading 2": "Appendix X.1",
-        "Heading 3": "Appendix X.1.1",
-        "Heading 4": "Appendix X.1.1.1",
+        "Heading 3": "Appendix X.2",
+        "Heading 4": "Appendix X.3",
     }
 
     def __init__(
@@ -66,11 +67,11 @@ class OneDoc:
         self.equations = dict()
 
         # Style info: https://python-docx.readthedocs.io/en/latest/user/styles-using.html
-        self.table_format = kwargs.get("table_format", "Grid Table 1 Light")
+        self.table_format = TableFormat()
         self.paragraph_style_map = kwargs.get(
             "paragraph_style_map",
             {
-                # "Normal": "Normal Indent",
+                "Normal": "Normal Indent",
                 "First Paragraph": "Normal Indent",
                 "Body Text": "Normal Indent",
                 "Compact": "Normal Indent",
@@ -110,8 +111,8 @@ class OneDoc:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
     def compile(self, output_name, auto_open=False, metadata_file=None):
-        from .formatting import (
-            Formatting,
+        from .formatting import Formatting
+        from .formatting.utils import (
             apply_custom_styles_to_docx,
             fix_headers_after_compose,
         )

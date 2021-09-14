@@ -1,16 +1,11 @@
 import logging
-from dataclasses import dataclass
 
 from docx import Document
+from docx.shared import Pt
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
-
-@dataclass
-class Formatting:
-    is_appendix: bool
-    paragraph_style_map: dict
-    table_format: str
+from .concepts import Formatting, TableFormat
 
 
 def add_indented_normal(doc):
@@ -29,15 +24,7 @@ def add_indented_normal(doc):
     return style
 
 
-def format_paragraph(pg, document, paragraph_formatting):
-    """
-
-    :param pg:
-    :param document:
-    :param paragraph_formatting:
-    :type paragraph_formatting: paradoc.Formatting
-    :return:
-    """
+def format_paragraph(pg, document, paragraph_formatting: Formatting):
     from docx.shared import Mm
 
     paragraph_style_map = paragraph_formatting.paragraph_style_map
@@ -69,21 +56,9 @@ def format_paragraph(pg, document, paragraph_formatting):
             logging.info(f'StyleDoc missing style "{style_name}"')
 
 
-def apply_custom_styles_to_docx(doc, doc_format=None, style_doc=None):
-    """
-
-    :param doc:
-    :param doc_format:
-    :type doc_format: paradoc.Formatting
-    :param style_doc:
-    :return:
-    """
-
+def apply_custom_styles_to_docx(doc, doc_format: Formatting = None, style_doc=None):
     from paradoc import MY_DOCX_TMPL
-
-    from .references import format_captions
-    from .tables import format_table
-    from .utils import iter_block_items
+    from paradoc.utils import iter_block_items
 
     document = style_doc if style_doc is not None else Document(MY_DOCX_TMPL)
     prev_table = False
@@ -109,10 +84,29 @@ def apply_custom_styles_to_docx(doc, doc_format=None, style_doc=None):
     return refs
 
 
+def format_table(tbl, document, tbl_format: TableFormat):
+    new_tbl_style = document.styles[tbl_format.style]
+    tbl.style = new_tbl_style
+    logging.info(f'Changed Table style from "{tbl.style}" to "{new_tbl_style}"')
+    # tbl.paragraph_format.space_after = Pt(12)
+    for i, row in enumerate(tbl.rows):
+        for cell in row.cells:
+            paragraphs = cell.paragraphs
+            for paragraph in paragraphs:
+                for run in paragraph.runs:
+                    font = run.font
+                    # run.style = document.styles["Normal"]
+                    font.name = tbl_format.font_style
+                    font.size = Pt(tbl_format.font_size)
+                    if i == 0:
+                        font.bold = True
+                    else:
+                        font.bold = False
+
+
 def fix_headers_after_compose(doc: Document):
     from paradoc import OneDoc
-
-    from .utils import delete_paragraph, iter_block_items
+    from paradoc.utils import delete_paragraph, iter_block_items
 
     pg_rem = []
     for pg in iter_block_items(doc):
@@ -126,3 +120,21 @@ def fix_headers_after_compose(doc: Document):
 
     for pg in pg_rem:
         delete_paragraph(pg)
+
+
+def format_captions(pg, doc_format: Formatting):
+    from paradoc.references import insert_caption_into_runs
+
+    ref_dict = dict()
+    style_name = pg.style.name
+    logging.debug(style_name)
+    tmp_split = pg.text.split(":")
+    prefix = tmp_split[0].strip()
+    if style_name == "Image Caption":
+        ref_dict[prefix] = insert_caption_into_runs(pg, "Figure", doc_format)
+    elif style_name == "Table Caption":
+        ref_dict[prefix] = insert_caption_into_runs(pg, "Table", doc_format)
+    else:
+        raise ValueError("Not possible")
+
+    return ref_dict

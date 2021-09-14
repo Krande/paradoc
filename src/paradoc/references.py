@@ -1,5 +1,3 @@
-import logging
-
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
@@ -158,29 +156,6 @@ def insert_caption_into_runs(pg, prefix, doc_format):
         insert_caption(pg, prefix, run, text, doc_format)
 
     return srun, pg, prefix_old
-
-
-def format_captions(pg, doc_format):
-    """
-
-    :param pg:
-    :param doc_format:
-    :type doc_format: paradoc.Formatting
-    :return:
-    """
-    ref_dict = dict()
-    style_name = pg.style.name
-    logging.debug(style_name)
-    tmp_split = pg.text.split(":")
-    prefix = tmp_split[0].strip()
-    if style_name == "Image Caption":
-        ref_dict[prefix] = insert_caption_into_runs(pg, "Figure", doc_format)
-    elif style_name == "Table Caption":
-        ref_dict[prefix] = insert_caption_into_runs(pg, "Table", doc_format)
-    else:
-        raise ValueError("Not possible")
-
-    return ref_dict
 
 
 def add_seq_reference(run_in, seq, parent):
