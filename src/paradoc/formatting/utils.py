@@ -59,7 +59,7 @@ def format_paragraph(pg, document, paragraph_style_map: dict):
 
 def apply_custom_styles_to_docx(doc, doc_format: Formatting = None, style_doc=None):
     from paradoc import MY_DOCX_TMPL
-    from paradoc.utils import iter_block_items
+    from paradoc.io.word.utils import iter_block_items
 
     document = style_doc if style_doc is not None else Document(MY_DOCX_TMPL)
     prev_table = False
@@ -119,7 +119,7 @@ def format_table(tbl: DocxTable, document, tbl_format: TableFormat):
 
 def fix_headers_after_compose(doc: Document):
     from paradoc import OneDoc
-    from paradoc.utils import delete_paragraph, iter_block_items
+    from paradoc.io.word.utils import delete_paragraph, iter_block_items
 
     pg_rem = []
     for pg in iter_block_items(doc):
