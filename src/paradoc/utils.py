@@ -286,10 +286,19 @@ def basic_equation_compiler(f, print_latex=False, print_formula=False):
 
 
 def variable_sub(md_doc_str, variable_dict):
+    from .concepts import Table
+
+    def sub_table(tbl: Table) -> str:
+        return tbl.to_markdown(True)
+
     for key, value in variable_dict.items():
         key_str = f"{{{{__{key}__}}}}"
         if key_str in md_doc_str:
-            md_doc_str = md_doc_str.replace(key_str, str(value))
+            if type(value) is Table:
+                value_str = sub_table(value)
+            else:
+                value_str = str(value)
+            md_doc_str = md_doc_str.replace(key_str, value_str)
     return md_doc_str
 
 

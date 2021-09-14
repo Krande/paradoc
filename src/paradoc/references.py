@@ -100,7 +100,7 @@ def add_bookmark(paragraph, bookmark_text, bookmark_name):
     tag.append(end)
 
 
-def insert_caption(pg, prefix, run, text, doc_format):
+def insert_caption(pg, prefix, run, text, is_appendix: bool):
     """
 
     :param pg:
@@ -113,7 +113,7 @@ def insert_caption(pg, prefix, run, text, doc_format):
     """
     from docx.text.run import Run
 
-    heading_ref = "Appendix" if doc_format.is_appendix is True else '"Heading 1"'
+    heading_ref = "Appendix" if is_appendix is True else '"Heading 1"'
 
     seq1 = pg._element._new_r()
     add_seq_reference(seq1, f"STYLEREF \\s {heading_ref} \\n", run._parent)

@@ -2,10 +2,12 @@ import logging
 
 from docx import Document
 from docx.shared import Pt
-from docx.table import Table
+from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph
-
+from typing import Dict
 from .concepts import Formatting, TableFormat
+from paradoc.concepts import Table
+from typing import Union
 
 
 def add_indented_normal(doc):
@@ -24,10 +26,9 @@ def add_indented_normal(doc):
     return style
 
 
-def format_paragraph(pg, document, paragraph_formatting: Formatting):
+def format_paragraph(pg, document, paragraph_style_map: dict):
     from docx.shared import Mm
 
-    paragraph_style_map = paragraph_formatting.paragraph_style_map
     style_name = pg.style.name
     logging.debug(style_name)
     if style_name == "Compact":  # Is a bullet point list
@@ -74,9 +75,9 @@ def apply_custom_styles_to_docx(doc, doc_format: Formatting = None, style_doc=No
                 ref_ = format_captions(block, doc_format)
                 refs.update(ref_)
             else:
-                format_paragraph(block, document, doc_format)
+                format_paragraph(block, document, doc_format.paragraph_style_map)
 
-        elif type(block) == Table:
+        elif type(block) == DocxTable:
             if doc_format.table_format:
                 format_table(block, document, doc_format.table_format)
             prev_table = True
@@ -84,7 +85,19 @@ def apply_custom_styles_to_docx(doc, doc_format: Formatting = None, style_doc=No
     return refs
 
 
-def format_table(tbl, document, tbl_format: TableFormat):
+def get_table_ref(docx_table: DocxTable, tables: Dict[str, Table]) -> Union[Table, None]:
+    cell0 = docx_table.rows[1].cells[0].paragraphs[0]
+    cell0_str = cell0.text
+    for key, tbl in tables.items():
+        if key == cell0_str:
+            df = tbl.df
+            col_name = df.columns[0]
+            cell0.text = str(df.iloc[0, df.columns.get_loc(col_name)])
+            return tbl
+    return None
+
+
+def format_table(tbl: DocxTable, document, tbl_format: TableFormat):
     new_tbl_style = document.styles[tbl_format.style]
     tbl.style = new_tbl_style
     logging.info(f'Changed Table style from "{tbl.style}" to "{new_tbl_style}"')

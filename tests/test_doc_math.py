@@ -19,8 +19,8 @@ class MathDocTests(unittest.TestCase):
 
         one.equations["my_equation"] = basic_equation_compiler(my_calc_example_1)
         one.equations["my_equation_2"] = basic_equation_compiler(my_calc_example_2)
-        one.tables["results"] = df1.to_markdown(index=False, tablefmt="grid")
-        one.tables["results_2"] = df2.to_markdown(index=False, tablefmt="grid")
+        one.add_table("results", df1)
+        one.add_table("results_2", df2)
 
         one.compile("MathDoc")
 

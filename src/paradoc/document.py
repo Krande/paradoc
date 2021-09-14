@@ -1,5 +1,7 @@
+from __future__ import annotations
 import logging
 import os
+import pandas as pd
 import pathlib
 import shutil
 from dataclasses import dataclass
@@ -7,7 +9,8 @@ from dataclasses import dataclass
 import pypandoc
 from docx import Document
 from docxcompose.composer import Composer
-
+from typing import Dict
+from .concepts import Table
 from .formatting import TableFormat
 from .utils import close_word_docs_by_name, docx_update, get_list_of_files
 
@@ -63,7 +66,7 @@ class OneDoc:
         self._app_prefix = app_prefix
         self.export_format = export_format
         self.variables = dict()
-        self.tables = dict()
+        self.tables: Dict[str, Table] = dict()
         self.equations = dict()
 
         # Style info: https://python-docx.readthedocs.io/en/latest/user/styles-using.html
@@ -114,7 +117,7 @@ class OneDoc:
         from .formatting import Formatting
         from .formatting.utils import (
             apply_custom_styles_to_docx,
-            fix_headers_after_compose,
+            fix_headers_after_compose
         )
         from .utils import variable_sub
 
@@ -172,7 +175,7 @@ class OneDoc:
             logging.info(f"Added {md.new_file}")
 
         main_format = Formatting(False, self.paragraph_style_map, self.table_format)
-        _ = apply_custom_styles_to_docx(composer_main.doc, main_format)
+        _ = self._reformat_doc(composer_main.doc, False)
         composer_main.doc.add_page_break()
 
         # Appendix - Format Style
@@ -188,7 +191,7 @@ class OneDoc:
         app_paragraph_style.update(self.paragraph_style_map)
 
         app_format = Formatting(True, app_paragraph_style, self.table_format)
-        _ = apply_custom_styles_to_docx(composer_app.doc, app_format)
+        _ = self._reformat_doc(composer_main.doc, True)
 
         composer_main.append(composer_app.doc)
 
@@ -204,6 +207,40 @@ class OneDoc:
 
         if auto_open is True:
             os.startfile(dest_file)
+
+    def add_table(self, name, df: pd.DataFrame, caption: str, tbl_format: TableFormat = None):
+        self.tables[name] = Table(name, df, caption, tbl_format)
+
+    def _reformat_doc(self, doc: Document, is_appendix, style_doc=None):
+        from paradoc import MY_DOCX_TMPL
+        from paradoc.utils import iter_block_items
+        from docx.table import Table as DocxTable
+        from docx.text.paragraph import Paragraph
+        from .formatting.utils import format_table, format_paragraph, format_captions, get_table_ref
+
+        document = style_doc if style_doc is not None else Document(MY_DOCX_TMPL)
+        prev_table = False
+        refs = dict()
+
+        for block in iter_block_items(doc):
+            if type(block) == Paragraph:
+                if prev_table and len(block.runs) > 0:
+                    block.runs[0].text = "\n" + block.runs[0].text
+                    prev_table = False
+                    block.paragraph_format.space_before = None
+                if block.style.name in ("Image Caption", "Table Caption"):
+                    ref_ = format_captions(block, is_appendix)
+                    refs.update(ref_)
+                else:
+                    format_paragraph(block, document, self.paragraph_style_map)
+
+            elif type(block) == DocxTable:
+                tbl_source = get_table_ref(block, self.tables)
+                if tbl_source is not None and tbl_source.format is not None:
+                    format_table(block, document, tbl_source.format)
+                prev_table = True
+
+        return refs
 
     @property
     def main_dir(self):
