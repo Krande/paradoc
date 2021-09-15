@@ -9,7 +9,14 @@ from typing import Dict
 import pandas as pd
 import pypandoc
 
-from .common import Equation, ExportFormats, MarkDownFile, Table, TableFormat
+from .common import (
+    DocXFormat,
+    Equation,
+    ExportFormats,
+    MarkDownFile,
+    Table,
+    TableFormat,
+)
 from .utils import get_list_of_files, variable_sub
 
 
@@ -61,9 +68,9 @@ class OneDoc:
         self.variables = dict()
         self.tables: Dict[str, Table] = dict()
         self.equations: Dict[str, Equation] = dict()
+        self.doc_format = DocXFormat()
 
         # Style info: https://python-docx.readthedocs.io/en/latest/user/styles-using.html
-        self.table_format = TableFormat()
         self.paragraph_style_map = kwargs.get("paragraph_style_map", OneDoc.default_paragraph_map)
         self.appendix_heading_map = kwargs.get("appendix_heading_map", OneDoc.default_app_map)
 

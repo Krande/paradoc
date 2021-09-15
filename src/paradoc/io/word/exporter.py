@@ -4,6 +4,7 @@ import logging
 import re
 from typing import List, Union
 
+import numpy as np
 from docx import Document
 from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph
@@ -32,6 +33,7 @@ class WordExporter:
         composer_app = add_to_composer(MY_DOCX_TMPL_BLANK, one_doc.md_files_app)
 
         for tbl in self.identify_tables(composer_main.doc):
+
             tbl.format_table(is_appendix=False)
 
         for tbl in self.identify_tables(composer_app.doc):
@@ -71,12 +73,12 @@ class WordExporter:
                 continue
 
             if block.style.name == "Table Caption":
+                if "using solid elements" in block.text:
+                    print("sd")
                 current_table.docx_caption = block
 
-            if type(block) == Paragraph and prev_table is True and len(block.runs) > 0:
-                block.runs[0].text = "\n" + block.runs[0].text
+            if type(block) == Paragraph and prev_table is True:
                 prev_table = False
-                block.paragraph_format.space_before = None
                 current_table.docx_following_pg = block
 
             if current_table.is_complete():
@@ -90,19 +92,42 @@ class WordExporter:
 
         return tables
 
-    def get_related_table(self, current_table: DocXTableRef) -> Union[Table, None]:
+    def get_related_table(self, current_table: DocXTableRef, frac=1e-4) -> Union[Table, None]:
         one = self.one_doc
+
+        # Search using Caption string
         caption = current_table.docx_caption
-        re_cap = re.compile("Table [0-9]{0,9}:(.*)")
+        re_cap = re.compile(r"Table\s*[0-9]{0,9}:(.*)")
         for key, tbl in one.tables.items():
             if "Table" in caption.text:
                 m = re_cap.search(caption.text)
+                if m is None:
+                    raise ValueError()
                 caption_text = str(m.group(1).strip())
             else:
                 caption_text = str(caption.text)
             caption_text = caption_text.replace("”", '"')
             if tbl.caption == caption_text:
                 return tbl
+
+        # If no match using caption string, then use contents of table
+        content = get_first_row_from_table(current_table.docx_table)
+        is_content_numeric = False
+
+        try:
+            content_numeric = np.array(content, dtype=float)
+            is_content_numeric = True
+        except ValueError:
+            content_numeric = None
+
+        for key, tbl in one.tables.items():
+            row_1 = tbl.df.iloc[0].values
+            if is_content_numeric and len(content) == len(row_1):
+                tot = sum(row_1)
+                diff = sum(row_1 - content_numeric)
+                if abs(diff) < abs(tot) * frac:
+                    return tbl
+            print("")
         return None
 
 
@@ -116,3 +141,15 @@ def add_to_composer(source_doc, md_files: List[MarkDownFile]) -> Composer:
         composer_doc.append(doc_in)
         logging.info(f"Added {md.new_file}")
     return composer_doc
+
+
+def get_first_row_from_table(docx_table: DocxTable, num_row=1):
+    content = []
+    for i, row in enumerate(docx_table.rows):
+        if i == 0:
+            continue
+        for cell in row.cells:
+            paragraphs = cell.paragraphs
+            for paragraph in paragraphs:
+                content.append(paragraph.text.strip())
+        return content

@@ -27,6 +27,7 @@ class Table:
     df: pd.DataFrame
     caption: str
     format: TableFormat = TableFormat()
+    add_link: bool = False
 
     def to_markdown(self, include_name_in_cell=False, flags=None):
         df = self.df.copy()
@@ -36,7 +37,9 @@ class Table:
         tbl_str = df.to_markdown(index=False, tablefmt="grid")
         if flags is not None and TableFlags.NO_CAPTION in flags:
             return tbl_str
-        tbl_str += f"\nTable: {self.caption} {{#tbl:{self.name}}}"
+        tbl_str += f"\n\nTable: {self.caption}"
+        if self.add_link:
+            tbl_str += f"{{#tbl:{self.name}}}"
         return tbl_str
 
 
@@ -70,10 +73,9 @@ class Equation:
 
 
 @dataclass
-class Formatting:
-    is_appendix: bool
-    paragraph_style_map: dict
-    table_format: TableFormat
+class DocXFormat:
+    pg_font: str = "Arial"
+    pg_size: int = 11
 
 
 @dataclass
