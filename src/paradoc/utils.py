@@ -2,14 +2,8 @@ import logging
 import os
 import pathlib
 import re
-import traceback
 
 import pypandoc
-from docx import Document
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
-from docx.table import Table
-from docx.text.paragraph import Paragraph
 
 
 def func_to_eq(func):
@@ -25,462 +19,6 @@ def func_to_eq(func):
     params = {x.groupdict()["var"].strip(): x.groupdict()["res"].strip() for x in params_re.finditer(func.__doc__)}
     equation = [x.group(1).strip() for x in equation_re.finditer(func.__doc__)]
     return equation, params
-
-
-def close_word_docs_by_name(names):
-    """
-
-    :param names: List of word document basenames (basenames e.g. "something.docx").
-    :type names: list
-    :return:
-    """
-
-    word = open_word_win32()
-    if word is None:
-        return
-
-    if len(word.Documents) > 0:
-        for doc in word.Documents:
-            doc_name = doc.Name
-            if doc_name in names:
-                print(f'Closing "{doc}"')
-                doc.Close()
-    else:
-        print(f"No Word docs named {names} found to be open. Ending Word Application COM session")
-
-    word.Quit()
-
-
-def add_table_reference(paragraph, seq=" SEQ Table \\* ARABIC \\s 1"):
-    """
-
-    :param paragraph:
-    :param seq
-    """
-    run = paragraph.add_run()
-    r = run._r
-    fldChar = OxmlElement("w:fldChar")
-    fldChar.set(qn("w:fldCharType"), "begin")
-    r.append(fldChar)
-    instrText = OxmlElement("w:instrText")
-    instrText.text = seq
-    r.append(instrText)
-    fldChar = OxmlElement("w:fldChar")
-    fldChar.set(qn("w:fldCharType"), "end")
-    r.append(fldChar)
-
-    return run
-
-
-def add_seq_reference(run_in, seq, parent):
-    """
-
-    :param run_in:
-    :param seq:
-    :param parent:
-    :return:
-    """
-    from docx.text.run import Run
-
-    new_run = Run(run_in, parent)
-    r = new_run._r
-    fldChar = OxmlElement("w:fldChar")
-    fldChar.set(qn("w:fldCharType"), "begin")
-    r.append(fldChar)
-    instrText = OxmlElement("w:instrText")
-    instrText.text = seq
-    r.append(instrText)
-    fldChar = OxmlElement("w:fldChar")
-    fldChar.set(qn("w:fldCharType"), "end")
-    r.append(fldChar)
-    return new_run
-
-
-def iter_block_items(parent):
-    """
-    Yield each paragraph and table child within *parent*, in document order.
-    Each returned value is an instance of either Table or Paragraph. *parent*
-    would most commonly be a reference to a main Document object, but
-    also works for a _Cell object, which itself can contain paragraphs and tables.
-    """
-    from docx.document import Document
-    from docx.oxml.table import CT_Tbl
-    from docx.oxml.text.paragraph import CT_P
-    from docx.table import Table, _Cell
-    from docx.text.paragraph import Paragraph
-
-    if isinstance(parent, Document):
-        parent_elm = parent.element.body
-    elif isinstance(parent, _Cell):
-        parent_elm = parent._tc
-    else:
-        raise ValueError("something's not right")
-
-    for child in parent_elm.iterchildren():
-        if isinstance(child, CT_P):
-            yield Paragraph(child, parent)
-        elif isinstance(child, CT_Tbl):
-            yield Table(child, parent)
-        else:
-            logging.info(f"Unrecognized child element type {type(child)}")
-
-
-def format_table(tbl, document, table_format):
-    """
-
-    :param tbl:
-    :param document:
-    :param table_format:
-    :return:
-    """
-    from docx.shared import Pt
-
-    new_tbl_style = document.styles[table_format]
-    tbl.style = new_tbl_style
-    logging.info(f'Changed Table style from "{tbl.style}" to "{new_tbl_style}"')
-    # tbl.paragraph_format.space_after = Pt(12)
-    for i, row in enumerate(tbl.rows):
-        for cell in row.cells:
-            paragraphs = cell.paragraphs
-            for paragraph in paragraphs:
-                for run in paragraph.runs:
-                    font = run.font
-                    # run.style = document.styles["Normal"]
-                    font.name = "Arial"
-                    font.size = Pt(12)
-                    if i == 0:
-                        font.bold = True
-                    else:
-                        font.bold = False
-
-
-def add_bookmark(paragraph, bookmark_text, bookmark_name):
-    """
-
-    :param paragraph:
-    :param bookmark_text:
-    :param bookmark_name:
-    :return:
-    """
-    from docx.oxml.ns import qn
-    from docx.oxml.shared import OxmlElement
-
-    run = paragraph.add_run()
-    tag = run._r  # for reference the following also works: tag =  document.element.xpath('//w:r')[-1]
-    start = OxmlElement("w:bookmarkStart")
-    start.set(qn("w:id"), "0")
-    start.set(qn("w:name"), bookmark_name)
-    tag.append(start)
-
-    text = OxmlElement("w:r")
-    text.text = bookmark_text
-    tag.append(text)
-
-    end = OxmlElement("w:bookmarkEnd")
-    end.set(qn("w:id"), "0")
-    end.set(qn("w:name"), bookmark_name)
-    tag.append(end)
-
-
-def insert_caption(pg, prefix, run, text, doc_format):
-    """
-
-    :param pg:
-    :param prefix:
-    :param run:
-    :param text:
-    :param doc_format:
-    :type doc_format: paradoc.Formatting
-    :return:
-    """
-    from docx.text.run import Run
-
-    heading_ref = "Appendix" if doc_format.is_appendix is True else '"Heading 1"'
-
-    seq1 = pg._element._new_r()
-    add_seq_reference(seq1, f"STYLEREF \\s {heading_ref} \\n", run._parent)
-    run._element.addprevious(seq1)
-    stroke = pg._element._new_r()
-    new_run = Run(stroke, run._parent)
-    new_run.text = "-"
-    run._element.addprevious(stroke)
-    seq2 = pg._element._new_r()
-    add_seq_reference(seq2, f"SEQ {prefix} \\* ARABIC \\s 1", run._parent)
-    run._element.addprevious(seq2)
-    fin = pg._element._new_r()
-    fin_run = Run(fin, run._parent)
-    fin_run.text = ": " + text
-    run._element.addprevious(fin)
-
-
-def insert_caption_into_runs(pg, prefix, doc_format):
-    """
-
-    :param pg:
-    :param prefix:
-    :param doc_format:
-    :type doc_format: paradoc.Formatting
-    :return:
-    """
-
-    tmp_split = pg.text.split(":")
-    prefix_old = tmp_split[0].strip()
-    text = tmp_split[-1].strip()
-    srun = pg.runs[0]
-    if len(pg.runs) > 1:
-        run = pg.runs[1]
-        tmp_str = pg.runs[0].text
-        pg.runs[0].text = f"{prefix} "
-        insert_caption(pg, prefix, run, tmp_str.split(":")[-1].strip(), doc_format)
-    else:
-        srun.text = f"{prefix} "
-        run = pg.add_run()
-        insert_caption(pg, prefix, run, text, doc_format)
-
-    return srun, pg, prefix_old
-
-
-def format_captions(pg, doc_format):
-    """
-
-    :param pg:
-    :param doc_format:
-    :type doc_format: paradoc.Formatting
-    :return:
-    """
-    ref_dict = dict()
-    style_name = pg.style.name
-    logging.debug(style_name)
-    tmp_split = pg.text.split(":")
-    prefix = tmp_split[0].strip()
-    if style_name == "Image Caption":
-        ref_dict[prefix] = insert_caption_into_runs(pg, "Figure", doc_format)
-    elif style_name == "Table Caption":
-        ref_dict[prefix] = insert_caption_into_runs(pg, "Table", doc_format)
-    else:
-        raise ValueError("Not possible")
-
-    return ref_dict
-
-
-def add_indented_normal(doc):
-    from docx.enum.style import WD_STYLE_TYPE
-    from docx.shared import Mm, Pt
-
-    styles = doc.styles
-    style = styles.add_style("Normal indent", WD_STYLE_TYPE.PARAGRAPH)
-    style.base_style = styles["Normal"]
-
-    paragraph_format = style.paragraph_format
-    paragraph_format.left_indent = Mm(0.25)
-    paragraph_format.space_before = Pt(12)
-    paragraph_format.widow_control = True
-
-    return style
-
-
-def format_paragraph(pg, document, paragraph_formatting):
-    """
-
-    :param pg:
-    :param document:
-    :param paragraph_formatting:
-    :type paragraph_formatting: paradoc.Formatting
-    :return:
-    """
-    from docx.shared import Mm
-
-    paragraph_style_map = paragraph_formatting.paragraph_style_map
-    style_name = pg.style.name
-    logging.debug(style_name)
-    if style_name == "Compact":  # Is a bullet point list
-        new_style_name = paragraph_style_map[pg.style.name]
-        new_style = document.styles[new_style_name]
-        pg.style = new_style
-        pg.paragraph_format.left_indent = Mm(25)
-
-    elif style_name in paragraph_style_map.keys():
-        new_style_name = paragraph_style_map[pg.style.name]
-
-        if new_style_name not in document.styles:
-            styles = "".join([x.name + "\n" for x in document.styles])
-            raise ValueError(
-                f'The requested style "{new_style_name}" does not exist in style_doc.\n'
-                "Note! Style names are CAPS sensitive.\n"
-                f"Available styles are:\n{styles}"
-            )
-
-        new_style = document.styles[new_style_name]
-        pg.style = new_style
-
-        logging.debug(f'Changed paragraph style "{pg.style}" to "{new_style_name}"')
-    else:
-        if style_name not in document.styles:
-            logging.info(f'StyleDoc missing style "{style_name}"')
-
-
-def add_bookmarkStart(paragraph, _id):
-    name = "_Ref_id_num_" + _id
-    start = OxmlElement("w:bookmarkStart")
-    start.set(qn("w:name"), name)
-    start.set(qn("w:id"), str(_id))
-    paragraph._p.append(start)
-    return name
-
-
-def append_ref_to_paragraph(paragraph, refName, text=""):
-    """
-
-    :param paragraph:
-    :param refName:
-    :param text:
-    :return:
-    """
-    # run 1
-    run = paragraph.add_run(text)
-    r = run._r
-    fldChar = OxmlElement("w:fldChar")
-    fldChar.set(qn("w:fldCharType"), "begin")
-    r.append(fldChar)
-    # run 2
-    run = paragraph.add_run()
-    r = run._r
-    instrText = OxmlElement("w:instrText")
-    instrText.text = "REF " + refName + " \\h"
-    r.append(instrText)
-    # run 3
-    run = paragraph.add_run()
-    r = run._r
-    fldChar = OxmlElement("w:fldChar")
-    fldChar.set(qn("w:fldCharType"), "end")
-    r.append(fldChar)
-
-
-def apply_custom_styles_to_docx(doc, doc_format=None, style_doc=None):
-    """
-
-    :param doc:
-    :param doc_format:
-    :type doc_format: paradoc.Formatting
-    :param style_doc:
-    :return:
-    """
-
-    from paradoc import MY_DOCX_TMPL
-
-    document = style_doc if style_doc is not None else Document(MY_DOCX_TMPL)
-    prev_table = False
-    refs = dict()
-
-    for block in iter_block_items(doc):
-        if type(block) == Paragraph:
-            if prev_table:
-                block.runs[0].text = "\n" + block.runs[0].text
-                prev_table = False
-                block.paragraph_format.space_before = None
-            if block.style.name in ("Image Caption", "Table Caption"):
-                ref_ = format_captions(block, doc_format)
-                refs.update(ref_)
-            else:
-                format_paragraph(block, document, doc_format)
-
-        elif type(block) == Table:
-            if doc_format.table_format:
-                format_table(block, document, doc_format.table_format)
-            prev_table = True
-
-    return refs
-
-
-def resolve_references(document):
-    import re
-
-    from docx.text.paragraph import Paragraph
-
-    refs = dict()
-    fig_re = re.compile(
-        r"(?:Figure\s(?P<number>[0-9]{0,5})\s*)",
-        re.MULTILINE | re.DOTALL | re.IGNORECASE,
-    )
-    tbl_re = re.compile(r"(?:Table\s(?P<number>[0-9]{0,5})\s*)", re.MULTILINE | re.DOTALL | re.IGNORECASE)
-
-    # Fix references
-    for block in iter_block_items(document):
-        if type(block) == Paragraph:
-            if block.style.name in ("Image Caption", "Table Caption"):
-                continue
-            if "Figure" in block.text or "Table" in block.text:
-                for m in fig_re.finditer(block.text):
-                    d = m.groupdict()
-                    n = d["number"]
-                    figref = f"Figure {n}"
-                    if figref in refs.keys():
-                        fref = refs[figref]
-                        pg_ref = fref[1]
-
-                for m in tbl_re.finditer(block.text):
-                    d = m.groupdict()
-                    n = d["number"]
-                    tblref = f"Table {n}"
-                    if tblref in refs.keys():
-                        tref = refs[tblref]
-                        pg_ref = tref[1]
-                        parent = pg_ref._p
-                        # ref_id = parent.id
-                        print(parent)
-
-
-def convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_doc=None):
-    """
-
-    :param source:
-    :param dest:
-    :param dest_format:
-    :param extra_args:
-    :param style_doc:
-    :return:
-    """
-    from docx import Document
-    from docxcompose.composer import Composer
-
-    build_dir = source / "_build"
-    if style_doc is not None:
-        document = Document(str(style_doc))
-        document.add_page_break()
-        composer = Composer(document)
-    else:
-        composer = None
-    files = []
-    for md_file in get_list_of_files(source, ".md"):
-        if "_build" in md_file or "_dist" in md_file:
-            continue
-        md_file = pathlib.Path(md_file)
-        new_file = build_dir / md_file.parent.name / md_file.with_suffix(".docx").name
-        os.makedirs(new_file.parent, exist_ok=True)
-
-        output = pypandoc.convert_file(
-            str(md_file),
-            dest_format,
-            format="markdown",
-            outputfile=str(new_file),
-            extra_args=extra_args,
-            filters=["pandoc-crossref"],
-            encoding="utf8",
-        )
-        logging.info(output)
-        files.append(str(new_file))
-
-    # for i in range(0, len(files)):
-    #     doc = Document(files[i])
-    #     doc.add_page_break()
-    #     if composer is None:
-    #         composer = Composer(doc)
-    #     else:
-    #         composer.append(doc)
-    #
-    #     logging.info(f"Added {files[i]}")
-
-    composer.save(str(dest))
 
 
 def convert_markdown(
@@ -500,6 +38,7 @@ def convert_markdown(
     :param pdf_engine:
     :return:
     """
+    from .io.word.utils import convert_markdown_dir_to_docx
 
     source = pathlib.Path(source)
     dest = pathlib.Path(dest).with_suffix(f".{dest_format}")
@@ -526,86 +65,6 @@ def convert_markdown(
             encoding="utf8",
         )
         logging.info(output)
-
-
-def delete_paragraph(paragraph):
-    p = paragraph._element
-    p.getparent().remove(p)
-    paragraph._p = paragraph._element = None
-
-
-def fix_headers_after_compose(doc):
-    """
-
-    :param doc:
-    :type doc: docx.document.Document
-    :return:
-    """
-    from paradoc import OneDoc
-
-    pg_rem = []
-    for pg in iter_block_items(doc):
-        if type(pg) == Paragraph:
-            if pg.style.name in ("Image Caption", "Table Caption"):
-                continue
-            else:
-                if pg.style.name in list(OneDoc.default_app_map.values())[1:]:
-                    pg.insert_paragraph_before(pg.text, style=pg.style.name)
-                    pg_rem.append(pg)
-
-    for pg in pg_rem:
-        delete_paragraph(pg)
-
-
-def open_word_win32():
-    import sys
-
-    if sys.platform != "win32":
-        return
-
-    try:
-        import win32com.client
-
-        word = win32com.client.DispatchEx("Word.Application")
-    except (ModuleNotFoundError, ImportError):
-        logging.error(
-            "Ensure you have you have win32com installed. "
-            'Use "conda install -c conda-forge pywin32" to install. '
-            f"{traceback.format_exc()}"
-        )
-        return None
-    except BaseException as e:
-        logging.error(
-            "Probably unable to find COM connection to Word application. "
-            f"Is Word installed? {traceback.format_exc()}, {e}"
-        )
-        return None
-    return word
-
-
-def docx_update(docx_file):
-    """
-
-    :param docx_file:
-    :return:
-    """
-    word = open_word_win32()
-    if word is None:
-        return
-
-    doc = word.Documents.Open(docx_file)
-
-    # update all figure / table numbers
-    word.ActiveDocument.Fields.Update()
-
-    # update Table of content / figure / table
-    word.ActiveDocument.TablesOfContents(1).Update()
-    # word.ActiveDocument.TablesOfFigures(1).Update()
-    # word.ActiveDocument.TablesOfFigures(2).Update()
-
-    doc.Close(SaveChanges=True)
-
-    word.Quit()
 
 
 def get_list_of_files(dir_path, file_ext=None, strict=False):
@@ -664,10 +123,35 @@ def basic_equation_compiler(f, print_latex=False, print_formula=False):
 
 
 def variable_sub(md_doc_str, variable_dict):
-    for key, value in variable_dict.items():
-        key_str = f"{{{{__{key}__}}}}"
-        if key_str in md_doc_str:
-            md_doc_str = md_doc_str.replace(key_str, str(value))
+    from .common import Equation, Table
+
+    def sub_table(tbl: Table, flags) -> str:
+        return tbl.to_markdown(False, flags=flags)
+
+    def sub_equation(eq: Equation, flags) -> str:
+        return eq.to_latex(flags=flags)
+
+    def convert_variable(value, flags) -> str:
+        if type(value) is Table:
+            value_str = sub_table(value, flags)
+        elif type(value) is Equation:
+            value_str = sub_equation(value, flags)
+        else:
+            value_str = str(value)
+        return value_str
+
+    key_re = re.compile("{{(.*)}}")
+    for m in key_re.finditer(md_doc_str):
+        res = m.group(1)
+        key = res.split("|")[0] if "|" in res else res
+        list_of_flags = res.split("|")[1:] if "|" in res else None
+        key_clean = key[2:-2]
+        variable = variable_dict.get(key_clean, None)
+        if variable is None:
+            continue
+        value_result_str = convert_variable(variable, list_of_flags)
+        md_doc_str = md_doc_str.replace(m.group(0), value_result_str)
+
     return md_doc_str
 
 
