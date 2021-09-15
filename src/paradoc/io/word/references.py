@@ -1,14 +1,14 @@
+import re
+
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from docx.text.paragraph import Paragraph
+from docx.text.run import Run
+
+from .utils import iter_block_items
 
 
 def resolve_references(document):
-    import re
-
-    from docx.text.paragraph import Paragraph
-
-    from .utils import iter_block_items
-
     refs = dict()
     fig_re = re.compile(
         r"(?:Figure\s(?P<number>[0-9]{0,5})\s*)",
@@ -42,7 +42,7 @@ def resolve_references(document):
                         print(parent)
 
 
-def add_bookmarkStart(paragraph, _id):
+def add_bookmarkStart(paragraph: Paragraph, _id):
     name = "_Ref_id_num_" + _id
     start = OxmlElement("w:bookmarkStart")
     start.set(qn("w:name"), name)
@@ -51,7 +51,7 @@ def add_bookmarkStart(paragraph, _id):
     return name
 
 
-def append_ref_to_paragraph(paragraph, refName, text=""):
+def append_ref_to_paragraph(paragraph: Paragraph, ref_name, text=""):
     # run 1
     run = paragraph.add_run(text)
     r = run._r
@@ -62,7 +62,7 @@ def append_ref_to_paragraph(paragraph, refName, text=""):
     run = paragraph.add_run()
     r = run._r
     instrText = OxmlElement("w:instrText")
-    instrText.text = "REF " + refName + " \\h"
+    instrText.text = "REF " + ref_name + " \\h"
     r.append(instrText)
     # run 3
     run = paragraph.add_run()
@@ -72,17 +72,7 @@ def append_ref_to_paragraph(paragraph, refName, text=""):
     r.append(fldChar)
 
 
-def add_bookmark(paragraph, bookmark_text, bookmark_name):
-    """
-
-    :param paragraph:
-    :param bookmark_text:
-    :param bookmark_name:
-    :return:
-    """
-    from docx.oxml.ns import qn
-    from docx.oxml.shared import OxmlElement
-
+def add_bookmark(paragraph: Paragraph, bookmark_text, bookmark_name):
     run = paragraph.add_run()
     tag = run._r  # for reference the following also works: tag =  document.element.xpath('//w:r')[-1]
     start = OxmlElement("w:bookmarkStart")
@@ -100,18 +90,7 @@ def add_bookmark(paragraph, bookmark_text, bookmark_name):
     tag.append(end)
 
 
-def insert_caption(pg, prefix, run, text, is_appendix: bool):
-    """
-
-    :param pg:
-    :param prefix:
-    :param run:
-    :param text:
-    :param doc_format:
-    :type doc_format: paradoc.Formatting
-    :return:
-    """
-    from docx.text.run import Run
+def insert_caption(pg: Paragraph, prefix, run, text, is_appendix: bool):
 
     heading_ref = "Appendix" if is_appendix is True else '"Heading 1"'
 
@@ -131,16 +110,7 @@ def insert_caption(pg, prefix, run, text, is_appendix: bool):
     run._element.addprevious(fin)
 
 
-def insert_caption_into_runs(pg, prefix, doc_format):
-    """
-
-    :param pg:
-    :param prefix:
-    :param doc_format:
-    :type doc_format: paradoc.Formatting
-    :return:
-    """
-
+def insert_caption_into_runs(pg: Paragraph, prefix: str, is_appendix: bool):
     tmp_split = pg.text.split(":")
     prefix_old = tmp_split[0].strip()
     text = tmp_split[-1].strip()
@@ -149,11 +119,11 @@ def insert_caption_into_runs(pg, prefix, doc_format):
         run = pg.runs[1]
         tmp_str = pg.runs[0].text
         pg.runs[0].text = f"{prefix} "
-        insert_caption(pg, prefix, run, tmp_str.split(":")[-1].strip(), doc_format)
+        insert_caption(pg, prefix, run, tmp_str.split(":")[-1].strip(), is_appendix)
     else:
         srun.text = f"{prefix} "
         run = pg.add_run()
-        insert_caption(pg, prefix, run, text, doc_format)
+        insert_caption(pg, prefix, run, text, is_appendix)
 
     return srun, pg, prefix_old
 

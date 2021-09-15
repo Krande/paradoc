@@ -1,8 +1,9 @@
 import logging
 import os
 import pathlib
-import pypandoc
 import re
+
+import pypandoc
 
 
 def func_to_eq(func):
@@ -122,19 +123,35 @@ def basic_equation_compiler(f, print_latex=False, print_formula=False):
 
 
 def variable_sub(md_doc_str, variable_dict):
-    from .concepts import Table
+    from .common import Equation, Table
 
-    def sub_table(tbl: Table) -> str:
-        return tbl.to_markdown(True)
+    def sub_table(tbl: Table, flags) -> str:
+        return tbl.to_markdown(False, flags=flags)
 
-    for key, value in variable_dict.items():
-        key_str = f"{{{{__{key}__}}}}"
-        if key_str in md_doc_str:
-            if type(value) is Table:
-                value_str = sub_table(value)
-            else:
-                value_str = str(value)
-            md_doc_str = md_doc_str.replace(key_str, value_str)
+    def sub_equation(eq: Equation, flags) -> str:
+        return eq.to_latex(flags=flags)
+
+    def convert_variable(value, flags) -> str:
+        if type(value) is Table:
+            value_str = sub_table(value, flags)
+        elif type(value) is Equation:
+            value_str = sub_equation(value, flags)
+        else:
+            value_str = str(value)
+        return value_str
+
+    key_re = re.compile("{{(.*)}}")
+    for m in key_re.finditer(md_doc_str):
+        res = m.group(1)
+        key = res.split("|")[0] if "|" in res else res
+        list_of_flags = res.split("|")[1:] if "|" in res else None
+        key_clean = key[2:-2]
+        variable = variable_dict.get(key_clean, None)
+        if variable is None:
+            continue
+        value_result_str = convert_variable(variable, list_of_flags)
+        md_doc_str = md_doc_str.replace(m.group(0), value_result_str)
+
     return md_doc_str
 
 

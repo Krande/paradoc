@@ -4,7 +4,7 @@ from common import files_dir, test_dir
 from ex_funcs import my_calc_example_1, my_calc_example_2
 
 from paradoc import OneDoc
-from paradoc.utils import basic_equation_compiler, make_df
+from paradoc.utils import make_df
 
 
 class MathDocTests(unittest.TestCase):
@@ -17,10 +17,11 @@ class MathDocTests(unittest.TestCase):
 
         one = OneDoc(report_dir, work_dir=test_dir / "doc_math")
 
-        one.equations["my_equation"] = basic_equation_compiler(my_calc_example_1)
-        one.equations["my_equation_2"] = basic_equation_compiler(my_calc_example_2)
-        one.add_table("results", df1)
-        one.add_table("results_2", df2)
+        one.add_equation("my_equation", my_calc_example_1)
+        one.add_equation("my_equation_2", my_calc_example_2)
+
+        one.add_table("results", df1, "Results from Equation my_equation")
+        one.add_table("results_2", df2, "Results from Equation my_equation_2")
 
         one.compile("MathDoc")
 

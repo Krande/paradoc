@@ -10,6 +10,8 @@ The results from equation @eq:my_equation_1 is presented in table @tbl:results b
 {{__results__}}
 
 
+some text after the table
+
 ## Equation 2
 
 The results from equation @eq:my_equation_2 is presented in table @tbl:results_2 below.

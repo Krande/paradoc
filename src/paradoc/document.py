@@ -1,17 +1,16 @@
 from __future__ import annotations
+
 import logging
 import os
-import pandas as pd
 import pathlib
 import shutil
-
-import pypandoc
 from typing import Dict
-from .concepts import Table
-from .formatting import TableFormat
-from .utils import get_list_of_files
 
-from .common import ExportFormats, MarkDownFile
+import pandas as pd
+import pypandoc
+
+from .common import Equation, ExportFormats, MarkDownFile, Table, TableFormat
+from .utils import get_list_of_files, variable_sub
 
 
 class OneDoc:
@@ -37,6 +36,12 @@ class OneDoc:
         "Heading 3": "Appendix X.2",
         "Heading 4": "Appendix X.3",
     }
+    default_paragraph_map = {
+        "Normal": "Normal Indent",
+        "First Paragraph": "Normal Indent",
+        "Body Text": "Normal Indent",
+        "Compact": "Normal Indent",
+    }
 
     def __init__(
         self,
@@ -55,24 +60,12 @@ class OneDoc:
         self.export_format = export_format
         self.variables = dict()
         self.tables: Dict[str, Table] = dict()
-        self.equations = dict()
+        self.equations: Dict[str, Equation] = dict()
 
         # Style info: https://python-docx.readthedocs.io/en/latest/user/styles-using.html
         self.table_format = TableFormat()
-        self.paragraph_style_map = kwargs.get(
-            "paragraph_style_map",
-            {
-                "Normal": "Normal Indent",
-                "First Paragraph": "Normal Indent",
-                "Body Text": "Normal Indent",
-                "Compact": "Normal Indent",
-            },
-        )
-
-        self.appendix_heading_map = kwargs.get(
-            "appendix_heading_map",
-            OneDoc.default_app_map,
-        )
+        self.paragraph_style_map = kwargs.get("paragraph_style_map", OneDoc.default_paragraph_map)
+        self.appendix_heading_map = kwargs.get("appendix_heading_map", OneDoc.default_app_map)
 
         self.md_files_main = []
         self.md_files_app = []
@@ -102,8 +95,6 @@ class OneDoc:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
     def compile(self, output_name, auto_open=False, metadata_file=None):
-        from .utils import variable_sub
-
         dest_file = (self.dist_dir / output_name).with_suffix(f".{self.export_format}").resolve().absolute()
 
         logging.debug(f'Compiling report to "{dest_file}"')
@@ -155,8 +146,13 @@ class OneDoc:
         if auto_open is True:
             os.startfile(dest_file)
 
-    def add_table(self, name, df: pd.DataFrame, caption: str, tbl_format: TableFormat = None):
+    def add_table(self, name, df: pd.DataFrame, caption: str, tbl_format: TableFormat = TableFormat()):
+        if '"' in caption:
+            raise ValueError('Using characters such as " currently breaks the caption search in the docs compiler')
         self.tables[name] = Table(name, df, caption, tbl_format)
+
+    def add_equation(self, name, eq, custom_eq_str_compiler=None):
+        self.equations[name] = Equation(name, eq, custom_eq_str_compiler=custom_eq_str_compiler)
 
     @property
     def main_dir(self):

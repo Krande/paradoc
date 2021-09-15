@@ -1,9 +1,11 @@
-import traceback
 import logging
-from paradoc.utils import get_list_of_files
-import pathlib
 import os
+import pathlib
+import traceback
+
 import pypandoc
+
+from paradoc.utils import get_list_of_files
 
 
 def delete_paragraph(paragraph):

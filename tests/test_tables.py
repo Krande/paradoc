@@ -1,9 +1,10 @@
 import unittest
-from paradoc import OneDoc
-from paradoc.formatting import TableFormat
-import pandas as pd
 
+import pandas as pd
 from common import files_dir, test_dir
+
+from paradoc import OneDoc
+from paradoc.common import TableFormat
 
 
 class TableTests(unittest.TestCase):
