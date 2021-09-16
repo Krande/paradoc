@@ -5,12 +5,19 @@ import re
 from typing import List, Union
 
 import numpy as np
+import pypandoc
 from docx import Document
 from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph
 from docxcompose.composer import Composer
 
-from paradoc.common import MY_DOCX_TMPL, MY_DOCX_TMPL_BLANK, MarkDownFile, Table
+from paradoc.common import (
+    MY_DOCX_TMPL,
+    MY_DOCX_TMPL_BLANK,
+    ExportFormats,
+    MarkDownFile,
+    Table,
+)
 from paradoc.document import OneDoc
 
 from .common import DocXTableRef
@@ -26,14 +33,36 @@ class WordExporter:
     def __init__(self, one_doc: OneDoc):
         self.one_doc = one_doc
 
-    def convert_to_docx(self, output_name, dest_file):
+    def _compile_individual_md_files_to_docx(self):
+        one = self.one_doc
+        for mdf in one.md_files_main + one.md_files_app:
+            md_file = mdf.path
+            pypandoc.convert_file(
+                str(mdf.build_file),
+                ExportFormats.DOCX,
+                outputfile=str(mdf.new_file),
+                format="markdown",
+                extra_args=[
+                    "-M2GB",
+                    "+RTS",
+                    "-K64m",
+                    "-RTS",
+                    f"--resource-path={md_file.parent}",
+                    f"--metadata-file={one.metadata_file}"
+                    # f"--reference-doc={MY_DOCX_TMPL}",
+                ],
+                filters=["pandoc-crossref"],
+                encoding="utf8",
+            )
+
+    def export(self, output_name, dest_file):
         one_doc = self.one_doc
+        self._compile_individual_md_files_to_docx()
 
         composer_main = add_to_composer(MY_DOCX_TMPL, one_doc.md_files_main)
         composer_app = add_to_composer(MY_DOCX_TMPL_BLANK, one_doc.md_files_app)
 
         for tbl in self.identify_tables(composer_main.doc):
-
             tbl.format_table(is_appendix=False)
 
         for tbl in self.identify_tables(composer_app.doc):
@@ -73,8 +102,6 @@ class WordExporter:
                 continue
 
             if block.style.name == "Table Caption":
-                if "using solid elements" in block.text:
-                    print("sd")
                 current_table.docx_caption = block
 
             if type(block) == Paragraph and prev_table is True:
@@ -92,7 +119,7 @@ class WordExporter:
 
         return tables
 
-    def get_related_table(self, current_table: DocXTableRef, frac=1e-4) -> Union[Table, None]:
+    def get_related_table(self, current_table: DocXTableRef, frac=1e-2) -> Union[Table, None]:
         one = self.one_doc
 
         # Search using Caption string
@@ -113,7 +140,6 @@ class WordExporter:
         # If no match using caption string, then use contents of table
         content = get_first_row_from_table(current_table.docx_table)
         is_content_numeric = False
-
         try:
             content_numeric = np.array(content, dtype=float)
             is_content_numeric = True

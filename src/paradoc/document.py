@@ -7,7 +7,6 @@ import shutil
 from typing import Dict
 
 import pandas as pd
-import pypandoc
 
 from .common import (
     DocXFormat,
@@ -49,11 +48,11 @@ class OneDoc:
         "Body Text": "Normal Indent",
         "Compact": "Normal Indent",
     }
+    FORMATS = ExportFormats
 
     def __init__(
         self,
         source_dir=None,
-        export_format=ExportFormats.DOCX,
         main_prefix="00-main",
         app_prefix="01-app",
         clean_build_dir=True,
@@ -64,7 +63,6 @@ class OneDoc:
         self.work_dir = kwargs.get("work_dir", pathlib.Path("").resolve().absolute())
         self._main_prefix = main_prefix
         self._app_prefix = app_prefix
-        self.export_format = export_format
         self.variables = dict()
         self.tables: Dict[str, Table] = dict()
         self.equations: Dict[str, Equation] = dict()
@@ -76,6 +74,7 @@ class OneDoc:
 
         self.md_files_main = []
         self.md_files_app = []
+        self.metadata_file = None
 
         for md_file in get_list_of_files(self.source_dir, ".md"):
             is_appendix = True if app_prefix in md_file else False
@@ -101,12 +100,14 @@ class OneDoc:
         if clean_build_dir is True:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
-    def compile(self, output_name, auto_open=False, metadata_file=None):
-        dest_file = (self.dist_dir / output_name).with_suffix(f".{self.export_format}").resolve().absolute()
+    def compile(self, output_name, auto_open=False, metadata_file=None, export_format=ExportFormats.DOCX):
+        dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format}").resolve().absolute()
 
         logging.debug(f'Compiling report to "{dest_file}"')
         os.makedirs(self.build_dir, exist_ok=True)
         os.makedirs(self.dist_dir, exist_ok=True)
+
+        self.metadata_file = self.source_dir / "metadata.yaml" if metadata_file is None else pathlib.Path(metadata_file)
 
         for mdf in self.md_files_main + self.md_files_app:
             md_file = mdf.path
@@ -122,44 +123,33 @@ class OneDoc:
             with open(mdf.build_file, "w") as f:
                 f.write(tmp_md_doc)
 
-            metadata_file = self.source_dir / "metadata.yaml" if metadata_file is None else metadata_file
-            if metadata_file.exists() is False:
-                with open(metadata_file, "w") as f:
+            if self.metadata_file.exists() is False:
+                with open(self.metadata_file, "w") as f:
                     f.write('linkReferences: true\nnameInLink: true\nfigPrefix: "Figure"\ntblPrefix: "Table"')
 
-            pypandoc.convert_file(
-                str(mdf.build_file),
-                self.export_format,
-                outputfile=str(mdf.new_file),
-                format="markdown",
-                extra_args=[
-                    "-M2GB",
-                    "+RTS",
-                    "-K64m",
-                    "-RTS",
-                    f"--resource-path={md_file.parent}",
-                    f"--metadata-file={metadata_file}"
-                    # f"--reference-doc={MY_DOCX_TMPL}",
-                ],
-                filters=["pandoc-crossref"],
-                encoding="utf8",
-            )
-        if self.export_format == ExportFormats.DOCX:
+        if export_format == ExportFormats.DOCX:
             from paradoc.io.word.exporter import WordExporter
 
             wordx = WordExporter(self)
-            wordx.convert_to_docx(output_name, dest_file)
+            wordx.export(output_name, dest_file)
+        elif export_format == ExportFormats.PDF:
+            from paradoc.io.pdf.exporter import PdfExporter
+
+            pdf = PdfExporter(self)
+            pdf.export(dest_file)
+        else:
+            raise NotImplementedError(f'Export format "{export_format}" is not yet supported')
 
         if auto_open is True:
             os.startfile(dest_file)
 
-    def add_table(self, name, df: pd.DataFrame, caption: str, tbl_format: TableFormat = TableFormat()):
+    def add_table(self, name, df: pd.DataFrame, caption: str, tbl_format: TableFormat = TableFormat(), **kwargs):
         if '"' in caption:
             raise ValueError('Using characters such as " currently breaks the caption search in the docs compiler')
-        self.tables[name] = Table(name, df, caption, tbl_format)
+        self.tables[name] = Table(name, df, caption, tbl_format, **kwargs)
 
-    def add_equation(self, name, eq, custom_eq_str_compiler=None):
-        self.equations[name] = Equation(name, eq, custom_eq_str_compiler=custom_eq_str_compiler)
+    def add_equation(self, name, eq, custom_eq_str_compiler=None, **kwargs):
+        self.equations[name] = Equation(name, eq, custom_eq_str_compiler=custom_eq_str_compiler, **kwargs)
 
     @property
     def main_dir(self):

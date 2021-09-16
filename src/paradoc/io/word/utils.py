@@ -4,6 +4,11 @@ import pathlib
 import traceback
 
 import pypandoc
+from docx.document import Document
+from docx.oxml.table import CT_Tbl
+from docx.oxml.text.paragraph import CT_P
+from docx.table import Table, _Cell
+from docx.text.paragraph import Paragraph
 
 from paradoc.utils import get_list_of_files
 
@@ -41,11 +46,6 @@ def open_word_win32():
 
 
 def docx_update(docx_file):
-    """
-
-    :param docx_file:
-    :return:
-    """
     word = open_word_win32()
     if word is None:
         return
@@ -65,14 +65,7 @@ def docx_update(docx_file):
     word.Quit()
 
 
-def close_word_docs_by_name(names):
-    """
-
-    :param names: List of word document basenames (basenames e.g. "something.docx").
-    :type names: list
-    :return:
-    """
-
+def close_word_docs_by_name(names: list) -> None:
     word = open_word_win32()
     if word is None:
         return
@@ -96,12 +89,6 @@ def iter_block_items(parent):
     would most commonly be a reference to a main Document object, but
     also works for a _Cell object, which itself can contain paragraphs and tables.
     """
-    from docx.document import Document
-    from docx.oxml.table import CT_Tbl
-    from docx.oxml.text.paragraph import CT_P
-    from docx.table import Table, _Cell
-    from docx.text.paragraph import Paragraph
-
     if isinstance(parent, Document):
         parent_elm = parent.element.body
     elif isinstance(parent, _Cell):
@@ -115,7 +102,7 @@ def iter_block_items(parent):
         elif isinstance(child, CT_Tbl):
             yield Table(child, parent)
         else:
-            logging.error(f"Unrecognized child element type {type(child)}")
+            logging.debug(f"Unrecognized child element type {type(child)}")
 
 
 def convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_doc=None):

@@ -8,7 +8,7 @@ from paradoc.utils import make_df
 
 
 class MathDocTests(unittest.TestCase):
-    def test_math_doc(self):
+    def setUp(self) -> None:
         report_dir = files_dir / "doc_math"
 
         inputs = [(0, 0), (1, 1), (2, 1), (2, 2)]
@@ -17,13 +17,17 @@ class MathDocTests(unittest.TestCase):
 
         one = OneDoc(report_dir, work_dir=test_dir / "doc_math")
 
-        one.add_equation("my_equation", my_calc_example_1)
+        one.add_equation("my_equation_1", my_calc_example_1, include_python_code=True)
         one.add_equation("my_equation_2", my_calc_example_2)
-
         one.add_table("results", df1, "Results from Equation my_equation")
         one.add_table("results_2", df2, "Results from Equation my_equation_2")
+        self.one = one
 
-        one.compile("MathDoc")
+    def test_math_docx(self):
+        self.one.compile("MathDoc", export_format=OneDoc.FORMATS.DOCX)
+
+    def test_math_pdf(self):
+        self.one.compile("MathDoc", export_format=OneDoc.FORMATS.PDF)
 
 
 if __name__ == "__main__":
