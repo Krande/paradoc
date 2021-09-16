@@ -55,19 +55,6 @@ jobs:
           activate-environment: anaconda-client-env
           python-version: ${{ matrix.pyver.distver }}
           environment-file: conda/environment.yml
-      - name: Install latex on Windows
-        shell: bash -l {0}
-        if: ${{ matrix.platform.name }} == 'Windows'
-        run: |
-          conda install -c krande -c conda-forge miktex
-      - name: Install latex on Linux
-        if: ${{ matrix.platform.name }} == 'Linux'
-        run: |
-          apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-              texlive-latex-extra \
-              texlive-lang-polish \
-              make \
-           && rm -rf /var/lib/apt/lists/*
       - name: build, test and upload conda package
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:

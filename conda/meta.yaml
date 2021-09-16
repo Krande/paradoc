@@ -29,6 +29,7 @@ requirements:
     - svgwrite
     - pytexit
     - miktex   # [win]
+    - texlive-core # [linux,osx]
 test:
   source_files:
     - tests
