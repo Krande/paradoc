@@ -56,12 +56,12 @@ jobs:
           python-version: ${{ matrix.pyver.distver }}
           environment-file: conda/environment.yml
       - name: Install latex on Windows
-        if: ${{ matrix.platform.name }} == Windows
         shell: bash -l {0}
+        if: ${{ matrix.platform.name }} == 'Windows'
         run: |
           conda install -c krande -c conda-forge miktex
       - name: Install latex on Linux
-        if: ${{ matrix.platform.name }} == Linux
+        if: ${{ matrix.platform.name }} == 'Linux'
         run: |
           apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
               texlive-latex-extra \
