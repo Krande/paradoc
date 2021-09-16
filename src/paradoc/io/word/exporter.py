@@ -33,7 +33,7 @@ class WordExporter:
     def __init__(self, one_doc: OneDoc):
         self.one_doc = one_doc
 
-    def _compile_individual_md_files_to_docx(self):
+    def _compile_individual_md_files_to_docx(self, output_name, dest_file):
         one = self.one_doc
         for mdf in one.md_files_main + one.md_files_app:
             md_file = mdf.path
@@ -55,30 +55,22 @@ class WordExporter:
                 encoding="utf8",
             )
 
-    def export(self, output_name, dest_file):
-        one_doc = self.one_doc
-        self._compile_individual_md_files_to_docx()
+        composer_main = add_to_composer(MY_DOCX_TMPL, one.md_files_main)
+        composer_app = add_to_composer(MY_DOCX_TMPL_BLANK, one.md_files_app)
 
-        composer_main = add_to_composer(MY_DOCX_TMPL, one_doc.md_files_main)
-        composer_app = add_to_composer(MY_DOCX_TMPL_BLANK, one_doc.md_files_app)
-
-        for tbl in self.identify_tables(composer_main.doc):
-            tbl.format_table(is_appendix=False)
-
-        for tbl in self.identify_tables(composer_app.doc):
-            tbl.format_table(is_appendix=True)
+        self.format_tables(composer_main, composer_app)
 
         format_image_captions(composer_main.doc, False)
         format_image_captions(composer_app.doc, True)
 
-        format_paragraphs_and_headings(composer_app.doc, one_doc.appendix_heading_map)
+        format_paragraphs_and_headings(composer_app.doc, one.appendix_heading_map)
 
         # Merge docs
         composer_main.doc.add_page_break()
         composer_main.append(composer_app.doc)
 
         # Format all paragraphs
-        format_paragraphs_and_headings(composer_main.doc, one_doc.paragraph_style_map)
+        format_paragraphs_and_headings(composer_main.doc, one.paragraph_style_map)
 
         # Apply last minute fixes
         fix_headers_after_compose(composer_main.doc)
@@ -90,6 +82,45 @@ class WordExporter:
         composer_main.save(dest_file)
 
         docx_update(str(dest_file))
+
+    def compile_docx_from_str(self, dest_file):
+        one = self.one_doc
+        md_main_str = "".join([md.read_built_file() for md in one.md_files_main])
+
+        app_str = """\n\n\\appendix\n\n"""
+
+        md_app_str = "".join([md.read_built_file() for md in one.md_files_app])
+        combined_str = md_main_str + app_str + md_app_str
+        pypandoc.convert_text(
+            combined_str,
+            one.FORMATS.DOCX,
+            outputfile=str(dest_file),
+            format="markdown",
+            extra_args=[
+                "-M2GB",
+                "+RTS",
+                "-K64m",
+                "-RTS",
+                f"--metadata-file={one.metadata_file}"
+                # f"--reference-doc={MY_DOCX_TMPL}",
+            ],
+            filters=["pandoc-crossref"],
+            encoding="utf8",
+        )
+
+    def export(self, output_name, dest_file):
+        self._compile_individual_md_files_to_docx(output_name, dest_file)
+        # self.compile_docx_from_str(dest_file)
+
+    def alt_format_tables(self):
+        pass
+
+    def format_tables(self, composer_main, composer_app):
+        for tbl in self.identify_tables(composer_main.doc):
+            tbl.format_table(is_appendix=False)
+
+        for tbl in self.identify_tables(composer_app.doc):
+            tbl.format_table(is_appendix=True)
 
     def identify_tables(self, doc: Document):
         prev_table = False
