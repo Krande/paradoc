@@ -56,7 +56,7 @@ jobs:
           python-version: ${{ matrix.pyver.distver }}
           environment-file: conda/environment.yml
       - name: Install latex on Windows
-        if: ${{ matrix.platform.name }} == Linux
+        if: ${{ matrix.platform.name }} == Windows
         shell: bash -l {0}
         run: |
           conda install -c krande -c conda-forge miktex
@@ -75,7 +75,6 @@ jobs:
         shell: bash -l {0}
         run: |
           conda-build -c krande -c conda-forge conda --python=${{ matrix.pyver.distver }} --token=$ANACONDA_TOKEN --user krande --override-channels
-
       - name: build and test conda package
         if: github.event_name == 'push' && github.ref != 'refs/heads/main'
         shell: bash -l {0}
