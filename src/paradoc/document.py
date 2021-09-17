@@ -16,7 +16,8 @@ from .common import (
     Table,
     TableFormat,
 )
-from .utils import get_list_of_files, variable_sub
+from .exceptions import LatexNotInstalled
+from .utils import get_list_of_files
 
 
 class OneDoc:
@@ -71,7 +72,6 @@ class OneDoc:
         # Style info: https://python-docx.readthedocs.io/en/latest/user/styles-using.html
         self.paragraph_style_map = kwargs.get("paragraph_style_map", OneDoc.default_paragraph_map)
         self.appendix_heading_map = kwargs.get("appendix_heading_map", OneDoc.default_app_map)
-
         self.md_files_main = []
         self.md_files_app = []
         self.metadata_file = None
@@ -100,7 +100,7 @@ class OneDoc:
         if clean_build_dir is True:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
-    def compile(self, output_name, auto_open=False, metadata_file=None, export_format=ExportFormats.DOCX):
+    def compile(self, output_name, auto_open=False, metadata_file=None, export_format=ExportFormats.DOCX, **kwargs):
         dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format}").resolve().absolute()
 
         logging.debug(f'Compiling report to "{dest_file}"')
@@ -109,32 +109,34 @@ class OneDoc:
 
         self.metadata_file = self.source_dir / "metadata.yaml" if metadata_file is None else pathlib.Path(metadata_file)
 
-        for mdf in self.md_files_main + self.md_files_app:
-            md_file = mdf.path
-            os.makedirs(mdf.new_file.parent, exist_ok=True)
-
-            # Substitute parameters/tables in the creation of the document
-            with open(md_file, "r") as f:
-                tmp_md_doc = f.read()
-                tmp_md_doc = variable_sub(tmp_md_doc, self.tables)
-                tmp_md_doc = variable_sub(tmp_md_doc, self.variables)
-                tmp_md_doc = variable_sub(tmp_md_doc, self.equations)
-
-            with open(mdf.build_file, "w") as f:
-                f.write(tmp_md_doc)
-
-            if self.metadata_file.exists() is False:
-                with open(self.metadata_file, "w") as f:
-                    f.write('linkReferences: true\nnameInLink: true\nfigPrefix: "Figure"\ntblPrefix: "Table"')
+        if self.metadata_file.exists() is False:
+            with open(self.metadata_file, "w") as f:
+                f.write('linkReferences: true\nnameInLink: true\nfigPrefix: "Figure"\ntblPrefix: "Table"')
 
         if export_format == ExportFormats.DOCX:
             from paradoc.io.word.exporter import WordExporter
 
-            wordx = WordExporter(self)
+            use_custom_compile = kwargs.get("use_custom_docx_compile", True)
+            if use_custom_compile is False:
+                use_table_name_in_cell_as_index = False
+            else:
+                use_table_name_in_cell_as_index = True
+
+            self._perform_variable_substitution(use_table_name_in_cell_as_index)
+
+            wordx = WordExporter(self, **kwargs)
             wordx.export(output_name, dest_file)
         elif export_format == ExportFormats.PDF:
             from paradoc.io.pdf.exporter import PdfExporter
 
+            latex_path = shutil.which("latex")
+            if latex_path is None:
+                latex_url = "https://www.latex-project.org/get/"
+                raise LatexNotInstalled(
+                    "Latex was not installed on your system. "
+                    f'Please install latex before exporting to pdf. See "{latex_url}" for installation packages'
+                )
+            self._perform_variable_substitution(False)
             pdf = PdfExporter(self)
             pdf.export(dest_file)
         else:
@@ -146,10 +148,58 @@ class OneDoc:
     def add_table(self, name, df: pd.DataFrame, caption: str, tbl_format: TableFormat = TableFormat(), **kwargs):
         if '"' in caption:
             raise ValueError('Using characters such as " currently breaks the caption search in the docs compiler')
+        self._uniqueness_check(name)
         self.tables[name] = Table(name, df, caption, tbl_format, **kwargs)
 
     def add_equation(self, name, eq, custom_eq_str_compiler=None, **kwargs):
+        self._uniqueness_check(name)
         self.equations[name] = Equation(name, eq, custom_eq_str_compiler=custom_eq_str_compiler, **kwargs)
+
+    def _perform_variable_substitution(self, use_table_var_substitution):
+        logging.info("Performing variable substitution")
+        for mdf in self.md_files_main + self.md_files_app:
+            md_file = mdf.path
+            os.makedirs(mdf.new_file.parent, exist_ok=True)
+            md_str = mdf.read_original_file()
+            for m in mdf.get_variables():
+                res = m.group(1)
+                key = res.split("|")[0] if "|" in res else res
+                list_of_flags = res.split("|")[1:] if "|" in res else None
+                key_clean = key[2:-2]
+
+                tbl = self.tables.get(key_clean, None)
+                eq = self.equations.get(key_clean, None)
+                variables = self.variables.get(key_clean, None)
+
+                if tbl is not None:
+                    tbl.md_instances.append(mdf)
+                    new_str = tbl.to_markdown(use_table_var_substitution, list_of_flags)
+                elif eq is not None:
+                    eq.md_instances.append(mdf)
+                    new_str = eq.to_latex()
+                elif variables is not None:
+                    new_str = str(variables)
+                else:
+                    logging.error(f'key "{key_clean}" located in {md_file} has not been substituted')
+                    new_str = m.group(0)
+
+                md_str = md_str.replace(m.group(0), new_str)
+
+            with open(mdf.build_file, "w") as f:
+                f.write(md_str)
+
+    def _uniqueness_check(self, name):
+        error_msg = 'Table name "{name}" must be unique. This name is already used by {cont_type}="{container}"'
+
+        tbl = self.tables.get(name, None)
+        if tbl is not None:
+            raise ValueError(error_msg.format(name=name, cont_type="Table", container=tbl))
+        eq = self.equations.get(name, None)
+        if eq is not None:
+            raise ValueError(error_msg.format(name=name, cont_type="Equation", container=eq))
+        v = self.variables.get(name, None)
+        if v is not None:
+            raise ValueError(error_msg.format(name=name, cont_type="Variable", container=v))
 
     @property
     def main_dir(self):

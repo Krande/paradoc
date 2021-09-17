@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import pathlib
-from dataclasses import dataclass
-from typing import Callable, Union
+import re
+from dataclasses import dataclass, field
+from typing import Callable, List, Union
 
 import pandas as pd
 
@@ -29,6 +30,12 @@ class Table:
     caption: str
     format: TableFormat = TableFormat()
     add_link: bool = True
+    md_instances: List[MarkDownFile] = field(default_factory=list)
+    docx_instances: List[object] = field(default_factory=list)
+
+    # def get_cell0(self):
+    #     col_name = self.df.columns[0]
+    #     df.iloc[0, df.columns.get_loc(col_name)]
 
     def to_markdown(self, include_name_in_cell=False, flags=None):
         df = self.df.copy()
@@ -55,6 +62,8 @@ class Equation:
     custom_eq_str_compiler: Callable = None
     add_link: bool = True
     include_python_code: bool = False
+    md_instances: List[MarkDownFile] = field(default_factory=list)
+    docx_instances: List[object] = field(default_factory=list)
 
     def to_latex(self, print_latex=False, print_formula=False, flags=None):
         if self.custom_eq_str_compiler is not None:
@@ -98,9 +107,19 @@ class MarkDownFile:
     new_file: pathlib.Path
     build_file: pathlib.Path
 
+    def read_original_file(self):
+        with open(self.path, "r") as f:
+            return f.read()
+
     def read_built_file(self):
+        """Read the Markdown file after performed variable substitution"""
         with open(self.build_file, "r") as f:
             return f.read()
+
+    def get_variables(self):
+        md_doc_str = self.read_original_file()
+        key_re = re.compile("{{(.*)}}")
+        return key_re.finditer(md_doc_str)
 
 
 class ExportFormats:

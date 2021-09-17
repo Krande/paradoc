@@ -1,0 +1,2 @@
+class LatexNotInstalled(Exception):
+    pass
