@@ -5,6 +5,8 @@ import re
 
 import pypandoc
 
+from .common import Equation, MarkDownFile, Table
+
 
 def func_to_eq(func):
     """
@@ -122,23 +124,7 @@ def basic_equation_compiler(f, print_latex=False, print_formula=False):
     return eq_latex
 
 
-def variable_sub(md_doc_str, variable_dict):
-    from .common import Equation, Table
-
-    def sub_table(tbl: Table, flags) -> str:
-        return tbl.to_markdown(False, flags=flags)
-
-    def sub_equation(eq: Equation, flags) -> str:
-        return eq.to_latex(flags=flags)
-
-    def convert_variable(value, flags) -> str:
-        if type(value) is Table:
-            value_str = sub_table(value, flags)
-        elif type(value) is Equation:
-            value_str = sub_equation(value, flags)
-        else:
-            value_str = str(value)
-        return value_str
+def variable_sub(md_doc_str, variable_dict, md_file: MarkDownFile):
 
     key_re = re.compile("{{(.*)}}")
     for m in key_re.finditer(md_doc_str):
@@ -165,3 +151,21 @@ def make_df(inputs, header, func):
     df.columns = df.iloc[0]
     df = df.drop(df.index[0])
     return df
+
+
+def sub_table(tbl: Table, flags) -> str:
+    return tbl.to_markdown(False, flags=flags)
+
+
+def sub_equation(eq: Equation, flags) -> str:
+    return eq.to_latex(flags=flags)
+
+
+def convert_variable(value, flags) -> str:
+    if type(value) is Table:
+        value_str = sub_table(value, flags)
+    elif type(value) is Equation:
+        value_str = sub_equation(value, flags)
+    else:
+        value_str = str(value)
+    return value_str

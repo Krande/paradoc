@@ -1,16 +1,10 @@
 from __future__ import annotations
 
-import logging
-import re
-from typing import List, Union
-
-import numpy as np
+import pypandoc
 from docx import Document
 from docx.table import Table as DocxTable
-from docx.text.paragraph import Paragraph
-from docxcompose.composer import Composer
 
-from paradoc.common import MY_DOCX_TMPL, MY_DOCX_TMPL_BLANK, MarkDownFile, Table
+from paradoc.common import MY_DOCX_TMPL, MY_DOCX_TMPL_BLANK, ExportFormats
 from paradoc.document import OneDoc
 
 from .common import DocXTableRef
@@ -19,37 +13,66 @@ from .formatting import (
     format_image_captions,
     format_paragraphs_and_headings,
 )
-from .utils import close_word_docs_by_name, docx_update, iter_block_items
+from .utils import (
+    add_to_composer,
+    close_word_docs_by_name,
+    docx_update,
+    get_from_doc_by_index,
+    iter_block_items,
+)
 
 
 class WordExporter:
-    def __init__(self, one_doc: OneDoc):
+    def __init__(self, one_doc: OneDoc, **kwargs):
         self.one_doc = one_doc
+        self.use_custom_docx_compile = kwargs.get("use_custom_docx_compile", True)
 
-    def convert_to_docx(self, output_name, dest_file):
-        one_doc = self.one_doc
+    def export(self, output_name, dest_file):
+        if self.use_custom_docx_compile:
+            self._compile_individual_md_files_to_docx(output_name, dest_file)
+        else:
+            self._compile_docx_from_str(dest_file)
 
-        composer_main = add_to_composer(MY_DOCX_TMPL, one_doc.md_files_main)
-        composer_app = add_to_composer(MY_DOCX_TMPL_BLANK, one_doc.md_files_app)
+    def _compile_individual_md_files_to_docx(self, output_name, dest_file):
+        one = self.one_doc
+        for mdf in one.md_files_main + one.md_files_app:
+            md_file = mdf.path
+            pypandoc.convert_file(
+                str(mdf.build_file),
+                ExportFormats.DOCX,
+                outputfile=str(mdf.new_file),
+                format="markdown",
+                extra_args=[
+                    "-M2GB",
+                    "+RTS",
+                    "-K64m",
+                    "-RTS",
+                    f"--resource-path={md_file.parent}",
+                    f"--metadata-file={one.metadata_file}"
+                    # f"--reference-doc={MY_DOCX_TMPL}",
+                ],
+                filters=["pandoc-crossref"],
+                encoding="utf8",
+            )
 
-        for tbl in self.identify_tables(composer_main.doc):
+        composer_main = add_to_composer(MY_DOCX_TMPL, one.md_files_main)
+        composer_app = add_to_composer(MY_DOCX_TMPL_BLANK, one.md_files_app)
 
-            tbl.format_table(is_appendix=False)
-
-        for tbl in self.identify_tables(composer_app.doc):
-            tbl.format_table(is_appendix=True)
+        # self.format_tables(composer_main, composer_app)
+        self.format_tables(composer_main.doc, False)
+        self.format_tables(composer_app.doc, True)
 
         format_image_captions(composer_main.doc, False)
         format_image_captions(composer_app.doc, True)
 
-        format_paragraphs_and_headings(composer_app.doc, one_doc.appendix_heading_map)
+        format_paragraphs_and_headings(composer_app.doc, one.appendix_heading_map)
 
         # Merge docs
         composer_main.doc.add_page_break()
         composer_main.append(composer_app.doc)
 
         # Format all paragraphs
-        format_paragraphs_and_headings(composer_main.doc, one_doc.paragraph_style_map)
+        format_paragraphs_and_headings(composer_main.doc, one.paragraph_style_map)
 
         # Apply last minute fixes
         fix_headers_after_compose(composer_main.doc)
@@ -62,94 +85,57 @@ class WordExporter:
 
         docx_update(str(dest_file))
 
-    def identify_tables(self, doc: Document):
-        prev_table = False
+    def format_tables(self, composer_doc: Document, is_appendix):
+        for i, docx_tbl in enumerate(self.get_all_tables(composer_doc)):
+            cell0 = docx_tbl.get_content_cell0_pg()
+            tbl_name = cell0.text
+            tbl = self.one_doc.tables.get(tbl_name, None)
+            if tbl is None:
+                raise ValueError("Unable to retrieve originally parsed table")
+
+            docx_tbl.table_ref = tbl
+            docx_tbl.substitute_back_temp_var()
+            if is_appendix and i == 0:
+                restart_caption_num = True
+            else:
+                restart_caption_num = False
+            docx_tbl.format_table(is_appendix, should_restart_caption_numbering=restart_caption_num)
+
+    def get_all_tables(self, doc: Document):
         tables = []
-        current_table = DocXTableRef()
-        for block in iter_block_items(doc):
-            if type(block) == DocxTable:
-                current_table.docx_table = block
-                prev_table = True
-                continue
 
-            if block.style.name == "Table Caption":
-                if "using solid elements" in block.text:
-                    print("sd")
-                current_table.docx_caption = block
-
-            if type(block) == Paragraph and prev_table is True:
-                prev_table = False
-                current_table.docx_following_pg = block
-
-            if current_table.is_complete():
-                source_table = self.get_related_table(current_table)
-                if source_table is not None:
-                    current_table.table_ref = source_table
-                    tables.append(current_table)
-                else:
-                    logging.error(f'Unable to find table with caption "{current_table.docx_caption}"')
+        for i, block in enumerate(iter_block_items(doc)):
+            if type(block) is DocxTable:
                 current_table = DocXTableRef()
+                current_table.docx_table = block
+                current_table.docx_caption = get_from_doc_by_index(i - 1, doc)
+                current_table.docx_following_pg = get_from_doc_by_index(i + 1, doc)
+                current_table.document_index = i
+                tables.append(current_table)
 
         return tables
 
-    def get_related_table(self, current_table: DocXTableRef, frac=1e-4) -> Union[Table, None]:
+    def _compile_docx_from_str(self, dest_file):
         one = self.one_doc
+        md_main_str = "\n".join([md.read_built_file() for md in one.md_files_main])
 
-        # Search using Caption string
-        caption = current_table.docx_caption
-        re_cap = re.compile(r"Table\s*[0-9]{0,9}:(.*)")
-        for key, tbl in one.tables.items():
-            if "Table" in caption.text:
-                m = re_cap.search(caption.text)
-                if m is None:
-                    raise ValueError()
-                caption_text = str(m.group(1).strip())
-            else:
-                caption_text = str(caption.text)
-            caption_text = caption_text.replace("”", '"')
-            if tbl.caption == caption_text:
-                return tbl
+        app_str = """\n\n\\appendix\n\n"""
 
-        # If no match using caption string, then use contents of table
-        content = get_first_row_from_table(current_table.docx_table)
-        is_content_numeric = False
-
-        try:
-            content_numeric = np.array(content, dtype=float)
-            is_content_numeric = True
-        except ValueError:
-            content_numeric = None
-
-        for key, tbl in one.tables.items():
-            row_1 = tbl.df.iloc[0].values
-            if is_content_numeric and len(content) == len(row_1):
-                tot = sum(row_1)
-                diff = sum(row_1 - content_numeric)
-                if abs(diff) < abs(tot) * frac:
-                    return tbl
-            print("")
-        return None
-
-
-def add_to_composer(source_doc, md_files: List[MarkDownFile]) -> Composer:
-    composer_doc = Composer(Document(source_doc))
-    if source_doc == MY_DOCX_TMPL:
-        composer_doc.doc.add_page_break()
-    for i, md in enumerate(md_files):
-        doc_in = Document(str(md.new_file))
-        doc_in.add_page_break()
-        composer_doc.append(doc_in)
-        logging.info(f"Added {md.new_file}")
-    return composer_doc
-
-
-def get_first_row_from_table(docx_table: DocxTable, num_row=1):
-    content = []
-    for i, row in enumerate(docx_table.rows):
-        if i == 0:
-            continue
-        for cell in row.cells:
-            paragraphs = cell.paragraphs
-            for paragraph in paragraphs:
-                content.append(paragraph.text.strip())
-        return content
+        md_app_str = "\n".join([md.read_built_file() for md in one.md_files_app])
+        combined_str = md_main_str + app_str + md_app_str
+        pypandoc.convert_text(
+            combined_str,
+            one.FORMATS.DOCX,
+            outputfile=str(dest_file),
+            format="markdown",
+            extra_args=[
+                "-M2GB",
+                "+RTS",
+                "-K64m",
+                "-RTS",
+                f"--metadata-file={one.metadata_file}"
+                # f"--reference-doc={MY_DOCX_TMPL}",
+            ],
+            filters=["pandoc-crossref"],
+            encoding="utf8",
+        )

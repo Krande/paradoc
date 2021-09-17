@@ -15,6 +15,9 @@ class TableTests(unittest.TestCase):
 
         one.add_table("my_table", df, "A basic table")
         one.add_table("my_table_2", df, "A slightly smaller table", TableFormat(font_size=8))
+        one.add_table("my_table_3", df, "No Space 1")
+        one.add_table("my_table_4", df, "No Space 2")
+        one.add_table("my_table_5", df, "No Space 3")
 
         one.compile("TableDoc")
 

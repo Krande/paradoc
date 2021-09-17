@@ -2,9 +2,17 @@ import logging
 import os
 import pathlib
 import traceback
+from typing import List
 
 import pypandoc
+from docx.document import Document as ProxyDocument
+from docx.oxml.table import CT_Tbl
+from docx.oxml.text.paragraph import CT_P
+from docx.table import Table, _Cell
+from docx.text.paragraph import Paragraph
+from docxcompose.composer import Composer
 
+from paradoc.common import MY_DOCX_TMPL, MarkDownFile
 from paradoc.utils import get_list_of_files
 
 
@@ -41,11 +49,6 @@ def open_word_win32():
 
 
 def docx_update(docx_file):
-    """
-
-    :param docx_file:
-    :return:
-    """
     word = open_word_win32()
     if word is None:
         return
@@ -65,14 +68,7 @@ def docx_update(docx_file):
     word.Quit()
 
 
-def close_word_docs_by_name(names):
-    """
-
-    :param names: List of word document basenames (basenames e.g. "something.docx").
-    :type names: list
-    :return:
-    """
-
+def close_word_docs_by_name(names: list) -> None:
     word = open_word_win32()
     if word is None:
         return
@@ -97,10 +93,6 @@ def iter_block_items(parent):
     also works for a _Cell object, which itself can contain paragraphs and tables.
     """
     from docx.document import Document
-    from docx.oxml.table import CT_Tbl
-    from docx.oxml.text.paragraph import CT_P
-    from docx.table import Table, _Cell
-    from docx.text.paragraph import Paragraph
 
     if isinstance(parent, Document):
         parent_elm = parent.element.body
@@ -115,7 +107,7 @@ def iter_block_items(parent):
         elif isinstance(child, CT_Tbl):
             yield Table(child, parent)
         else:
-            logging.error(f"Unrecognized child element type {type(child)}")
+            logging.debug(f"Unrecognized child element type {type(child)}")
 
 
 def convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_doc=None):
@@ -169,3 +161,23 @@ def convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_do
     #     logging.info(f"Added {files[i]}")
 
     composer.save(str(dest))
+
+
+def get_from_doc_by_index(index: int, doc: ProxyDocument):
+    for i, block in enumerate(iter_block_items(doc)):
+        if i == index:
+            return block
+
+
+def add_to_composer(source_doc, md_files: List[MarkDownFile]) -> Composer:
+    from docx import Document
+
+    composer_doc = Composer(Document(str(source_doc)))
+    if source_doc == MY_DOCX_TMPL:
+        composer_doc.doc.add_page_break()
+    for i, md in enumerate(md_files):
+        doc_in = Document(str(md.new_file))
+        doc_in.add_page_break()
+        composer_doc.append(doc_in)
+        logging.info(f"Added {md.new_file}")
+    return composer_doc

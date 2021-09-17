@@ -1,5 +1,6 @@
 name: anaconda-client-env
 channels:
+  - krande
   - conda-forge
 dependencies:
   - conda-build

@@ -1,4 +1,6 @@
 lang: en-GB
+date: \today
+urlcolor: "black"
 linkReferences: true
 nameInLink: true
 figPrefix: "Figure"
