@@ -28,7 +28,6 @@ requirements:
     - tabulate
     - svgwrite
     - pytexit
-    - miktex   # [win]
 test:
   source_files:
     - tests
