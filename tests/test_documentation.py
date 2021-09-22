@@ -7,7 +7,6 @@ from common import files_dir, test_dir
 from docx import Document
 
 from paradoc import MY_DOCX_TMPL, OneDoc
-from paradoc.utils import convert_markdown
 
 # Miktex installer https://miktex.org/download
 
@@ -21,14 +20,12 @@ pg_style = "Normal Indent"
 
 class ReportTests(unittest.TestCase):
     def test_report_markdown_to_docx(self):
-        source = files_dir / "doc1/main.md"
+        source = files_dir / "doc1"
         dest = test_dir / "report_md/md_to_docx_standard.docx"
-        metadata_file = source.parent / "metadata.yaml"
-        os.makedirs(dest.parent, exist_ok=True)
-        output = convert_markdown(source, dest, "docx", metadata_file, style_doc=MY_DOCX_TMPL)
-        print(output)
-        # output = convert_markdown(source, dest, 'pdf', metadata_file)
-        # assert output == ""
+
+        one = OneDoc(source, work_dir=dest.parent)
+        one.compile("somefile_formatted", auto_open=auto_open)
+
         if auto_open is True:
             os.startfile(dest)
 
