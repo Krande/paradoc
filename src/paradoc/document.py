@@ -4,7 +4,7 @@ import logging
 import os
 import pathlib
 import shutil
-from typing import Dict
+from typing import Dict, Callable
 
 import pandas as pd
 
@@ -151,9 +151,9 @@ class OneDoc:
         self._uniqueness_check(name)
         self.tables[name] = Table(name, df, caption, tbl_format, **kwargs)
 
-    def add_equation(self, name, eq, custom_eq_str_compiler=None, **kwargs):
+    def add_equation(self, name, func: Callable, custom_eq_str_compiler=None, **kwargs):
         self._uniqueness_check(name)
-        self.equations[name] = Equation(name, eq, custom_eq_str_compiler=custom_eq_str_compiler, **kwargs)
+        self.equations[name] = Equation(name, func, custom_eq_str_compiler=custom_eq_str_compiler, **kwargs)
 
     def _perform_variable_substitution(self, use_table_var_substitution):
         logging.info("Performing variable substitution")
