@@ -4,7 +4,7 @@ import logging
 import os
 import pathlib
 import shutil
-from typing import Dict, Callable
+from typing import Callable, Dict
 
 import pandas as pd
 

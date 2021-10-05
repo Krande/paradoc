@@ -80,7 +80,12 @@ class DocXTableRef:
 
         use_decimals = True
         if len(self.docx_table.rows) > 1:
-            row2 = self.docx_table.rows[2].cells[0].paragraphs[0]
+            try:
+                row2 = self.docx_table.rows[2].cells[0].paragraphs[0]
+            except IndexError as e:
+                logging.error(f"Second row not used by table. Using first error: '{e}'")
+                row2 = self.docx_table.rows[1].cells[0].paragraphs[0]
+
             if "." not in row2.text:
                 use_decimals = False
         if fmt is None or use_decimals is False:
