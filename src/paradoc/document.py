@@ -12,6 +12,7 @@ from .common import (
     DocXFormat,
     Equation,
     ExportFormats,
+    Figure,
     MarkDownFile,
     Table,
     TableFormat,
@@ -67,6 +68,7 @@ class OneDoc:
         self.variables = dict()
         self.tables: Dict[str, Table] = dict()
         self.equations: Dict[str, Equation] = dict()
+        self.figures: Dict[str, Figure] = dict()
         self.doc_format = DocXFormat()
 
         # Style info: https://python-docx.readthedocs.io/en/latest/user/styles-using.html
@@ -92,6 +94,16 @@ class OneDoc:
                 self.md_files_app.append(md_file)
             else:
                 self.md_files_main.append(md_file)
+
+            for fig in md_file.get_figures():
+                d = fig.groupdict()
+                ref = d["reference"]
+                caption = d["caption"]
+                file_path = d["file_path"]
+                name = ref if ref is not None else caption
+                if caption in self.figures.keys():
+                    raise ValueError("Uniqueness of Figure captions are required for OneDoc to index the figures")
+                self.figures[caption] = Figure(name, caption, ref, file_path)
 
         if create_dirs is True:
             os.makedirs(self.main_dir, exist_ok=True)
@@ -161,6 +173,7 @@ class OneDoc:
             md_file = mdf.path
             os.makedirs(mdf.new_file.parent, exist_ok=True)
             md_str = mdf.read_original_file()
+
             for m in mdf.get_variables():
                 res = m.group(1)
                 key = res.split("|")[0] if "|" in res else res

@@ -19,7 +19,7 @@ here is a reference to the figure [@fig:AFigureReference]
 # Is this an appendix
 Some intro text 
 
-![A figure of a box!](images/test.png){#fig:AFigureReference2}
+![Another figure of a box!](images/test.png){#fig:AFigureReference2}
 
 here is a reference to the figure [@fig:AFigureReference2]
 
