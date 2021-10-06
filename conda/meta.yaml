@@ -25,6 +25,7 @@ requirements:
     - docxcompose
     - numpy
     - pandas
+    - openpyxl
     - tabulate
     - svgwrite
     - pytexit

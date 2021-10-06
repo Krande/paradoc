@@ -4,7 +4,7 @@ import logging
 import os
 import pathlib
 import shutil
-from typing import Dict
+from typing import Callable, Dict
 
 import pandas as pd
 
@@ -12,6 +12,7 @@ from .common import (
     DocXFormat,
     Equation,
     ExportFormats,
+    Figure,
     MarkDownFile,
     Table,
     TableFormat,
@@ -67,6 +68,7 @@ class OneDoc:
         self.variables = dict()
         self.tables: Dict[str, Table] = dict()
         self.equations: Dict[str, Equation] = dict()
+        self.figures: Dict[str, Figure] = dict()
         self.doc_format = DocXFormat()
 
         # Style info: https://python-docx.readthedocs.io/en/latest/user/styles-using.html
@@ -92,6 +94,16 @@ class OneDoc:
                 self.md_files_app.append(md_file)
             else:
                 self.md_files_main.append(md_file)
+
+            for fig in md_file.get_figures():
+                d = fig.groupdict()
+                ref = d["reference"]
+                caption = d["caption"]
+                file_path = d["file_path"]
+                name = ref if ref is not None else caption
+                if caption in self.figures.keys():
+                    raise ValueError("Uniqueness of Figure captions are required for OneDoc to index the figures")
+                self.figures[caption] = Figure(name, caption, ref, file_path)
 
         if create_dirs is True:
             os.makedirs(self.main_dir, exist_ok=True)
@@ -151,9 +163,9 @@ class OneDoc:
         self._uniqueness_check(name)
         self.tables[name] = Table(name, df, caption, tbl_format, **kwargs)
 
-    def add_equation(self, name, eq, custom_eq_str_compiler=None, **kwargs):
+    def add_equation(self, name, func: Callable, custom_eq_str_compiler=None, **kwargs):
         self._uniqueness_check(name)
-        self.equations[name] = Equation(name, eq, custom_eq_str_compiler=custom_eq_str_compiler, **kwargs)
+        self.equations[name] = Equation(name, func, custom_eq_str_compiler=custom_eq_str_compiler, **kwargs)
 
     def _perform_variable_substitution(self, use_table_var_substitution):
         logging.info("Performing variable substitution")
@@ -161,6 +173,7 @@ class OneDoc:
             md_file = mdf.path
             os.makedirs(mdf.new_file.parent, exist_ok=True)
             md_str = mdf.read_original_file()
+
             for m in mdf.get_variables():
                 res = m.group(1)
                 key = res.split("|")[0] if "|" in res else res

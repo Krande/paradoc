@@ -7,12 +7,8 @@ from docx.table import Table as DocxTable
 from paradoc.common import MY_DOCX_TMPL, MY_DOCX_TMPL_BLANK, ExportFormats
 from paradoc.document import OneDoc
 
-from .common import DocXTableRef
-from .formatting import (
-    fix_headers_after_compose,
-    format_image_captions,
-    format_paragraphs_and_headings,
-)
+from .common import DocXFigureRef, DocXTableRef
+from .formatting import fix_headers_after_compose, format_paragraphs_and_headings
 from .utils import (
     add_to_composer,
     close_word_docs_by_name,
@@ -58,12 +54,11 @@ class WordExporter:
         composer_main = add_to_composer(MY_DOCX_TMPL, one.md_files_main)
         composer_app = add_to_composer(MY_DOCX_TMPL_BLANK, one.md_files_app)
 
-        # self.format_tables(composer_main, composer_app)
         self.format_tables(composer_main.doc, False)
         self.format_tables(composer_app.doc, True)
 
-        format_image_captions(composer_main.doc, False)
-        format_image_captions(composer_app.doc, True)
+        self.format_figures(composer_main.doc, False)
+        self.format_figures(composer_app.doc, True)
 
         format_paragraphs_and_headings(composer_app.doc, one.appendix_heading_map)
 
@@ -99,7 +94,15 @@ class WordExporter:
                 restart_caption_num = True
             else:
                 restart_caption_num = False
-            docx_tbl.format_table(is_appendix, should_restart_caption_numbering=restart_caption_num)
+            docx_tbl.format_table(is_appendix, restart_caption_numbering=restart_caption_num)
+
+    def format_figures(self, composer_doc: Document, is_appendix):
+        for i, docx_fig in enumerate(self.get_all_figures(composer_doc)):
+            if is_appendix and i == 0:
+                restart_caption_num = True
+            else:
+                restart_caption_num = False
+            docx_fig.format_figure(is_appendix, restart_caption_num)
 
     def get_all_tables(self, doc: Document):
         tables = []
@@ -114,6 +117,24 @@ class WordExporter:
                 tables.append(current_table)
 
         return tables
+
+    def get_all_figures(self, doc: Document):
+        figures = []
+        for i, block in enumerate(iter_block_items(doc)):
+            if block.style.name == "Captioned Figure":
+                caption = get_from_doc_by_index(i + 1, doc)
+                caption_str = caption.text.split(":")[-1].strip()
+                figure = self.one_doc.figures.get(caption_str, None)
+                if figure is None:
+                    raise ValueError("Figure not retrieved")
+                current_fig = DocXFigureRef(figure, doc)
+                current_fig.docx_figure = block
+                current_fig.docx_caption = caption
+                current_fig.docx_following_pg = get_from_doc_by_index(i + 2, doc)
+                current_fig.document_index = i
+                figures.append(current_fig)
+
+        return figures
 
     def _compile_docx_from_str(self, dest_file):
         one = self.one_doc

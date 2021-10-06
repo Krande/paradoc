@@ -8,7 +8,7 @@ from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
-from paradoc.common import Table
+from paradoc.common import Figure, Table
 
 from .references import add_seq_reference
 
@@ -30,7 +30,7 @@ class DocXTableRef:
         tbl = self.docx_table
         return tbl.rows[1].cells[0].paragraphs[0]
 
-    def format_table(self, is_appendix, should_restart_caption_numbering=False):
+    def format_table(self, is_appendix, restart_caption_numbering=False):
         tbl = self.docx_table
         tbl_format = self.table_ref.format
 
@@ -59,7 +59,7 @@ class DocXTableRef:
 
         # Format table Caption
         self.docx_caption.paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-        rebuild_caption(self.docx_caption, self.table_ref.caption, is_appendix, should_restart_caption_numbering)
+        rebuild_caption(self.docx_caption, "Table", self.table_ref.caption, is_appendix, restart_caption_numbering)
 
         for run in self.docx_caption.runs:
             run.font.name = tbl_format.font_style
@@ -80,7 +80,12 @@ class DocXTableRef:
 
         use_decimals = True
         if len(self.docx_table.rows) > 1:
-            row2 = self.docx_table.rows[2].cells[0].paragraphs[0]
+            try:
+                row2 = self.docx_table.rows[2].cells[0].paragraphs[0]
+            except IndexError as e:
+                logging.error(f"Second row not used by table. Using first error: '{e}'")
+                row2 = self.docx_table.rows[1].cells[0].paragraphs[0]
+
             if "." not in row2.text:
                 use_decimals = False
         if fmt is None or use_decimals is False:
@@ -89,7 +94,29 @@ class DocXTableRef:
             pg_0.text = f"{res:{fmt}}"
 
 
-def rebuild_caption(caption: Paragraph, caption_str, is_appendix, should_restart=False):
+@dataclass
+class DocXFigureRef:
+    figure_ref: Figure = None
+    docx_figure: Paragraph = None
+    docx_caption: Paragraph = None
+    docx_following_pg: Paragraph = None
+    is_appendix = False
+    document_index: int = None
+
+    def format_figure(self, is_appendix, restart_caption_numbering):
+        figure_format = self.figure_ref.format
+        # Format Figure Caption
+        self.docx_caption.paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+
+        for run in self.docx_caption.runs:
+            font = run.font
+            font.name = figure_format.font_style
+            font.size = figure_format.font_size
+
+        rebuild_caption(self.docx_caption, "Figure", self.figure_ref.caption, is_appendix, restart_caption_numbering)
+
+
+def rebuild_caption(caption: Paragraph, caption_prefix, caption_str, is_appendix, should_restart=False):
     caption.clear()
     caption.runs.clear()
 
@@ -104,7 +131,7 @@ def rebuild_caption(caption: Paragraph, caption_str, is_appendix, should_restart
         sub_heading_ref += '"Heading 1"'
 
     seq1 = caption._element._new_r()
-    seq1.text = "Table "
+    seq1.text = caption_prefix + " "
 
     add_seq_reference(seq1, f"STYLEREF \\s {heading_ref} \\n", run._parent)
     run._element.addprevious(seq1)

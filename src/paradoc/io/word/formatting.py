@@ -37,7 +37,7 @@ def format_paragraphs_and_headings(doc: Document, paragraph_style_map, style_doc
 
 
 def format_paragraph(pg, document, paragraph_style_map: dict):
-    from docx.shared import Mm
+    from docx.shared import Mm, Pt
 
     style_name = pg.style.name
     logging.debug(style_name)
@@ -46,7 +46,10 @@ def format_paragraph(pg, document, paragraph_style_map: dict):
         new_style = document.styles[new_style_name]
         pg.style = new_style
         pg.paragraph_format.left_indent = Mm(25)
-
+    elif style_name == "Source Code":
+        pg.paragraph_format.left_indent = Mm(15)
+        pg.paragraph_format.space_before = Pt(12)
+        pg.paragraph_format.space_after = Pt(12)
     elif style_name in paragraph_style_map.keys():
         new_style_name = paragraph_style_map[pg.style.name]
 

@@ -19,6 +19,12 @@ class TableFormat:
     float_fmt: Union[str, tuple] = None
 
 
+@dataclass
+class FigureFormat:
+    font_style: str = "Arial"
+    font_size: float = 11
+
+
 class TableFlags:
     NO_CAPTION = "nocaption"
 
@@ -33,9 +39,9 @@ class Table:
     md_instances: List[MarkDownFile] = field(default_factory=list)
     docx_instances: List[object] = field(default_factory=list)
 
-    # def get_cell0(self):
-    #     col_name = self.df.columns[0]
-    #     df.iloc[0, df.columns.get_loc(col_name)]
+    def __post_init__(self):
+        if self.df is None:
+            raise ValueError('Passed in dataframe "df" cannot be None')
 
     def to_markdown(self, include_name_in_cell=False, flags=None):
         df = self.df.copy()
@@ -53,6 +59,17 @@ class Table:
         if self.add_link:
             tbl_str += f" {{#tbl:{self.name}}}"
         return tbl_str
+
+
+@dataclass
+class Figure:
+    name: str
+    caption: str
+    reference: str
+    file_path: str
+    format: FigureFormat = FigureFormat()
+    md_instances: List[MarkDownFile] = field(default_factory=list)
+    docx_instances: List[object] = field(default_factory=list)
 
 
 @dataclass
@@ -117,9 +134,12 @@ class MarkDownFile:
             return f.read()
 
     def get_variables(self):
-        md_doc_str = self.read_original_file()
-        key_re = re.compile("{{(.*)}}")
-        return key_re.finditer(md_doc_str)
+        key_re = re.compile(r"{{(.*)}}")
+        return key_re.finditer(self.read_original_file())
+
+    def get_figures(self):
+        regx = re.compile(r"(?:!\[(?P<caption>.*?)\]\((?P<file_path>.*?)\)(?:{#fig:(?P<reference>.*?)}|))")
+        return regx.finditer(self.read_original_file())
 
 
 class ExportFormats:
