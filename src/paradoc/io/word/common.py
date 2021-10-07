@@ -59,10 +59,12 @@ class DocXTableRef:
 
         # Format table Caption
         self.docx_caption.paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+
         rebuild_caption(self.docx_caption, "Table", self.table_ref.caption, is_appendix, restart_caption_numbering)
 
         for run in self.docx_caption.runs:
             run.font.name = tbl_format.font_style
+            # run.font.size = tbl_format.font_size
 
         # Fix formatting before Table
         self.docx_caption.paragraph_format.space_before = Pt(18)
@@ -105,15 +107,13 @@ class DocXFigureRef:
 
     def format_figure(self, is_appendix, restart_caption_numbering):
         figure_format = self.figure_ref.format
-        # Format Figure Caption
         self.docx_caption.paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
-        for run in self.docx_caption.runs:
-            font = run.font
-            font.name = figure_format.font_style
-            font.size = figure_format.font_size
-
         rebuild_caption(self.docx_caption, "Figure", self.figure_ref.caption, is_appendix, restart_caption_numbering)
+
+        for run in self.docx_caption.runs:
+            run.font.name = figure_format.font_style
+            # run.font.size = figure_format.font_size
 
 
 def rebuild_caption(caption: Paragraph, caption_prefix, caption_str, is_appendix, should_restart=False):
