@@ -79,6 +79,7 @@ class OneDoc:
         self.metadata_file = None
 
         for md_file in get_list_of_files(self.source_dir, ".md"):
+            logging.info(f'Adding markdown file "{md_file}"')
             is_appendix = True if app_prefix in md_file else False
             md_file = pathlib.Path(md_file)
             new_file = self.build_dir / md_file.relative_to(self.source_dir).with_suffix(".docx")
