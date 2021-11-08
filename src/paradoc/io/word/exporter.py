@@ -19,8 +19,10 @@ from .utils import (
 
 
 class WordExporter:
-    def __init__(self, one_doc: OneDoc, **kwargs):
+    def __init__(self, one_doc: OneDoc, main_tmpl=MY_DOCX_TMPL, app_tmpl=MY_DOCX_TMPL_BLANK, **kwargs):
         self.one_doc = one_doc
+        self.main_tmpl = main_tmpl
+        self.app_tmpl = app_tmpl
         self.use_custom_docx_compile = kwargs.get("use_custom_docx_compile", True)
 
     def export(self, output_name, dest_file):
@@ -51,8 +53,8 @@ class WordExporter:
                 encoding="utf8",
             )
 
-        composer_main = add_to_composer(MY_DOCX_TMPL, one.md_files_main)
-        composer_app = add_to_composer(MY_DOCX_TMPL_BLANK, one.md_files_app)
+        composer_main = add_to_composer(self.main_tmpl, one.md_files_main)
+        composer_app = add_to_composer(self.app_tmpl, one.md_files_app)
 
         self.format_tables(composer_main.doc, False)
         self.format_tables(composer_app.doc, True)

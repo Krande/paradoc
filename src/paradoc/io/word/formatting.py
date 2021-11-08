@@ -40,8 +40,10 @@ def format_paragraph(pg, document, paragraph_style_map: dict, index, doc: Docume
 
     style_name = pg.style.name
     new_style_name = paragraph_style_map.get(style_name, None)
-    if 'heading' in style_name:
-        print('sd')
+    if "No table of contents entries found." in pg.text:
+        logging.info(f'Skipping Table of Contents at index "{index}"')
+        return
+
     logging.debug(style_name)
     if style_name == "Compact":  # Is a bullet point list
         new_style = document.styles[new_style_name]

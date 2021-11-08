@@ -81,6 +81,10 @@ class OneDoc:
         self.md_files_app = []
         self.metadata_file = None
 
+        if create_dirs is True:
+            os.makedirs(self.main_dir, exist_ok=True)
+            os.makedirs(self.app_dir, exist_ok=True)
+
         for md_file in get_list_of_files(self.source_dir, ".md"):
             logging.info(f'Adding markdown file "{md_file}"')
             is_appendix = True if app_prefix in md_file else False
@@ -108,10 +112,6 @@ class OneDoc:
                 if caption in self.figures.keys():
                     raise ValueError("Uniqueness of Figure captions are required for OneDoc to index the figures")
                 self.figures[caption] = Figure(name, caption, ref, file_path)
-
-        if create_dirs is True:
-            os.makedirs(self.main_dir, exist_ok=True)
-            os.makedirs(self.app_dir, exist_ok=True)
 
         if clean_build_dir is True:
             shutil.rmtree(self.build_dir, ignore_errors=True)

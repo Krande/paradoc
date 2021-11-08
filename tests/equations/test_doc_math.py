@@ -2,7 +2,6 @@ import logging
 
 import pytest
 
-from common import files_dir, test_dir
 from ex_funcs import my_calc_example_1, my_calc_example_2
 from paradoc import OneDoc
 from paradoc.exceptions import LatexNotInstalled
@@ -10,7 +9,7 @@ from paradoc.utils import make_df
 
 
 @pytest.fixture
-def test_doc():
+def test_doc(files_dir, test_dir):
     logging.getLogger().setLevel(logging.INFO)
     report_dir = files_dir / "doc_math"
 
