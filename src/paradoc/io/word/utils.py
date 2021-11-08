@@ -52,20 +52,24 @@ def docx_update(docx_file):
     word = open_word_win32()
     if word is None:
         return
-
     doc = word.Documents.Open(docx_file)
+    try:
+        # update all figure / table numbers
+        word.ActiveDocument.Fields.Update()
 
-    # update all figure / table numbers
-    word.ActiveDocument.Fields.Update()
+        # update Table of content / figure / table
+        if len(word.ActiveDocument.TablesOfContents) > 0:
+            word.ActiveDocument.TablesOfContents(1).Update()
+        else:
+            logging.error("No table of contents is found")
+        # word.ActiveDocument.TablesOfFigures(1).Update()
+        # word.ActiveDocument.TablesOfFigures(2).Update()
+    except Exception as e:
+        raise Exception(e)
+    finally:
+        doc.Close(SaveChanges=True)
 
-    # update Table of content / figure / table
-    word.ActiveDocument.TablesOfContents(1).Update()
-    # word.ActiveDocument.TablesOfFigures(1).Update()
-    # word.ActiveDocument.TablesOfFigures(2).Update()
-
-    doc.Close(SaveChanges=True)
-
-    word.Quit()
+        word.Quit()
 
 
 def close_word_docs_by_name(names: list) -> None:

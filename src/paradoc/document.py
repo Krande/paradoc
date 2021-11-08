@@ -38,18 +38,21 @@ class OneDoc:
     :param appendix_heading_map: Optional override appendix formats
     """
 
-    default_app_map = {
-        "Heading 1": "Appendix",
-        "Heading 2": "Appendix X.1",
-        "Heading 3": "Appendix X.2",
-        "Heading 4": "Appendix X.3",
-    }
     default_paragraph_map = {
         "Normal": "Normal Indent",
         "First Paragraph": "Normal Indent",
         "Body Text": "Normal Indent",
         "Compact": "Normal Indent",
     }
+
+    default_app_map = {
+        **default_paragraph_map,
+        "Heading 1": "Appendix",
+        "Heading 2": "Appendix X.1",
+        "Heading 3": "Appendix X.2",
+        "Heading 4": "Appendix X.3",
+    }
+
     FORMATS = ExportFormats
 
     def __init__(
