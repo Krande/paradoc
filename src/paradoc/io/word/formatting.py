@@ -1,4 +1,5 @@
 import logging
+
 from docx import Document
 from docx.text.paragraph import Paragraph
 

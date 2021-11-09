@@ -1,0 +1,4 @@
+linkReferences: true
+nameInLink: true
+figPrefix: "Figure"
+tblPrefix: "Table"

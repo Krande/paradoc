@@ -125,10 +125,10 @@ class WordExporter:
         for i, block in enumerate(iter_block_items(doc)):
             if block.style.name == "Captioned Figure":
                 caption = get_from_doc_by_index(i + 1, doc)
-                caption_str = caption.text.split(":")[-1].strip()
+                caption_str = caption.text.split(":")[-1].strip().replace("“", '"').replace("”", '"')
                 figure = self.one_doc.figures.get(caption_str, None)
                 if figure is None:
-                    raise ValueError("Figure not retrieved")
+                    raise ValueError(f'Figure with caption "{caption_str}" not retrieved')
                 current_fig = DocXFigureRef(figure, doc)
                 current_fig.docx_figure = block
                 current_fig.docx_caption = caption

@@ -62,12 +62,14 @@ class OneDoc:
         app_prefix="01-app",
         clean_build_dir=True,
         create_dirs=False,
+        output_dir=None,
         **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
         self.work_dir = kwargs.get("work_dir", pathlib.Path("").resolve().absolute())
         self._main_prefix = main_prefix
         self._app_prefix = app_prefix
+        self._output_dir = output_dir
         self.variables = dict()
         self.tables: Dict[str, Table] = dict()
         self.equations: Dict[str, Equation] = dict()
@@ -106,11 +108,14 @@ class OneDoc:
             for fig in md_file.get_figures():
                 d = fig.groupdict()
                 ref = d["reference"]
-                caption = d["caption"]
+                caption = str(d["caption"])
                 file_path = d["file_path"]
                 name = ref if ref is not None else caption
                 if caption in self.figures.keys():
-                    raise ValueError("Uniqueness of Figure captions are required for OneDoc to index the figures")
+                    raise ValueError(
+                        f'Failed uniqueness check for Caption "{caption}". '
+                        f"Uniqueness is required for OneDoc to index the figures"
+                    )
                 self.figures[caption] = Figure(name, caption, ref, file_path)
 
         if clean_build_dir is True:
@@ -157,6 +162,10 @@ class OneDoc:
             pdf.export(dest_file)
         else:
             raise NotImplementedError(f'Export format "{export_format}" is not yet supported')
+
+        if self.output_dir is not None:
+            print(f'Copying outputted document from "{dest_file}" to "{self.output_dir}"')
+            shutil.copy(dest_file, self.output_dir)
 
         if auto_open is True:
             os.startfile(dest_file)
@@ -233,3 +242,7 @@ class OneDoc:
     @property
     def dist_dir(self):
         return self.work_dir / "temp" / "_dist"
+
+    @property
+    def output_dir(self):
+        return self._output_dir

@@ -32,3 +32,4 @@ class PdfExporter:
             filters=["pandoc-crossref"],
             encoding="utf8",
         )
+        print(f'Successfully exported PDF to "{dest_file}"')
