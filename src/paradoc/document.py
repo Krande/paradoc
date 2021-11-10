@@ -124,7 +124,7 @@ class OneDoc:
     def compile(self, output_name, auto_open=False, metadata_file=None, export_format=ExportFormats.DOCX, **kwargs):
         dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format}").resolve().absolute()
 
-        logging.debug(f'Compiling report to "{dest_file}"')
+        print(f'Compiling OneDoc report to "{dest_file}"')
         os.makedirs(self.build_dir, exist_ok=True)
         os.makedirs(self.dist_dir, exist_ok=True)
 
