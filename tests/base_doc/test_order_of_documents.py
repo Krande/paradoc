@@ -14,7 +14,7 @@ def test_order_of_docs(files_dir):
     for f_assert, md_actual in zip(assert_list_main, one.md_files_main):
         desired_f = files_dir / f_assert
         actual_f = md_actual.path
-        assert desired_f == actual_f
+        assert desired_f.as_posix() == actual_f.as_posix()
 
     assert_list_app = [
         "order_of_docs\\01-app\\00-app1.md",
@@ -25,4 +25,4 @@ def test_order_of_docs(files_dir):
     for f_assert, md_actual in zip(assert_list_app, one.md_files_app):
         desired_f = files_dir / f_assert
         actual_f = md_actual.path
-        assert desired_f == actual_f
+        assert desired_f.as_posix() == actual_f.as_posix()
