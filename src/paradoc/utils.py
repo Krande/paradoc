@@ -79,7 +79,7 @@ def get_list_of_files(dir_path, file_ext=None, strict=False):
     :return: list of all found files
     """
     all_files = []
-    list_of_file = os.listdir(dir_path)
+    list_of_file = sorted(os.listdir(dir_path))
 
     # Iterate over all the entries
     for entry in list_of_file:
