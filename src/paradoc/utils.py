@@ -84,7 +84,7 @@ def get_list_of_files(dir_path, file_ext=None, strict=False):
     # Iterate over all the entries
     for entry in list_of_file:
         # Create full path
-        full_path = os.path.join(dir_path, entry)
+        full_path = os.path.join(dir_path, entry).replace(os.sep, "/")
         # If entry is a directory then get the list of files in this directory
         if os.path.isdir(full_path):
             all_files += get_list_of_files(full_path, file_ext, strict)
