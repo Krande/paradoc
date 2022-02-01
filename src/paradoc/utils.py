@@ -5,7 +5,8 @@ import re
 
 import pypandoc
 
-from .common import Equation, MarkDownFile, Table
+from .common import MarkDownFile, Table
+from .equations import Equation
 
 
 def func_to_eq(func):

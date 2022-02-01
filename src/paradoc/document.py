@@ -8,15 +8,8 @@ from typing import Callable, Dict
 
 import pandas as pd
 
-from .common import (
-    DocXFormat,
-    Equation,
-    ExportFormats,
-    Figure,
-    MarkDownFile,
-    Table,
-    TableFormat,
-)
+from .common import DocXFormat, ExportFormats, Figure, MarkDownFile, Table, TableFormat
+from .equations import Equation
 from .exceptions import LatexNotInstalled
 from .utils import get_list_of_files
 
