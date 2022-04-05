@@ -10,8 +10,8 @@ on:
     branches:
     - main
     - dev
-  schedule:
-    - cron: '0 0 * * 7'  # every sunday at midnight
+#  schedule:
+#    - cron: '0 0 * * 7'  # every sunday at midnight
 
 jobs:
   activate:
