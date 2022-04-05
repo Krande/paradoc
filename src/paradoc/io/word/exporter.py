@@ -19,8 +19,10 @@ from .utils import (
 
 
 class WordExporter:
-    def __init__(self, one_doc: OneDoc, **kwargs):
+    def __init__(self, one_doc: OneDoc, main_tmpl=MY_DOCX_TMPL, app_tmpl=MY_DOCX_TMPL_BLANK, **kwargs):
         self.one_doc = one_doc
+        self.main_tmpl = main_tmpl
+        self.app_tmpl = app_tmpl
         self.use_custom_docx_compile = kwargs.get("use_custom_docx_compile", True)
 
     def export(self, output_name, dest_file):
@@ -51,8 +53,8 @@ class WordExporter:
                 encoding="utf8",
             )
 
-        composer_main = add_to_composer(MY_DOCX_TMPL, one.md_files_main)
-        composer_app = add_to_composer(MY_DOCX_TMPL_BLANK, one.md_files_app)
+        composer_main = add_to_composer(self.main_tmpl, one.md_files_main)
+        composer_app = add_to_composer(self.app_tmpl, one.md_files_app)
 
         self.format_tables(composer_main.doc, False)
         self.format_tables(composer_app.doc, True)
@@ -123,10 +125,10 @@ class WordExporter:
         for i, block in enumerate(iter_block_items(doc)):
             if block.style.name == "Captioned Figure":
                 caption = get_from_doc_by_index(i + 1, doc)
-                caption_str = caption.text.split(":")[-1].strip()
+                caption_str = caption.text.split(":")[-1].strip().replace("“", '"').replace("”", '"')
                 figure = self.one_doc.figures.get(caption_str, None)
                 if figure is None:
-                    raise ValueError("Figure not retrieved")
+                    raise ValueError(f'Figure with caption "{caption_str}" not retrieved')
                 current_fig = DocXFigureRef(figure, doc)
                 current_fig.docx_figure = block
                 current_fig.docx_caption = caption

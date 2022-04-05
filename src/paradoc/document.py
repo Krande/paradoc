@@ -8,15 +8,8 @@ from typing import Callable, Dict
 
 import pandas as pd
 
-from .common import (
-    DocXFormat,
-    Equation,
-    ExportFormats,
-    Figure,
-    MarkDownFile,
-    Table,
-    TableFormat,
-)
+from .common import DocXFormat, ExportFormats, Figure, MarkDownFile, Table, TableFormat
+from .equations import Equation
 from .exceptions import LatexNotInstalled
 from .utils import get_list_of_files
 
@@ -38,18 +31,21 @@ class OneDoc:
     :param appendix_heading_map: Optional override appendix formats
     """
 
-    default_app_map = {
-        "Heading 1": "Appendix",
-        "Heading 2": "Appendix X.1",
-        "Heading 3": "Appendix X.2",
-        "Heading 4": "Appendix X.3",
-    }
     default_paragraph_map = {
         "Normal": "Normal Indent",
         "First Paragraph": "Normal Indent",
         "Body Text": "Normal Indent",
         "Compact": "Normal Indent",
     }
+
+    default_app_map = {
+        **default_paragraph_map,
+        "Heading 1": "Appendix",
+        "Heading 2": "Appendix X.1",
+        "Heading 3": "Appendix X.2",
+        "Heading 4": "Appendix X.3",
+    }
+
     FORMATS = ExportFormats
 
     def __init__(
@@ -59,12 +55,14 @@ class OneDoc:
         app_prefix="01-app",
         clean_build_dir=True,
         create_dirs=False,
+        output_dir=None,
         **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
         self.work_dir = kwargs.get("work_dir", pathlib.Path("").resolve().absolute())
         self._main_prefix = main_prefix
         self._app_prefix = app_prefix
+        self._output_dir = output_dir
         self.variables = dict()
         self.tables: Dict[str, Table] = dict()
         self.equations: Dict[str, Equation] = dict()
@@ -78,7 +76,12 @@ class OneDoc:
         self.md_files_app = []
         self.metadata_file = None
 
+        if create_dirs is True:
+            os.makedirs(self.main_dir, exist_ok=True)
+            os.makedirs(self.app_dir, exist_ok=True)
+
         for md_file in get_list_of_files(self.source_dir, ".md"):
+            logging.info(f'Adding markdown file "{md_file}"')
             is_appendix = True if app_prefix in md_file else False
             md_file = pathlib.Path(md_file)
             new_file = self.build_dir / md_file.relative_to(self.source_dir).with_suffix(".docx")
@@ -98,16 +101,15 @@ class OneDoc:
             for fig in md_file.get_figures():
                 d = fig.groupdict()
                 ref = d["reference"]
-                caption = d["caption"]
+                caption = str(d["caption"])
                 file_path = d["file_path"]
                 name = ref if ref is not None else caption
                 if caption in self.figures.keys():
-                    raise ValueError("Uniqueness of Figure captions are required for OneDoc to index the figures")
+                    raise ValueError(
+                        f'Failed uniqueness check for Caption "{caption}". '
+                        f"Uniqueness is required for OneDoc to index the figures"
+                    )
                 self.figures[caption] = Figure(name, caption, ref, file_path)
-
-        if create_dirs is True:
-            os.makedirs(self.main_dir, exist_ok=True)
-            os.makedirs(self.app_dir, exist_ok=True)
 
         if clean_build_dir is True:
             shutil.rmtree(self.build_dir, ignore_errors=True)
@@ -115,7 +117,7 @@ class OneDoc:
     def compile(self, output_name, auto_open=False, metadata_file=None, export_format=ExportFormats.DOCX, **kwargs):
         dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format}").resolve().absolute()
 
-        logging.debug(f'Compiling report to "{dest_file}"')
+        print(f'Compiling OneDoc report to "{dest_file}"')
         os.makedirs(self.build_dir, exist_ok=True)
         os.makedirs(self.dist_dir, exist_ok=True)
 
@@ -153,6 +155,10 @@ class OneDoc:
             pdf.export(dest_file)
         else:
             raise NotImplementedError(f'Export format "{export_format}" is not yet supported')
+
+        if self.output_dir is not None:
+            print(f'Copying outputted document from "{dest_file}" to "{self.output_dir}"')
+            shutil.copy(dest_file, self.output_dir)
 
         if auto_open is True:
             os.startfile(dest_file)
@@ -229,3 +235,7 @@ class OneDoc:
     @property
     def dist_dir(self):
         return self.work_dir / "temp" / "_dist"
+
+    @property
+    def output_dir(self):
+        return self._output_dir

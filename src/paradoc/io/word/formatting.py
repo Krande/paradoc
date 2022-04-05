@@ -28,21 +28,25 @@ def format_paragraphs_and_headings(doc: Document, paragraph_style_map, style_doc
 
     document = style_doc if style_doc is not None else Document(MY_DOCX_TMPL)
 
-    for block in iter_block_items(doc):
+    for i, block in enumerate(iter_block_items(doc)):
         if type(block) == Paragraph:
             if block.style.name in ("Image Caption", "Table Caption"):
                 continue
             else:
-                format_paragraph(block, document, paragraph_style_map)
+                format_paragraph(block, document, paragraph_style_map, i, doc)
 
 
-def format_paragraph(pg, document, paragraph_style_map: dict):
+def format_paragraph(pg, document, paragraph_style_map: dict, index, doc: Document):
     from docx.shared import Mm, Pt
 
     style_name = pg.style.name
+    new_style_name = paragraph_style_map.get(style_name, None)
+    if "No table of contents entries found." in pg.text:
+        logging.info(f'Skipping Table of Contents at index "{index}"')
+        return
+
     logging.debug(style_name)
     if style_name == "Compact":  # Is a bullet point list
-        new_style_name = paragraph_style_map[pg.style.name]
         new_style = document.styles[new_style_name]
         pg.style = new_style
         pg.paragraph_format.left_indent = Mm(25)
@@ -50,17 +54,14 @@ def format_paragraph(pg, document, paragraph_style_map: dict):
         pg.paragraph_format.left_indent = Mm(15)
         pg.paragraph_format.space_before = Pt(12)
         pg.paragraph_format.space_after = Pt(12)
-    elif style_name in paragraph_style_map.keys():
-        new_style_name = paragraph_style_map[pg.style.name]
-
+    elif style_name is not None and new_style_name is not None and pg.text.strip() != "":
         if new_style_name not in document.styles:
             styles = "".join([x.name + "\n" for x in document.styles])
             raise ValueError(
-                f'The requested style "{new_style_name}" does not exist in style_doc.\n'
+                f'The requested style "{pg.style.name}" does not exist in style_doc.\n'
                 "Note! Style names are CAPS sensitive.\n"
                 f"Available styles are:\n{styles}"
             )
-
         new_style = document.styles[new_style_name]
         pg.style = new_style
 

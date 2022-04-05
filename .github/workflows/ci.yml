@@ -10,6 +10,8 @@ on:
     branches:
     - main
     - dev
+#  schedule:
+#    - cron: '0 0 * * 7'  # every sunday at midnight
 
 jobs:
   activate:
@@ -42,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pyver: [ { name: py38, distver: '3.8' }, { name: py39, distver: '3.9' } ]
+        pyver: [ { name: py39, distver: '3.9' }, { name: py310, distver: '3.10' }]
         platform: [
           { name: Windows, distver: windows-latest },
           { name: Linux, distver: ubuntu-latest },
