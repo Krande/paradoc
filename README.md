@@ -15,7 +15,7 @@ Install using
 conda install -c krande -c conda-forge paradoc
 ```
 
-Note! This is still very early in development so expect things to break.
+Note! This is a very experimental project so expect things to break.
 
 
 ## Usage
@@ -36,7 +36,6 @@ as you prefer. The document order is simply the alphabetical order of subdirecto
 
 ```python
 # build.py
-
 from paradoc import OneDoc
 
 one = OneDoc()
@@ -49,14 +48,13 @@ Assuming you have somewhere in any of your documents a variable `{{__val_gM__}}`
 example will substitute that variable with the number 1.15.
 
 ```python
+# build.py
 from paradoc import OneDoc
 
 one = OneDoc()
 one.variables["val_gM"] = 1.15
 one.compile("MyDocument.docx")
 ```
-
-### 
 
 ## For developers
 

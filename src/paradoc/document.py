@@ -75,7 +75,9 @@ class OneDoc:
         self.md_files_main = []
         self.md_files_app = []
         self.metadata_file = None
+        self._setup(create_dirs, app_prefix, clean_build_dir)
 
+    def _setup(self, create_dirs, app_prefix, clean_build_dir):
         if create_dirs is True:
             os.makedirs(self.main_dir, exist_ok=True)
             os.makedirs(self.app_dir, exist_ok=True)
@@ -85,7 +87,8 @@ class OneDoc:
             is_appendix = True if app_prefix in md_file_path else False
             md_file_path = pathlib.Path(md_file_path)
             rel_path = md_file_path.relative_to(self.source_dir)
-            top = rel_path.parents[0]
+            parents = list(rel_path.parents)
+            top = str(parents[-2])
             if top == "temp":
                 logging.info(f"file {md_file_path} located in `temp` dir is skipped")
                 continue
@@ -108,7 +111,7 @@ class OneDoc:
                 d = fig.groupdict()
                 ref = d["reference"]
                 caption = str(d["caption"])
-                file_path = md_file_path / d["file_path"]
+                file_path = d["file_path"]
                 name = ref if ref is not None else caption
                 if caption in self.figures.keys():
                     raise ValueError(
@@ -126,6 +129,19 @@ class OneDoc:
         print(f'Compiling OneDoc report to "{dest_file}"')
         os.makedirs(self.build_dir, exist_ok=True)
         os.makedirs(self.dist_dir, exist_ok=True)
+
+        # Move all non-md files to temp dir because pandoc (tested on 2.19.2) struggles with external resource paths
+        for f in get_list_of_files(self.source_dir):
+            fp = pathlib.Path(f)
+            rel_path = fp.relative_to(self.source_dir)
+            if fp.suffix in (".md", ".yaml"):
+                continue
+            build_file = self.build_dir / rel_path
+            dist_file = self.dist_dir / "/".join(rel_path.parts[1:])
+            os.makedirs(build_file.parent, exist_ok=True)
+            os.makedirs(dist_file.parent, exist_ok=True)
+            shutil.copy(fp, build_file)
+            shutil.copy(fp, dist_file)
 
         self.metadata_file = self.source_dir / "metadata.yaml" if metadata_file is None else pathlib.Path(metadata_file)
 
@@ -159,6 +175,12 @@ class OneDoc:
             self._perform_variable_substitution(False)
             pdf = PdfExporter(self)
             pdf.export(dest_file)
+        elif export_format == ExportFormats.HTML:
+            from paradoc.io.html.exporter import HTMLExporter
+
+            self._perform_variable_substitution(False)
+            html = HTMLExporter(self)
+            html.export(dest_file)
         else:
             raise NotImplementedError(f'Export format "{export_format}" is not yet supported')
 

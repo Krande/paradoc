@@ -106,3 +106,4 @@ class MarkDownFile:
 class ExportFormats:
     DOCX = "docx"
     PDF = "pdf"
+    HTML = "html"
