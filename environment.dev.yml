@@ -1,0 +1,17 @@
+name: paradoc
+channels:
+  - conda-forge
+  - krande
+dependencies:
+  - pandoc
+  - pandoc-crossref
+  - pypandoc
+  - python-docx
+  - docxcompose
+  - numpy
+  - pandas
+  - openpyxl
+  - tabulate
+  - svgwrite
+  - pytexit
+  - pytest

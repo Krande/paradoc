@@ -80,15 +80,21 @@ class OneDoc:
             os.makedirs(self.main_dir, exist_ok=True)
             os.makedirs(self.app_dir, exist_ok=True)
 
-        for md_file in get_list_of_files(self.source_dir, ".md"):
-            logging.info(f'Adding markdown file "{md_file}"')
-            is_appendix = True if app_prefix in md_file else False
-            md_file = pathlib.Path(md_file)
-            new_file = self.build_dir / md_file.relative_to(self.source_dir).with_suffix(".docx")
-            build_file = self.build_dir / md_file.relative_to(self.source_dir)
+        for md_file_path in get_list_of_files(self.source_dir, ".md"):
+            logging.info(f'Adding markdown file "{md_file_path}"')
+            is_appendix = True if app_prefix in md_file_path else False
+            md_file_path = pathlib.Path(md_file_path)
+            rel_path = md_file_path.relative_to(self.source_dir)
+            top = rel_path.parents[0]
+            if top == "temp":
+                logging.info(f"file {md_file_path} located in `temp` dir is skipped")
+                continue
+
+            new_file = self.build_dir / rel_path.with_suffix(".docx")
+            build_file = self.build_dir / rel_path
 
             md_file = MarkDownFile(
-                path=md_file,
+                path=md_file_path,
                 is_appendix=is_appendix,
                 new_file=new_file,
                 build_file=build_file,
@@ -102,7 +108,7 @@ class OneDoc:
                 d = fig.groupdict()
                 ref = d["reference"]
                 caption = str(d["caption"])
-                file_path = d["file_path"]
+                file_path = md_file_path / d["file_path"]
                 name = ref if ref is not None else caption
                 if caption in self.figures.keys():
                     raise ValueError(
