@@ -9,7 +9,6 @@ on:
       - '.github/workflows/ci.yml'
     branches:
     - main
-    - 0.0.6-dev
 #  schedule:
 #    - cron: '0 0 * * 7'  # every sunday at midnight
 
@@ -23,24 +22,31 @@ jobs:
       - run: echo ok go
   lint:
     needs: activate
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/setup-python@v2
-      with:
-        python-version: "3.x"
-    - uses: actions/checkout@v2
-    - name: Install lint packages
-      run: pip install isort flake8 black
-    - name: Lint with isort
-      run: isort --check .
-    - name: Lint with flake8
-      run: flake8 .
-    - name: Lint with black
-      run: black --config pyproject.toml --check .
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - uses: actions/checkout@v3
+      - name: Install lint packages
+        run: pip install isort ruff black
+      - name: Lint with black
+        run: black --config pyproject.toml --check .
+      - name: Lint with isort
+        run: isort --check .
+      - name: Lint with ruff
+        run: ruff .
   build:
-    needs: lint
+    needs: activate
     name: ${{ matrix.platform.name }}-${{ matrix.pyver.name }}
     runs-on: ${{ matrix.platform.distver }}
+    defaults:
+      run:
+        shell: bash -l {0}
+    env:
+      CONDALABEL: krande
+      CONDALABEL2: ''
     strategy:
       fail-fast: false
       matrix:
@@ -55,24 +61,28 @@ jobs:
           { name: macOS, distver: macos-latest }
         ]
     steps:
-      - uses: actions/checkout@v2
-      - uses: conda-incubator/setup-miniconda@v2  # https://github.com/conda-incubator/setup-miniconda
+      - uses: actions/checkout@v3
+      - uses: mamba-org/provision-with-micromamba@main # https://github.com/mamba-org/provision-with-micromamba
         with:
-          activate-environment: anaconda-client-env
-          mamba-version: "*"
-          python-version: ${{ matrix.pyver.distver }}
+          environment-name: anaconda-client-env
+          channels: conda-forge
+          channel-priority: strict
           environment-file: conda/environment.yml
-      - name: build, test and upload conda package
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
-        shell: bash -l {0}
+          extra-specs: |
+            python=${{ matrix.pyver.distver }}
+      - name: edit conda channel label if not on main
+        if: github.ref != 'refs/heads/main'
         run: |
-          conda-build -c krande -c conda-forge conda --python=${{ matrix.pyver.distver }} --token=$ANACONDA_TOKEN --user krande --override-channels
-      - name: build and test conda package
-        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
-        shell: bash -l {0}
+          echo "CONDALABEL=krande/label/dev" >> $GITHUB_ENV
+          echo "CONDALABEL2= --label dev" >> $GITHUB_ENV
+      - name: edit conda channel label if not on main
+        if: github.ref != 'refs/heads/main'
         run: |
-          conda-build -c krande -c conda-forge conda --python=${{ matrix.pyver.distver }} --override-channels
+          echo "CONDALABEL=krande/label/dev" >> $GITHUB_ENV
+          echo "CONDALABEL2= --label dev" >> $GITHUB_ENV
+      - name: build
+        run: |
+          conda-build -c conda-forge -c ${{env.CONDALABEL}} . --python=${{ matrix.pyver.distver }} --user krande${{env.CONDALABEL2}} --token=${{ secrets.ANACONDA_TOKEN }}
+        working-directory: conda
 
 

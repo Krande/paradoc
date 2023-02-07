@@ -57,6 +57,7 @@ def test_report_crossref(files_dir, test_dir):
         outputfile=str(dest),
         filters=["pandoc-crossref"],
         extra_args=[f"--resource-path={source.parent}"],
+        sandbox=False,
     )
     assert output == ""
     if auto_open is True:

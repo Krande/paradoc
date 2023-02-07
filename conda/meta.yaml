@@ -29,6 +29,7 @@ requirements:
     - tabulate
     - svgwrite
     - pytexit
+    - nomkl
 test:
   source_files:
     - tests

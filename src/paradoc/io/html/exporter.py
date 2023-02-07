@@ -47,4 +47,5 @@ def docx2pdf(docx_file, output_file):
         extra_args=["--pdf-engine=pdflatex"],
         outputfile=str(output_file),
         encoding="utf8",
+        sandbox=False,
     )
