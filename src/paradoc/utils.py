@@ -66,6 +66,7 @@ def convert_markdown(
             extra_args=extra_args,
             filters=["pandoc-crossref"],
             encoding="utf8",
+            sandbox=False,
         )
         logging.info(output)
 
@@ -126,7 +127,6 @@ def basic_equation_compiler(f, print_latex=False, print_formula=False):
 
 
 def variable_sub(md_doc_str, variable_dict, md_file: MarkDownFile):
-
     key_re = re.compile("{{(.*)}}")
     for m in key_re.finditer(md_doc_str):
         res = m.group(1)

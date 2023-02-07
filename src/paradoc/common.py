@@ -34,7 +34,7 @@ class Table:
     name: str
     df: pd.DataFrame
     caption: str
-    format: TableFormat = TableFormat()
+    format: TableFormat = field(default_factory=TableFormat)
     add_link: bool = True
     md_instances: List[MarkDownFile] = field(default_factory=list)
     docx_instances: List[object] = field(default_factory=list)
@@ -67,7 +67,7 @@ class Figure:
     caption: str
     reference: str
     file_path: str
-    format: FigureFormat = FigureFormat()
+    format: FigureFormat = field(default_factory=FigureFormat)
     md_instances: List[MarkDownFile] = field(default_factory=list)
     docx_instances: List[object] = field(default_factory=list)
 
@@ -106,3 +106,4 @@ class MarkDownFile:
 class ExportFormats:
     DOCX = "docx"
     PDF = "pdf"
+    HTML = "html"

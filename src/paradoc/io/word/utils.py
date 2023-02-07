@@ -150,6 +150,7 @@ def convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_do
             extra_args=extra_args,
             filters=["pandoc-crossref"],
             encoding="utf8",
+            sandbox=False,
         )
         logging.info(output)
         files.append(str(new_file))

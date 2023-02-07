@@ -33,8 +33,9 @@ class WordExporter:
 
     def _compile_individual_md_files_to_docx(self, output_name, dest_file):
         one = self.one_doc
+
         for mdf in one.md_files_main + one.md_files_app:
-            md_file = mdf.path
+            resource_paths = f"--resource-path={mdf.path.parent.absolute()}"
             pypandoc.convert_file(
                 str(mdf.build_file),
                 ExportFormats.DOCX,
@@ -45,12 +46,14 @@ class WordExporter:
                     "+RTS",
                     "-K64m",
                     "-RTS",
-                    f"--resource-path={md_file.parent}",
+                    # "--file-scope",
+                    resource_paths,
                     f"--metadata-file={one.metadata_file}"
                     # f"--reference-doc={MY_DOCX_TMPL}",
                 ],
                 filters=["pandoc-crossref"],
                 encoding="utf8",
+                sandbox=False,
             )
 
         composer_main = add_to_composer(self.main_tmpl, one.md_files_main)

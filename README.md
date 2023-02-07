@@ -15,12 +15,46 @@ Install using
 conda install -c krande -c conda-forge paradoc
 ```
 
-Note! This is still very early in development so expect things to break.
+Note! This is a very experimental project so expect things to break.
 
 
 ## Usage
- 
 
+Assuming you have a folder structure set up as this:
+
+```mermaid
+graph LR
+    . --> 00-main/
+    . --> 01-app/
+    . --> build.py
+```
+whereas `00-main` and `01-app` contains markdown (.md) files representing content in your
+main and appendix respectively. Both `00-main` and `01-app` can contain as many subdirectories
+as you prefer. The document order is simply the alphabetical order of subdirectories and naming of markdown files.
+
+### Convert to a single Word DOCX
+
+```python
+# build.py
+from paradoc import OneDoc
+
+one = OneDoc()
+one.compile("MyDocument.docx")
+```
+
+### Performing variable substitution
+
+Assuming you have somewhere in any of your documents a variable `{{__val_gM__}}` the following
+example will substitute that variable with the number 1.15.
+
+```python
+# build.py
+from paradoc import OneDoc
+
+one = OneDoc()
+one.variables["val_gM"] = 1.15
+one.compile("MyDocument.docx")
+```
 
 ## For developers
 

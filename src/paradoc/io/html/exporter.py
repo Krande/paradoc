@@ -3,7 +3,7 @@ import pypandoc
 from paradoc import OneDoc
 
 
-class PdfExporter:
+class HTMLExporter:
     def __init__(self, one_doc: OneDoc):
         self.one_doc = one_doc
 
@@ -16,9 +16,14 @@ class PdfExporter:
 
         md_app_str = "\n".join([md.read_built_file() for md in one.md_files_app])
         combined_str = md_main_str + app_str + md_app_str
+
+        # html = markdown.markdown(combined_str)
+        # with open(dest_file, 'w') as f:
+        #     f.write(html)
+
         pypandoc.convert_text(
             combined_str,
-            one.FORMATS.PDF,
+            one.FORMATS.HTML,
             outputfile=str(dest_file),
             format="markdown",
             extra_args=[
@@ -32,7 +37,7 @@ class PdfExporter:
             filters=["pandoc-crossref"],
             encoding="utf8",
         )
-        print(f'Successfully exported PDF to "{dest_file}"')
+        print(f'Successfully exported HTML to "{dest_file}"')
 
 
 def docx2pdf(docx_file, output_file):

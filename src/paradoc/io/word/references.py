@@ -91,7 +91,6 @@ def add_bookmark(paragraph: Paragraph, bookmark_text, bookmark_name):
 
 
 def insert_caption(pg: Paragraph, prefix, run, text, is_appendix: bool):
-
     heading_ref = "Appendix" if is_appendix is True else '"Heading 1"'
 
     seq1 = pg._element._new_r()

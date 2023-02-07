@@ -1,2 +1,5 @@
+dev:
+	mamba env update --file environment.dev.yml --prune
+
 format:
-	black . && isort . && flake8 .
+	black --config pyproject.toml . && isort . && ruff . --fix

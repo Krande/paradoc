@@ -27,6 +27,17 @@ def test_report_markdown_to_docx(files_dir, test_dir):
         os.startfile(dest)
 
 
+def test_report_markdown_to_html(files_dir, test_dir):
+    source = files_dir / "doc1"
+    dest = test_dir / "report_md_html/index.html"
+
+    one = OneDoc(source, work_dir=dest.parent)
+    one.compile("index", auto_open=auto_open, export_format=OneDoc.FORMATS.HTML)
+
+    if auto_open is True:
+        os.startfile(dest)
+
+
 def test_compose_markdown_to_docx(files_dir, test_dir):
     source = files_dir / "doc2"
     dest = test_dir / "md_dir_to_docx/output.docx"
@@ -42,10 +53,11 @@ def test_report_crossref(files_dir, test_dir):
     os.makedirs(dest.parent, exist_ok=True)
     output = pypandoc.convert_file(
         str(source),
-        "docx",
+        to="docx",
         outputfile=str(dest),
         filters=["pandoc-crossref"],
         extra_args=[f"--resource-path={source.parent}"],
+        sandbox=False,
     )
     assert output == ""
     if auto_open is True:
