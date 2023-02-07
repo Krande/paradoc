@@ -9,6 +9,11 @@ on:
       - '.github/workflows/ci.yml'
     branches:
     - main
+  pull_request:
+    paths-ignore:
+      - setup.py
+    branches:
+      - main
 #  schedule:
 #    - cron: '0 0 * * 7'  # every sunday at midnight
 
