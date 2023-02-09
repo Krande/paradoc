@@ -15,6 +15,8 @@ from docxcompose.composer import Composer
 from paradoc.common import MY_DOCX_TMPL, MarkDownFile
 from paradoc.utils import get_list_of_files
 
+logger = logging.getLogger("paradoc")
+
 
 def delete_paragraph(paragraph):
     p = paragraph._element
@@ -33,14 +35,14 @@ def open_word_win32():
 
         word = win32com.client.DispatchEx("Word.Application")
     except (ModuleNotFoundError, ImportError):
-        logging.error(
+        logger.error(
             "Ensure you have you have win32com installed. "
             'Use "conda install -c conda-forge pywin32" to install. '
             f"{traceback.format_exc()}"
         )
         return None
     except BaseException as e:
-        logging.error(
+        logger.error(
             "Probably unable to find COM connection to Word application. "
             f"Is Word installed? {traceback.format_exc()}, {e}"
         )
@@ -61,7 +63,7 @@ def docx_update(docx_file):
         if len(word.ActiveDocument.TablesOfContents) > 0:
             word.ActiveDocument.TablesOfContents(1).Update()
         else:
-            logging.error("No table of contents is found")
+            logger.error("No table of contents is found")
         # word.ActiveDocument.TablesOfFigures(1).Update()
         # word.ActiveDocument.TablesOfFigures(2).Update()
     except Exception as e:
@@ -111,7 +113,7 @@ def iter_block_items(parent):
         elif isinstance(child, CT_Tbl):
             yield Table(child, parent)
         else:
-            logging.debug(f"Unrecognized child element type {type(child)}")
+            logger.debug(f"Unrecognized child element type {type(child)}")
 
 
 def convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_doc=None):
@@ -152,7 +154,7 @@ def convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_do
             encoding="utf8",
             sandbox=False,
         )
-        logging.info(output)
+        logger.info(output)
         files.append(str(new_file))
 
     # for i in range(0, len(files)):
@@ -163,7 +165,7 @@ def convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_do
     #     else:
     #         composer.append(doc)
     #
-    #     logging.info(f"Added {files[i]}")
+    #     logger.info(f"Added {files[i]}")
 
     composer.save(str(dest))
 
@@ -184,5 +186,5 @@ def add_to_composer(source_doc, md_files: List[MarkDownFile]) -> Composer:
         doc_in = Document(str(md.new_file))
         doc_in.add_page_break()
         composer_doc.append(doc_in)
-        logging.info(f"Added {md.new_file}")
+        logger.info(f"Added {md.new_file}")
     return composer_doc

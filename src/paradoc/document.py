@@ -13,6 +13,8 @@ from .equations import Equation
 from .exceptions import LatexNotInstalled
 from .utils import get_list_of_files
 
+logger = logging.getLogger("paradoc")
+
 
 class OneDoc:
     """
@@ -83,14 +85,14 @@ class OneDoc:
             os.makedirs(self.app_dir, exist_ok=True)
 
         for md_file_path in get_list_of_files(self.source_dir, ".md"):
-            logging.info(f'Adding markdown file "{md_file_path}"')
+            logger.info(f'Adding markdown file "{md_file_path}"')
             is_appendix = True if app_prefix in md_file_path else False
             md_file_path = pathlib.Path(md_file_path)
             rel_path = md_file_path.relative_to(self.source_dir)
             parents = list(rel_path.parents)
             top = str(parents[-2])
             if top == "temp":
-                logging.info(f"file {md_file_path} located in `temp` dir is skipped")
+                logger.info(f"file {md_file_path} located in `temp` dir is skipped")
                 continue
 
             new_file = self.build_dir / rel_path.with_suffix(".docx")
@@ -202,7 +204,7 @@ class OneDoc:
         self.equations[name] = Equation(name, func, custom_eq_str_compiler=custom_eq_str_compiler, **kwargs)
 
     def _perform_variable_substitution(self, use_table_var_substitution):
-        logging.info("Performing variable substitution")
+        logger.info("Performing variable substitution")
         for mdf in self.md_files_main + self.md_files_app:
             md_file = mdf.path
             os.makedirs(mdf.new_file.parent, exist_ok=True)
@@ -227,7 +229,7 @@ class OneDoc:
                 elif variables is not None:
                     new_str = str(variables)
                 else:
-                    logging.error(f'key "{key_clean}" located in {md_file} has not been substituted')
+                    logger.error(f'key "{key_clean}" located in {md_file} has not been substituted')
                     new_str = m.group(0)
 
                 md_str = md_str.replace(m.group(0), new_str)

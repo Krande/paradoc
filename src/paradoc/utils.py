@@ -8,6 +8,8 @@ import pypandoc
 from .common import MarkDownFile, Table
 from .equations import Equation
 
+logger = logging.getLogger("paradoc")
+
 
 def func_to_eq(func):
     """
@@ -68,7 +70,7 @@ def convert_markdown(
             encoding="utf8",
             sandbox=False,
         )
-        logging.info(output)
+        logger.info(output)
 
 
 def get_list_of_files(dir_path, file_ext=None, strict=False):
@@ -101,7 +103,7 @@ def get_list_of_files(dir_path, file_ext=None, strict=False):
         if strict:
             raise FileNotFoundError(msg)
         else:
-            logging.info(msg)
+            logger.info(msg)
 
     return all_files
 

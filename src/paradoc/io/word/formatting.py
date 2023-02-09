@@ -6,6 +6,8 @@ from docx.text.paragraph import Paragraph
 from .references import insert_caption_into_runs
 from .utils import iter_block_items
 
+logger = logging.getLogger("paradoc")
+
 
 def add_indented_normal(doc: Document):
     from docx.enum.style import WD_STYLE_TYPE
@@ -42,10 +44,10 @@ def format_paragraph(pg, document, paragraph_style_map: dict, index, doc: Docume
     style_name = pg.style.name
     new_style_name = paragraph_style_map.get(style_name, None)
     if "No table of contents entries found." in pg.text:
-        logging.info(f'Skipping Table of Contents at index "{index}"')
+        logger.info(f'Skipping Table of Contents at index "{index}"')
         return
 
-    logging.debug(style_name)
+    logger.debug(style_name)
     if style_name == "Compact":  # Is a bullet point list
         new_style = document.styles[new_style_name]
         pg.style = new_style
@@ -65,10 +67,10 @@ def format_paragraph(pg, document, paragraph_style_map: dict, index, doc: Docume
         new_style = document.styles[new_style_name]
         pg.style = new_style
 
-        logging.debug(f'Changed paragraph style "{pg.style}" to "{new_style_name}"')
+        logger.debug(f'Changed paragraph style "{pg.style}" to "{new_style_name}"')
     else:
         if style_name not in document.styles:
-            logging.info(f'StyleDoc missing style "{style_name}"')
+            logger.info(f'StyleDoc missing style "{style_name}"')
 
 
 def fix_headers_after_compose(doc: Document):
