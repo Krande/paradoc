@@ -1,12 +1,15 @@
-import logging
 import os
 import pathlib
 import re
 
 import pypandoc
 
+from paradoc.config import create_logger
+
 from .common import MarkDownFile, Table
 from .equations import Equation
+
+logger = create_logger()
 
 
 def func_to_eq(func):
@@ -68,7 +71,7 @@ def convert_markdown(
             encoding="utf8",
             sandbox=False,
         )
-        logging.info(output)
+        logger.info(output)
 
 
 def get_list_of_files(dir_path, file_ext=None, strict=False):
@@ -101,7 +104,7 @@ def get_list_of_files(dir_path, file_ext=None, strict=False):
         if strict:
             raise FileNotFoundError(msg)
         else:
-            logging.info(msg)
+            logger.info(msg)
 
     return all_files
 

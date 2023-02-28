@@ -1,4 +1,3 @@
-import logging
 from dataclasses import dataclass
 
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
@@ -9,8 +8,11 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
 from paradoc.common import Figure, Table
+from paradoc.config import create_logger
 
 from .references import add_seq_reference
+
+logger = create_logger()
 
 
 @dataclass
@@ -38,7 +40,7 @@ class DocXTableRef:
         tbl.style = tbl_format.style
         tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-        logging.info(f'Changed Table style from "{tbl.style}" to "{tbl_format.style}"')
+        logger.info(f'Changed Table style from "{tbl.style}" to "{tbl_format.style}"')
         for i, row in enumerate(tbl.rows):
             for cell in row.cells:
                 # https://python-docx.readthedocs.io/en/latest/api/enum/WdCellVerticalAlignment.html
@@ -85,7 +87,7 @@ class DocXTableRef:
             try:
                 row2 = self.docx_table.rows[2].cells[0].paragraphs[0]
             except IndexError as e:
-                logging.error(f"Second row not used by table. Using first error: '{e}'")
+                logger.error(f"Second row not used by table. Using first error: '{e}'")
                 row2 = self.docx_table.rows[1].cells[0].paragraphs[0]
 
             if "." not in row2.text:
