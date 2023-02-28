@@ -1,14 +1,15 @@
-import logging
 import os
 import pathlib
 import re
 
 import pypandoc
 
+from paradoc.config import create_logger
+
 from .common import MarkDownFile, Table
 from .equations import Equation
 
-logger = logging.getLogger("paradoc")
+logger = create_logger()
 
 
 def func_to_eq(func):

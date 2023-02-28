@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 import pathlib
 import shutil
@@ -8,12 +7,14 @@ from typing import Callable, Dict
 
 import pandas as pd
 
+from paradoc.config import create_logger
+
 from .common import DocXFormat, ExportFormats, Figure, MarkDownFile, Table, TableFormat
 from .equations import Equation
 from .exceptions import LatexNotInstalled
 from .utils import get_list_of_files
 
-logger = logging.getLogger("paradoc")
+logger = create_logger()
 
 
 class OneDoc:

@@ -1,12 +1,12 @@
-import logging
-
 from docx import Document
 from docx.text.paragraph import Paragraph
+
+from paradoc.config import create_logger
 
 from .references import insert_caption_into_runs
 from .utils import iter_block_items
 
-logger = logging.getLogger("paradoc")
+logger = create_logger()
 
 
 def add_indented_normal(doc: Document):

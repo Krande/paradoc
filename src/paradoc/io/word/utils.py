@@ -1,4 +1,3 @@
-import logging
 import os
 import pathlib
 import traceback
@@ -13,9 +12,10 @@ from docx.text.paragraph import Paragraph
 from docxcompose.composer import Composer
 
 from paradoc.common import MY_DOCX_TMPL, MarkDownFile
+from paradoc.config import create_logger
 from paradoc.utils import get_list_of_files
 
-logger = logging.getLogger("paradoc")
+logger = create_logger()
 
 
 def delete_paragraph(paragraph):
