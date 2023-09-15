@@ -1,0 +1,12 @@
+name: git-doc
+channels:
+  - conda-forge
+  - krande
+dependencies:
+  - fastapi
+  - python-dotenv
+  - paradoc
+  - uvicorn
+  - gitpython
+  - jinja2
+  - requests

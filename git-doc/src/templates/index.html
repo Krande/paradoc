@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI App</title>
+</head>
+<body>
+    <div style="display: flex; align-items: center; justify-content: space-between; background-color: #f5f5f5; padding: 10px;">
+        <input type="text" id="gitServer" value="http://localhost:3000" style="flex: 1; margin-right: 10px;">
+        <button onclick="refreshContent()">Refresh</button>
+    </div>
+    <div id="content" style="margin-top: 20px;"></div>
+
+    <script>
+        async function refreshContent() {
+            const gitServer = document.getElementById('gitServer').value;
+            const response = await fetch('/refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    git_server: gitServer
+                })
+            });
+            const data = await response.json();
+            document.getElementById('content').innerHTML = data.content;
+        }
+    </script>
+</body>
+</html>
