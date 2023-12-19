@@ -59,10 +59,13 @@ class OneDoc:
         clean_build_dir=True,
         create_dirs=False,
         output_dir=None,
+        work_dir=None,
         **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
-        self.work_dir = kwargs.get("work_dir", pathlib.Path("").resolve().absolute())
+        self.work_dir = pathlib.Path(work_dir) if work_dir is not None else pathlib.Path("")
+        self.work_dir = self.work_dir.resolve().absolute()
+
         self._main_prefix = main_prefix
         self._app_prefix = app_prefix
         self._output_dir = output_dir
@@ -127,7 +130,7 @@ class OneDoc:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
     def compile(self, output_name, auto_open=False, metadata_file=None, export_format=ExportFormats.DOCX, **kwargs):
-        dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format}").resolve().absolute()
+        dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format.value}").resolve().absolute()
 
         print(f'Compiling OneDoc report to "{dest_file}"')
         os.makedirs(self.build_dir, exist_ok=True)

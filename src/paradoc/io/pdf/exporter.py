@@ -30,7 +30,6 @@ class PdfExporter:
                 # f"--reference-doc={MY_DOCX_TMPL}",
             ],
             filters=["pandoc-crossref"],
-            encoding="utf8",
         )
         print(f'Successfully exported PDF to "{dest_file}"')
 
@@ -41,6 +40,5 @@ def docx2pdf(docx_file, output_file):
         "pdf",
         extra_args=["--pdf-engine=pdflatex"],
         outputfile=str(output_file),
-        encoding="utf8",
         sandbox=False,
     )

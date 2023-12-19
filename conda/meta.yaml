@@ -12,12 +12,12 @@ source:
 build:
   noarch: python
   number: 0
-  script: "{{ PYTHON }} -m pip install . -vv"
+  script: python -m pip install . --no-deps -vv
   entry_points:
     - paradoc=paradoc.cli_app:app
 
 requirements:
-  build:
+  host:
     - python
   run:
     - python
@@ -34,6 +34,7 @@ requirements:
     - pytexit
     - typer
     - nomkl
+    - pywin32  # [win]
 test:
   source_files:
     - tests

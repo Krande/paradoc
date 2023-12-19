@@ -27,7 +27,7 @@ classifiers = [
     "Topic :: Utilities",
 ]
 [project.scripts]
-ada-viewer = "paradoc.cli_app:app"
+paradoc = "paradoc.cli_app:app"
 
 [project.urls]
 "Homepage" = "https://github.com/Krande/paradoc"

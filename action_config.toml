@@ -3,7 +3,7 @@ enabled = true
 pre_release_tag = "dev"
 
 [tool.python.pip]
-enabled = true
+enabled = false
 
 [tool.python.conda]
 enabled = true

@@ -52,7 +52,6 @@ class WordExporter:
                     # f"--reference-doc={MY_DOCX_TMPL}",
                 ],
                 filters=["pandoc-crossref"],
-                encoding="utf8",
                 sandbox=False,
             )
 
@@ -87,7 +86,10 @@ class WordExporter:
 
     def format_tables(self, composer_doc: Document, is_appendix):
         for i, docx_tbl in enumerate(self.get_all_tables(composer_doc)):
-            cell0 = docx_tbl.get_content_cell0_pg()
+            try:
+                cell0 = docx_tbl.get_content_cell0_pg()
+            except IndexError:
+                continue
             tbl_name = cell0.text
             tbl = self.one_doc.tables.get(tbl_name, None)
             if tbl is None:
@@ -163,5 +165,4 @@ class WordExporter:
                 # f"--reference-doc={MY_DOCX_TMPL}",
             ],
             filters=["pandoc-crossref"],
-            encoding="utf8",
         )

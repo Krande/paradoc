@@ -68,7 +68,6 @@ def convert_markdown(
             outputfile=str(dest),
             extra_args=extra_args,
             filters=["pandoc-crossref"],
-            encoding="utf8",
             sandbox=False,
         )
         logger.info(output)
