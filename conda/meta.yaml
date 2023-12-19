@@ -34,6 +34,7 @@ requirements:
     - pytexit
     - typer
     - nomkl
+    - pywin32  # [win]
 test:
   source_files:
     - tests
