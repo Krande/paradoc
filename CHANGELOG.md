@@ -2,6 +2,13 @@
 
 
 
+## v0.1.1 (2023-12-19)
+
+### Fix
+
+* fix: pin conda versions of pandoc (#12) ([`c2ac758`](https://github.com/Krande/paradoc/commit/c2ac758c56300e9a4d2af99514c26175d217df83))
+
+
 ## v0.1.0 (2023-12-19)
 
 ### Chore
