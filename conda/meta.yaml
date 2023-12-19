@@ -1,17 +1,20 @@
 {% set name = "paradoc" %}
 {% set data = load_setup_py_data() %}
+{% set version = load_file_data('pyproject.toml')["project"]["version"] %}
 
 package:
   name: "{{ name|lower }}"
-  version: {{ data.get('version') }}
+  version: {{ version}}
 
 source:
   path: ../
 
 build:
+  noarch: python
   number: 0
   script: "{{ PYTHON }} -m pip install . -vv"
-#  preserve_egg_dir: True
+  entry_points:
+    - paradoc=paradoc.cli_app:app
 
 requirements:
   build:
@@ -29,6 +32,7 @@ requirements:
     - tabulate
     - svgwrite
     - pytexit
+    - typer
     - nomkl
 test:
   source_files:
