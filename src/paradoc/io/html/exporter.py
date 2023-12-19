@@ -35,7 +35,6 @@ class HTMLExporter:
                 # f"--reference-doc={MY_DOCX_TMPL}",
             ],
             filters=["pandoc-crossref"],
-            encoding="utf8",
         )
         print(f'Successfully exported HTML to "{dest_file}"')
 

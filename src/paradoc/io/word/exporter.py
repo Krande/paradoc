@@ -52,7 +52,6 @@ class WordExporter:
                     # f"--reference-doc={MY_DOCX_TMPL}",
                 ],
                 filters=["pandoc-crossref"],
-                encoding="utf8",
                 sandbox=False,
             )
 

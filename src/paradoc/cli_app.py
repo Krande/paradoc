@@ -1,4 +1,5 @@
 import typer
+
 from paradoc import OneDoc
 
 app = typer.Typer()
