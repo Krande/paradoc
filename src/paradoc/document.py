@@ -59,10 +59,13 @@ class OneDoc:
         clean_build_dir=True,
         create_dirs=False,
         output_dir=None,
+        work_dir=None,
         **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
-        self.work_dir = kwargs.get("work_dir", pathlib.Path("").resolve().absolute())
+        self.work_dir = pathlib.Path(work_dir) if work_dir is not None else pathlib.Path("")
+        self.work_dir = self.work_dir.resolve().absolute()
+
         self._main_prefix = main_prefix
         self._app_prefix = app_prefix
         self._output_dir = output_dir
