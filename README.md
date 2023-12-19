@@ -12,27 +12,42 @@ variable substitution. Use `{{__variable__}}` in your markdown files to insert a
 Install using
 
 ```
-conda install -c krande -c conda-forge paradoc
+mamba install -c krande -c conda-forge paradoc
 ```
 
 Note! This is a very experimental project so expect things to break.
 
-
 ## Usage
 
-Assuming you have a folder structure set up as this:
+Paradoc by default assumes you have a folder structure set up as this;
 
 ```mermaid
 graph LR
     . --> 00-main/
     . --> 01-app/
-    . --> build.py
 ```
+
 whereas `00-main` and `01-app` contains markdown (.md) files representing content in your
 main and appendix respectively. Both `00-main` and `01-app` can contain as many subdirectories
 as you prefer. The document order is simply the alphabetical order of subdirectories and naming of markdown files.
 
-### Convert to a single Word DOCX
+### Cli usage
+
+Make sure you activate the conda environment you installed `paradoc` in. Then run
+
+```bash
+paradoc . "my-doc" --auto-open
+```
+
+_(for now the variable substitution scheme is not implemented in the cli)_
+
+Use `paradoc --help` to see all available options.
+
+### Usage as a python module
+
+This is for more advanced users who want to integrate paradoc into their own build system.
+
+#### Convert to a single Word DOCX
 
 ```python
 # build.py
@@ -42,7 +57,9 @@ one = OneDoc()
 one.compile("MyDocument.docx")
 ```
 
-### Performing variable substitution
+_(this is pretty much what the cli does under the hood)_
+
+#### Performing variable substitution
 
 Assuming you have somewhere in any of your documents a variable `{{__val_gM__}}` the following
 example will substitute that variable with the number 1.15.
@@ -72,9 +89,6 @@ isort .
 flake8 .
 black .
 ````
-
-Or if you have make installed you can just run `make format` 
-to run all three tools at once.
 
 ## Project Responsible ###
 

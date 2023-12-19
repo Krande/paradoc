@@ -130,7 +130,7 @@ class OneDoc:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
     def compile(self, output_name, auto_open=False, metadata_file=None, export_format=ExportFormats.DOCX, **kwargs):
-        dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format}").resolve().absolute()
+        dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format.value}").resolve().absolute()
 
         print(f'Compiling OneDoc report to "{dest_file}"')
         os.makedirs(self.build_dir, exist_ok=True)

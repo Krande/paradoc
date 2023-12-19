@@ -3,6 +3,7 @@ from __future__ import annotations
 import pathlib
 import re
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import List, Union
 
 import pandas as pd
@@ -103,7 +104,7 @@ class MarkDownFile:
         return regx.finditer(self.read_original_file())
 
 
-class ExportFormats:
+class ExportFormats(str, Enum):
     DOCX = "docx"
     PDF = "pdf"
     HTML = "html"
