@@ -21,9 +21,9 @@ requirements:
     - python
   run:
     - python
-    - pandoc
-    - pandoc-crossref
-    - pypandoc
+    - pandoc 3.1.2
+    - pandoc-crossref 0.3.16
+    - pypandoc 1.12
     - python-docx
     - docxcompose
     - numpy
