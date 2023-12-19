@@ -1,0 +1,36 @@
+name: ci-branch-tests
+
+
+on: push
+
+concurrency:
+  group: paradoc-quick-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v1 # https://github.com/mamba-org/setup-micromamba
+        with:
+          cache-environment: true
+          condarc: |
+            channels:
+              - conda-forge
+              - krande
+          environment-file: environment.dev.yml
+          create-args: >-
+            python=3.11
+            pytest
+
+      - name: Install latest paradoc
+        run: |
+          pip install -e .
+
+      - name: Runs Tests
+        run: pytest ./tests

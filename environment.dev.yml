@@ -8,6 +8,7 @@ dependencies:
   - pypandoc
   - python-docx
   - docxcompose
+  - typer
   - numpy
   - pandas
   - openpyxl
