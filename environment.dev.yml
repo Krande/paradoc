@@ -3,9 +3,9 @@ channels:
   - conda-forge
   - krande
 dependencies:
-  - pandoc
-  - pandoc-crossref
-  - pypandoc
+  - pandoc 3.1.2
+  - pandoc-crossref 0.3.16
+  - pypandoc 1.12
   - python-docx
   - docxcompose
   - typer
