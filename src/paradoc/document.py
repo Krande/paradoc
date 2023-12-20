@@ -238,7 +238,7 @@ class OneDoc:
 
                 md_str = md_str.replace(m.group(0), new_str)
 
-            with open(mdf.build_file, "w", encoding='utf-8') as f:
+            with open(mdf.build_file, "w", encoding="utf-8") as f:
                 f.write(md_str)
 
     def _uniqueness_check(self, name):

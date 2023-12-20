@@ -1,8 +1,4 @@
-import copy
-
 from docx import Document
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
-from docx.styles.styles import Styles
 from docx.text.paragraph import Paragraph
 
 from paradoc.config import create_logger

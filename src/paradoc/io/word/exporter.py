@@ -41,14 +41,7 @@ class WordExporter:
                 ExportFormats.DOCX,
                 outputfile=str(mdf.new_file),
                 format="markdown",
-                extra_args=[
-                    "-M2GB",
-                    "+RTS",
-                    "-K64m",
-                    "-RTS",
-                    resource_paths,
-                    f"--metadata-file={one.metadata_file}"
-                ],
+                extra_args=["-M2GB", "+RTS", "-K64m", "-RTS", resource_paths, f"--metadata-file={one.metadata_file}"],
                 filters=["pandoc-crossref"],
                 sandbox=False,
             )
