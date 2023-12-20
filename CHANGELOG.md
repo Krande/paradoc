@@ -2,6 +2,13 @@
 
 
 
+## v0.1.2 (2023-12-20)
+
+### Fix
+
+* fix: formatting in exported docx paragraphs and bullet lists (#13) ([`41e2c3e`](https://github.com/Krande/paradoc/commit/41e2c3ebe3417eefc53ec647c04dfd21604d3e9c))
+
+
 ## v0.1.1 (2023-12-19)
 
 ### Fix
