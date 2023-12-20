@@ -25,13 +25,13 @@ class WordExporter:
         self.app_tmpl = app_tmpl
         self.use_custom_docx_compile = kwargs.get("use_custom_docx_compile", True)
 
-    def export(self, output_name, dest_file):
+    def export(self, output_name, dest_file, check_open_docs=False):
         if self.use_custom_docx_compile:
-            self._compile_individual_md_files_to_docx(output_name, dest_file)
+            self._compile_individual_md_files_to_docx(output_name, dest_file, check_open_docs)
         else:
             self._compile_docx_from_str(dest_file)
 
-    def _compile_individual_md_files_to_docx(self, output_name, dest_file):
+    def _compile_individual_md_files_to_docx(self, output_name, dest_file, check_open_docs=False):
         one = self.one_doc
 
         for mdf in one.md_files_main + one.md_files_app:
@@ -41,16 +41,7 @@ class WordExporter:
                 ExportFormats.DOCX,
                 outputfile=str(mdf.new_file),
                 format="markdown",
-                extra_args=[
-                    "-M2GB",
-                    "+RTS",
-                    "-K64m",
-                    "-RTS",
-                    # "--file-scope",
-                    resource_paths,
-                    f"--metadata-file={one.metadata_file}"
-                    # f"--reference-doc={MY_DOCX_TMPL}",
-                ],
+                extra_args=["-M2GB", "+RTS", "-K64m", "-RTS", resource_paths, f"--metadata-file={one.metadata_file}"],
                 filters=["pandoc-crossref"],
                 sandbox=False,
             )
@@ -77,7 +68,8 @@ class WordExporter:
         fix_headers_after_compose(composer_main.doc)
 
         print("Close Existing Word documents")
-        close_word_docs_by_name([output_name, f"{output_name}.docx"])
+        if check_open_docs:
+            close_word_docs_by_name([output_name, f"{output_name}.docx"])
 
         print(f'Saving Composed Document to "{dest_file}"')
         composer_main.save(dest_file)

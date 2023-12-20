@@ -165,9 +165,9 @@ class OneDoc:
                 use_table_name_in_cell_as_index = True
 
             self._perform_variable_substitution(use_table_name_in_cell_as_index)
-
+            check_open_docs = auto_open is True
             wordx = WordExporter(self, **kwargs)
-            wordx.export(output_name, dest_file)
+            wordx.export(output_name, dest_file, check_open_docs=check_open_docs)
         elif export_format == ExportFormats.PDF:
             from paradoc.io.pdf.exporter import PdfExporter
 
@@ -238,7 +238,7 @@ class OneDoc:
 
                 md_str = md_str.replace(m.group(0), new_str)
 
-            with open(mdf.build_file, "w") as f:
+            with open(mdf.build_file, "w", encoding="utf-8") as f:
                 f.write(md_str)
 
     def _uniqueness_check(self, name):
