@@ -115,7 +115,15 @@ class OneDoc:
 
             for fig in md_file.get_figures():
                 d = fig.groupdict()
-                ref = d["reference"]
+
+                # Check if the figure is commented out
+                # Get first newline right before regex search found start and till the end (capture entire line)
+                start = fig.string[: fig.start()].rfind("\n") + 1
+                end = fig.string[fig.start() :].find("\n") + fig.start()
+                line = fig.string[start:end]
+                if line.startswith("[//]: #"):
+                    continue
+                ref = d.get("reference", None)
                 caption = str(d["caption"])
                 file_path = d["file_path"]
                 name = ref if ref is not None else caption

@@ -101,7 +101,11 @@ class MarkDownFile:
 
     def get_figures(self):
         regx = re.compile(r"(?:!\[(?P<caption>.*?)\]\((?P<file_path>.*?)\)(?:{#fig:(?P<reference>.*?)}|))")
-        return regx.finditer(self.read_original_file())
+        yield from regx.finditer(self.read_original_file())
+
+        # scan for html image refs also <img src="fig_path" alt="Subtitle" width="300"/>
+        regx = re.compile(r'<img src="(?P<file_path>.*?)" alt="(?P<caption>.*?)"\s*(?:width="(?P<width>.*?)"|)\/>')
+        yield from regx.finditer(self.read_original_file())
 
 
 class ExportFormats(str, Enum):
