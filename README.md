@@ -15,7 +15,7 @@ Install using
 mamba install -c krande -c conda-forge paradoc
 ```
 
-_(Note! If you want to export to pdf you need to have latex installed (which can be included using))_
+_(Note! If you want to export to pdf you need to have latex installed (which on windows can be included using))_
 
 ```
 mamba install -c krande -c conda-forge paradoc miktex
