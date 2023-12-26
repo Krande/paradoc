@@ -2,6 +2,13 @@
 
 
 
+## v0.1.3 (2023-12-26)
+
+### Fix
+
+* fix: pdf and html export is working and minor fixes (#14) ([`65f0493`](https://github.com/Krande/paradoc/commit/65f0493a43c79f4ca5037df73add5d934ba94d5f))
+
+
 ## v0.1.2 (2023-12-20)
 
 ### Fix
