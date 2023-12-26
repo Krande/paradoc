@@ -1,27 +1,27 @@
 This is a demo file for pandoc-crossref. With this filter, you can
-cross-reference figures (see figs. 2-4), display equations (see eq. 1),
-tables (see tbl. 1) and sections (secs. 1, 2, 4.1-4.3)
+cross-reference figures (see figs. 2-4), display equations (see eq. 1),
+tables (see tbl. 1) and sections (secs. 1, 2, 4.1-4.3)
 
-For immediate example, see fig. 1
+For immediate example, see fig. 1
 
 ![Figure \# 1: A figure](img1.jpg){#fig:figure0}
 
-There is also support for code blocks, for example, lsts. 1-3
+There is also support for code blocks, for example, lsts. 1-3
 
-It's possible to capitalize reference prefixes, like this: Fig. 2.
+It's possible to capitalize reference prefixes, like this: Fig. 2.
 
 In case of multiple references, capitalization is determined by first
-reference. Figs. 2, 3 is capitalized, while figs. 2, 3 is not.
+reference. Figs. 2, 3 is capitalized, while figs. 2, 3 is not.
 
-It is also possible to mix different references, like fig. 2, tbl. 1,
-lsts. 1, 2, figs. 3, 4, which will be grouped in order they are
+It is also possible to mix different references, like fig. 2, tbl. 1,
+lsts. 1, 2, figs. 3, 4, which will be grouped in order they are
 specified. You can even intermix this with regular citations, although
-it's not recommended: fig. 2, tbl. 1, [@unprocessedCitation]
+it's not recommended: fig. 2, tbl. 1, [@unprocessedCitation]
 
 You can also have custom chapter reference labels, like
-sec. AppA.CustLab
+sec. AppA.CustLab
 
-Subfigures are supported, see figs. 5, 5 (b)
+Subfigures are supported, see figs. 5, 5 (b)
 
 Chapter 1. Figures {#sec:sec1}
 ==================

@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import os
 import pathlib
 import re
+import shutil
+from typing import TYPE_CHECKING
 
 import pypandoc
 
@@ -9,7 +13,19 @@ from paradoc.config import create_logger
 from .common import MarkDownFile, Table
 from .equations import Equation
 
+if TYPE_CHECKING:
+    from paradoc import OneDoc
 logger = create_logger()
+
+
+def copy_figures_to_dist(one: OneDoc, dest_dir: pathlib.Path):
+    # iterate figures and copy them to the destination folder
+    for fig in one.figures.values():
+        source_path = fig.md_instance.path.parent / fig.file_path
+        new_fig_path = dest_dir / fig.file_path
+        if not new_fig_path.parent.exists():
+            new_fig_path.parent.mkdir(parents=True)
+        shutil.copy(source_path, new_fig_path)
 
 
 def func_to_eq(func):
