@@ -15,6 +15,13 @@ Install using
 mamba install -c krande -c conda-forge paradoc
 ```
 
+_(Note! If you want to export to pdf you need to have latex installed (which can be included using))_
+
+```
+mamba install -c krande -c conda-forge paradoc miktex
+```
+
+
 Note! This is a very experimental project so expect things to break.
 
 ## Usage

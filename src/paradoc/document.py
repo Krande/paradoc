@@ -9,7 +9,15 @@ import pandas as pd
 
 from paradoc.config import create_logger
 
-from .common import DocXFormat, ExportFormats, Figure, MarkDownFile, Table, TableFormat
+from .common import (
+    MY_DEFAULT_HTML_CSS,
+    DocXFormat,
+    ExportFormats,
+    Figure,
+    MarkDownFile,
+    Table,
+    TableFormat,
+)
 from .equations import Equation
 from .exceptions import LatexNotInstalled
 from .utils import get_list_of_files
@@ -60,6 +68,7 @@ class OneDoc:
         create_dirs=False,
         output_dir=None,
         work_dir=None,
+        use_default_html_style=True,
         **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
@@ -81,6 +90,7 @@ class OneDoc:
         self.md_files_main = []
         self.md_files_app = []
         self.metadata_file = None
+        self._use_default_html_style = use_default_html_style
         self._setup(create_dirs, app_prefix, clean_build_dir)
 
     def _setup(self, create_dirs, app_prefix, clean_build_dir):
@@ -126,13 +136,15 @@ class OneDoc:
                 ref = d.get("reference", None)
                 caption = str(d["caption"])
                 file_path = d["file_path"]
+                if ' "' in file_path:
+                    file_path = file_path.split(' "')[0]
                 name = ref if ref is not None else caption
                 if caption in self.figures.keys():
                     raise ValueError(
                         f'Failed uniqueness check for Caption "{caption}". '
                         f"Uniqueness is required for OneDoc to index the figures"
                     )
-                self.figures[caption] = Figure(name, caption, ref, file_path)
+                self.figures[caption] = Figure(name, caption, ref, file_path, md_instance=md_file)
 
         if clean_build_dir is True:
             shutil.rmtree(self.build_dir, ignore_errors=True)
@@ -162,6 +174,11 @@ class OneDoc:
         if self.metadata_file.exists() is False:
             with open(self.metadata_file, "w") as f:
                 f.write('linkReferences: true\nnameInLink: true\nfigPrefix: "Figure"\ntblPrefix: "Table"')
+                if self._use_default_html_style is True:
+                    f.write("\nstylesheet: style.css")
+            css_style = self.source_dir / "style.css"
+            if css_style.exists() is False:
+                shutil.copy(MY_DEFAULT_HTML_CSS, css_style)
 
         if export_format == ExportFormats.DOCX:
             from paradoc.io.word.exporter import WordExporter

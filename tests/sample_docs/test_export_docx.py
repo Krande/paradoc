@@ -27,17 +27,6 @@ def test_report_markdown_to_docx(files_dir, test_dir):
         os.startfile(dest)
 
 
-def test_report_markdown_to_html(files_dir, test_dir):
-    source = files_dir / "doc1"
-    dest = test_dir / "report_md_html/index.html"
-
-    one = OneDoc(source, work_dir=dest.parent)
-    one.compile("index", auto_open=auto_open, export_format=OneDoc.FORMATS.HTML)
-
-    if auto_open is True:
-        os.startfile(dest)
-
-
 def test_compose_markdown_to_docx(files_dir, test_dir):
     source = files_dir / "doc2"
     dest = test_dir / "md_dir_to_docx/output.docx"

@@ -8,8 +8,10 @@ from typing import List, Union
 
 import pandas as pd
 
-MY_DOCX_TMPL = pathlib.Path(__file__).resolve().absolute().parent / "resources" / "template.docx"
-MY_DOCX_TMPL_BLANK = pathlib.Path(__file__).resolve().absolute().parent / "resources" / "template_blank.docx"
+RESOURCE_DIR = pathlib.Path(__file__).resolve().absolute().parent / "resources"
+MY_DOCX_TMPL = RESOURCE_DIR / "template.docx"
+MY_DOCX_TMPL_BLANK = RESOURCE_DIR / "template_blank.docx"
+MY_DEFAULT_HTML_CSS = RESOURCE_DIR / "default_style.css"
 
 
 @dataclass
@@ -48,7 +50,8 @@ class Table:
         df = self.df.copy()
         if include_name_in_cell:
             col_name = df.columns[0]
-            df.iloc[0, df.columns.get_loc(col_name)] = self.name
+            col_index = df.columns.get_loc(col_name)
+            df.iloc[0, col_index] = self.name
 
         props = dict(index=False, tablefmt="grid")
         if self.format.float_fmt is not None:
@@ -69,7 +72,7 @@ class Figure:
     reference: str
     file_path: str
     format: FigureFormat = field(default_factory=FigureFormat)
-    md_instances: List[MarkDownFile] = field(default_factory=list)
+    md_instance: MarkDownFile = field(default_factory=list)
     docx_instances: List[object] = field(default_factory=list)
 
 
@@ -92,7 +95,7 @@ class MarkDownFile:
 
     def read_built_file(self):
         """Read the Markdown file after performed variable substitution"""
-        with open(self.build_file, "r") as f:
+        with open(self.build_file, "r", encoding="utf-8") as f:
             return f.read()
 
     def get_variables(self):

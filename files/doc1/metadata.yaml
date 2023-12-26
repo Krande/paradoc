@@ -12,3 +12,4 @@ figPrefix: "Figure"
 tblPrefix: "Table"
 header-includes:
     - "\\newcommand{\\pcdoc}{Pandoc-crossref documentation}"
+stylesheet: "style.css"
