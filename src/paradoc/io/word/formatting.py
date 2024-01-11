@@ -91,6 +91,9 @@ def format_paragraph(pg, document: Document, paragraph_style_map: dict, index):
                 f"Available styles are:\n{styles}"
             )
         pg._p.style = new_style_name
+        if pg.style.name != new_style_name:
+            forced_style = document.styles[new_style_name]
+            pg.style = forced_style
         pg.paragraph_format.space_before = Pt(2)
         pg.paragraph_format.left_indent = Mm(15)
 

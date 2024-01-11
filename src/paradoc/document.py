@@ -98,10 +98,12 @@ class OneDoc:
             os.makedirs(self.main_dir, exist_ok=True)
             os.makedirs(self.app_dir, exist_ok=True)
 
-        main_dir_iter = get_list_of_files(self.main_dir, ".md")
-        app_dir_iter = get_list_of_files(self.app_dir, ".md")
+        content_iters = [get_list_of_files(self.main_dir, ".md")]
+        if self.app_dir.exists():
+            content_iters.append(get_list_of_files(self.app_dir, ".md"))
+
         # chain to single iterable
-        md_file_iter = chain(main_dir_iter, app_dir_iter)
+        md_file_iter = chain(*content_iters)
 
         for md_file_path in md_file_iter:
             logger.info(f'Adding markdown file "{md_file_path}"')
@@ -155,6 +157,9 @@ class OneDoc:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
     def compile(self, output_name, auto_open=False, metadata_file=None, export_format=ExportFormats.DOCX, **kwargs):
+        if isinstance(export_format, str):
+            export_format = ExportFormats(export_format)
+
         dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format.value}").resolve().absolute()
 
         print(f'Compiling OneDoc report to "{dest_file}"')
