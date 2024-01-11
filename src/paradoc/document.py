@@ -9,6 +9,7 @@ from typing import Callable, Dict, Iterable
 import pandas as pd
 
 from paradoc.config import create_logger
+
 from .common import (
     MY_DEFAULT_HTML_CSS,
     DocXFormat,
