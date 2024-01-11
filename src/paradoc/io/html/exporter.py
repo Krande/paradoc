@@ -36,6 +36,9 @@ class HTMLExporter:
         styled_html = f"""<html>
         <head>
         <link rel="stylesheet" type="text/css" href="style.css">
+        <script type="text/javascript" async
+            src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.1.2/es5/tex-mml-chtml.js">
+        </script>
         </head>
         <body>
         {html_str}
