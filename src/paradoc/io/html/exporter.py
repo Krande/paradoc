@@ -1,3 +1,5 @@
+import shutil
+
 import pypandoc
 
 from paradoc import OneDoc
@@ -47,4 +49,9 @@ class HTMLExporter:
 
         with open(dest_file, "w", encoding="utf-8") as f:
             f.write(styled_html)
+
+        style_css_file = one.source_dir / "style.css"
+        if style_css_file.exists():
+            shutil.copy(style_css_file, dest_file.parent / "style.css")
+
         print(f'Successfully exported HTML to "{dest_file}"')

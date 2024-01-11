@@ -4,7 +4,7 @@ import os
 import pathlib
 import shutil
 from itertools import chain
-from typing import Callable, Dict
+from typing import Callable, Dict, Iterable
 
 import pandas as pd
 
@@ -91,29 +91,30 @@ class OneDoc:
         self.md_files_app = []
         self.metadata_file = None
         self._use_default_html_style = use_default_html_style
-        self._setup(create_dirs, app_prefix, clean_build_dir)
+        self._setup(create_dirs, clean_build_dir)
 
-    def _setup(self, create_dirs, app_prefix, clean_build_dir):
-        if create_dirs is True:
-            os.makedirs(self.main_dir, exist_ok=True)
-            os.makedirs(self.app_dir, exist_ok=True)
-
+    def _iter_md_files(self) -> Iterable[pathlib.Path]:
         content_iters = [get_list_of_files(self.main_dir, ".md")]
         if self.app_dir.exists():
             content_iters.append(get_list_of_files(self.app_dir, ".md"))
 
         # chain to single iterable
         md_file_iter = chain(*content_iters)
-
         for md_file_path in md_file_iter:
+            yield pathlib.Path(md_file_path)
+
+    def _setup(self, create_dirs, clean_build_dir):
+        if create_dirs is True:
+            os.makedirs(self.main_dir, exist_ok=True)
+            os.makedirs(self.app_dir, exist_ok=True)
+
+        for md_file_path in self._iter_md_files():
             logger.info(f'Adding markdown file "{md_file_path}"')
-            is_appendix = True if app_prefix in md_file_path else False
+            is_appendix = self.app_dir in md_file_path.parents
             md_file_path = pathlib.Path(md_file_path)
             rel_path = md_file_path.relative_to(self.source_dir)
-            parents = list(rel_path.parents)
-            top = str(parents[-2])
-            if top == "temp":
-                logger.info(f"file {md_file_path} located in `temp` dir is skipped")
+            if self.dist_dir in md_file_path.parents:
+                logger.info(f"file {md_file_path} located in `dist_dir` dir is skipped")
                 continue
 
             new_file = self.build_dir / rel_path.with_suffix(".docx")
@@ -167,8 +168,7 @@ class OneDoc:
         self.dist_dir.mkdir(exist_ok=True, parents=True)
 
         # Move all non-md files to temp dir because pandoc (tested on 2.19.2) struggles with external resource paths
-        for f in get_list_of_files(self.source_dir):
-            fp = pathlib.Path(f)
+        for fp in self._iter_md_files():
             rel_path = fp.relative_to(self.source_dir)
             if fp.suffix in (".md", ".yaml"):
                 continue
