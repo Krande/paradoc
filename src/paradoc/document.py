@@ -3,12 +3,12 @@ from __future__ import annotations
 import os
 import pathlib
 import shutil
+from itertools import chain
 from typing import Callable, Dict
 
 import pandas as pd
 
 from paradoc.config import create_logger
-
 from .common import (
     MY_DEFAULT_HTML_CSS,
     DocXFormat,
@@ -72,7 +72,7 @@ class OneDoc:
         **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
-        self.work_dir = pathlib.Path(work_dir) if work_dir is not None else pathlib.Path("")
+        self.work_dir = pathlib.Path(work_dir).resolve().absolute() if work_dir is not None else pathlib.Path("")
         self.work_dir = self.work_dir.resolve().absolute()
 
         self._main_prefix = main_prefix
@@ -98,7 +98,12 @@ class OneDoc:
             os.makedirs(self.main_dir, exist_ok=True)
             os.makedirs(self.app_dir, exist_ok=True)
 
-        for md_file_path in get_list_of_files(self.source_dir, ".md"):
+        main_dir_iter = get_list_of_files(self.main_dir, ".md")
+        app_dir_iter = get_list_of_files(self.app_dir, ".md")
+        # chain to single iterable
+        md_file_iter = chain(main_dir_iter, app_dir_iter)
+
+        for md_file_path in md_file_iter:
             logger.info(f'Adding markdown file "{md_file_path}"')
             is_appendix = True if app_prefix in md_file_path else False
             md_file_path = pathlib.Path(md_file_path)
@@ -153,8 +158,8 @@ class OneDoc:
         dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format.value}").resolve().absolute()
 
         print(f'Compiling OneDoc report to "{dest_file}"')
-        os.makedirs(self.build_dir, exist_ok=True)
-        os.makedirs(self.dist_dir, exist_ok=True)
+        self.build_dir.mkdir(exist_ok=True, parents=True)
+        self.dist_dir.mkdir(exist_ok=True, parents=True)
 
         # Move all non-md files to temp dir because pandoc (tested on 2.19.2) struggles with external resource paths
         for f in get_list_of_files(self.source_dir):
