@@ -2,6 +2,13 @@
 
 
 
+## v0.2.0 (2024-01-11)
+
+### Feature
+
+* feat: support math rendering in html and various bug fixes (#15) ([`70e0e90`](https://github.com/Krande/paradoc/commit/70e0e907ec1132de3aff1e1042339ec5721f9df7))
+
+
 ## v0.1.3 (2023-12-26)
 
 ### Fix
