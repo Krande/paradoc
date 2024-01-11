@@ -109,7 +109,7 @@ def fix_headers_after_compose(doc: Document):
 
     pg_rem = []
     for pg in iter_block_items(doc):
-        if type(pg) == Paragraph:
+        if isinstance(pg, Paragraph):
             if pg.style.name in ("Image Caption", "Table Caption"):
                 continue
             else:
