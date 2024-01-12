@@ -2,6 +2,13 @@
 
 
 
+## v0.3.1 (2024-01-12)
+
+### Fix
+
+* fix: iframe scrolling for the optional navbar support (#17) ([`8c24f82`](https://github.com/Krande/paradoc/commit/8c24f8220b4ad248ed5d68d0a340ddaf1aaa9f52))
+
+
 ## v0.3.0 (2024-01-12)
 
 ### Feature
