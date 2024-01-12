@@ -2,6 +2,13 @@
 
 
 
+## v0.3.0 (2024-01-12)
+
+### Feature
+
+* feat: Add optional navbar to html export (#16) ([`605474c`](https://github.com/Krande/paradoc/commit/605474c71779f10c51b846079e0e73bfe644fedc))
+
+
 ## v0.2.0 (2024-01-11)
 
 ### Feature
