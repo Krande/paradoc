@@ -11,7 +11,7 @@ html {
 
 body {
   color: #444;
-  font-family: Georgia, Palatino, 'Palatino Linotype', Times, 'Times New Roman', serif;
+  font-family: Arial, serif;
   font-size: 12px;
   line-height: 1.7;
   padding: 1em;
@@ -325,4 +325,29 @@ table td {
   h2, h3 {
     page-break-after: avoid;
   }
+}
+
+/* Basic styling for the navigation bar */
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 20%;
+    height: 100%;
+    overflow: auto;
+    background-color: #f0f0f0;
+    padding: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.navbar a {
+    display: block;
+    padding: 5px;
+    margin: 5px 0;
+    text-decoration: none;
+    color: black;
+}
+
+.navbar a:hover {
+    background-color: #ddd;
 }

@@ -91,7 +91,7 @@ class OneDoc:
         self.md_files_main = []
         self.md_files_app = []
         self.metadata_file = None
-        self._use_default_html_style = use_default_html_style
+        self.use_default_html_style = use_default_html_style
         self._setup(create_dirs, clean_build_dir)
 
     def _iter_md_files(self) -> Iterable[pathlib.Path]:
@@ -185,7 +185,7 @@ class OneDoc:
         if self.metadata_file.exists() is False:
             with open(self.metadata_file, "w") as f:
                 f.write('linkReferences: true\nnameInLink: true\nfigPrefix: "Figure"\ntblPrefix: "Table"')
-                if self._use_default_html_style is True:
+                if self.use_default_html_style is True:
                     f.write("\nstylesheet: style.css")
             css_style = self.source_dir / "style.css"
             if css_style.exists() is False:
@@ -222,7 +222,7 @@ class OneDoc:
 
             self._perform_variable_substitution(False)
             html = HTMLExporter(self)
-            html.export(dest_file)
+            html.export(dest_file, include_navbar=kwargs.get("include_navbar", True))
         else:
             raise NotImplementedError(f'Export format "{export_format}" is not yet supported')
 
