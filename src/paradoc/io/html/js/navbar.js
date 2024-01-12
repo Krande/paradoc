@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         headers.forEach(function(header) {
             const headerText = header.textContent.replace(/\s+/g, '');
-            const level = parseInt(header.tagName.substring(1)) - 1; // Define level here
+            const level = parseInt(header.tagName.substring(1)) - 1;
 
             if (headerText === appendixStartText) {
                 inAppendix = true;
@@ -22,8 +22,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
             let number;
             if (inAppendix) {
-                if (level === 0) { // Increment letter for each h1 in appendix
-                    if (counters[0] > 0) { // Increment letter after the first h1
+                if (level === 0) {
+                    if (counters[0] > 0) {
                         currentAppendixLetter = String.fromCharCode(currentAppendixLetter.charCodeAt(0) + 1);
                     }
                     counters = [0, 0, 0, 0, 0, 0];
@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 counters[level]++;
                 number = counters.slice(0, level + 1).join(".");
             }
-            // reset lower levels
+
             for (let i = level + 1; i < counters.length; i++) {
                 counters[i] = 0;
             }
@@ -46,6 +46,13 @@ document.addEventListener("DOMContentLoaded", function() {
             link.href = "#" + header.id;
             link.textContent = header.textContent;
             link.style.paddingLeft = `${indentSize * level}px`;
+            link.addEventListener('click', function(event) {
+                event.preventDefault();
+                const targetElement = document.getElementById(header.id);
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
 
             navbar.appendChild(link);
         });
