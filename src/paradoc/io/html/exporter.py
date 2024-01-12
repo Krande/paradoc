@@ -43,12 +43,13 @@ class HTMLExporter:
         if include_navbar:
             js_script = "<script>\n" + open(THIS_DIR / "js/navbar.js", "r").read() + "\n</script>"
 
-        app_file1 = open(one.md_files_app[0].path, "r").read()
         app_head_text = ""
-        for line in app_file1.splitlines():
-            if line.startswith("# "):
-                app_head_text = line[2:]
-                break
+        if len(one.md_files_app) > 0:
+            app_file1 = open(one.md_files_app[0].path, "r").read()
+            for line in app_file1.splitlines():
+                if line.startswith("# "):
+                    app_head_text = line[2:]
+                    break
 
         styled_html = f"""<html>
         <head>
