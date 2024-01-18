@@ -86,7 +86,7 @@ class Table:
             data.append([x.strip() for x in line.split("|")[1:-1]])
 
         caption = table_caption_str.split("Table:")[1].strip()
-        caption = caption.split('{')[0].strip()
+        caption = caption.split("{")[0].strip()
         # Create a pandas DataFrame using the extracted header and data rows
         df = pd.DataFrame(data, columns=header)
         name = str(df.values[0][0])
@@ -143,7 +143,7 @@ class MarkDownFile:
         yield from regx.finditer(self.read_original_file())
 
     def get_tables(self):
-        regx = re.compile(r'(\|.*?\nTable:.*?$)', re.MULTILINE | re.DOTALL)
+        regx = re.compile(r"(\|.*?\nTable:.*?$)", re.MULTILINE | re.DOTALL)
         yield from regx.finditer(self.read_original_file())
 
 

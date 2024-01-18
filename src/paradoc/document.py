@@ -61,16 +61,16 @@ class OneDoc:
     FORMATS = ExportFormats
 
     def __init__(
-            self,
-            source_dir=None,
-            main_prefix="00-main",
-            app_prefix="01-app",
-            clean_build_dir=True,
-            create_dirs=False,
-            output_dir=None,
-            work_dir="temp",
-            use_default_html_style=True,
-            **kwargs,
+        self,
+        source_dir=None,
+        main_prefix="00-main",
+        app_prefix="01-app",
+        clean_build_dir=True,
+        create_dirs=False,
+        output_dir=None,
+        work_dir="temp",
+        use_default_html_style=True,
+        **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
         self.work_dir = pathlib.Path(work_dir).resolve().absolute()
@@ -138,7 +138,7 @@ class OneDoc:
                 # Check if the figure is commented out
                 # Get first newline right before regex search found start and till the end (capture entire line)
                 start = fig.string[: fig.start()].rfind("\n") + 1
-                end = fig.string[fig.start():].find("\n") + fig.start()
+                end = fig.string[fig.start() :].find("\n") + fig.start()
                 line = fig.string[start:end]
                 if line.startswith("[//]: #"):
                     continue
