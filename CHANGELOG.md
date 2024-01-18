@@ -2,6 +2,13 @@
 
 
 
+## v0.3.2 (2024-01-18)
+
+### Chore
+
+* chore: remove hardcoded &#34;temp&#34; subdir between work and _dist and _build (#18) ([`2aa7be5`](https://github.com/Krande/paradoc/commit/2aa7be5f169472261fc3f3bbf6a858b03e5cb8f2))
+
+
 ## v0.3.1 (2024-01-12)
 
 ### Fix
