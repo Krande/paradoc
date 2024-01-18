@@ -2,6 +2,13 @@
 
 
 
+## v0.3.3 (2024-01-18)
+
+### Fix
+
+* fix: parse existing tables from markdown (#19) ([`dbc0372`](https://github.com/Krande/paradoc/commit/dbc0372f089bd3811740aab88bcb63972f39eaa7))
+
+
 ## v0.3.2 (2024-01-18)
 
 ### Chore
