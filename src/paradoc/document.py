@@ -68,12 +68,12 @@ class OneDoc:
         clean_build_dir=True,
         create_dirs=False,
         output_dir=None,
-        work_dir=None,
+        work_dir="temp",
         use_default_html_style=True,
         **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
-        self.work_dir = pathlib.Path(work_dir).resolve().absolute() if work_dir is not None else pathlib.Path("")
+        self.work_dir = pathlib.Path(work_dir).resolve().absolute()
         self.work_dir = self.work_dir.resolve().absolute()
 
         self._main_prefix = main_prefix
@@ -300,11 +300,11 @@ class OneDoc:
 
     @property
     def build_dir(self):
-        return self.work_dir / "temp" / "_build"
+        return self.work_dir / "_build"
 
     @property
     def dist_dir(self):
-        return self.work_dir / "temp" / "_dist"
+        return self.work_dir / "_dist"
 
     @property
     def output_dir(self):
