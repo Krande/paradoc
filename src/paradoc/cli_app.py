@@ -11,7 +11,7 @@ def main(
     source_dir: str,
     report_name: str,
     auto_open: bool = False,
-    work_dir: str = None,
+    work_dir: str = "temp",
     export_format: ExportFormats = ExportFormats.DOCX,
 ):
     one = OneDoc(source_dir, work_dir=work_dir)
