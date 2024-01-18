@@ -16,3 +16,10 @@ def test_table(files_dir, test_dir):
     one.add_table("my_table_5", df, "No Space 3")
 
     one.compile("TableDoc")
+
+
+def test_regular_table(files_dir, test_dir):
+    report_dir = files_dir / "doc_regular_table"
+    one = OneDoc(report_dir, work_dir=test_dir / "doc_regular_table")
+
+    one.compile("TableDoc", export_format="docx")

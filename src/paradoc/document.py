@@ -155,6 +155,10 @@ class OneDoc:
                     )
                 self.figures[caption] = Figure(name, caption, ref, file_path, md_instance=md_file)
 
+            for re_table in md_file.get_tables():
+                table = Table.from_markdown_str(re_table.group(1))
+                self.tables[table.name] = table
+
         if clean_build_dir is True:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 

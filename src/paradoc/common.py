@@ -41,6 +41,7 @@ class Table:
     add_link: bool = True
     md_instances: List[MarkDownFile] = field(default_factory=list)
     docx_instances: List[object] = field(default_factory=list)
+    link_name_override: str = None
 
     def __post_init__(self):
         if self.df is None:
@@ -61,8 +62,39 @@ class Table:
             return tbl_str
         tbl_str += f"\n\nTable: {self.caption}"
         if self.add_link:
-            tbl_str += f" {{#tbl:{self.name}}}"
+            if self.link_name_override is None:
+                link_name = self.name
+            else:
+                link_name = self.link_name_override
+
+            tbl_str += f" {{#tbl:{link_name}}}"
         return tbl_str
+
+    @staticmethod
+    def from_markdown_str(table_str: str) -> Table:
+        """Parse a markdown table string and return a Table instance"""
+        lines = table_str.splitlines()
+        header = [x.strip() for x in lines[0].split("|")[1:-1]]
+        data = []
+        table_caption_str = None
+        for line in lines[2:]:
+            if line == "":
+                continue
+            if line.strip().startswith("Table:"):
+                table_caption_str = line.strip()
+                break
+            data.append([x.strip() for x in line.split("|")[1:-1]])
+
+        caption = table_caption_str.split("Table:")[1].strip()
+        caption = caption.split("{")[0].strip()
+        # Create a pandas DataFrame using the extracted header and data rows
+        df = pd.DataFrame(data, columns=header)
+        name = str(df.values[0][0])
+        tbl_ref = re.search(r"{#tbl:(.*?)}", table_str)
+        link_override = None
+        if tbl_ref is not None:
+            link_override = tbl_ref.group(1)
+        return Table(name=name, df=df, caption=caption, link_name_override=link_override)
 
 
 @dataclass
@@ -108,6 +140,10 @@ class MarkDownFile:
 
         # scan for html image refs also <img src="fig_path" alt="Subtitle" width="300"/>
         regx = re.compile(r'<img src="(?P<file_path>.*?)" alt="(?P<caption>.*?)"\s*(?:width="(?P<width>.*?)"|)\/>')
+        yield from regx.finditer(self.read_original_file())
+
+    def get_tables(self):
+        regx = re.compile(r"(\|.*?\nTable:.*?$)", re.MULTILINE | re.DOTALL)
         yield from regx.finditer(self.read_original_file())
 
 
