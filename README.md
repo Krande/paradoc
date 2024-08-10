@@ -12,13 +12,13 @@ variable substitution. Use `{{__variable__}}` in your markdown files to insert a
 Install using
 
 ```
-mamba install -c krande -c conda-forge paradoc
+mamba install paradoc
 ```
 
 _(Note! If you want to export to pdf you need to have latex installed (which on windows can be included using))_
 
 ```
-mamba install -c krande -c conda-forge paradoc miktex
+mamba install paradoc miktex
 ```
 
 
