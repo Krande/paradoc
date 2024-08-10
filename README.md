@@ -1,9 +1,9 @@
 # Paradoc
 
-[![Anaconda-Server Badge](https://anaconda.org/krande/paradoc/badges/version.svg)](https://anaconda.org/krande/paradoc)
-[![Anaconda-Server Badge](https://anaconda.org/krande/paradoc/badges/latest_release_date.svg)](https://anaconda.org/krande/paradoc)
-[![Anaconda-Server Badge](https://anaconda.org/krande/paradoc/badges/platforms.svg)](https://anaconda.org/krande/paradoc)
-[![Anaconda-Server Badge](https://anaconda.org/krande/paradoc/badges/downloads.svg)](https://anaconda.org/krande/paradoc)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/paradoc/badges/version.svg)](https://anaconda.org/conda-forge/paradoc)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/paradoc/badges/latest_release_date.svg)](https://anaconda.org/conda-forge/paradoc)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/paradoc/badges/platforms.svg)](https://anaconda.org/conda-forge/paradoc)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/paradoc/badges/downloads.svg)](https://anaconda.org/conda-forge/paradoc)
 
 A python library for parametric documentation based on markdown and pandoc. `paradoc` brings
 some additional functionality to ensure improved end-formatting for .docx exports and integrating 
