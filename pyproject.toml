@@ -36,6 +36,16 @@ paradoc = "paradoc.cli_app:app"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+paradoc = [
+    "resources/default_style.css",
+    "resources/template.docx",
+    "resources/template_blank.docx",
+    "io/html/js/*.js",
+    "svg/templates/*.svg",
+    "svg/templates/titleblocks/*.svg",
+]
+
 [tool.black]
 line-length = 120
 

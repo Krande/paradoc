@@ -1,7 +1,6 @@
 name: paradoc
 channels:
   - conda-forge
-  - krande
 dependencies:
   - pandoc 3.1.2
   - pandoc-crossref 0.3.16
