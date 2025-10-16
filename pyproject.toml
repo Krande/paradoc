@@ -49,3 +49,67 @@ profile = "black"
 [tool.flake8]
 max-line-length = 120
 ignore = ["E24", "E121", "E123", "E126", "E203", "E226", "E704", "E741", "W503", "W504"]
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64"]
+
+[tool.pixi.environments]
+prod = { features = ["prod"], solve-group = "prod", no-default-feature = true }
+tests-core = { features = ["tests-core"], solve-group = "prod", no-default-feature = true }
+tests = { features = ["tests", "tests-core", "prod"], solve-group = "prod", no-default-feature = true }
+lint = { features = ["lint"], no-default-feature = true }
+profile = { features = ["profile", "prod"], solve-group = "prod", no-default-feature = true }
+frontend = { features = ["frontend"], no-default-feature = true }
+docs = { features = ["docs", "prod", "tests-core"], no-default-feature = true }
+
+
+[tool.pixi.feature.prod.dependencies]
+pandoc = "==3.1.2"
+pandoc-crossref = "==0.3.16"
+pypandoc = "==1.12"
+python-docx = "*"
+docxcompose = "*"
+typer = "*"
+numpy = "*"
+pandas = "*"
+openpyxl = "*"
+tabulate = "*"
+svgwrite = "*"
+pytexit = "*"
+nomkl = "*"
+
+[tool.pixi.feature.tests-core.dependencies]
+pytest = "*"
+
+[tool.pixi.feature.frontend.dependencies]
+nodejs = "*"
+
+[tool.pixi.feature.lint.dependencies]
+black = "==24.4.2"
+isort = "==5.13.2"
+ruff = "==0.12.8"
+
+[tool.pixi.feature.profile.dependencies]
+pytest = "*"
+pytest-benchmark = "*"
+pytest-asyncio = "*"
+pyinstrument = "*"
+
+[tool.pixi.feature.docs.dependencies]
+mkdocs = "==1.6.1"
+mkdocstrings = "*"
+mkdocstrings-python = "*"
+mkdocs-material = "*"
+mkdocs-jupyter = "*"
+mkdocs-glightbox = "*"
+
+[tool.pixi.feature.tests.tasks]
+test = { cmd = "pytest tests", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
+
+[tool.pixi.feature.lint.tasks]
+lint = "black . --config pyproject.toml && ruff check . --fix && isort ."
+
+[tool.pixi.feature.docs.tasks]
+build = { cmd = "mkdocs build", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
+serve = { cmd = "mkdocs serve -a localhost:8080", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }

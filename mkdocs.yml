@@ -1,0 +1,65 @@
+# mkdocs.yml
+site_name: Paradoc
+repo_url: https://github.com/Krande/paradoc
+edit_uri: edit/main/docs/
+
+nav:
+  - Home: index.md
+
+plugins:
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          load_external_modules: false
+          paths: [src]  # search packages in the src folder
+  - mkdocs-jupyter:
+      theme: dark
+      include_requirejs: True
+      include_source: True
+      execute: True # set True when compiling for final documentation
+  - glightbox: # https://github.com/blueswen/mkdocs-glightbox?tab=readme-ov-file#usage
+      width: 100%
+      background: "#1f2129"
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - attr_list
+  - md_in_html
+  - pymdownx.blocks.caption
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+# https://squidfunk.github.io/mkdocs-material/getting-started/
+theme:
+  name: "material"
+  custom_dir: docs/overrides
+  palette:
+    # Palette toggle for dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.instant
+    - content.code.copy
+
+# Adding the src/param_models to the PYTHONPATH so mkdocstrings can find it
+extra:
+  mkdocs:
+    python_path: src

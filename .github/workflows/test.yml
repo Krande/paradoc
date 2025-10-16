@@ -16,21 +16,11 @@ jobs:
         shell: bash -l {0}
     steps:
       - uses: actions/checkout@v4
-      - uses: mamba-org/setup-micromamba@v1 # https://github.com/mamba-org/setup-micromamba
+      - uses: prefix-dev/setup-pixi@v0.9.1 # https://github.com/prefix-dev/setup-pixi
         with:
-          cache-environment: true
-          condarc: |
-            channels:
-              - conda-forge
-              - krande
-          environment-file: environment.dev.yml
-          create-args: >-
-            python=3.11
-            pytest
-
-      - name: Install latest paradoc
-        run: |
-          pip install -e .
+          pixi-version: v0.55.0
+          environments: tests
+          cache: true
 
       - name: Runs Tests
-        run: pytest ./tests
+        run: pixi run test
