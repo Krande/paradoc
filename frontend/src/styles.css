@@ -1,0 +1,12 @@
+@import "tailwindcss";
+@import "./paradoc-default.css";
+
+/* App base styles */
+html, body, #root {
+  height: 100%;
+}
+
+/* Typography tweaks for prose */
+.prose {
+  --tw-prose-headings: rgb(17 24 39);
+}

@@ -85,6 +85,10 @@ pytest = "*"
 [tool.pixi.feature.frontend.dependencies]
 nodejs = "*"
 
+[tool.pixi.feature.frontend.tasks]
+winstall = { cmd = "npm install", cwd = "./frontend", outputs = ["$PIXI_PROJECT_ROOT/frontend/node_modules"] }
+wdev = { cmd = "npm run dev --prefix frontend", depends-on = ["winstall"] }
+
 [tool.pixi.feature.lint.dependencies]
 black = "==24.4.2"
 isort = "==5.13.2"

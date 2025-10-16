@@ -11,6 +11,12 @@ You always perform tests at the end of each development cycle to ensure that you
 * Typescript
 * React
 * vite
+* nodejs
+
+#### Functional requirements
+The frontend is a single page document reader app. 
+The frontend should also spin up a websocket server upon startup. 
+The websocket server receives html content which are documents from pandoc converted html from markdown. 
 
 #### Style guide
 
@@ -34,11 +40,8 @@ Or if you want to test the quetz backend tests you can run `pixi run qtest` whic
 .github/
 .junie/
 docs/
+src/paradoc
 frontend/
 tests/
-pixi.toml
 pyproject.toml
-prod.Dockerfile
 ```
-
-integration tests are in `tests/integration`
