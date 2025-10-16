@@ -2,7 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Topbar } from './components/Topbar'
 import { Navbar, TocItem } from './components/Navbar'
 
-const WS_URL = 'ws://localhost:13579'
+// WebSocket management is delegated to a Web Worker that reconnects and forwards messages
+// Vite will inline the worker into the single-file build
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+const WorkerCtor = (URL as any) ? (url: string) => new Worker(new URL(url, import.meta.url), { type: 'module' }) : null
 
 const MOCK_HTML = `
   <main>
@@ -19,7 +23,7 @@ const MOCK_HTML = `
 export default function App() {
   const [connected, setConnected] = useState<boolean>(false)
   const [docHtml, setDocHtml] = useState<string>(MOCK_HTML)
-  const wsRef = useRef<WebSocket | null>(null)
+  const workerRef = useRef<Worker | null>(null)
 
   // Parse HTML into a Document for TOC extraction
   const doc = useMemo(() => {
@@ -79,28 +83,35 @@ export default function App() {
   }, [doc])
 
   useEffect(() => {
-    const ws = new WebSocket(WS_URL)
-    wsRef.current = ws
-    ws.addEventListener('open', () => setConnected(true))
-    ws.addEventListener('close', () => setConnected(false))
-    ws.addEventListener('error', () => setConnected(false))
+    // Start the WS worker (runs in a dedicated thread)
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    const worker: Worker = new Worker(new URL('./ws/worker.ts', import.meta.url), { type: 'module' })
+    workerRef.current = worker
 
-    ws.addEventListener('message', (event) => {
-      const data = typeof event.data === 'string' ? event.data : ''
-      if (data.trim()) {
-        setDocHtml(data)
+    const onMessage = (event: MessageEvent) => {
+      const msg = event.data
+      if (!msg) return
+      if (msg.type === 'status') {
+        setConnected(!!msg.connected)
+      } else if (msg.type === 'html' && typeof msg.html === 'string') {
+        if (msg.html.trim()) setDocHtml(msg.html)
       }
-    })
+    }
+
+    worker.addEventListener('message', onMessage)
 
     return () => {
-      ws.close()
-      wsRef.current = null
+      try { worker.postMessage({ type: 'stop' }) } catch {}
+      worker.removeEventListener('message', onMessage)
+      worker.terminate()
+      workerRef.current = null
     }
   }, [])
 
   const sendHtml = (html: string) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(html)
+    if (workerRef.current) {
+      workerRef.current.postMessage({ type: 'send', html })
     }
   }
 

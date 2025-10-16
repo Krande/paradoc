@@ -79,6 +79,7 @@ svgwrite = "*"
 pytexit = "*"
 nomkl = "*"
 websocket-client = "*"
+websockets = "*"
 
 [tool.pixi.feature.tests-core.dependencies]
 pytest = "*"

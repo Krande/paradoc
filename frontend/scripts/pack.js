@@ -5,8 +5,9 @@ import path from 'path'
 import AdmZip from 'adm-zip'
 
 const root = path.resolve(process.cwd())
-const distIndex = path.join(root, 'dist', 'index.html')
-const outZipFrontend = path.join(root, 'dist', 'frontend.zip')
+const distDir = path.join(root, 'dist')
+const distIndex = path.join(distDir, 'index.html')
+const outZipFrontend = path.join(distDir, 'frontend.zip')
 const resourcesZip = path.resolve(root, '..', 'src', 'paradoc', 'resources', 'frontend.zip')
 
 function ensureDir(p) {
@@ -22,9 +23,22 @@ function main() {
     process.exit(1)
   }
 
-  // Create zip with only index.html (renamed to index.html inside zip)
+  // Create zip with everything from dist (excluding the zip itself), so workers/assets are preserved
   const zip = new AdmZip()
-  zip.addLocalFile(distIndex, '', 'index.html')
+
+  // Add all files under dist, preserving paths
+  const entries = fs.readdirSync(distDir)
+  for (const entry of entries) {
+    const full = path.join(distDir, entry)
+    if (full === outZipFrontend) continue
+    const stat = fs.statSync(full)
+    if (stat.isFile()) {
+      zip.addLocalFile(full, '')
+    } else if (stat.isDirectory()) {
+      zip.addLocalFolder(full, entry)
+    }
+  }
+
   zip.writeZip(outZipFrontend)
   console.log(`[pack] Wrote ${outZipFrontend}`)
 

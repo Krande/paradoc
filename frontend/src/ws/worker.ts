@@ -1,0 +1,97 @@
+// Web Worker to maintain a persistent WebSocket connection and forward HTML to the UI
+// Runs in its own thread. Reconnects with backoff and sends heartbeats to keep the connection alive.
+
+// In a worker, self is DedicatedWorkerGlobalScope
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ctx: any = self as any
+
+const WS_URL = 'ws://localhost:13579'
+
+let ws: WebSocket | null = null
+let stopped = false
+let reconnectAttempts = 0
+let heartbeatTimer: number | null = null
+
+function scheduleReconnect() {
+  if (stopped) return
+  reconnectAttempts++
+  const delay = Math.min(30000, 1000 * Math.pow(2, Math.min(5, reconnectAttempts))) // 1s → 32s, capped at 30s
+  setTimeout(connect, delay)
+}
+
+function clearHeartbeat() {
+  if (heartbeatTimer !== null) {
+    clearInterval(heartbeatTimer)
+    heartbeatTimer = null
+  }
+}
+
+function startHeartbeat() {
+  clearHeartbeat()
+  // Send a ping every 20s to keep NATs/IDS from closing idle connections
+  heartbeatTimer = setInterval(() => {
+    try {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send('') // empty ping
+      }
+    } catch {
+      // ignore
+    }
+  }, 20000) as unknown as number
+}
+
+function connect() {
+  if (stopped) return
+
+  try {
+    ws = new WebSocket(WS_URL)
+  } catch (e) {
+    // Unable to construct; try again later
+    scheduleReconnect()
+    return
+  }
+
+  ws.addEventListener('open', () => {
+    reconnectAttempts = 0
+    startHeartbeat()
+    ctx.postMessage({ type: 'status', connected: true })
+  })
+
+  ws.addEventListener('close', () => {
+    ctx.postMessage({ type: 'status', connected: false })
+    clearHeartbeat()
+    scheduleReconnect()
+  })
+
+  ws.addEventListener('error', () => {
+    ctx.postMessage({ type: 'status', connected: false })
+  })
+
+  ws.addEventListener('message', (event: MessageEvent) => {
+    const data = typeof event.data === 'string' ? event.data : ''
+    if (data && data.trim()) {
+      ctx.postMessage({ type: 'html', html: data })
+    }
+  })
+}
+
+// Allow main thread to forward HTML back to the server if needed
+ctx.addEventListener('message', (event: MessageEvent) => {
+  const msg = event.data
+  if (!msg) return
+  if (msg.type === 'stop') {
+    stopped = true
+    try { ws?.close() } catch {}
+    clearHeartbeat()
+    return
+  }
+  if (msg.type === 'send' && typeof msg.html === 'string') {
+    try {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(msg.html)
+      }
+    } catch {}
+  }
+})
+
+connect()

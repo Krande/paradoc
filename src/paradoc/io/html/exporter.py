@@ -92,6 +92,17 @@ class HTMLExporter:
 
         Returns True if the message was sent successfully, False otherwise.
         """
+        # Ensure the WebSocket server is running in a dedicated background thread.
+        # This allows the packaged frontend (browser) to connect to ws://localhost:13579
+        # and receive the latest HTML, even if it connects after we send.
+        try:
+            from paradoc.frontend.ws_server import ensure_ws_server  # lazy import
+            ensure_ws_server(host=host, port=port)
+        except Exception:
+            # If starting the server fails, we'll still try to connect below; if no server
+            # is available, the connection will fail with a clear message.
+            pass
+
         try:
             # Lazy import so dependency is optional for users not using the WS flow
             import websocket  # type: ignore
