@@ -61,16 +61,16 @@ class OneDoc:
     FORMATS = ExportFormats
 
     def __init__(
-        self,
-        source_dir=None,
-        main_prefix="00-main",
-        app_prefix="01-app",
-        clean_build_dir=True,
-        create_dirs=False,
-        output_dir=None,
-        work_dir="temp",
-        use_default_html_style=True,
-        **kwargs,
+            self,
+            source_dir=None,
+            main_prefix="00-main",
+            app_prefix="01-app",
+            clean_build_dir=True,
+            create_dirs=False,
+            output_dir=None,
+            work_dir="temp",
+            use_default_html_style=True,
+            **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
         self.work_dir = pathlib.Path(work_dir).resolve().absolute()
@@ -138,7 +138,7 @@ class OneDoc:
                 # Check if the figure is commented out
                 # Get first newline right before regex search found start and till the end (capture entire line)
                 start = fig.string[: fig.start()].rfind("\n") + 1
-                end = fig.string[fig.start() :].find("\n") + fig.start()
+                end = fig.string[fig.start():].find("\n") + fig.start()
                 line = fig.string[start:end]
                 if line.startswith("[//]: #"):
                     continue
@@ -162,7 +162,11 @@ class OneDoc:
         if clean_build_dir is True:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
-    def compile(self, output_name, auto_open=False, metadata_file=None, export_format=ExportFormats.DOCX, **kwargs):
+    def send_to_frontend(self):
+        self.compile("report", send_to_frontend=True, export_format=ExportFormats.HTML)
+
+    def compile(self, output_name, auto_open=False, metadata_file=None,
+                export_format: ExportFormats = ExportFormats.DOCX, send_to_frontend=False, **kwargs):
         if isinstance(export_format, str):
             export_format = ExportFormats(export_format)
 
@@ -227,6 +231,8 @@ class OneDoc:
             self._perform_variable_substitution(False)
             html = HTMLExporter(self)
             html.export(dest_file, include_navbar=kwargs.get("include_navbar", True))
+            if send_to_frontend:
+                html.send_to_frontend()
         else:
             raise NotImplementedError(f'Export format "{export_format}" is not yet supported')
 

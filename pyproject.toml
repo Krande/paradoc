@@ -78,6 +78,7 @@ tabulate = "*"
 svgwrite = "*"
 pytexit = "*"
 nomkl = "*"
+websocket-client = "*"
 
 [tool.pixi.feature.tests-core.dependencies]
 pytest = "*"
@@ -86,8 +87,10 @@ pytest = "*"
 nodejs = "*"
 
 [tool.pixi.feature.frontend.tasks]
+npm = { cmd = "npm", cwd = "./frontend" }
 winstall = { cmd = "npm install", cwd = "./frontend", outputs = ["$PIXI_PROJECT_ROOT/frontend/node_modules"] }
 wdev = { cmd = "npm run dev --prefix frontend", depends-on = ["winstall"] }
+wbuild = { cmd = "npm run build:standalone", cwd = "./frontend", depends-on = ["winstall"], outputs = ["$PIXI_PROJECT_ROOT/src/paradoc/resources/frontend.zip"] }
 
 [tool.pixi.feature.lint.dependencies]
 black = "==24.4.2"
@@ -110,6 +113,7 @@ mkdocs-glightbox = "*"
 
 [tool.pixi.feature.tests.tasks]
 test = { cmd = "pytest tests", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
+test1 = { cmd = "python send_to_frontend.py", cwd = "examples"}
 
 [tool.pixi.feature.lint.tasks]
 lint = "black . --config pyproject.toml && ruff check . --fix && isort ."
@@ -117,3 +121,6 @@ lint = "black . --config pyproject.toml && ruff check . --fix && isort ."
 [tool.pixi.feature.docs.tasks]
 build = { cmd = "mkdocs build", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
 serve = { cmd = "mkdocs serve -a localhost:8080", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
+
+[tool.pixi.feature.tests.target.win-64.activation.env]
+PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
