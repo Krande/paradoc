@@ -171,13 +171,25 @@ class OneDoc:
         self.build_dir.mkdir(exist_ok=True, parents=True)
         self.dist_dir.mkdir(exist_ok=True, parents=True)
 
-        # Move all non-md files to temp dir because pandoc (tested on 2.19.2) struggles with external resource paths
-        for fp in self._iter_md_files():
-            rel_path = fp.relative_to(self.source_dir)
-            if fp.suffix in (".md", ".yaml"):
+        # Move/copy all non-markdown assets into build and dist so Pandoc and the HTTP server can resolve them
+        src_root = pathlib.Path(self.source_dir)
+        for fp in src_root.rglob('*'):
+            fp = pathlib.Path(fp)
+            if not fp.is_file():
                 continue
+            # Skip markdown/metadata and anything already under dist_dir
+            if fp.suffix.lower() in ('.md', '.yaml'):
+                continue
+            try:
+                if self.dist_dir in fp.parents:
+                    continue
+            except Exception:
+                pass
+            rel_path = fp.relative_to(self.source_dir)
+            # Preserve relative structure; if there is only one segment, keep it
+            rel_without_first = pathlib.Path(*rel_path.parts[1:]) if len(rel_path.parts) > 1 else rel_path
             build_file = self.build_dir / rel_path
-            dist_file = self.dist_dir / "/".join(rel_path.parts[1:])
+            dist_file = self.dist_dir / rel_without_first
             os.makedirs(build_file.parent, exist_ok=True)
             os.makedirs(dist_file.parent, exist_ok=True)
             shutil.copy(fp, build_file)

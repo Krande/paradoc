@@ -120,6 +120,35 @@ export function renderBlock(b: PandocBlock, key?: React.Key): React.ReactElement
       }
       return <div key={key} {...attrs(a)}>{blocks.map((bb, j) => renderBlock(bb, j))}</div>
     }
+    case 'Figure': {
+      // Pandoc v3+ Figure block: c = [Attr, [ShortCaption|null, [Blocks caption]], [Blocks content]]
+      const [a, cap, content] = (b as any).c as [Attr, any, PandocBlock[]]
+      const captionBlocks: any[] = (cap && Array.isArray(cap) && Array.isArray(cap[1])) ? cap[1] : []
+      // Extract inlines from first caption block if present
+      let captionInlines: any[] = []
+      if (captionBlocks.length > 0) {
+        const firstCap = captionBlocks[0]
+        // Supports { t: 'Plain'|'Para', c: [inlines...] } and list-form
+        if (firstCap && typeof firstCap === 'object') {
+          if (Array.isArray(firstCap)) {
+            // list-form, [ 'Plain', inlines ]
+            captionInlines = (firstCap.length > 1 && Array.isArray(firstCap[1])) ? firstCap[1] : []
+          } else if ('t' in firstCap) {
+            captionInlines = Array.isArray((firstCap as any).c) ? (firstCap as any).c : []
+          }
+        }
+      }
+      return (
+        <figure key={key} {...attrs(a)} className={'my-4 ' + (a as any)?.classes?.join(' ') || ''}>
+          {Array.isArray(content) ? content.map((bb, j) => renderBlock(bb as any, j)) : null}
+          {captionInlines && captionInlines.length > 0 ? (
+            <figcaption className="text-sm text-gray-600 italic mt-2">
+              {renderInlines(captionInlines as any)}
+            </figcaption>
+          ) : null}
+        </figure>
+      )
+    }
     default:
       return null
   }

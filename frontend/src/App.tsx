@@ -47,6 +47,10 @@ export default function App() {
       } else if (msg.type === 'manifest' && msg.manifest) {
         const man = msg.manifest as DocManifest
         setManifest(man)
+        // Ensure our docId matches the manifest to avoid URL mismatches
+        try {
+          if (man && (man as any).docId) setDocId((man as any).docId)
+        } catch {}
         try {
           if (man.assetBase) {
             // Expose to renderer for resolving relative asset URLs
@@ -88,8 +92,10 @@ export default function App() {
     if (state.manifest) return
     fetchManifest(docId).then((m) => {
       setManifest(m)
+      // Align our docId with the manifest to avoid mixing ids in URLs
+      try { if ((m as any).docId) setDocId((m as any).docId) } catch {}
       // Eagerly load first section
-      if (m.sections.length > 0) void fetchSection(docId, m.sections[0].id, m.sections[0].index).then(upsertSection).catch(() => {})
+      if (m.sections.length > 0) void fetchSection((m as any).docId || docId, m.sections[0].id, m.sections[0].index).then(upsertSection).catch(() => {})
     }).catch(() => {})
   }, [docId, state.manifest])
 
