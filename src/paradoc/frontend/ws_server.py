@@ -1,163 +1,171 @@
 from __future__ import annotations
 
+import argparse
 import asyncio
-import threading
-from dataclasses import dataclass, field
-from typing import Dict, Set, Tuple
+import json
+import os
+import sys
+import time
+from typing import Set
 
-# Lightweight WebSocket broadcast server that runs on a dedicated background thread.
-# It stores the last message and sends it to any client that connects later.
-# Implemented with the "websockets" package (asyncio-based).
+import websockets
+from typing import Any as _Any  # fallback for type hints; avoid hard dependency on internals
 
-
-@dataclass
-class _ServerState:
-    host: str
-    port: int
-    thread: threading.Thread | None = None
-    loop: asyncio.AbstractEventLoop | None = None
-    clients: Set["websockets.WebSocketServerProtocol"] = field(default_factory=set)
-    last_message: str | None = None
-    started: bool = False
+# Optional client utility depends on websocket-client (already in dependencies)
+try:
+    import websocket as ws_client  # type: ignore
+except Exception:  # pragma: no cover - only used for ensure/ping
+    ws_client = None  # type: ignore
 
 
-_states: Dict[Tuple[str, int], _ServerState] = {}
+ProtocolType = _Any
+CLIENTS: Set[ProtocolType] = set()
 
 
-async def _handler(websocket, state: _ServerState):
-    # Register client
-    state.clients.add(websocket)
+async def _handle_client(ws: ProtocolType) -> None:
+    CLIENTS.add(ws)
     try:
-        # Send last content to newly connected client, if available
-        if state.last_message:
+        async for message in ws:
+            # Lightweight ping protocol
             try:
-                await websocket.send(state.last_message)
-            except Exception:
-                pass
-
-        # Echo/broadcast any messages to all clients and remember last
-        async for message in websocket:
-            # Ignore keep-alive empty messages to avoid wiping the last document
-            try:
-                if not message or (isinstance(message, str) and message.strip() == ""):
+                if message == "__ping__":
+                    await ws.send("__pong__")
                     continue
+                # If JSON with kind=="ping"
+                if isinstance(message, str):
+                    obj = json.loads(message)
+                    if isinstance(obj, dict) and obj.get("kind") == "ping":
+                        await ws.send(json.dumps({"kind": "pong"}))
+                        continue
             except Exception:
-                # If we can't inspect it, proceed
+                # Not JSON or other error; just treat as broadcast content
                 pass
-            state.last_message = message
-            # Broadcast to all
-            send_tasks = []
-            for client in list(state.clients):
-                try:
-                    send_tasks.append(client.send(message))
-                except Exception:
-                    pass
-            if send_tasks:
-                try:
-                    await asyncio.gather(*send_tasks, return_exceptions=True)
-                except Exception:
-                    pass
+
+            # Broadcast to all connected clients (including sender)
+            await _broadcast(message)
     finally:
-        # Unregister client
-        try:
-            state.clients.discard(websocket)
-        except Exception:
-            pass
+        CLIENTS.discard(ws)
 
 
-def _run_server(state: _ServerState):
-    # Dedicated event loop in this background thread
-    try:
-        import websockets  # type: ignore
-    except Exception:
-        # If dependency missing, give up starting server in this thread
-        # Surface a clear hint to the user
-        print(
-            "Paradoc: Missing optional dependency 'websockets'.\n"
-            "Install it to enable the live preview server: pip install websockets\n"
-            "Alternatively, add it to your environment via pixi (see pyproject)."
-        )
-        state.started = False
+async def _broadcast(message: str | bytes) -> None:
+    if not CLIENTS:
         return
+    # Create a snapshot to avoid mutation during iteration
+    conns = list(CLIENTS)
+    # Send concurrently; drop clients that error
+    pending = []
+    for c in conns:
+        pending.append(_safe_send(c, message))
+    await asyncio.gather(*pending, return_exceptions=True)
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    state.loop = loop
 
-    async def _start():
-        # Bind to all interfaces when host is unspecified or localhost-like to support both IPv4 and IPv6 loopbacks.
-        listen_host = None if state.host in ("", "localhost", "127.0.0.1", "::1") else state.host
-        server = await websockets.serve(
-            lambda ws: _handler(ws, state), listen_host, state.port
-        )
-        return server
-
+async def _safe_send(ws: ProtocolType, message: str | bytes) -> None:
     try:
-        server = loop.run_until_complete(_start())
-        state.started = True
-        print(f"Paradoc: WebSocket server listening on ws://{state.host}:{state.port}")
-        loop.run_forever()
-    finally:
+        await ws.send(message)
+    except Exception:
         try:
-            state.started = False
-            # Close server and all client connections
-            for client in list(state.clients):
-                try:
-                    loop.run_until_complete(client.close())
-                except Exception:
-                    pass
-            state.clients.clear()
+            await ws.close()
         except Exception:
             pass
+        CLIENTS.discard(ws)
+
+
+async def _serve_forever(host: str, port: int) -> None:
+    async with websockets.serve(_handle_client, host, port, ping_interval=20, ping_timeout=20):
+        # Keep the server running forever
+        await asyncio.Future()
+
+
+def run_server(host: str = "localhost", port: int = 13579) -> None:
+    """Run the websocket relay server (blocking)."""
+    try:
+        asyncio.run(_serve_forever(host, port))
+    except KeyboardInterrupt:
+        pass
+
+
+def ping_ws_server(host: str = "localhost", port: int = 13579, timeout: float = 1.5) -> bool:
+    """Ping the websocket server; return True if responsive."""
+    if ws_client is None:
+        # Best-effort: attempt a TCP handshake using websockets library
         try:
-            pending = asyncio.all_tasks(loop)
-            for t in pending:
-                t.cancel()
-        except Exception:
-            pass
-        try:
-            loop.stop()
-            loop.close()
-        except Exception:
-            pass
+            import socket
 
-
-def ensure_ws_server(host: str = "localhost", port: int = 13579) -> bool:
-    """
-    Ensure a WebSocket broadcast server is running in a background thread.
-
-    Returns True if the server is (or becomes) running, False otherwise.
-    """
-    key = (host, port)
-    state = _states.get(key)
-    if state and state.started:
-        return True
-
-    if state is None:
-        state = _ServerState(host=host, port=port)
-        _states[key] = state
-
-    # If a thread exists but not started, we'll still wait for readiness below
-    if not (state.thread and state.thread.is_alive()):
-        # Spawn background daemon thread
-        th = threading.Thread(target=_run_server, args=(state,), daemon=True, name=f"frontend-ws@{host}:{port}")
-        state.thread = th
-        try:
-            th.start()
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
         except Exception:
             return False
 
-    # Wait briefly for the server to report started
+    url = f"ws://{host}:{port}"
     try:
-        import time
-        deadline = time.time() + 1.0  # up to 1s
-        while time.time() < deadline:
-            if state.started:
-                return True
-            time.sleep(0.05)
+        ws = ws_client.create_connection(url, timeout=timeout)
     except Exception:
-        # best-effort; fall back to optimistic
-        pass
+        return False
+    try:
+        ws.send("__ping__")
+        ws.settimeout(timeout)
+        resp = ws.recv()
+        return resp == "__pong__"
+    except Exception:
+        return False
+    finally:
+        try:
+            ws.close()
+        except Exception:
+            pass
 
-    # Not started within the timeout
+
+def ensure_ws_server(host: str = "localhost", port: int = 13579, wait_seconds: float = 3.0) -> bool:
+    """
+    Ensure a single background websocket relay server is running.
+
+    Returns True if a server is already running or was successfully started; False otherwise.
+    """
+    if ping_ws_server(host, port):
+        return True
+
+    # Spawn a detached background process: python -m paradoc.frontend.ws_server --host ... --port ...
+    cmd = [sys.executable, "-m", "paradoc.frontend.ws_server", "--host", host, "--port", str(port)]
+
+    # On Windows, detach the process
+    creationflags = 0
+    if os.name == "nt":
+        # CREATE_NEW_PROCESS_GROUP (0x200) | DETACHED_PROCESS (0x8)
+        creationflags = 0x00000200 | 0x00000008
+
+    try:
+        import subprocess
+
+        with open(os.devnull, "wb") as devnull:
+            subprocess.Popen(
+                cmd,
+                stdout=devnull,
+                stderr=devnull,
+                stdin=devnull,
+                creationflags=creationflags,
+            )
+    except Exception:
+        return False
+
+    # Wait briefly for it to boot and become pingable
+    deadline = time.time() + wait_seconds
+    while time.time() < deadline:
+        if ping_ws_server(host, port):
+            return True
+        time.sleep(0.1)
+
     return False
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Paradoc WebSocket relay server")
+    parser.add_argument("--host", default="localhost", help="Host to bind (default: localhost)")
+    parser.add_argument("--port", type=int, default=13579, help="Port to bind (default: 13579)")
+    args = parser.parse_args(argv)
+    print(f"Paradoc WS server listening on ws://{args.host}:{args.port}")
+    run_server(args.host, args.port)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
