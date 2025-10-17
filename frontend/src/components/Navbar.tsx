@@ -25,7 +25,12 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
               onClick={(e) => {
                 e.preventDefault()
                 const el = document.getElementById(item.id)
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                if (el) {
+                  const topbar = document.getElementById('paradoc-topbar')
+                  const offset = topbar ? topbar.getBoundingClientRect().height : 0
+                  const top = window.scrollY + el.getBoundingClientRect().top - offset - 8
+                  window.scrollTo({ top, behavior: 'smooth' })
+                }
                 onClose()
               }}
               aria-label={`Go to ${item.text}`}

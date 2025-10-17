@@ -46,7 +46,13 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
         {manifest.sections.map((s, i) => {
           const bundle = sections[s.id]
           return (
-            <section key={s.id} id={s.id} data-section-index={i} style={{ containIntrinsicSize: '1px 800px' as any }} className="content-visibility-auto my-6">
+            <section
+              key={s.id}
+              id={s.id}
+              data-section-index={i}
+              style={{ containIntrinsicSize: '1px 800px' as any }}
+              className="content-visibility-auto my-6 scroll-mt-14"
+            >
               {bundle ? (
                 <Section blockKey={s.id} bundle={bundle} />
               ) : (

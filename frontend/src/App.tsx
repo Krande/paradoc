@@ -107,17 +107,31 @@ export default function App() {
           // Build and broadcast a minimal AST manifest + section over WS for demo purposes
           const manifest = {
             docId: 'mock-doc',
-            sections: [{ id: 'intro', title: 'Mock Document', level: 1, index: 0 }]
+            sections: [
+              { id: 'h1-intro', title: 'Introduction', level: 1, index: 0 },
+              { id: 'h2-goals', title: 'Goals', level: 2, index: 1 },
+              { id: 'h2-scope', title: 'Scope', level: 2, index: 2 },
+              { id: 'h1-details', title: 'Details', level: 1, index: 3 },
+              { id: 'h2-arch', title: 'Architecture', level: 2, index: 4 },
+              { id: 'h3-components', title: 'Components', level: 3, index: 5 },
+            ]
           }
           const section = {
             section: manifest.sections[0],
             doc: {
               blocks: [
-                { t: 'Header', c: [1, { id: 'intro', classes: [], attributes: {} }, [{ t: 'Str', c: 'Mock' }, { t: 'Space' }, { t: 'Str', c: 'Document' }]] },
-                { t: 'Para', c: [
-                  { t: 'Str', c: 'This' }, { t: 'Space' }, { t: 'Str', c: 'is' }, { t: 'Space' }, { t: 'Str', c: 'a' }, { t: 'Space' },
-                  { t: 'Str', c: 'mock' }, { t: 'Space' }, { t: 'Str', c: 'section' }, { t: 'Str', c: '.' }
-                ]}
+                { t: 'Header', c: [1, { id: 'h1-intro', classes: [], attributes: {} }, [{ t: 'Str', c: 'Introduction' }]] },
+                { t: 'Para', c: [ { t: 'Str', c: 'This' }, { t: 'Space' }, { t: 'Str', c: 'is' }, { t: 'Space' }, { t: 'Str', c: 'intro' }, { t: 'Str', c: '.' } ] },
+                { t: 'Header', c: [2, { id: 'h2-goals', classes: [], attributes: {} }, [{ t: 'Str', c: 'Goals' }]] },
+                { t: 'Para', c: [ { t: 'Str', c: 'Goals' }, { t: 'Space' }, { t: 'Str', c: 'content' } ] },
+                { t: 'Header', c: [2, { id: 'h2-scope', classes: [], attributes: {} }, [{ t: 'Str', c: 'Scope' }]] },
+                { t: 'Para', c: [ { t: 'Str', c: 'Scope' }, { t: 'Space' }, { t: 'Str', c: 'content' } ] },
+                { t: 'Header', c: [1, { id: 'h1-details', classes: [], attributes: {} }, [{ t: 'Str', c: 'Details' }]] },
+                { t: 'Para', c: [ { t: 'Str', c: 'Details' }, { t: 'Space' }, { t: 'Str', c: 'content' } ] },
+                { t: 'Header', c: [2, { id: 'h2-arch', classes: [], attributes: {} }, [{ t: 'Str', c: 'Architecture' }]] },
+                { t: 'Para', c: [ { t: 'Str', c: 'Arch' }, { t: 'Space' }, { t: 'Str', c: 'content' } ] },
+                { t: 'Header', c: [3, { id: 'h3-components', classes: [], attributes: {} }, [{ t: 'Str', c: 'Components' }]] },
+                { t: 'Para', c: [ { t: 'Str', c: 'Components' }, { t: 'Space' }, { t: 'Str', c: 'content' } ] },
               ]
             }
           }
