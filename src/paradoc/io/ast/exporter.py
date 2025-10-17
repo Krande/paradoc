@@ -57,14 +57,27 @@ class ASTExporter:
 
     @staticmethod
     def _header_text(inlines: List[Any]) -> str:
-        # Extract plain text from a list of Pandoc inline elements
+        # Extract plain text from a list of Pandoc inline elements (supports list- and dict-form)
         parts: List[str] = []
         for item in inlines or []:
-            t = item[0] if isinstance(item, list) and item else None
-            if t == "Str" and len(item) >= 2:
-                parts.append(item[1])
-            elif t == "Space":
-                parts.append(" ")
+            # Dict-form: {"t": "Str", "c": "Text"} or {"t": "Space"}
+            if isinstance(item, dict):
+                t = item.get("t")
+                if t == "Str":
+                    c = item.get("c")
+                    if isinstance(c, str):
+                        parts.append(c)
+                elif t == "Space":
+                    parts.append(" ")
+                # Ignore other inline types for title extraction
+                continue
+            # List-form: ["Str", "Text"] or ["Space"]
+            if isinstance(item, list) and item:
+                t = item[0]
+                if t == "Str" and len(item) >= 2 and isinstance(item[1], str):
+                    parts.append(item[1])
+                elif t == "Space":
+                    parts.append(" ")
         return "".join(parts).strip()
 
     def slice_sections(self, ast: Dict[str, Any]) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
@@ -94,8 +107,22 @@ class ASTExporter:
             })
 
         for blk in blocks:
-            if isinstance(blk, list) and blk and blk[0] == "Header":
-                # Pandoc JSON compact form: ["Header", level, [id, classes, kv], inlines]
+            level = None
+            attrs: Any = None
+            inlines: List[Any] = []
+
+            # Dict-form header detection
+            if isinstance(blk, dict) and blk.get("t") == "Header":
+                try:
+                    content = blk.get("c", [])
+                    if isinstance(content, list) and len(content) >= 3:
+                        level = int(content[0])
+                        attrs = content[1]
+                        inlines = content[2]
+                except Exception:
+                    level = 1
+            # List-form header detection
+            elif isinstance(blk, list) and blk and blk[0] == "Header":
                 try:
                     level = int(blk[1])
                 except Exception:
@@ -103,18 +130,25 @@ class ASTExporter:
                 attrs = blk[2] if len(blk) > 2 else ["", [], []]
                 inlines = blk[3] if len(blk) > 3 else []
 
-                if level == 1:
-                    # Finish previous
-                    push_current()
-                    current = []
-                    section_index += 1
-                    sec_id = ""
-                    try:
+            if level == 1:
+                # Finish previous
+                push_current()
+                current = []
+                section_index += 1
+                sec_id = ""
+                # Extract id from attrs for both forms
+                try:
+                    if isinstance(attrs, list) and attrs:
                         sec_id = attrs[0] or f"sec-{section_index}"
-                    except Exception:
+                    elif isinstance(attrs, dict):
+                        # Some tools might give {"id": "...", "classes": [...], "keyvals": [...]}
+                        sec_id = attrs.get("id") or f"sec-{section_index}"
+                    else:
                         sec_id = f"sec-{section_index}"
-                    title = self._header_text(inlines)
-                    current_meta = {"id": sec_id, "title": title or f"Section {section_index+1}", "level": level, "index": section_index}
+                except Exception:
+                    sec_id = f"sec-{section_index}"
+                title = self._header_text(inlines)
+                current_meta = {"id": sec_id, "title": title or f"Section {section_index+1}", "level": 1, "index": section_index}
             # Accumulate
             if current_meta is None:
                 # Before first H1, skip content (optional: could create a preface section)
@@ -131,17 +165,31 @@ class ASTExporter:
             title = "Document"
             sec_id = "sec-0"
             for blk in all_blocks:
-                if isinstance(blk, list) and blk and blk[0] == "Header":
-                    try:
+                try:
+                    if isinstance(blk, dict) and blk.get("t") == "Header":
+                        content = blk.get("c", [])
+                        attrs = content[1] if isinstance(content, list) and len(content) >= 2 else ["", [], []]
+                        inlines = content[2] if isinstance(content, list) and len(content) >= 3 else []
+                        if isinstance(attrs, list) and attrs:
+                            maybe_id = attrs[0]
+                        elif isinstance(attrs, dict):
+                            maybe_id = attrs.get("id")
+                        else:
+                            maybe_id = None
+                        if maybe_id:
+                            sec_id = str(maybe_id)
+                        title = self._header_text(inlines) or title
+                        break
+                    if isinstance(blk, list) and blk and blk[0] == "Header":
                         attrs = blk[2] if len(blk) > 2 else ["", [], []]
                         inlines = blk[3] if len(blk) > 3 else []
                         maybe_id = attrs[0] if isinstance(attrs, list) and attrs else ""
                         if maybe_id:
                             sec_id = str(maybe_id)
                         title = self._header_text(inlines) or title
-                    except Exception:
-                        pass
-                    break
+                        break
+                except Exception:
+                    continue
             sections.append({
                 "section": {"id": sec_id, "title": title, "level": 1, "index": 0},
                 "doc": {"blocks": list(all_blocks)},
