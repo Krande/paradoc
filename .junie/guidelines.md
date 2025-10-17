@@ -6,6 +6,14 @@ You always perform tests at the end of each development cycle to ensure that you
 
 ## Technology Stack
 
+Paradoc is a thin python wrapper around pandoc. It provides functionality for variable substitution in markdown files
+and some additional formatting tweaks to ensure better output when exporting to .docx format.
+
+### Python library Paradoc
+
+In addition to wrap conversion capabilities around pandoc, paradoc also provides a websocket server that can be used to
+stream converted html documents to a frontend document reader app.
+
 ### Frontend
 * TailwindCSS 4
 * Typescript
@@ -15,7 +23,7 @@ You always perform tests at the end of each development cycle to ensure that you
 
 #### Functional requirements
 The frontend is a single page document reader app. 
-The frontend should also spin up a websocket server upon startup. 
+The frontend shall have a websocket client running in a background thread listening for new html documents. 
 The websocket server receives html content which are documents from pandoc converted html from markdown. 
 
 #### Style guide

@@ -114,7 +114,7 @@ mkdocs-glightbox = "*"
 
 [tool.pixi.feature.tests.tasks]
 test = { cmd = "pytest tests", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
-test1 = { cmd = "python send_to_frontend.py", cwd = "examples"}
+test-doc = { cmd = "python send_to_frontend.py", cwd = "examples"}
 
 [tool.pixi.feature.lint.tasks]
 lint = "black . --config pyproject.toml && ruff check . --fix && isort ."

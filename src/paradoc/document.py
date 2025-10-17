@@ -8,8 +8,6 @@ from typing import Callable, Dict, Iterable
 
 import pandas as pd
 
-from paradoc.config import create_logger
-
 from .common import (
     MY_DEFAULT_HTML_CSS,
     DocXFormat,
@@ -19,11 +17,10 @@ from .common import (
     Table,
     TableFormat,
 )
+from .config import logger
 from .equations import Equation
 from .exceptions import LatexNotInstalled
 from .utils import get_list_of_files
-
-logger = create_logger()
 
 
 class OneDoc:
@@ -162,17 +159,14 @@ class OneDoc:
         if clean_build_dir is True:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
-    def send_to_frontend(self):
-        self.compile("report", send_to_frontend=True, export_format=ExportFormats.HTML)
+    def send_to_frontend(self, metadata_file=None):
+        from paradoc.io.html.exporter import HTMLExporter
+        self._prep_compilation(metadata_file=metadata_file)
+        self._perform_variable_substitution(False)
+        html = HTMLExporter(self)
+        html.send_to_frontend()
 
-    def compile(self, output_name, auto_open=False, metadata_file=None,
-                export_format: ExportFormats = ExportFormats.DOCX, send_to_frontend=False, **kwargs):
-        if isinstance(export_format, str):
-            export_format = ExportFormats(export_format)
-
-        dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format.value}").resolve().absolute()
-
-        print(f'Compiling OneDoc report to "{dest_file}"')
+    def _prep_compilation(self, metadata_file=None):
         self.build_dir.mkdir(exist_ok=True, parents=True)
         self.dist_dir.mkdir(exist_ok=True, parents=True)
 
@@ -198,6 +192,16 @@ class OneDoc:
             css_style = self.source_dir / "style.css"
             if css_style.exists() is False:
                 shutil.copy(MY_DEFAULT_HTML_CSS, css_style)
+
+    def compile(self, output_name, auto_open=False, metadata_file=None,
+                export_format: ExportFormats = ExportFormats.DOCX, send_to_frontend=False, **kwargs):
+        if isinstance(export_format, str):
+            export_format = ExportFormats(export_format)
+
+        dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format.value}").resolve().absolute()
+
+        print(f'Compiling OneDoc report to "{dest_file}"')
+        self._prep_compilation(metadata_file=metadata_file)
 
         if export_format == ExportFormats.DOCX:
             from paradoc.io.word.exporter import WordExporter
