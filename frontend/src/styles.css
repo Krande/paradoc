@@ -1,12 +1,42 @@
 @import "tailwindcss";
-@import "./paradoc-default.css";
 
-/* App base styles */
-html, body, #root {
-  height: 100%;
+/* Global gray tones theme and sensible defaults */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    /* Global gray theme baseline */
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+  /* Typography defaults */
+  h1 { @apply text-3xl font-semibold text-gray-900; }
+  h2 { @apply text-2xl font-semibold text-gray-900; }
+  h3 { @apply text-xl font-semibold text-gray-900; }
+  h4 { @apply text-lg font-semibold text-gray-900; }
+  h5 { @apply text-base font-semibold text-gray-900; }
+  h6 { @apply text-sm font-semibold text-gray-900; }
+
+  p { @apply text-gray-800; }
+  a { @apply text-blue-600 hover:underline cursor-pointer; }
+  code { @apply bg-gray-100 rounded px-1 py-0.5; }
+  pre { @apply bg-gray-100 text-sm rounded p-3 overflow-auto; }
+  hr { @apply border-gray-200 my-6; }
+  blockquote { @apply border-l-4 border-gray-200 pl-4 text-gray-700; }
 }
 
-/* Typography tweaks for prose */
-.prose {
-  --tw-prose-headings: rgb(17 24 39);
+/* Component defaults to keep UI cohesive in grayscale */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-700 cursor-pointer;
+  }
+  .card {
+    @apply rounded-lg border border-gray-200 bg-white shadow-sm;
+  }
+  .muted {
+    @apply text-gray-500;
+  }
 }

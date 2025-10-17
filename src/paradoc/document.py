@@ -160,10 +160,11 @@ class OneDoc:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
     def send_to_frontend(self, metadata_file=None):
-        from paradoc.io.html.exporter import HTMLExporter
+        from paradoc.io.ast.exporter import ASTExporter
+
         self._prep_compilation(metadata_file=metadata_file)
         self._perform_variable_substitution(False)
-        html = HTMLExporter(self)
+        html = ASTExporter(self)
         html.send_to_frontend()
 
     def _prep_compilation(self, metadata_file=None):

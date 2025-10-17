@@ -22,7 +22,7 @@ def my_calc_example_2(a, b):
     return V_x
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def test_doc(files_dir, tmp_path):
     logging.getLogger().setLevel(logging.INFO)
     report_dir = files_dir / "doc_math"

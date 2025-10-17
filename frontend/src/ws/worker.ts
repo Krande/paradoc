@@ -81,6 +81,15 @@ function connect() {
           ctx.postMessage({ type: 'bundle', payload: obj })
           return
         }
+        // New: AST streaming support
+        if (obj && obj.kind === 'manifest' && obj.manifest) {
+          ctx.postMessage({ type: 'manifest', manifest: obj.manifest })
+          return
+        }
+        if (obj && obj.kind === 'ast_section' && obj.section && obj.doc) {
+          ctx.postMessage({ type: 'ast_section', bundle: { section: obj.section, doc: obj.doc } })
+          return
+        }
       } catch {
         // fall through to plain html
       }

@@ -43,7 +43,7 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex md:flex-col w-72 shrink-0 border-r border-gray-200 bg-white/60 backdrop-blur sticky top-0 h-screen overflow-auto">
         <div className="px-4 py-3 border-b border-gray-200">
-          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Contents</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Outline</div>
         </div>
         {NavList}
       </aside>
@@ -65,7 +65,7 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
           aria-modal="true"
         >
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-            <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Contents</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Outline</div>
             <button
               className="cursor-pointer inline-flex items-center justify-center rounded p-2 text-gray-500 hover:text-gray-700"
               onClick={onClose}
