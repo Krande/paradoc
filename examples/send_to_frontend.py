@@ -1,9 +1,20 @@
+import pathlib
 import time
+import argparse
 import paradoc as pa
 
 
 def main():
-    od = pa.OneDoc("../files/doc1")
+    parser = argparse.ArgumentParser(description="Send a Paradoc document to the Reader app.")
+    parser.add_argument("--doc", default="doc1", help="Path to Paradoc document dir to send.")
+    args = parser.parse_args()
+    doc_dir = args.doc
+    files_dir = pathlib.Path(__file__).resolve().absolute().parent / ".." / "files"
+    doc_names = list(files_dir.iterdir())
+    if doc_dir in doc_names:
+        od = pa.OneDoc(files_dir / doc_dir)
+    else:
+        od = pa.OneDoc(doc_dir)
     ok = od.send_to_frontend()
     print("Sent document to Reader over WebSocket.")
     print("Serving JSON and assets via Paradoc HTTP server at http://localhost:13580/")
