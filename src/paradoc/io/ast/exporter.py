@@ -245,10 +245,39 @@ class ASTExporter:
                 self.one_doc.dist_dir.mkdir(exist_ok=True, parents=True)
             except Exception:
                 pass
+
+            # Write JSON artifacts expected by the frontend fetch() paths
+            try:
+                import os
+
+                doc_id = manifest.get("docId") or self._infer_doc_id()
+                base_dir = self.one_doc.dist_dir / "doc" / doc_id
+                section_dir = base_dir / "section"
+                section_dir.mkdir(parents=True, exist_ok=True)
+
+                # manifest.json
+                (base_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+
+                # sections: by index and by id
+                for bundle in sections:
+                    sec = bundle["section"]
+                    idx = sec.get("index")
+                    sid = sec.get("id")
+                    data = json.dumps(bundle, ensure_ascii=False)
+                    if idx is not None:
+                        (section_dir / f"{idx}.json").write_text(data, encoding="utf-8")
+                    if sid:
+                        # sanitize filename a bit
+                        safe_sid = "".join(ch if ch.isalnum() or ch in ("-","_",".") else "-" for ch in str(sid))
+                        (section_dir / f"{safe_sid}.json").write_text(data, encoding="utf-8")
+            except Exception:
+                logger.error("Failed to write HTTP JSON artifacts for frontend", exc_info=True)
+
             _ = ensure_http_server(host=host, port=http_port, directory=str(self.one_doc.dist_dir))
             # Advertise asset base to the frontend manifest so it can resolve relative URLs
             try:
                 manifest["assetBase"] = f"http://{host}:{http_port}/"
+                manifest["httpDocBase"] = f"http://{host}:{http_port}/doc/{doc_id}/"
             except Exception:
                 logger.error("Could not advertise asset base to frontend manifest", exc_info=True)
                 pass
