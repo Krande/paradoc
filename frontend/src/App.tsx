@@ -89,6 +89,74 @@ export default function App() {
     const worker: Worker = new Worker(new URL('./ws/worker.ts', import.meta.url), { type: 'module' })
     workerRef.current = worker
 
+    const toBlobUrl = (b64: string, mime: string) => {
+      try {
+        const byteStr = atob(b64)
+        const bytes = new Uint8Array(byteStr.length)
+        for (let i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i)
+        const blob = new Blob([bytes], { type: mime || 'application/octet-stream' })
+        return URL.createObjectURL(blob)
+      } catch {
+        return ''
+      }
+    }
+
+    const rewriteHtmlWithAssets = (html: string, payload: any) => {
+      try {
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(html, 'text/html')
+
+        // Inline styles if provided
+        if (Array.isArray(payload?.styles)) {
+          payload.styles.forEach((s: any) => {
+            if (s && typeof s.text === 'string') {
+              const styleEl = document.createElement('style')
+              styleEl.setAttribute('data-paradoc-style', s.path || '')
+              styleEl.textContent = s.text
+              doc.head.appendChild(styleEl)
+            }
+          })
+        }
+
+        // Build a lookup for assets
+        const assetMap: Record<string, { mime: string, b64: string }> = {}
+        if (Array.isArray(payload?.assets)) {
+          payload.assets.forEach((a: any) => {
+            if (a && typeof a.path === 'string' && typeof a.b64 === 'string') {
+              assetMap[a.path] = { mime: a.mime || 'application/octet-stream', b64: a.b64 }
+              // Persist in localStorage (best-effort; may fail if over quota)
+              try { localStorage.setItem(`paradoc:asset:${a.path}`, JSON.stringify(assetMap[a.path])) } catch {}
+            }
+          })
+        }
+
+        // Rewrite <img src>
+        doc.querySelectorAll('img[src]').forEach((img) => {
+          const src = img.getAttribute('src') || ''
+          if (!src || src.startsWith('http') || src.startsWith('data:')) return
+          const key = src.replace('\\\\', '/').replace('\\\
+', '/')
+          const a = assetMap[key] || assetMap[src]
+          if (a) {
+            const url = toBlobUrl(a.b64, a.mime)
+            if (url) img.setAttribute('src', url)
+          }
+        })
+
+        // Remove external stylesheet links we may have inlined
+        doc.querySelectorAll('link[rel="stylesheet"][href]').forEach((lnk) => {
+          const href = lnk.getAttribute('href') || ''
+          if (!href) return
+          // If we have this css inlined, drop the link
+          if (assetMap[href]) lnk.parentElement?.removeChild(lnk)
+        })
+
+        return doc.documentElement.outerHTML
+      } catch {
+        return html
+      }
+    }
+
     const onMessage = (event: MessageEvent) => {
       const msg = event.data
       if (!msg) return
@@ -96,6 +164,9 @@ export default function App() {
         setConnected(!!msg.connected)
       } else if (msg.type === 'html' && typeof msg.html === 'string') {
         if (msg.html.trim()) setDocHtml(msg.html)
+      } else if (msg.type === 'bundle' && msg.payload && typeof msg.payload.html === 'string') {
+        const transformed = rewriteHtmlWithAssets(msg.payload.html, msg.payload)
+        if (transformed.trim()) setDocHtml(transformed)
       }
     }
 

@@ -62,10 +62,15 @@ def _run_server(state: _ServerState):
     # Dedicated event loop in this background thread
     try:
         import websockets  # type: ignore
-    except Exception as e:
+    except Exception:
         # If dependency missing, give up starting server in this thread
-        # Note: The caller can still attempt to send; the client will fail
-        # with a helpful message from the exporter.
+        # Surface a clear hint to the user
+        print(
+            "Paradoc: Missing optional dependency 'websockets'.\n"
+            "Install it to enable the live preview server: pip install websockets\n"
+            "Alternatively, add it to your environment via pixi (see pyproject)."
+        )
+        state.started = False
         return
 
     loop = asyncio.new_event_loop()
@@ -81,6 +86,7 @@ def _run_server(state: _ServerState):
     try:
         server = loop.run_until_complete(_start())
         state.started = True
+        print(f"Paradoc: WebSocket server listening on ws://{state.host}:{state.port}")
         loop.run_forever()
     finally:
         try:
@@ -122,16 +128,27 @@ def ensure_ws_server(host: str = "localhost", port: int = 13579) -> bool:
         state = _ServerState(host=host, port=port)
         _states[key] = state
 
-    if state.thread and state.thread.is_alive():
-        # Thread alive but not marked started yet; give it a moment
-        return True
+    # If a thread exists but not started, we'll still wait for readiness below
+    if not (state.thread and state.thread.is_alive()):
+        # Spawn background daemon thread
+        th = threading.Thread(target=_run_server, args=(state,), daemon=True, name=f"frontend-ws@{host}:{port}")
+        state.thread = th
+        try:
+            th.start()
+        except Exception:
+            return False
 
-    # Spawn background daemon thread
-    th = threading.Thread(target=_run_server, args=(state,), daemon=True, name=f"frontend-ws@{host}:{port}")
-    state.thread = th
-
+    # Wait briefly for the server to report started
     try:
-        th.start()
-        return True
+        import time
+        deadline = time.time() + 1.0  # up to 1s
+        while time.time() < deadline:
+            if state.started:
+                return True
+            time.sleep(0.05)
     except Exception:
-        return False
+        # best-effort; fall back to optimistic
+        pass
+
+    # Not started within the timeout
+    return False

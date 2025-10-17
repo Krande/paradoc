@@ -34,7 +34,13 @@ class Equation:
                 dots += line.count("'")
                 continue
             if dots >= 6 or dots == 0:
-                eq_latex += pytexit.py2tex(line, print_latex=print_latex, print_formula=print_formula) + "\n"
+                try:
+                    eq_latex += pytexit.py2tex(line, print_latex=print_latex, print_formula=print_formula) + "\n"
+                except Exception:
+                    # Fallback: include the line as verbatim code to avoid crashing on pytexit quirks
+                    safe = line.strip().replace('\n', '')
+                    if safe:
+                        eq_latex += f"\\texttt{{{safe}}}\n"
         eq_str = eq_latex
 
         if self.add_link:

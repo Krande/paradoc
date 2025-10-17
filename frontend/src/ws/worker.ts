@@ -68,10 +68,24 @@ function connect() {
   })
 
   ws.addEventListener('message', (event: MessageEvent) => {
-    const data = typeof event.data === 'string' ? event.data : ''
-    if (data && data.trim()) {
-      ctx.postMessage({ type: 'html', html: data })
+    const raw = event.data
+    if (typeof raw !== 'string') return
+    const data = raw.trim()
+    if (!data) return
+
+    // Try to detect JSON bundle first
+    if (data.startsWith('{')) {
+      try {
+        const obj = JSON.parse(data)
+        if (obj && obj.kind === 'html_bundle' && typeof obj.html === 'string') {
+          ctx.postMessage({ type: 'bundle', payload: obj })
+          return
+        }
+      } catch {
+        // fall through to plain html
+      }
     }
+    ctx.postMessage({ type: 'html', html: data })
   })
 }
 
