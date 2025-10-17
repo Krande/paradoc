@@ -161,7 +161,7 @@ class OneDoc:
 
     def send_to_frontend(self, metadata_file=None):
         from paradoc.io.ast.exporter import ASTExporter
-
+        shutil.rmtree(self.dist_dir, ignore_errors=True)
         self._prep_compilation(metadata_file=metadata_file)
         self._perform_variable_substitution(False)
         html = ASTExporter(self)
