@@ -56,23 +56,72 @@ export function useSectionStore() {
 export async function fetchManifest(docId: string): Promise<DocManifest> {
   const cached = await dbGet<DocManifest>('manifests', docId)
   if (cached) return cached
-  const res = await fetch(`/doc/${encodeURIComponent(docId)}/manifest.json`, { cache: 'no-store' })
-  if (!res.ok) throw new Error('manifest fetch failed')
-  const m = await res.json() as DocManifest
-  await dbPut('manifests', docId, m)
-  return m
+
+  // Determine base URL: prefer window-provided httpDocBase or assetBase
+  let base = ''
+  try {
+    const w: any = window as any
+    if (w.__PARADOC_HTTP_DOC_BASE) {
+      base = String(w.__PARADOC_HTTP_DOC_BASE)
+    } else if (w.__PARADOC_ASSET_BASE) {
+      base = String(w.__PARADOC_ASSET_BASE).replace(/\/?$/, '/') + `doc/${encodeURIComponent(docId)}/`
+    }
+  } catch {}
+  const url = `${base || ''}doc/${encodeURIComponent(docId)}/manifest.json`.replace(/doc\/([^/]+)\/doc\//, 'doc/$1/')
+
+  const res = await fetch(base ? url : `/doc/${encodeURIComponent(docId)}/manifest.json`, { cache: 'no-store' })
+  if (!res.ok) throw new Error(`manifest fetch failed: ${res.status} ${res.statusText}`)
+  const ct = res.headers.get('content-type') || ''
+  const text = await res.text()
+  try {
+    const m = JSON.parse(text) as DocManifest
+    await dbPut('manifests', docId, m)
+    return m
+  } catch (e) {
+    if (/^\s*<!doctype/i.test(text) || ct.includes('text/html')) {
+      throw new Error('manifest fetch returned HTML instead of JSON. Ensure you are serving the JSON from the Paradoc HTTP server (default http://localhost:13580).')
+    }
+    throw e
+  }
 }
 
 export async function fetchSection(docId: string, sectionId: string, index?: number): Promise<SectionBundle> {
   const key = `${docId}:${sectionId}`
   const cached = await dbGet<SectionBundle>('sections', key)
   if (cached) return cached
-  const path = index != null ? `/doc/${encodeURIComponent(docId)}/section/${index}.json` : `/doc/${encodeURIComponent(docId)}/section/${encodeURIComponent(sectionId)}.json`
-  const res = await fetch(path, { cache: 'no-store' })
-  if (!res.ok) throw new Error('section fetch failed')
-  const b = await res.json() as SectionBundle
-  await dbPut('sections', key, b)
-  return b
+
+  // Determine base URL similar to fetchManifest
+  let base = ''
+  try {
+    const w: any = window as any
+    if (w.__PARADOC_HTTP_DOC_BASE) {
+      base = String(w.__PARADOC_HTTP_DOC_BASE)
+    } else if (w.__PARADOC_ASSET_BASE) {
+      base = String(w.__PARADOC_ASSET_BASE).replace(/\/?$/, '/') + `doc/${encodeURIComponent(docId)}/`
+    }
+  } catch {}
+
+  const relPath = index != null
+    ? `doc/${encodeURIComponent(docId)}/section/${index}.json`
+    : `doc/${encodeURIComponent(docId)}/section/${encodeURIComponent(sectionId)}.json`
+
+  const full = (base ? (base.endsWith('/') ? base : base + '/') : '') + relPath
+  const url = base ? full.replace(/doc\/([^/]+)\/doc\//, 'doc/$1/') : ('/' + relPath)
+
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) throw new Error(`section fetch failed: ${res.status} ${res.statusText}`)
+  const ct = res.headers.get('content-type') || ''
+  const text = await res.text()
+  try {
+    const b = JSON.parse(text) as SectionBundle
+    await dbPut('sections', key, b)
+    return b
+  } catch (e) {
+    if (/^\s*<!doctype/i.test(text) || ct.includes('text/html')) {
+      throw new Error('section fetch returned HTML instead of JSON. Ensure the Paradoc HTTP server is running and the path is correct.')
+    }
+    throw e
+  }
 }
 
 export function predictivePrefetch(docId: string, manifest: DocManifest, visibleIndex: number) {

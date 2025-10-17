@@ -52,6 +52,9 @@ export default function App() {
             // Expose to renderer for resolving relative asset URLs
             ;(window as any).__PARADOC_ASSET_BASE = man.assetBase
           }
+          if ((man as any).httpDocBase) {
+            ;(window as any).__PARADOC_HTTP_DOC_BASE = (man as any).httpDocBase
+          }
         } catch {}
       } else if (msg.type === 'ast_section' && msg.bundle) {
         upsertSection(msg.bundle as SectionBundle)
