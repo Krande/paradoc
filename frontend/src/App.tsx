@@ -87,7 +87,38 @@ export default function App() {
     <div className="flex min-h-screen">
       <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col">
-        <Topbar connected={connected} onSendMock={() => {}} onToggleSidebar={() => setSidebarOpen((v) => !v)} />
+        <Topbar connected={connected} onSendMock={() => {
+          // Build and broadcast a minimal AST manifest + section over WS for demo purposes
+          const manifest = {
+            docId: 'mock-doc',
+            sections: [{ id: 'intro', title: 'Mock Document', level: 1, index: 0 }]
+          }
+          const section = {
+            section: manifest.sections[0],
+            doc: {
+              blocks: [
+                { t: 'Header', c: [1, { id: 'intro', classes: [], attributes: {} }, [{ t: 'Str', c: 'Mock' }, { t: 'Space' }, { t: 'Str', c: 'Document' }]] },
+                { t: 'Para', c: [
+                  { t: 'Str', c: 'This' }, { t: 'Space' }, { t: 'Str', c: 'is' }, { t: 'Space' }, { t: 'Str', c: 'a' }, { t: 'Space' },
+                  { t: 'Str', c: 'mock' }, { t: 'Space' }, { t: 'Str', c: 'section' }, { t: 'Str', c: '.' }
+                ]}
+              ]
+            }
+          }
+
+          // Update local store so it works even without WS connectivity
+          setManifest(manifest as DocManifest)
+          upsertSection(section as SectionBundle)
+
+          // Broadcast over WS so other connected clients receive it
+          try {
+            const w = workerRef.current
+            if (w) {
+              w.postMessage({ type: 'send', html: JSON.stringify({ kind: 'manifest', manifest }) })
+              w.postMessage({ type: 'send', html: JSON.stringify({ kind: 'ast_section', section: section.section, doc: section.doc }) })
+            }
+          } catch {}
+        }} onToggleSidebar={() => setSidebarOpen((v) => !v)} />
         {state.manifest ? (
           <VirtualReader docId={docId} manifest={state.manifest} sections={state.sections} />
         ) : (
