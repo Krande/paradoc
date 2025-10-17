@@ -3,6 +3,24 @@ import type {
   PandocBlock, PandocInline, Plain, Para, Header, BulletList, OrderedList, CodeBlock, BlockQuote, HorizontalRule, RawBlock, Attr,
 } from './types'
 
+function isAbsoluteOrData(url: string): boolean {
+  return /^([a-z]+:)?\/\//i.test(url) || url.startsWith('data:')
+}
+
+function resolveAssetUrl(src: string): string {
+  try {
+    if (!src) return src
+    if (isAbsoluteOrData(src)) return src
+    const base = (window as any).__PARADOC_ASSET_BASE as string | undefined
+    if (!base) return src
+    const b = base.endsWith('/') ? base : base + '/'
+    const s = src.startsWith('/') ? src.slice(1) : src
+    return b + s
+  } catch {
+    return src
+  }
+}
+
 function attrs(a: Attr | undefined): { id?: string; className?: string; [k: string]: string | undefined } {
   if (!a) return {}
   const { id, classes, attributes } = a
@@ -32,7 +50,13 @@ function renderInlines(xs: PandocInline[]): React.ReactNode {
       }
       case 'Image': {
         const [a, alt, [src, title]] = x.c
-        out.push(<img key={i} {...attrs(a)} src={src} alt={String(renderInlines(alt))} title={title} className={'max-w-full ' + (a?.classes?.join(' ') || '')} />)
+        const resolved = resolveAssetUrl(src)
+        out.push(<img key={i} {...attrs(a)} src={resolved} alt={String(renderInlines(alt))} title={title} className={'max-w-full ' + (a?.classes?.join(' ') || '')} />)
+        break
+      }
+      case 'Span': {
+        const [a, content] = (x as any).c
+        out.push(<span key={i} {...attrs(a)} className={(a?.classes?.join(' ') || undefined)}>{renderInlines(content)}</span>)
         break
       }
       default:
@@ -82,6 +106,19 @@ export function renderBlock(b: PandocBlock, key?: React.Key): React.ReactElement
     case 'RawBlock': {
       const [, html] = (b as RawBlock).c
       return <div key={key} dangerouslySetInnerHTML={{ __html: html }} />
+    }
+    case 'Div': {
+      const [a, blocks] = (b as any).c as [Attr, PandocBlock[]]
+      const classList = a?.classes || []
+      if (classList.includes('figure')) {
+        // Basic figure styling; render children and allow captions to flow
+        return (
+          <figure key={key} {...attrs(a)} className={'my-4 ' + (a?.classes?.join(' ') || '')}>
+            {blocks.map((bb, j) => renderBlock(bb, j))}
+          </figure>
+        )
+      }
+      return <div key={key} {...attrs(a)}>{blocks.map((bb, j) => renderBlock(bb, j))}</div>
     }
     default:
       return null

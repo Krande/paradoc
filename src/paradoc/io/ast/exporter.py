@@ -188,6 +188,27 @@ class ASTExporter:
         ast = self.build_ast()
         manifest, sections = self.slice_sections(ast)
 
+        # Ensure a static HTTP server is serving assets from dist_dir so relative image paths load in the SPA
+        try:
+            from paradoc.frontend.http_server import ensure_http_server  # lazy import
+            http_port = int(port) + 1
+            # Make sure dist_dir exists
+            try:
+                self.one_doc.dist_dir.mkdir(exist_ok=True, parents=True)
+            except Exception:
+                pass
+            _ = ensure_http_server(host=host, port=http_port, directory=str(self.one_doc.dist_dir))
+            # Advertise asset base to the frontend manifest so it can resolve relative URLs
+            try:
+                manifest["assetBase"] = f"http://{host}:{http_port}/"
+            except Exception:
+                logger.error("Could not advertise asset base to frontend manifest", exc_info=True)
+                pass
+        except Exception:
+            # Non-fatal if HTTP server cannot be started; images may fail to load
+            logger.error("Could not ensure HTTP server is running", exc_info=True)
+            pass
+
         ws_url = f"ws://{host}:{port}"
         try:
             ws = websocket.create_connection(ws_url, timeout=3)

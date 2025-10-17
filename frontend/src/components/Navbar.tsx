@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 
 export type TocItem = {
   id: string
@@ -38,6 +38,16 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
     </nav>
   )
 
+  useEffect(() => {
+    if (!open) {
+      const panel = document.getElementById('paradoc-mobile-drawer')
+      const active = document.activeElement as HTMLElement | null
+      if (panel && active && panel.contains(active)) {
+        try { active.blur() } catch {}
+      }
+    }
+  }, [open])
+
   return (
     <>
       {/* Desktop sidebar */}
@@ -50,8 +60,9 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
 
       {/* Mobile drawer */}
       <div
+        id="paradoc-mobile-drawer-root"
         className={`fixed inset-0 z-40 md:hidden ${open ? 'pointer-events-auto' : 'pointer-events-none'}`}
-        aria-hidden={!open}
+        {...(!open ? ({ inert: '' } as any) : {})}
       >
         {/* Backdrop */}
         <div

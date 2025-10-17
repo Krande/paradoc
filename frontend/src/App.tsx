@@ -45,7 +45,14 @@ export default function App() {
       if (msg.type === 'status') {
         setConnected(!!msg.connected)
       } else if (msg.type === 'manifest' && msg.manifest) {
-        setManifest(msg.manifest as DocManifest)
+        const man = msg.manifest as DocManifest
+        setManifest(man)
+        try {
+          if (man.assetBase) {
+            // Expose to renderer for resolving relative asset URLs
+            ;(window as any).__PARADOC_ASSET_BASE = man.assetBase
+          }
+        } catch {}
       } else if (msg.type === 'ast_section' && msg.bundle) {
         upsertSection(msg.bundle as SectionBundle)
       }

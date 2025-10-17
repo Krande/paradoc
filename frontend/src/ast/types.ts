@@ -1,8 +1,8 @@
 // Minimal Pandoc JSON AST type declarations for core nodes we render
 // See: https://pandoc.org/lua-filters.html for structure; we model a pragmatic subset.
 
-export type PandocInline = Str | Space | SoftBreak | LineBreak | Emph | Strong | Code | Link | Image
-export type PandocBlock = Para | Plain | Header | BulletList | OrderedList | CodeBlock | BlockQuote | HorizontalRule | RawBlock
+export type PandocInline = Str | Space | SoftBreak | LineBreak | Emph | Strong | Code | Link | Image | Span
+export type PandocBlock = Para | Plain | Header | BulletList | OrderedList | CodeBlock | BlockQuote | HorizontalRule | RawBlock | Div
 
 export interface Attr {
   id: string
@@ -20,6 +20,7 @@ export interface Strong { t: 'Strong'; c: PandocInline[] }
 export interface Code { t: 'Code'; c: [Attr, string] }
 export interface Link { t: 'Link'; c: [Attr, PandocInline[], [string, string]] }
 export interface Image { t: 'Image'; c: [Attr, PandocInline[], [string, string]] }
+export interface Span { t: 'Span'; c: [Attr, PandocInline[]] }
 
 export interface Plain { t: 'Plain'; c: PandocInline[] }
 export interface Para { t: 'Para'; c: PandocInline[] }
@@ -30,6 +31,7 @@ export interface CodeBlock { t: 'CodeBlock'; c: [Attr, string] }
 export interface BlockQuote { t: 'BlockQuote'; c: PandocBlock[] }
 export interface HorizontalRule { t: 'HorizontalRule' }
 export interface RawBlock { t: 'RawBlock'; c: [string, string] }
+export interface Div { t: 'Div'; c: [Attr, PandocBlock[]] }
 
 export interface PandocDocument {
   // top-level Pandoc JSON: { pandoc-api-version: [..], meta: {}, blocks: [...] }
@@ -54,5 +56,6 @@ export interface SectionBundle {
 export interface DocManifest {
   docId: string
   sections: SectionMeta[]
+  assetBase?: string // optional: base URL for resolving relative asset paths
   // Optional additional data like cross-ref registry can be added later
 }
