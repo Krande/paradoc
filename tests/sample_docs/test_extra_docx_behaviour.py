@@ -15,9 +15,9 @@ table_format = "Grid Table 1 Light"
 pg_style = "Normal Indent"
 
 
-def test_report_crossref(files_dir, test_dir):
+def test_report_crossref(files_dir, tmp_path):
     source = files_dir / "doc3/demo.md"
-    dest = test_dir / "report_md/report_crossref.docx"
+    dest = tmp_path / "report_md/report_crossref.docx"
 
     os.makedirs(dest.parent, exist_ok=True)
     output = pypandoc.convert_file(
@@ -33,7 +33,7 @@ def test_report_crossref(files_dir, test_dir):
         os.startfile(dest)
 
 
-def test_basic_document_from_template(files_dir, test_dir):
+def test_basic_document_from_template(files_dir, tmp_path):
     document = Document(MY_DOCX_TMPL)
     document.add_paragraph("My Main Report", style="Heading 1")
     document.add_paragraph("A subheading", style="Heading 2")
@@ -42,5 +42,5 @@ def test_basic_document_from_template(files_dir, test_dir):
     document.add_paragraph("My Appendix", style="Appendix")
     document.add_paragraph("A subheading of my app", style="Appendix X.1")
     document.add_paragraph("A subheading of a subheading in my app", style="Appendix X.2")
-    os.makedirs(test_dir, exist_ok=True)
-    document.save(test_dir / "my_demo.docx")
+
+    document.save(tmp_path / "my_demo.docx")

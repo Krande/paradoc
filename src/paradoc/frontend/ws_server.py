@@ -37,6 +37,13 @@ async def _handler(websocket, state: _ServerState):
 
         # Echo/broadcast any messages to all clients and remember last
         async for message in websocket:
+            # Ignore keep-alive empty messages to avoid wiping the last document
+            try:
+                if not message or (isinstance(message, str) and message.strip() == ""):
+                    continue
+            except Exception:
+                # If we can't inspect it, proceed
+                pass
             state.last_message = message
             # Broadcast to all
             send_tasks = []
@@ -78,8 +85,10 @@ def _run_server(state: _ServerState):
     state.loop = loop
 
     async def _start():
+        # Bind to all interfaces when host is unspecified or localhost-like to support both IPv4 and IPv6 loopbacks.
+        listen_host = None if state.host in ("", "localhost", "127.0.0.1", "::1") else state.host
         server = await websockets.serve(
-            lambda ws: _handler(ws, state), state.host, state.port
+            lambda ws: _handler(ws, state), listen_host, state.port
         )
         return server
 

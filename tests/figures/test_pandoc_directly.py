@@ -5,16 +5,15 @@ import subprocess
 import pypandoc
 
 
-def test_run_pandoc_directly(files_dir):
+def test_run_pandoc_directly(files_dir, tmp_path):
     md_file = files_dir / "doc1/00-main/main.md"
-    os.makedirs("temp", exist_ok=True)
     pandoc_exe = shutil.which("pandoc")
     subprocess.run(
         [
             pandoc_exe,
             md_file,
             "-o",
-            "temp/test.docx",
+            (tmp_path / "test.docx").as_posix(),
             "--resource-path",
             str(md_file.parent.absolute()),
             "--filter",
@@ -23,13 +22,12 @@ def test_run_pandoc_directly(files_dir):
     )
 
 
-def test_run_pypandoc_directly(files_dir):
+def test_run_pypandoc_directly(files_dir, tmp_path):
     md_file = files_dir / "doc1/00-main/main.md"
-    os.makedirs("temp", exist_ok=True)
     pypandoc.convert_file(
         md_file,
         "docx",
-        outputfile="temp/test.docx",
+        outputfile=tmp_path / "test.docx",
         format="markdown",
         extra_args=[f"--resource-path={md_file.parent.absolute()}"],
         filters=["pandoc-crossref"],

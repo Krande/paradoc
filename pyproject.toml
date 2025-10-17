@@ -50,6 +50,11 @@ profile = "black"
 max-line-length = 120
 ignore = ["E24", "E121", "E123", "E126", "E203", "E226", "E704", "E741", "W503", "W504"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "--basetemp=temp"
+
 [tool.pixi.project]
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64"]

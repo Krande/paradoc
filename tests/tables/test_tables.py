@@ -4,9 +4,9 @@ from paradoc import OneDoc
 from paradoc.common import TableFormat
 
 
-def test_table(files_dir, test_dir):
+def test_table(files_dir, tmp_path):
     report_dir = files_dir / "doc_table"
-    one = OneDoc(report_dir, work_dir=test_dir / "doc_table")
+    one = OneDoc(report_dir, work_dir=tmp_path / "doc_table")
     df = pd.DataFrame([(0, 0), (1, 2)], columns=["a", "b"])
 
     one.add_table("my_table", df, "A basic table")
@@ -18,8 +18,8 @@ def test_table(files_dir, test_dir):
     one.compile("TableDoc")
 
 
-def test_regular_table(files_dir, test_dir):
+def test_regular_table(files_dir, tmp_path):
     report_dir = files_dir / "doc_regular_table"
-    one = OneDoc(report_dir, work_dir=test_dir / "doc_regular_table")
+    one = OneDoc(report_dir, work_dir=tmp_path / "doc_regular_table")
 
     one.compile("TableDoc", export_format="docx")

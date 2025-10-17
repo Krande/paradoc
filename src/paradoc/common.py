@@ -52,7 +52,9 @@ class Table:
         if include_name_in_cell:
             col_name = df.columns[0]
             col_index = df.columns.get_loc(col_name)
-            df.iloc[0, col_index] = self.name
+            # Convert the entire column to object dtype first
+            df[col_name] = df[col_name].astype(object)
+            df.iloc[0, int(col_index)] = self.name
 
         props = dict(index=False, tablefmt="grid")
         if self.format.float_fmt is not None:

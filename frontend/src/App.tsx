@@ -23,6 +23,7 @@ const MOCK_HTML = `
 export default function App() {
   const [connected, setConnected] = useState<boolean>(false)
   const [docHtml, setDocHtml] = useState<string>(MOCK_HTML)
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
   const workerRef = useRef<Worker | null>(null)
 
   // Parse HTML into a Document for TOC extraction
@@ -188,9 +189,9 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen">
-      <Navbar toc={toc} />
+      <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col">
-        <Topbar connected={connected} onSendMock={() => sendHtml(MOCK_HTML)} />
+        <Topbar connected={connected} onSendMock={() => sendHtml(MOCK_HTML)} onToggleSidebar={() => setSidebarOpen((v) => !v)} />
         <DocumentView html={docHtml} />
       </div>
     </div>
@@ -201,7 +202,7 @@ function DocumentView({ html }: { html: string }) {
   return (
     <div className="flex-1 overflow-auto p-6">
       <div
-        className="prose max-w-4xl mx-auto"
+        className="prose max-w-none w-full"
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </div>

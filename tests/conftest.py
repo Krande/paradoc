@@ -10,10 +10,5 @@ def top_dir() -> pathlib.Path:
 
 
 @pytest.fixture
-def test_dir():
-    return pathlib.Path(os.getenv("PARADOC_temp_dir", "temp"))
-
-
-@pytest.fixture
 def files_dir(top_dir):
     return (top_dir / ".." / "files").resolve().absolute()
