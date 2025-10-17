@@ -57,19 +57,22 @@ export async function fetchManifest(docId: string): Promise<DocManifest> {
   const cached = await dbGet<DocManifest>('manifests', docId)
   if (cached) return cached
 
-  // Determine base URL: prefer window-provided httpDocBase or assetBase
-  let base = ''
+  // Build document base URL
+  let docBase = ''
   try {
     const w: any = window as any
     if (w.__PARADOC_HTTP_DOC_BASE) {
-      base = String(w.__PARADOC_HTTP_DOC_BASE)
+      // Already something like http://host:13580/doc/{docId}/
+      docBase = String(w.__PARADOC_HTTP_DOC_BASE)
     } else if (w.__PARADOC_ASSET_BASE) {
-      base = String(w.__PARADOC_ASSET_BASE).replace(/\/?$/, '/') + `doc/${encodeURIComponent(docId)}/`
+      const assetBase = String(w.__PARADOC_ASSET_BASE)
+      docBase = assetBase.replace(/\/?$/, '/') + `doc/${encodeURIComponent(docId)}/`
     }
   } catch {}
-  const url = `${base || ''}doc/${encodeURIComponent(docId)}/manifest.json`.replace(/doc\/([^/]+)\/doc\//, 'doc/$1/')
 
-  const res = await fetch(base ? url : `/doc/${encodeURIComponent(docId)}/manifest.json`, { cache: 'no-store' })
+  const url = docBase ? (docBase.replace(/\/?$/, '/') + 'manifest.json') : `/doc/${encodeURIComponent(docId)}/manifest.json`
+
+  const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) throw new Error(`manifest fetch failed: ${res.status} ${res.statusText}`)
   const ct = res.headers.get('content-type') || ''
   const text = await res.text()
@@ -90,23 +93,23 @@ export async function fetchSection(docId: string, sectionId: string, index?: num
   const cached = await dbGet<SectionBundle>('sections', key)
   if (cached) return cached
 
-  // Determine base URL similar to fetchManifest
-  let base = ''
+  // Build document base URL (same logic as in fetchManifest)
+  let docBase = ''
   try {
     const w: any = window as any
     if (w.__PARADOC_HTTP_DOC_BASE) {
-      base = String(w.__PARADOC_HTTP_DOC_BASE)
+      docBase = String(w.__PARADOC_HTTP_DOC_BASE)
     } else if (w.__PARADOC_ASSET_BASE) {
-      base = String(w.__PARADOC_ASSET_BASE).replace(/\/?$/, '/') + `doc/${encodeURIComponent(docId)}/`
+      const assetBase = String(w.__PARADOC_ASSET_BASE)
+      docBase = assetBase.replace(/\/?$/, '/') + `doc/${encodeURIComponent(docId)}/`
     }
   } catch {}
 
-  const relPath = index != null
-    ? `doc/${encodeURIComponent(docId)}/section/${index}.json`
-    : `doc/${encodeURIComponent(docId)}/section/${encodeURIComponent(sectionId)}.json`
+  const rel = index != null
+    ? `section/${index}.json`
+    : `section/${encodeURIComponent(sectionId)}.json`
 
-  const full = (base ? (base.endsWith('/') ? base : base + '/') : '') + relPath
-  const url = base ? full.replace(/doc\/([^/]+)\/doc\//, 'doc/$1/') : ('/' + relPath)
+  const url = docBase ? (docBase.replace(/\/?$/, '/') + rel) : `/doc/${encodeURIComponent(docId)}/${rel}`
 
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) throw new Error(`section fetch failed: ${res.status} ${res.statusText}`)
