@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { DocManifest, SectionBundle, SectionMeta } from '../ast/types'
+import type { DocManifest, SectionBundle } from '../ast/types'
 
 // Very small IndexedDB helper
 function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('paradoc-cache', 1)
+    const req = indexedDB.open('paradoc-cache', 2)
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains('sections')) db.createObjectStore('sections')
       if (!db.objectStoreNames.contains('manifests')) db.createObjectStore('manifests')
+      if (!db.objectStoreNames.contains('images')) db.createObjectStore('images')
     }
     req.onerror = () => reject(req.error)
     req.onsuccess = () => {
@@ -18,7 +19,7 @@ function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
   })
 }
 
-export async function dbPut(store: 'sections' | 'manifests', key: string, value: unknown): Promise<void> {
+export async function dbPut(store: 'sections' | 'manifests' | 'images', key: string, value: unknown): Promise<void> {
   return withDb<void>((db) => new Promise((resolve, reject) => {
     const tx = db.transaction(store, 'readwrite')
     const os = tx.objectStore(store)
@@ -28,7 +29,7 @@ export async function dbPut(store: 'sections' | 'manifests', key: string, value:
   }))
 }
 
-export async function dbGet<T>(store: 'sections' | 'manifests', key: string): Promise<T | undefined> {
+export async function dbGet<T>(store: 'sections' | 'manifests' | 'images', key: string): Promise<T | undefined> {
   return withDb<T | undefined>((db) => new Promise((resolve, reject) => {
     const tx = db.transaction(store, 'readonly')
     const os = tx.objectStore(store)
@@ -132,4 +133,18 @@ export function predictivePrefetch(docId: string, manifest: DocManifest, visible
   const prev = visibleIndex > 0 ? manifest.sections[visibleIndex - 1] : undefined
   if (next) void fetchSection(docId, next.id, next.index)
   if (prev) void fetchSection(docId, prev.id, prev.index)
+}
+
+// Image storage helpers for embedded images
+export async function storeEmbeddedImage(docId: string, imagePath: string, data: string, mimeType: string): Promise<void> {
+  const key = `${docId}:${imagePath}`
+  const dataUrl = `data:${mimeType};base64,${data}`
+  await dbPut('images', key, dataUrl)
+}
+
+export async function getEmbeddedImage(docId: string, imagePath: string): Promise<string | undefined> {
+  // Normalize path: remove leading ./ or /
+  const normalizedPath = imagePath.replace(/^\.\//, '').replace(/^\//, '')
+  const key = `${docId}:${normalizedPath}`
+  return await dbGet<string>('images', key)
 }

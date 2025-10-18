@@ -1,4 +1,6 @@
 import json
+import base64
+import mimetypes
 from typing import Any, Dict, List, Tuple, TYPE_CHECKING
 
 import pypandoc
@@ -246,12 +248,130 @@ class ASTExporter:
             return "doc"
 
     # -------------------------------
+    # Image embedding utilities
+    # -------------------------------
+    def _extract_image_paths(self, blocks: List[Any]) -> List[str]:
+        """Recursively extract all image paths from Pandoc blocks."""
+        image_paths = []
+
+        def extract_from_inlines(inlines: List[Any]):
+            for inline in inlines or []:
+                if isinstance(inline, dict) and inline.get("t") == "Image":
+                    try:
+                        # Image: c = [Attr, [alt inlines], [src, title]]
+                        content = inline.get("c", [])
+                        if isinstance(content, list) and len(content) >= 3:
+                            src_info = content[2]
+                            if isinstance(src_info, list) and len(src_info) >= 1:
+                                src = src_info[0]
+                                if isinstance(src, str) and not src.startswith(('http://', 'https://', 'data:')):
+                                    image_paths.append(src)
+                    except Exception:
+                        pass
+
+        def extract_from_blocks(blks: List[Any]):
+            for blk in blks or []:
+                if not isinstance(blk, dict):
+                    continue
+
+                t = blk.get("t")
+                c = blk.get("c", [])
+
+                # Handle different block types that might contain images
+                if t == "Para" or t == "Plain":
+                    extract_from_inlines(c)
+                elif t == "Figure":
+                    # Figure: c = [Attr, caption, content_blocks]
+                    if isinstance(c, list) and len(c) >= 3:
+                        content_blocks = c[2]
+                        extract_from_blocks(content_blocks)
+                elif t == "Div":
+                    # Div: c = [Attr, blocks]
+                    if isinstance(c, list) and len(c) >= 2:
+                        extract_from_blocks(c[1])
+                elif t == "BulletList" or t == "OrderedList":
+                    # Lists contain list of block lists
+                    if t == "BulletList" and isinstance(c, list):
+                        for item in c:
+                            if isinstance(item, list):
+                                extract_from_blocks(item)
+                    elif t == "OrderedList" and isinstance(c, list) and len(c) >= 2:
+                        items = c[1]
+                        for item in items:
+                            if isinstance(item, list):
+                                extract_from_blocks(item)
+                elif t == "BlockQuote":
+                    extract_from_blocks(c)
+
+        extract_from_blocks(blocks)
+        return list(set(image_paths))  # Remove duplicates
+
+    def _embed_images_in_bundle(self, bundle: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+        """
+        Extract image paths from bundle and return embedded image data.
+        Returns dict mapping image path -> {data: base64_data, mimeType: mime_type}
+        """
+        embedded_images = {}
+        doc = bundle.get("doc", {})
+        blocks = doc.get("blocks", [])
+        image_paths = self._extract_image_paths(blocks)
+
+        if image_paths:
+            logger.info(f"Found {len(image_paths)} images to embed: {image_paths}")
+
+        for img_path in image_paths:
+            try:
+                # Normalize path: remove leading ./ if present
+                normalized_path = img_path.replace('./', '', 1) if img_path.startswith('./') else img_path
+
+                # Try to resolve image path relative to dist_dir or build_dir
+                resolved_path = None
+                for base in [self.one_doc.dist_dir, self.one_doc.build_dir, self.one_doc.source_dir]:
+                    # Try both original and normalized paths
+                    for path_variant in [img_path, normalized_path]:
+                        candidate = base / path_variant
+                        if candidate.exists() and candidate.is_file():
+                            resolved_path = candidate
+                            break
+                    if resolved_path:
+                        break
+
+                if resolved_path is None:
+                    logger.warning(f"Could not find image file: {img_path} (also tried: {normalized_path})")
+                    continue
+
+                # Read and encode image
+                with open(resolved_path, 'rb') as f:
+                    img_data = f.read()
+
+                b64_data = base64.b64encode(img_data).decode('ascii')
+                mime_type = mimetypes.guess_type(str(resolved_path))[0] or 'application/octet-stream'
+
+                # Store with normalized path (without ./)
+                embedded_images[normalized_path] = {
+                    'data': b64_data,
+                    'mimeType': mime_type
+                }
+
+                logger.info(f"Successfully embedded image: {img_path} -> {normalized_path} ({len(b64_data)} bytes, {mime_type})")
+
+            except Exception as e:
+                logger.warning(f"Failed to embed image {img_path}: {e}")
+
+        return embedded_images
+
+    # -------------------------------
     # WebSocket streaming
     # -------------------------------
-    def send_to_frontend(self, host: str = "localhost", port: int = 13579) -> bool:
+    def send_to_frontend(self, host: str = "localhost", port: int = 13579, embed_images: bool = True) -> bool:
         """
         Build AST, slice it into sections, and stream manifest + sections over the
         Paradoc WebSocket broadcast server.
+
+        Args:
+            host: WebSocket server host
+            port: WebSocket server port
+            embed_images: If True, embed images as base64 in WebSocket messages instead of serving via HTTP
         """
         # Ensure WS background server is running
         try:
@@ -275,54 +395,57 @@ class ASTExporter:
         # Get doc_id early so it's available in all scopes
         doc_id = manifest.get("docId") or self._infer_doc_id()
 
-        # Ensure a static HTTP server is serving assets from dist_dir so relative image paths load in the SPA
-        try:
-            from paradoc.frontend.http_server import ensure_http_server  # lazy import
-            http_port = int(port) + 1
-            # Make sure dist_dir exists
+        # Only start HTTP server if not embedding images
+        # When embed_images=True, images are sent via WebSocket and stored in IndexedDB
+        if not embed_images:
+            # Ensure a static HTTP server is serving assets from dist_dir so relative image paths load in the SPA
             try:
-                self.one_doc.dist_dir.mkdir(exist_ok=True, parents=True)
+                from paradoc.frontend.http_server import ensure_http_server  # lazy import
+                http_port = int(port) + 1
+                # Make sure dist_dir exists
+                try:
+                    self.one_doc.dist_dir.mkdir(exist_ok=True, parents=True)
+                except Exception:
+                    pass
+
+                # Write JSON artifacts expected by the frontend fetch() paths
+                try:
+                    import os
+
+                    base_dir = self.one_doc.dist_dir / "doc" / doc_id
+                    section_dir = base_dir / "section"
+                    section_dir.mkdir(parents=True, exist_ok=True)
+
+                    # manifest.json
+                    (base_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+
+                    # sections: by index and by id
+                    for bundle in sections:
+                        sec = bundle["section"]
+                        idx = sec.get("index")
+                        sid = sec.get("id")
+                        data = json.dumps(bundle, ensure_ascii=False)
+                        if idx is not None:
+                            (section_dir / f"{idx}.json").write_text(data, encoding="utf-8")
+                        if sid:
+                            # sanitize filename a bit
+                            safe_sid = "".join(ch if ch.isalnum() or ch in ("-", "_", ".") else "-" for ch in str(sid))
+                            (section_dir / f"{safe_sid}.json").write_text(data, encoding="utf-8")
+                except Exception:
+                    logger.error("Failed to write HTTP JSON artifacts for frontend", exc_info=True)
+
+                _ = ensure_http_server(host=host, port=http_port, directory=str(self.one_doc.dist_dir))
+                # Advertise asset base to the frontend manifest so it can resolve relative URLs
+                try:
+                    manifest["assetBase"] = f"http://{host}:{http_port}/"
+                    manifest["httpDocBase"] = f"http://{host}:{http_port}/doc/{doc_id}/"
+                except Exception:
+                    logger.error("Could not advertise asset base to frontend manifest", exc_info=True)
+                    pass
             except Exception:
+                # Non-fatal if HTTP server cannot be started; images may fail to load
+                logger.error("Could not ensure HTTP server is running", exc_info=True)
                 pass
-
-            # Write JSON artifacts expected by the frontend fetch() paths
-            try:
-                import os
-
-                base_dir = self.one_doc.dist_dir / "doc" / doc_id
-                section_dir = base_dir / "section"
-                section_dir.mkdir(parents=True, exist_ok=True)
-
-                # manifest.json
-                (base_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
-
-                # sections: by index and by id
-                for bundle in sections:
-                    sec = bundle["section"]
-                    idx = sec.get("index")
-                    sid = sec.get("id")
-                    data = json.dumps(bundle, ensure_ascii=False)
-                    if idx is not None:
-                        (section_dir / f"{idx}.json").write_text(data, encoding="utf-8")
-                    if sid:
-                        # sanitize filename a bit
-                        safe_sid = "".join(ch if ch.isalnum() or ch in ("-", "_", ".") else "-" for ch in str(sid))
-                        (section_dir / f"{safe_sid}.json").write_text(data, encoding="utf-8")
-            except Exception:
-                logger.error("Failed to write HTTP JSON artifacts for frontend", exc_info=True)
-
-            _ = ensure_http_server(host=host, port=http_port, directory=str(self.one_doc.dist_dir))
-            # Advertise asset base to the frontend manifest so it can resolve relative URLs
-            try:
-                manifest["assetBase"] = f"http://{host}:{http_port}/"
-                manifest["httpDocBase"] = f"http://{host}:{http_port}/doc/{doc_id}/"
-            except Exception:
-                logger.error("Could not advertise asset base to frontend manifest", exc_info=True)
-                pass
-        except Exception:
-            # Non-fatal if HTTP server cannot be started; images may fail to load
-            logger.error("Could not ensure HTTP server is running", exc_info=True)
-            pass
 
         ws_url = f"ws://{host}:{port}"
         try:
@@ -338,6 +461,15 @@ class ASTExporter:
             for bundle in sections:
                 msg = {"kind": "ast_section", "section": bundle["section"], "doc": bundle["doc"]}
                 ws.send(json.dumps(msg))
+
+            # Embed images if requested
+            if embed_images:
+                for bundle in sections:
+                    embedded_images = self._embed_images_in_bundle(bundle)
+                    if embedded_images:
+                        img_msg = {"kind": "embedded_images", "images": embedded_images}
+                        ws.send(json.dumps(img_msg))
+
             return True
         except Exception as e:
             print(f"Failed to send AST to frontend over WebSocket: {e}")

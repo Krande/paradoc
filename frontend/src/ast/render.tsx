@@ -5,19 +5,50 @@ import type {
   PandocBlock, PandocInline, Plain, Para, Header, BulletList, OrderedList, CodeBlock, BlockQuote, HorizontalRule, RawBlock, Attr, Table,
 } from './types'
 import type { HeadingNumbering } from './headingNumbers'
+import { getEmbeddedImage } from '../sections/store'
+
+// Create a context to pass docId through the render tree
+const DocIdContext = React.createContext<string | undefined>(undefined)
+
+export function RenderWithDocId({ docId, children }: { docId?: string; children: React.ReactNode }) {
+  return <DocIdContext.Provider value={docId}>{children}</DocIdContext.Provider>
+}
+
+function useDocId() {
+  return React.useContext(DocIdContext)
+}
 
 function isAbsoluteOrData(url: string): boolean {
   return /^([a-z]+:)?\/\//i.test(url) || url.startsWith('data:')
 }
 
-function resolveAssetUrl(src: string): string {
+async function resolveAssetUrl(src: string, docId?: string): Promise<string> {
   try {
     if (!src) return src
     if (isAbsoluteOrData(src)) return src
+
+    // Try to get embedded image from IndexedDB first
+    if (docId) {
+      // Normalize path: try original, without ./, and without leading /
+      const pathVariants = [
+        src,
+        src.replace(/^\.\//, ''),  // Remove leading ./
+        src.replace(/^\//, ''),     // Remove leading /
+      ]
+
+      for (const path of pathVariants) {
+        const embeddedImage = await getEmbeddedImage(docId, path)
+        if (embeddedImage) {
+          return embeddedImage
+        }
+      }
+    }
+
+    // Fall back to HTTP server
     const base = (window as any).__PARADOC_ASSET_BASE as string | undefined
     if (!base) return src
     const b = base.endsWith('/') ? base : base + '/'
-    const s = src.startsWith('/') ? src.slice(1) : src
+    const s = src.startsWith('/') ? src.slice(1) : src.replace(/^\.\//, '')
     return b + s
   } catch {
     return src
@@ -90,6 +121,26 @@ function MathElement({ latex, displayMode }: { latex: string; displayMode: boole
   )
 }
 
+/**
+ * Component to render an image with async URL resolution (checks IndexedDB first)
+ */
+function AsyncImage({ src, alt, title, className, imgAttrs }: {
+  src: string;
+  alt: string;
+  title: string;
+  className?: string;
+  imgAttrs?: any;
+}): React.ReactElement {
+  const docId = useDocId()
+  const [resolvedSrc, setResolvedSrc] = React.useState<string>(src)
+
+  React.useEffect(() => {
+    resolveAssetUrl(src, docId).then(setResolvedSrc).catch(() => setResolvedSrc(src))
+  }, [src, docId])
+
+  return <img {...imgAttrs} src={resolvedSrc} alt={alt} title={title} className={className} />
+}
+
 function renderInlines(xs: PandocInline[]): React.ReactNode {
   const out: React.ReactNode[] = []
   xs.forEach((x, i) => {
@@ -134,8 +185,7 @@ function renderInlines(xs: PandocInline[]): React.ReactNode {
       }
       case 'Image': {
         const [a, alt, [src, title]] = x.c
-        const resolved = resolveAssetUrl(src)
-        out.push(<img key={i} {...attrs(a)} src={resolved} alt={String(renderInlines(alt))} title={title} className={'max-w-full ' + (a?.classes?.join(' ') || '')} />)
+        out.push(<AsyncImage key={i} imgAttrs={attrs(a)} src={src} alt={String(renderInlines(alt))} title={title} className={'max-w-full ' + (a?.classes?.join(' ') || '')} />)
         break
       }
       case 'Span': {

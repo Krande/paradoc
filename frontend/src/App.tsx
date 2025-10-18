@@ -8,7 +8,7 @@ import { Navbar, TocItem } from './components/Navbar'
 // @ts-ignore
 const WorkerCtor = (URL as any) ? (url: string) => new Worker(new URL(url, import.meta.url), { type: 'module' }) : null
 
-import { useSectionStore, fetchManifest, fetchSection } from './sections/store'
+import { useSectionStore, fetchManifest, fetchSection, storeEmbeddedImage } from './sections/store'
 import type { DocManifest, SectionBundle } from './ast/types'
 import { VirtualReader } from './components/VirtualReader'
 import { calculateHeadingNumbers } from './ast/headingNumbers'
@@ -49,6 +49,9 @@ export default function App() {
     const worker: Worker = new Worker(new URL('./ws/worker.ts', import.meta.url), { type: 'module' })
     workerRef.current = worker
 
+    // Track the current docId from manifest
+    let currentDocId = 'demo'
+
     const onMessage = (event: MessageEvent) => {
       const msg = event.data
       if (!msg) return
@@ -59,7 +62,10 @@ export default function App() {
         setManifest(man)
         // Ensure our docId matches the manifest to avoid URL mismatches
         try {
-          if (man && (man as any).docId) setDocId((man as any).docId)
+          if (man && (man as any).docId) {
+            currentDocId = (man as any).docId
+            setDocId(currentDocId)
+          }
         } catch {}
         try {
           if (man.assetBase) {
@@ -72,6 +78,14 @@ export default function App() {
         } catch {}
       } else if (msg.type === 'ast_section' && msg.bundle) {
         upsertSection(msg.bundle as SectionBundle)
+      } else if (msg.type === 'embedded_images' && msg.images) {
+        // Store embedded images in IndexedDB using the current docId from manifest
+        const images = msg.images as Record<string, { data: string; mimeType: string }>
+        for (const [path, imgData] of Object.entries(images)) {
+          storeEmbeddedImage(currentDocId, path, imgData.data, imgData.mimeType).catch(err => {
+            console.warn(`Failed to store embedded image ${path} for docId ${currentDocId}:`, err)
+          })
+        }
       }
     }
 

@@ -90,6 +90,11 @@ function connect() {
           ctx.postMessage({ type: 'ast_section', bundle: { section: obj.section, doc: obj.doc } })
           return
         }
+        // New: Embedded images support
+        if (obj && obj.kind === 'embedded_images' && obj.images) {
+          ctx.postMessage({ type: 'embedded_images', images: obj.images })
+          return
+        }
       } catch {
         // fall through to plain html
       }

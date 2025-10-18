@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { DocManifest, SectionBundle, Header } from '../ast/types'
-import { renderBlock } from '../ast/render'
+import { renderBlock, RenderWithDocId } from '../ast/render'
 import { predictivePrefetch } from '../sections/store'
 import { calculateHeadingNumbers } from '../ast/headingNumbers'
 
@@ -54,28 +54,30 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
   }, [items])
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-auto p-6">
-      <div className="max-w-none w-full">
-        {h1Sections.map((s, i) => {
-          const bundle = sections[s.id]
-          return (
-            <section
-              key={s.id}
-              id={s.id}
-              data-section-index={i}
-              style={{ containIntrinsicSize: '1px 800px' as any }}
-              className="content-visibility-auto my-6 scroll-mt-14"
-            >
-              {bundle ? (
-                <Section blockKey={s.id} bundle={bundle} headingNumbers={headingNumbers} />
-              ) : (
-                <Skeleton title={s.title} />
-              )}
-            </section>
-          )
-        })}
+    <RenderWithDocId docId={docId}>
+      <div ref={containerRef} className="flex-1 overflow-auto p-6">
+        <div className="max-w-none w-full">
+          {h1Sections.map((s, i) => {
+            const bundle = sections[s.id]
+            return (
+              <section
+                key={s.id}
+                id={s.id}
+                data-section-index={i}
+                style={{ containIntrinsicSize: '1px 800px' as any }}
+                className="content-visibility-auto my-6 scroll-mt-14"
+              >
+                {bundle ? (
+                  <Section blockKey={s.id} bundle={bundle} headingNumbers={headingNumbers} />
+                ) : (
+                  <Skeleton title={s.title} />
+                )}
+              </section>
+            )
+          })}
+        </div>
       </div>
-    </div>
+    </RenderWithDocId>
   )
 }
 

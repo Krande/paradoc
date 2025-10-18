@@ -159,13 +159,13 @@ class OneDoc:
         if clean_build_dir is True:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
-    def send_to_frontend(self, metadata_file=None):
+    def send_to_frontend(self, metadata_file=None, embed_images=True):
         from paradoc.io.ast.exporter import ASTExporter
         shutil.rmtree(self.dist_dir, ignore_errors=True)
         self._prep_compilation(metadata_file=metadata_file)
         self._perform_variable_substitution(False)
         html = ASTExporter(self)
-        html.send_to_frontend()
+        html.send_to_frontend(embed_images=embed_images)
 
     def _prep_compilation(self, metadata_file=None):
         self.build_dir.mkdir(exist_ok=True, parents=True)
