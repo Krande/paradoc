@@ -1,11 +1,12 @@
 import json
-import pathlib
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, TYPE_CHECKING
 
 import pypandoc
 
-from paradoc import OneDoc
 from paradoc.config import logger
+
+if TYPE_CHECKING:
+    from paradoc import OneDoc
 
 
 class ASTExporter:
@@ -148,7 +149,8 @@ class ASTExporter:
                 except Exception:
                     sec_id = f"sec-{section_index}"
                 title = self._header_text(inlines)
-                current_meta = {"id": sec_id, "title": title or f"Section {section_index+1}", "level": 1, "index": section_index}
+                current_meta = {"id": sec_id, "title": title or f"Section {section_index + 1}", "level": 1,
+                                "index": section_index}
             # Accumulate
             if current_meta is None:
                 # Before first H1, skip content (optional: could create a preface section)
@@ -229,7 +231,8 @@ class ASTExporter:
         try:
             import websocket  # type: ignore
         except Exception:
-            print("websocket-client is not installed. Please add it to your environment to use ASTExporter.send_to_frontend().")
+            print(
+                "websocket-client is not installed. Please add it to your environment to use ASTExporter.send_to_frontend().")
             return False
 
         # Build and slice
@@ -268,7 +271,7 @@ class ASTExporter:
                         (section_dir / f"{idx}.json").write_text(data, encoding="utf-8")
                     if sid:
                         # sanitize filename a bit
-                        safe_sid = "".join(ch if ch.isalnum() or ch in ("-","_",".") else "-" for ch in str(sid))
+                        safe_sid = "".join(ch if ch.isalnum() or ch in ("-", "_", ".") else "-" for ch in str(sid))
                         (section_dir / f"{safe_sid}.json").write_text(data, encoding="utf-8")
             except Exception:
                 logger.error("Failed to write HTTP JSON artifacts for frontend", exc_info=True)

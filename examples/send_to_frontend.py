@@ -10,7 +10,8 @@ def main():
     args = parser.parse_args()
     doc_dir = args.doc
     files_dir = pathlib.Path(__file__).resolve().absolute().parent / ".." / "files"
-    doc_names = list(files_dir.iterdir())
+    doc_names = [d.name for d in files_dir.iterdir()]
+    print(doc_names)
     if doc_dir in doc_names:
         od = pa.OneDoc(files_dir / doc_dir)
     else:

@@ -1,4 +1,3 @@
-import json
 import pytest
 
 from paradoc import OneDoc
