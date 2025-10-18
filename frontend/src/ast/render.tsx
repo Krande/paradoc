@@ -2,6 +2,7 @@ import React from 'react'
 import type {
   PandocBlock, PandocInline, Plain, Para, Header, BulletList, OrderedList, CodeBlock, BlockQuote, HorizontalRule, RawBlock, Attr,
 } from './types'
+import type { HeadingNumbering } from './headingNumbers'
 
 function isAbsoluteOrData(url: string): boolean {
   return /^([a-z]+:)?\/\//i.test(url) || url.startsWith('data:')
@@ -66,7 +67,7 @@ function renderInlines(xs: PandocInline[]): React.ReactNode {
   return out
 }
 
-export function renderBlock(b: PandocBlock, key?: React.Key): React.ReactElement | null {
+export function renderBlock(b: PandocBlock, key?: React.Key, headingNumber?: HeadingNumbering): React.ReactElement | null {
   switch (b.t) {
     case 'Plain':
       return <p key={key} className="my-3">{renderInlines((b as Plain).c)}</p>
@@ -76,12 +77,19 @@ export function renderBlock(b: PandocBlock, key?: React.Key): React.ReactElement
       const [level, a, inls] = (b as Header).c
       const common = { ...attrs(a), className: `mt-6 mb-2 font-semibold ${a?.classes?.join(' ') || ''}` }
       const content = renderInlines(inls)
-      if (level === 1) return <h1 key={key} {...common} className={common.className + ' text-3xl'}>{content}</h1>
-      if (level === 2) return <h2 key={key} {...common} className={common.className + ' text-2xl'}>{content}</h2>
-      if (level === 3) return <h3 key={key} {...common} className={common.className + ' text-xl'}>{content}</h3>
-      if (level === 4) return <h4 key={key} {...common} className={common.className + ' text-lg'}>{content}</h4>
-      if (level === 5) return <h5 key={key} {...common} className={common.className + ' text-base'}>{content}</h5>
-      return <h6 key={key} {...common} className={common.className + ' text-sm'}>{content}</h6>
+      const numberedContent = headingNumber ? (
+        <>
+          <span className="mr-2">{headingNumber.fullText}</span>
+          {content}
+        </>
+      ) : content
+
+      if (level === 1) return <h1 key={key} {...common} className={common.className + ' text-3xl'}>{numberedContent}</h1>
+      if (level === 2) return <h2 key={key} {...common} className={common.className + ' text-2xl'}>{numberedContent}</h2>
+      if (level === 3) return <h3 key={key} {...common} className={common.className + ' text-xl'}>{numberedContent}</h3>
+      if (level === 4) return <h4 key={key} {...common} className={common.className + ' text-lg'}>{numberedContent}</h4>
+      if (level === 5) return <h5 key={key} {...common} className={common.className + ' text-base'}>{numberedContent}</h5>
+      return <h6 key={key} {...common} className={common.className + ' text-sm'}>{numberedContent}</h6>
     }
     case 'BulletList': {
       const items = (b as BulletList).c

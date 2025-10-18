@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import type { DocManifest, SectionBundle } from '../ast/types'
-import { renderBlocks } from '../ast/render'
+import type { DocManifest, SectionBundle, Header } from '../ast/types'
+import { renderBlock } from '../ast/render'
 import { predictivePrefetch } from '../sections/store'
+import { calculateHeadingNumbers } from '../ast/headingNumbers'
 
 interface Props {
   docId: string
@@ -15,6 +16,9 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
 
   // Build ordered list of rendered items with fallback placeholders
   const items = useMemo(() => manifest.sections.map((s) => sections[s.id] || null), [manifest, sections])
+
+  // Calculate heading numbers for all sections
+  const headingNumbers = useMemo(() => calculateHeadingNumbers(manifest.sections), [manifest.sections])
 
   useEffect(() => {
     if (!manifest) return
@@ -54,7 +58,7 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
               className="content-visibility-auto my-6 scroll-mt-14"
             >
               {bundle ? (
-                <Section blockKey={s.id} bundle={bundle} />
+                <Section blockKey={s.id} bundle={bundle} headingNumbers={headingNumbers} />
               ) : (
                 <Skeleton title={s.title} />
               )}
@@ -66,10 +70,21 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
   )
 }
 
-function Section({ bundle, blockKey }: { bundle: SectionBundle, blockKey: string }) {
+function Section({ bundle, blockKey, headingNumbers }: { bundle: SectionBundle, blockKey: string, headingNumbers: Map<string, any> }) {
   return (
     <div>
-      {renderBlocks(bundle.doc.blocks)}
+      {bundle.doc.blocks.map((b, i) => {
+        // Check if this block is a header and get its numbering
+        let headingNumber
+        if (b.t === 'Header') {
+          const [, attrs] = (b as Header).c
+          const headerId = typeof attrs === 'object' && attrs && 'id' in attrs ? attrs.id : (Array.isArray(attrs) && attrs[0] ? attrs[0] : undefined)
+          if (headerId) {
+            headingNumber = headingNumbers.get(headerId)
+          }
+        }
+        return renderBlock(b, i, headingNumber)
+      })}
     </div>
   )
 }

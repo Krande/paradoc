@@ -46,6 +46,7 @@ export interface SectionMeta {
   title: string
   index: number // ordering in the document
   level: number // header level of the section root
+  isAppendix?: boolean // whether this section is in the appendix
 }
 
 export interface SectionBundle {

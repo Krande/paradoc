@@ -87,7 +87,7 @@ class ASTExporter:
         Extract ALL headers (H1-H6) for the manifest to enable nested outline/TOC in frontend.
 
         Returns (manifest, section_bundles)
-        - manifest: { docId, sections: [{ id, title, level, index }] } - includes ALL headers
+        - manifest: { docId, sections: [{ id, title, level, index, isAppendix }] } - includes ALL headers
         - section_bundles: list of { section: meta, doc: { blocks: [...] } } - split by H1 only
         """
         blocks = ast.get("blocks") or ast.get("pandoc-api-version") and ast.get("blocks")
@@ -105,6 +105,9 @@ class ASTExporter:
         all_headers: List[Dict[str, Any]] = []
         header_index = 0
 
+        # Track whether we've encountered the \appendix marker
+        in_appendix = False
+
         def push_current():
             if current_meta is None:
                 return
@@ -114,6 +117,17 @@ class ASTExporter:
             })
 
         for blk in blocks:
+            # Check for \appendix marker in RawBlock
+            if isinstance(blk, dict) and blk.get("t") == "RawBlock":
+                try:
+                    content = blk.get("c", [])
+                    if isinstance(content, list) and len(content) >= 2:
+                        raw_text = content[1]
+                        if isinstance(raw_text, str) and "\\appendix" in raw_text:
+                            in_appendix = True
+                except Exception:
+                    pass
+
             level = None
             attrs: Any = None
             inlines: List[Any] = []
@@ -155,7 +169,8 @@ class ASTExporter:
                     "id": sec_id,
                     "title": title or f"Section {header_index + 1}",
                     "level": level,
-                    "index": header_index
+                    "index": header_index,
+                    "isAppendix": in_appendix
                 })
                 header_index += 1
 
@@ -211,7 +226,7 @@ class ASTExporter:
                 except Exception:
                     continue
             sections.append({
-                "section": {"id": sec_id, "title": title, "level": 1, "index": 0},
+                "section": {"id": sec_id, "title": title, "level": 1, "index": 0, "isAppendix": False},
                 "doc": {"blocks": list(all_blocks)},
             })
 
@@ -257,6 +272,9 @@ class ASTExporter:
         ast = self.build_ast()
         manifest, sections = self.slice_sections(ast)
 
+        # Get doc_id early so it's available in all scopes
+        doc_id = manifest.get("docId") or self._infer_doc_id()
+
         # Ensure a static HTTP server is serving assets from dist_dir so relative image paths load in the SPA
         try:
             from paradoc.frontend.http_server import ensure_http_server  # lazy import
@@ -271,7 +289,6 @@ class ASTExporter:
             try:
                 import os
 
-                doc_id = manifest.get("docId") or self._infer_doc_id()
                 base_dir = self.one_doc.dist_dir / "doc" / doc_id
                 section_dir = base_dir / "section"
                 section_dir.mkdir(parents=True, exist_ok=True)
