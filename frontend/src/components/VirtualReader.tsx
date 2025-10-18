@@ -14,16 +14,25 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [visibleIndex, setVisibleIndex] = useState(0)
 
-  // Build ordered list of rendered items with fallback placeholders
-  const items = useMemo(() => manifest.sections.map((s) => sections[s.id] || null), [manifest, sections])
+  // Filter manifest to only include H1 sections (level === 1) which have actual content bundles
+  // All headers are in the manifest for TOC, but only H1s have section content
+  const h1Sections = useMemo(() => manifest.sections.filter(s => s.level === 1), [manifest.sections])
 
-  // Calculate heading numbers for all sections
+  // Build ordered list of rendered items with fallback placeholders
+  const items = useMemo(() => h1Sections.map((s) => sections[s.id] || null), [h1Sections, sections])
+
+  // Calculate heading numbers for all sections (including H2-H6 for TOC)
   const headingNumbers = useMemo(() => calculateHeadingNumbers(manifest.sections), [manifest.sections])
 
   useEffect(() => {
     if (!manifest) return
-    predictivePrefetch(docId, manifest, visibleIndex)
-  }, [docId, manifest, visibleIndex])
+    // Use h1Sections for prefetching since those are the only ones with content
+    const visibleH1 = h1Sections[visibleIndex]
+    if (visibleH1) {
+      const originalIndex = manifest.sections.findIndex(s => s.id === visibleH1.id)
+      predictivePrefetch(docId, manifest, originalIndex)
+    }
+  }, [docId, manifest, h1Sections, visibleIndex])
 
   useEffect(() => {
     const root = containerRef.current
@@ -47,7 +56,7 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
   return (
     <div ref={containerRef} className="flex-1 overflow-auto p-6">
       <div className="max-w-none w-full">
-        {manifest.sections.map((s, i) => {
+        {h1Sections.map((s, i) => {
           const bundle = sections[s.id]
           return (
             <section
