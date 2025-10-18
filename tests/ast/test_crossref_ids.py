@@ -109,14 +109,30 @@ def test_table_ids_in_ast(files_dir, tmp_path):
 
     blocks = ast.get('blocks', [])
 
-    # Look for Table blocks
+    # Look for Table blocks (may be wrapped in Div by pandoc-crossref)
     tables = find_blocks_by_type(blocks, 'Table')
 
     # doc_lorum has tables with IDs like tbl:current-metrics
     assert len(tables) > 0, "Expected to find tables in doc_lorum"
 
-    # Check that at least one table has an ID starting with 'tbl:'
+    # pandoc-crossref wraps tables in Div blocks with the ID on the Div
+    # Find all Div blocks that contain tables
+    table_divs = []
+    for block in blocks:
+        if isinstance(block, dict) and block.get('t') == 'Div':
+            c = block.get('c', [])
+            if len(c) >= 2:
+                # Check if this Div contains a Table
+                nested_blocks = c[1] if isinstance(c[1], list) else []
+                for nested in nested_blocks:
+                    if isinstance(nested, dict) and nested.get('t') == 'Table':
+                        table_divs.append(block)
+                        break
+
+    # Extract IDs from both direct Table blocks and Div-wrapped tables
     table_ids = []
+
+    # Check direct Table blocks for IDs
     for tbl in tables:
         c = tbl.get('c', [])
         if len(c) >= 1:
@@ -124,6 +140,15 @@ def test_table_ids_in_ast(files_dir, tmp_path):
             tbl_id = extract_id_from_attrs(attrs)
             if tbl_id:
                 table_ids.append(tbl_id)
+
+    # Check Div wrappers for IDs (this is where pandoc-crossref puts them)
+    for div in table_divs:
+        c = div.get('c', [])
+        if len(c) >= 1:
+            attrs = c[0]
+            div_id = extract_id_from_attrs(attrs)
+            if div_id:
+                table_ids.append(div_id)
 
     tbl_prefixed = [tid for tid in table_ids if tid.startswith('tbl:')]
     assert len(tbl_prefixed) > 0, f"Expected tables with 'tbl:' IDs, found IDs: {table_ids}"
@@ -195,4 +220,3 @@ def test_equation_ids_in_ast(files_dir, tmp_path):
     expected_eqs = ['eq:energy', 'eq:diffusion']
     for eq_id in expected_eqs:
         assert eq_id in equation_ids, f"Expected '{eq_id}' in equation IDs, found: {equation_ids}"
-
