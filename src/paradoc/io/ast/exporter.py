@@ -31,13 +31,42 @@ class ASTExporter:
     # AST construction and slicing
     # -------------------------------
     def build_ast(self) -> Dict[str, Any]:
-        """Concatenate main and appendix md (with \appendix marker) and obtain Pandoc JSON AST."""
+        """
+        Concatenate main and appendix md (with \appendix marker) and obtain Pandoc JSON AST.
+        Inserts source file markers to enable tracking which blocks came from which files.
+        """
         one = self.one_doc
 
-        md_main_str = "\n\n".join([md.read_built_file() for md in one.md_files_main])
-        app_str = """\n\n\\appendix\n\n"""
-        md_app_str = "\n\n".join([md.read_built_file() for md in one.md_files_app])
-        combined_str = md_main_str + app_str + md_app_str
+        # Build concatenated markdown with source file markers
+        md_parts = []
+        source_markers = []  # Track marker positions and corresponding files
+
+        # Add main files with markers
+        for md_file in one.md_files_main:
+            marker = f"<!-- PARADOC_SOURCE_FILE: {md_file.path} -->"
+            source_markers.append({
+                'marker': marker,
+                'source_file': str(md_file.path),
+                'source_dir': str(md_file.path.parent)
+            })
+            md_parts.append(marker)
+            md_parts.append(md_file.read_built_file())
+
+        # Add appendix marker
+        md_parts.append("\n\n\\appendix\n\n")
+
+        # Add appendix files with markers
+        for md_file in one.md_files_app:
+            marker = f"<!-- PARADOC_SOURCE_FILE: {md_file.path} -->"
+            source_markers.append({
+                'marker': marker,
+                'source_file': str(md_file.path),
+                'source_dir': str(md_file.path.parent)
+            })
+            md_parts.append(marker)
+            md_parts.append(md_file.read_built_file())
+
+        combined_str = "\n\n".join(md_parts)
 
         ast_json = pypandoc.convert_text(
             combined_str,
@@ -57,7 +86,48 @@ class ASTExporter:
         except Exception as e:
             logger.error(f"Failed to parse Pandoc JSON AST: {e}")
             raise
+
+        # Parse the AST and map blocks to source files using the markers
+        self._map_blocks_to_sources(ast, source_markers)
+
         return ast
+
+    def _map_blocks_to_sources(self, ast: Dict[str, Any], source_markers: List[Dict[str, str]]):
+        """
+        Map blocks in the AST to their source files by finding the marker comments.
+        Annotates each block with _paradoc_source metadata.
+        """
+        blocks = ast.get("blocks", [])
+        if not blocks:
+            return
+
+        # Find marker positions in the blocks list
+        current_source = None
+        marker_indices = []
+
+        for idx, block in enumerate(blocks):
+            if isinstance(block, dict) and block.get("t") == "RawBlock":
+                c = block.get("c", [])
+                if isinstance(c, list) and len(c) >= 2:
+                    format_type, content = c[0], c[1]
+                    if format_type == "html" and "PARADOC_SOURCE_FILE:" in content:
+                        # Found a marker - extract source info
+                        for marker_info in source_markers:
+                            if marker_info['marker'] in content:
+                                current_source = {
+                                    'source_file': marker_info['source_file'],
+                                    'source_dir': marker_info['source_dir']
+                                }
+                                marker_indices.append(idx)
+                                break
+
+            # Annotate block with current source
+            if current_source and isinstance(block, dict):
+                block['_paradoc_source'] = current_source
+
+        # Remove the marker blocks from the AST (they've served their purpose)
+        for idx in reversed(marker_indices):
+            blocks.pop(idx)
 
     @staticmethod
     def _header_text(inlines: List[Any]) -> str:
@@ -310,35 +380,53 @@ class ASTExporter:
     def _embed_images_in_bundle(self, bundle: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
         """
         Extract image paths from bundle and return embedded image data.
+        Uses source file tracking to resolve images relative to their original markdown file.
         Returns dict mapping image path -> {data: base64_data, mimeType: mime_type}
         """
         embedded_images = {}
         doc = bundle.get("doc", {})
         blocks = doc.get("blocks", [])
-        image_paths = self._extract_image_paths(blocks)
 
-        if image_paths:
-            logger.info(f"Found {len(image_paths)} images to embed: {image_paths}")
+        # Extract images along with their source context
+        images_with_context = self._extract_images_with_source(blocks)
 
-        for img_path in image_paths:
+        if images_with_context:
+            logger.info(f"Found {len(images_with_context)} images to embed")
+
+        for img_info in images_with_context:
+            img_path = img_info['path']
+            source_dir = img_info.get('source_dir')
+
             try:
                 # Normalize path: remove leading ./ if present
                 normalized_path = img_path.replace('./', '', 1) if img_path.startswith('./') else img_path
 
-                # Try to resolve image path relative to dist_dir or build_dir
+                # Try to resolve image path
                 resolved_path = None
-                for base in [self.one_doc.dist_dir, self.one_doc.build_dir, self.one_doc.source_dir]:
-                    # Try both original and normalized paths
+
+                # Strategy 1: If we have source_dir info, try relative to the source markdown file
+                if source_dir:
+                    source_dir_path = pathlib.Path(source_dir)
                     for path_variant in [img_path, normalized_path]:
-                        candidate = base / path_variant
+                        candidate = source_dir_path / path_variant
                         if candidate.exists() and candidate.is_file():
                             resolved_path = candidate
+                            logger.info(f"Resolved {img_path} using source dir: {source_dir}")
                             break
-                    if resolved_path:
-                        break
+
+                # Strategy 2: Fall back to searching in dist_dir, build_dir, source_dir
+                if resolved_path is None:
+                    for base in [self.one_doc.dist_dir, self.one_doc.build_dir, self.one_doc.source_dir]:
+                        for path_variant in [img_path, normalized_path]:
+                            candidate = base / path_variant
+                            if candidate.exists() and candidate.is_file():
+                                resolved_path = candidate
+                                break
+                        if resolved_path:
+                            break
 
                 if resolved_path is None:
-                    logger.warning(f"Could not find image file: {img_path} (also tried: {normalized_path})")
+                    logger.warning(f"Could not find image file: {img_path} (source_dir: {source_dir}, also tried: {normalized_path})")
                     continue
 
                 # Read and encode image
@@ -360,6 +448,72 @@ class ASTExporter:
                 logger.warning(f"Failed to embed image {img_path}: {e}")
 
         return embedded_images
+
+    def _extract_images_with_source(self, blocks: List[Any]) -> List[Dict[str, str]]:
+        """
+        Recursively extract all image paths from Pandoc blocks along with their source file context.
+        Returns list of dicts with 'path' and 'source_dir' keys.
+        """
+        images_with_context = []
+
+        def extract_from_inlines(inlines: List[Any], source_dir: str = None):
+            for inline in inlines or []:
+                if isinstance(inline, dict) and inline.get("t") == "Image":
+                    try:
+                        # Image: c = [Attr, [alt inlines], [src, title]]
+                        content = inline.get("c", [])
+                        if isinstance(content, list) and len(content) >= 3:
+                            src_info = content[2]
+                            if isinstance(src_info, list) and len(src_info) >= 1:
+                                src = src_info[0]
+                                if isinstance(src, str) and not src.startswith(('http://', 'https://', 'data:')):
+                                    images_with_context.append({
+                                        'path': src,
+                                        'source_dir': source_dir
+                                    })
+                    except Exception:
+                        pass
+
+        def extract_from_blocks(blks: List[Any]):
+            for blk in blks or []:
+                if not isinstance(blk, dict):
+                    continue
+
+                # Extract source directory from block metadata
+                source_info = blk.get('_paradoc_source', {})
+                source_dir = source_info.get('source_dir')
+
+                t = blk.get("t")
+                c = blk.get("c", [])
+
+                # Handle different block types that might contain images
+                if t == "Para" or t == "Plain":
+                    extract_from_inlines(c, source_dir)
+                elif t == "Figure":
+                    # Figure: c = [Attr, caption, content_blocks]
+                    if isinstance(c, list) and len(c) >= 3:
+                        content_blocks = c[2]
+                        extract_from_blocks(content_blocks)
+                elif t == "Div":
+                    # Div: c = [Attr, blocks]
+                    if isinstance(c, list) and len(c) >= 2:
+                        extract_from_blocks(c[1])
+                elif t == "BulletList" or t == "OrderedList":
+                    # Lists contain list of block lists
+                    if t == "BulletList" and isinstance(c, list):
+                        for item in c:
+                            if isinstance(item, list):
+                                extract_from_blocks(item)
+                    elif t == "OrderedList" and isinstance(c, list) and len(c) >= 2:
+                        items = c[1]
+                        for item in items:
+                            if isinstance(item, list):
+                                extract_from_blocks(item)
+                elif t == "BlockQuote":
+                    extract_from_blocks(c)
+
+        extract_from_blocks(blocks)
+        return images_with_context
 
     # -------------------------------
     # WebSocket streaming
