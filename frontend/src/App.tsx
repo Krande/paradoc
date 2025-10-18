@@ -2,11 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Topbar } from './components/Topbar'
 import { Navbar, TocItem } from './components/Navbar'
 
-// WebSocket management is delegated to a Web Worker that reconnects and forwards messages
-// Vite will inline the worker into the single-file build
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-const WorkerCtor = (URL as any) ? (url: string) => new Worker(new URL(url, import.meta.url), { type: 'module' }) : null
+// Inline the worker so it's embedded in the bundle
+import InlineWorker from './ws/worker.ts?worker&inline'
 
 import { useSectionStore, fetchManifest, fetchSection, storeEmbeddedImage } from './sections/store'
 import type { DocManifest, SectionBundle } from './ast/types'
@@ -43,10 +40,8 @@ export default function App() {
   }, [state.manifest])
 
   useEffect(() => {
-    // Start the WS worker (runs in a dedicated thread)
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    const worker: Worker = new Worker(new URL('./ws/worker.ts', import.meta.url), { type: 'module' })
+    // Use inline worker for single-file builds that work from filesystem
+    const worker = new InlineWorker()
     workerRef.current = worker
 
     // Track the current docId from manifest
