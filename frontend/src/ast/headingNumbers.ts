@@ -63,7 +63,7 @@ export function calculateHeadingNumbers(sections: SectionMeta[]): Map<string, He
       number = parts.join('.')
     }
 
-    const prefix = isAppendix ? 'APPENDIX ' : ''
+    const prefix = isAppendix && level == 1 ? 'APPENDIX ' : ''
     const fullText = prefix + number
 
     result.set(section.id, { number, prefix, fullText })
