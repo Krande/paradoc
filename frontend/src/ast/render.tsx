@@ -150,6 +150,17 @@ function renderInlines(xs: PandocInline[]): React.ReactNode {
         out.push(<MathElement key={i} latex={latex} displayMode={isDisplay} />)
         break
       }
+      case 'RawInline': {
+        // Filter out \appendix LaTeX commands - they're used internally to mark appendix sections
+        // but should not be rendered in the frontend
+        const [, rawContent] = (x as any).c
+        if (rawContent && typeof rawContent === 'string' && rawContent.includes('\\appendix')) {
+          // Skip rendering this inline element
+          break
+        }
+        out.push(<span key={i} dangerouslySetInnerHTML={{ __html: rawContent }} />)
+        break
+      }
       default:
         out.push(null)
     }
@@ -161,8 +172,14 @@ export function renderBlock(b: PandocBlock, key?: React.Key, headingNumber?: Hea
   switch (b.t) {
     case 'Plain':
       return <p key={key} className="my-3">{renderInlines((b as Plain).c)}</p>
-    case 'Para':
-      return <p key={key} className="my-3">{renderInlines((b as Para).c)}</p>
+    case 'Para': {
+      // Filter out paragraphs containing only \appendix
+      const inlines = (b as Para).c
+      if (inlines.length === 1 && inlines[0].t === 'Str' && inlines[0].c === '\\appendix') {
+        return null
+      }
+      return <p key={key} className="my-3">{renderInlines(inlines)}</p>
+    }
     case 'Header': {
       const [level, a, inls] = (b as Header).c
       const common = { ...attrs(a), className: `mt-6 mb-2 font-semibold ${a?.classes?.join(' ') || ''}` }
@@ -203,6 +220,11 @@ export function renderBlock(b: PandocBlock, key?: React.Key, headingNumber?: Hea
       return <hr key={key} className="my-6" />
     case 'RawBlock': {
       const [, html] = (b as RawBlock).c
+      // Filter out \appendix LaTeX commands - they're used internally to mark appendix sections
+      // but should not be rendered in the frontend
+      if (html && typeof html === 'string' && html.includes('\\appendix')) {
+        return null
+      }
       return <div key={key} dangerouslySetInnerHTML={{ __html: html }} />
     }
     case 'Div': {
