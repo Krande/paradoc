@@ -13,6 +13,7 @@ import { calculateHeadingNumbers } from './ast/headingNumbers'
 export default function App() {
   const [connected, setConnected] = useState<boolean>(false)
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
+  const [processInfo, setProcessInfo] = useState<{ pid: number; thread_id: number } | null>(null)
   const workerRef = useRef<Worker | null>(null)
 
   // AST/Sections store
@@ -52,6 +53,10 @@ export default function App() {
       if (!msg) return
       if (msg.type === 'status') {
         setConnected(!!msg.connected)
+        // Clear process info when disconnected
+        if (!msg.connected) {
+          setProcessInfo(null)
+        }
       } else if (msg.type === 'manifest' && msg.manifest) {
         const man = msg.manifest as DocManifest
         setManifest(man)
@@ -81,6 +86,10 @@ export default function App() {
             console.warn(`Failed to store embedded image ${path} for docId ${currentDocId}:`, err)
           })
         }
+      } else if (msg.type === 'process_info') {
+        setProcessInfo({ pid: msg.pid, thread_id: msg.thread_id })
+      } else if (msg.type === 'shutdown_ack') {
+        console.log('WebSocket server acknowledged shutdown request')
       }
     }
 
@@ -118,11 +127,30 @@ export default function App() {
     }).catch(() => {})
   }, [docId, state.manifest])
 
+  const handleRequestProcessInfo = () => {
+    const worker = workerRef.current
+    if (worker && connected) {
+      worker.postMessage({ type: 'get_process_info' })
+    }
+  }
+
+  const handleKillServer = () => {
+    const worker = workerRef.current
+    if (worker && connected) {
+      worker.postMessage({ type: 'shutdown' })
+    }
+  }
+
   return (
     <div className="flex min-h-screen">
       <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col">
-        <Topbar connected={connected} onSendMock={() => {
+        <Topbar
+          connected={connected}
+          processInfo={processInfo}
+          onRequestProcessInfo={handleRequestProcessInfo}
+          onKillServer={handleKillServer}
+          onSendMock={() => {
           // Build and broadcast a minimal AST manifest + section over WS for demo purposes
           const manifest = {
             docId: 'mock-doc',

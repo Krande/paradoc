@@ -95,6 +95,16 @@ function connect() {
           ctx.postMessage({ type: 'embedded_images', images: obj.images })
           return
         }
+        // New: Process info response
+        if (obj && obj.kind === 'process_info') {
+          ctx.postMessage({ type: 'process_info', pid: obj.pid, thread_id: obj.thread_id })
+          return
+        }
+        // New: Shutdown acknowledgment
+        if (obj && obj.kind === 'shutdown_ack') {
+          ctx.postMessage({ type: 'shutdown_ack' })
+          return
+        }
       } catch {
         // fall through to plain html
       }
@@ -117,6 +127,22 @@ ctx.addEventListener('message', (event: MessageEvent) => {
     try {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(msg.html)
+      }
+    } catch {}
+  }
+  // New: Request process info
+  if (msg.type === 'get_process_info') {
+    try {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ kind: 'get_process_info' }))
+      }
+    } catch {}
+  }
+  // New: Send shutdown command
+  if (msg.type === 'shutdown') {
+    try {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ kind: 'shutdown' }))
       }
     } catch {}
   }

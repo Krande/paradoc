@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import time
+import threading
 from typing import Set
 
 import websockets
@@ -21,6 +22,9 @@ except Exception:  # pragma: no cover - only used for ensure/ping
 ProtocolType = _Any
 CLIENTS: Set[ProtocolType] = set()
 
+# Global flag to trigger shutdown
+SHUTDOWN_REQUESTED = False
+
 
 async def _handle_client(ws: ProtocolType) -> None:
     CLIENTS.add(ws)
@@ -34,9 +38,36 @@ async def _handle_client(ws: ProtocolType) -> None:
                 # If JSON with kind=="ping"
                 if isinstance(message, str):
                     obj = json.loads(message)
-                    if isinstance(obj, dict) and obj.get("kind") == "ping":
-                        await ws.send(json.dumps({"kind": "pong"}))
-                        continue
+                    if isinstance(obj, dict):
+                        kind = obj.get("kind")
+
+                        # Handle ping
+                        if kind == "ping":
+                            await ws.send(json.dumps({"kind": "pong"}))
+                            continue
+
+                        # Handle process info request
+                        if kind == "get_process_info":
+                            process_info = {
+                                "kind": "process_info",
+                                "pid": os.getpid(),
+                                "thread_id": threading.get_ident(),
+                            }
+                            await ws.send(json.dumps(process_info))
+                            continue
+
+                        # Handle shutdown request
+                        if kind == "shutdown":
+                            global SHUTDOWN_REQUESTED
+                            SHUTDOWN_REQUESTED = True
+                            await ws.send(json.dumps({"kind": "shutdown_ack"}))
+                            # Close all client connections
+                            for client in list(CLIENTS):
+                                try:
+                                    await client.close()
+                                except Exception:
+                                    pass
+                            return
             except Exception:
                 # Not JSON or other error; just treat as broadcast content
                 pass
@@ -72,8 +103,12 @@ async def _safe_send(ws: ProtocolType, message: str | bytes) -> None:
 
 async def _serve_forever(host: str, port: int) -> None:
     async with websockets.serve(_handle_client, host, port, ping_interval=20, ping_timeout=20):
-        # Keep the server running forever
-        await asyncio.Future()
+        # Keep the server running until shutdown is requested
+        try:
+            while not SHUTDOWN_REQUESTED:
+                await asyncio.sleep(0.5)
+        except asyncio.CancelledError:
+            pass
 
 
 def run_server(host: str = "localhost", port: int = 13579) -> None:
