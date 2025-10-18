@@ -16,6 +16,18 @@ class QuietHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format: str, *args):  # noqa: A003 (shadow builtins)
         pass
 
+    def end_headers(self):
+        # Add CORS headers to allow requests from any origin
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        # Handle preflight requests
+        self.send_response(200)
+        self.end_headers()
+
 
 def _serve(directory: str, host: str, port: int) -> None:
     # Change working dir for the handler to serve from the desired root
