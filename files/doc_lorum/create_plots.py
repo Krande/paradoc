@@ -14,7 +14,7 @@ get_chrome()
 
 # Set up output directories
 main_images = Path(r"C:\Work\code\paradoc\files\doc_lorum\00-main\images")
-appendix_images = Path(r"C:\Work\code\paradoc\files\doc_lorum\01-appendix\images")
+appendix_images = Path(r"/files/doc_lorum/01-app\images")
 
 # Create directories
 main_images.mkdir(parents=True, exist_ok=True)

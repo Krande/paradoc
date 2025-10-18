@@ -46,7 +46,31 @@ function renderInlines(xs: PandocInline[]): React.ReactNode {
       case 'Code': out.push(<code key={i} {...attrs(x.c[0])} className={'px-1 py-0.5 rounded bg-gray-100 ' + (x.c[0]?.classes?.join(' ') || '')}>{x.c[1]}</code>); break
       case 'Link': {
         const [a, content, [href, title]] = x.c
-        out.push(<a key={i} {...attrs(a)} href={href} title={title} className={'text-blue-600 hover:underline cursor-pointer ' + (a?.classes?.join(' ') || '')}>{renderInlines(content)}</a>)
+        // Check if this is an internal anchor link (starts with #)
+        const isInternalLink = href.startsWith('#')
+        const handleClick = isInternalLink ? (e: React.MouseEvent<HTMLAnchorElement>) => {
+          e.preventDefault()
+          const targetId = href.slice(1) // Remove the '#'
+          const el = document.getElementById(targetId)
+          if (el) {
+            const topbar = document.getElementById('paradoc-topbar')
+            const offset = topbar ? topbar.getBoundingClientRect().height : 0
+            const top = window.scrollY + el.getBoundingClientRect().top - offset - 8
+            window.scrollTo({ top, behavior: 'smooth' })
+          }
+        } : undefined
+        out.push(
+          <a
+            key={i}
+            {...attrs(a)}
+            href={href}
+            title={title}
+            className={'text-blue-600 hover:underline cursor-pointer ' + (a?.classes?.join(' ') || '')}
+            onClick={handleClick}
+          >
+            {renderInlines(content)}
+          </a>
+        )
         break
       }
       case 'Image': {

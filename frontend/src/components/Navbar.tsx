@@ -4,6 +4,7 @@ export type TocItem = {
   id: string
   text: string
   level: number // 0-based: h1 -> 0
+  number?: string // Optional heading number (e.g., "1.1", "A.2")
 }
 
 type NavbarProps = {
@@ -35,6 +36,7 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
               }}
               aria-label={`Go to ${item.text}`}
             >
+              {item.number && <span className="mr-2 text-gray-500">{item.number}</span>}
               {item.text}
             </a>
           </li>

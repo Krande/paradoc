@@ -11,6 +11,7 @@ const WorkerCtor = (URL as any) ? (url: string) => new Worker(new URL(url, impor
 import { useSectionStore, fetchManifest, fetchSection } from './sections/store'
 import type { DocManifest, SectionBundle } from './ast/types'
 import { VirtualReader } from './components/VirtualReader'
+import { calculateHeadingNumbers } from './ast/headingNumbers'
 
 export default function App() {
   const [connected, setConnected] = useState<boolean>(false)
@@ -25,7 +26,16 @@ export default function App() {
 
   useEffect(() => {
     if (state.manifest) {
-      const items: TocItem[] = state.manifest.sections.map((s) => ({ id: s.id, text: s.title, level: Math.max(0, s.level - 1) }))
+      const headingNumbers = calculateHeadingNumbers(state.manifest.sections)
+      const items: TocItem[] = state.manifest.sections.map((s) => {
+        const numbering = headingNumbers.get(s.id)
+        return {
+          id: s.id,
+          text: s.title,
+          level: Math.max(0, s.level - 1),
+          number: numbering?.fullText
+        }
+      })
       setToc(items)
     } else {
       setToc([])

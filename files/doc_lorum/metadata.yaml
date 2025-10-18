@@ -2,7 +2,7 @@ title: "Comprehensive Lorem Ipsum Documentation"
 subtitle: "A Demonstration of Advanced Document Features"
 lang: en-GB
 autoSectionLabels: True
-#numberSections: true
+#numberSections: true # This breaks the
 sectionsDepth: -1
 chapDelim: "-"
 chapters: true
