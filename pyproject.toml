@@ -85,6 +85,8 @@ pytexit = "*"
 nomkl = "*"
 websocket-client = "*"
 websockets = "*"
+plotly = "*"
+python-kaleido = "*"
 
 [tool.pixi.feature.tests-core.dependencies]
 pytest = "*"

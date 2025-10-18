@@ -1,0 +1,15 @@
+title: "Comprehensive Lorem Ipsum Documentation"
+subtitle: "A Demonstration of Advanced Document Features"
+lang: en-GB
+autoSectionLabels: True
+#numberSections: true
+sectionsDepth: -1
+chapDelim: "-"
+chapters: true
+linkReferences: true
+nameInLink: true
+figPrefix: "Figure"
+tblPrefix: "Table"
+header-includes:
+    - "\\newcommand{\\lorumdoc}{Lorem Ipsum Documentation}"
+

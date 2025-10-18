@@ -38,9 +38,13 @@ There's a prod and test environment.
 
 There is a `pixi run test` command that runs the pytest test suite.
 
-To run a specific integration test, use `pixi run test -k test_name`
-Or if you want to test the quetz backend tests you can run `pixi run qtest` which points to the tests located in
-[quetz/tests](quetz/tests)
+To run arbitrary python commands you should do
+
+```pixi run python -e prod -c "import plotly; import kaleido; print('Success')" 2>&1```
+
+Or to run a python script
+
+```pixi run -e prod python scripts/run_script.py```
 
 ## Project Structure
 
