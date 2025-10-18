@@ -130,5 +130,8 @@ lint = "black . --config pyproject.toml && ruff check . --fix && isort ."
 build = { cmd = "mkdocs build", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
 serve = { cmd = "mkdocs serve -a localhost:8080", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
 
+[tool.pixi.feature.prod.target.win-64.activation.env]
+PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
+
 [tool.pixi.feature.tests.target.win-64.activation.env]
 PYTHONPATH="%PIXI_PROJECT_ROOT%/src"

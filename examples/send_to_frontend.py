@@ -6,7 +6,7 @@ import paradoc as pa
 
 def main():
     parser = argparse.ArgumentParser(description="Send a Paradoc document to the Reader app.")
-    parser.add_argument("--doc", default="doc1", help="Path to Paradoc document dir to send.")
+    parser.add_argument("--doc", default="doc_lorum", help="Path to Paradoc document dir to send.")
     args = parser.parse_args()
     doc_dir = args.doc
     files_dir = pathlib.Path(__file__).resolve().absolute().parent / ".." / "files"

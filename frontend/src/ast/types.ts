@@ -4,12 +4,19 @@
 export type PandocInline = Str | Space | SoftBreak | LineBreak | Emph | Strong | Code | Link | Image | Span
 export type PandocBlock = Para | Plain | Header | BulletList | OrderedList | CodeBlock | BlockQuote | HorizontalRule | RawBlock | Div
 
-export interface Attr {
+// Attr can be in object form {id, classes, attributes} or array form [id, [classes], {attributes}]
+export type Attr = AttrObject | AttrArray
+
+export interface AttrObject {
   id: string
   classes: string[]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   attributes: Record<string, any>
 }
+
+// Array form: [id, [classes], {attributes}]
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AttrArray = [string, string[], Record<string, any>]
 
 export interface Str { t: 'Str'; c: string }
 export interface Space { t: 'Space' }

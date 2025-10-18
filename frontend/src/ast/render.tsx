@@ -24,13 +24,35 @@ function resolveAssetUrl(src: string): string {
 
 function attrs(a: Attr | undefined): { id?: string; className?: string; [k: string]: string | undefined } {
   if (!a) return {}
-  const { id, classes, attributes } = a
+
+  // Handle both array form [id, classes, attributes] and object form {id, classes, attributes}
+  let id: string | undefined
+  let classes: string[] = []
+  let attributes: Record<string, any> = {}
+
+  if (Array.isArray(a)) {
+    // Array form: [id, [classes], {attributes}]
+    id = (a[0] && typeof a[0] === 'string') ? a[0] : undefined
+    classes = (Array.isArray(a[1])) ? a[1] : []
+    attributes = (a[2] && typeof a[2] === 'object') ? a[2] : {}
+  } else {
+    // Object form: {id, classes, attributes}
+    id = a.id
+    classes = a.classes || []
+    attributes = a.attributes || {}
+  }
+
   const other: Record<string, string> = {}
   for (const k in attributes || {}) {
     const v = attributes[k]
     if (typeof v === 'string') other[k] = v
   }
-  return { id: id || undefined, className: (classes || []).join(' ') || undefined, ...other }
+
+  return {
+    id: id || undefined,
+    className: (classes || []).join(' ') || undefined,
+    ...other
+  }
 }
 
 function renderInlines(xs: PandocInline[]): React.ReactNode {
@@ -51,7 +73,9 @@ function renderInlines(xs: PandocInline[]): React.ReactNode {
         const handleClick = isInternalLink ? (e: React.MouseEvent<HTMLAnchorElement>) => {
           e.preventDefault()
           const targetId = href.slice(1) // Remove the '#'
-          const el = document.getElementById(targetId)
+          // Use querySelector with attribute selector to handle IDs with special characters like colons
+          // This works reliably for IDs like "tbl:table-name", "fig:figure-name", "eq:equation-name"
+          const el = document.querySelector(`[id="${targetId}"]`) as HTMLElement | null
           if (el) {
             const topbar = document.getElementById('paradoc-topbar')
             const offset = topbar ? topbar.getBoundingClientRect().height : 0
@@ -144,8 +168,10 @@ export function renderBlock(b: PandocBlock, key?: React.Key, headingNumber?: Hea
       const classList = a?.classes || []
       if (classList.includes('figure')) {
         // Basic figure styling; render children and allow captions to flow
+        const figAttrs = attrs(a)
+        const className = ['my-4', ...(a?.classes || [])].filter(Boolean).join(' ')
         return (
-          <figure key={key} {...attrs(a)} className={'my-4 ' + (a?.classes?.join(' ') || '')}>
+          <figure key={key} {...figAttrs} className={className}>
             {blocks.map((bb, j) => renderBlock(bb, j))}
           </figure>
         )
@@ -170,8 +196,10 @@ export function renderBlock(b: PandocBlock, key?: React.Key, headingNumber?: Hea
           }
         }
       }
+      const figAttrs = attrs(a)
+      const className = ['my-4', ...(a?.classes || [])].filter(Boolean).join(' ')
       return (
-        <figure key={key} {...attrs(a)} className={'my-4 ' + (a as any)?.classes?.join(' ') || ''}>
+        <figure key={key} {...figAttrs} className={className}>
           {Array.isArray(content) ? content.map((bb, j) => renderBlock(bb as any, j)) : null}
           {captionInlines && captionInlines.length > 0 ? (
             <figcaption className="text-sm text-gray-600 italic mt-2">

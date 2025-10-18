@@ -23,7 +23,9 @@ stream converted html documents to a frontend document reader app.
 
 #### Functional requirements
 The frontend is a single page document reader app. 
-The frontend shall have a websocket client running in a background thread listening for new html documents. 
+The frontend shall support 2 modes of operation:
+
+1) It should have a websocket client running in a worker thread listening for new . 
 The websocket server receives html content which are documents from pandoc converted html from markdown. 
 
 #### Style guide
@@ -46,6 +48,9 @@ Or to run a python script
 
 ```pixi run -e prod python scripts/run_script.py```
 
+
+[quetz/tests](quetz/tests)
+
 ## Project Structure
 
 ```
@@ -57,3 +62,5 @@ frontend/
 tests/
 pyproject.toml
 ```
+## Copilot instructions
+The default shell for agentic commands is powershell and the cwd is always the project root.
