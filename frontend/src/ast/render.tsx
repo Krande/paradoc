@@ -1,6 +1,8 @@
 import React from 'react'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
 import type {
-  PandocBlock, PandocInline, Plain, Para, Header, BulletList, OrderedList, CodeBlock, BlockQuote, HorizontalRule, RawBlock, Attr,
+  PandocBlock, PandocInline, Plain, Para, Header, BulletList, OrderedList, CodeBlock, BlockQuote, HorizontalRule, RawBlock, Attr, Table,
 } from './types'
 import type { HeadingNumbering } from './headingNumbers'
 
@@ -55,6 +57,39 @@ function attrs(a: Attr | undefined): { id?: string; className?: string; [k: stri
   }
 }
 
+/**
+ * Component to render LaTeX math using KaTeX
+ */
+function MathElement({ latex, displayMode }: { latex: string; displayMode: boolean }): React.ReactElement {
+  const elementRef = React.useRef<HTMLSpanElement>(null)
+
+  React.useEffect(() => {
+    if (elementRef.current) {
+      try {
+        katex.render(latex, elementRef.current, {
+          displayMode,
+          throwOnError: false,
+          errorColor: '#cc0000',
+          strict: false,
+        })
+      } catch (error) {
+        console.error('KaTeX rendering error:', error)
+        // Fallback: show the raw LaTeX if rendering fails
+        if (elementRef.current) {
+          elementRef.current.textContent = displayMode ? `\\[${latex}\\]` : `\\(${latex}\\)`
+        }
+      }
+    }
+  }, [latex, displayMode])
+
+  return (
+    <span
+      ref={elementRef}
+      className={displayMode ? "block my-4 text-center" : "inline-block mx-0.5"}
+    />
+  )
+}
+
 function renderInlines(xs: PandocInline[]): React.ReactNode {
   const out: React.ReactNode[] = []
   xs.forEach((x, i) => {
@@ -106,6 +141,13 @@ function renderInlines(xs: PandocInline[]): React.ReactNode {
       case 'Span': {
         const [a, content] = (x as any).c
         out.push(<span key={i} {...attrs(a)} className={(a?.classes?.join(' ') || undefined)}>{renderInlines(content)}</span>)
+        break
+      }
+      case 'Math': {
+        // Math: c = [{t: 'InlineMath'|'DisplayMath'}, latex_string]
+        const [mathType, latex] = (x as any).c
+        const isDisplay = mathType && typeof mathType === 'object' && mathType.t === 'DisplayMath'
+        out.push(<MathElement key={i} latex={latex} displayMode={isDisplay} />)
         break
       }
       default:
@@ -207,6 +249,103 @@ export function renderBlock(b: PandocBlock, key?: React.Key, headingNumber?: Hea
             </figcaption>
           ) : null}
         </figure>
+      )
+    }
+    case 'Table': {
+      // Table: [Attr, Caption, [ColSpec], TableHead, [TableBody], TableFoot]
+      const [a, caption, colSpecs, tableHead, tableBodies, tableFoot] = (b as Table).c
+
+      // Extract caption text if present
+      let captionInlines: any[] = []
+      if (caption && Array.isArray(caption)) {
+        // Caption structure: [ShortCaption|null, [Blocks]]
+        const captionBlocks = (Array.isArray(caption[1])) ? caption[1] : []
+        if (captionBlocks.length > 0) {
+          const firstBlock = captionBlocks[0]
+          if (firstBlock && typeof firstBlock === 'object' && 't' in firstBlock && Array.isArray(firstBlock.c)) {
+            captionInlines = firstBlock.c
+          }
+        }
+      }
+
+      // Helper to render table cells
+      const renderCell = (cell: any, cellKey: number, isHeader = false) => {
+        // Cell structure: [Attr, Alignment, RowSpan, ColSpan, [Blocks]]
+        if (!cell || !Array.isArray(cell)) return null
+        const [cellAttr, , rowSpan, colSpan, cellBlocks] = cell
+        const cellAttrs = attrs(cellAttr)
+        const content = Array.isArray(cellBlocks) ? cellBlocks.map((bb: any, i: number) => renderBlock(bb, i)) : null
+        const className = isHeader
+          ? 'px-3 py-2 bg-gray-100 font-semibold text-left border border-gray-300'
+          : 'px-3 py-2 border border-gray-300'
+
+        const Tag = isHeader ? 'th' : 'td'
+        return (
+          <Tag
+            key={cellKey}
+            {...cellAttrs}
+            className={className + (cellAttrs.className ? ' ' + cellAttrs.className : '')}
+            rowSpan={rowSpan > 1 ? rowSpan : undefined}
+            colSpan={colSpan > 1 ? colSpan : undefined}
+          >
+            {content}
+          </Tag>
+        )
+      }
+
+      // Helper to render table rows
+      const renderRow = (row: any, rowKey: number, isHeader = false) => {
+        // Row structure: [Attr, [Cell]]
+        if (!row || !Array.isArray(row)) return null
+        const [rowAttr, cells] = row
+        const rowAttrs = attrs(rowAttr)
+        return (
+          <tr key={rowKey} {...rowAttrs}>
+            {Array.isArray(cells) ? cells.map((cell: any, i: number) => renderCell(cell, i, isHeader)) : null}
+          </tr>
+        )
+      }
+
+      const tableAttrs = attrs(a)
+
+      return (
+        <div key={key} className="my-4 overflow-x-auto">
+          <table
+            {...tableAttrs}
+            className={'min-w-full border-collapse border border-gray-300 ' + (tableAttrs.className || '')}
+          >
+            {tableHead && Array.isArray(tableHead) && tableHead.length > 1 && Array.isArray(tableHead[1]) && tableHead[1].length > 0 ? (
+              <thead>
+                {tableHead[1].map((row: any, i: number) => renderRow(row, i, true))}
+              </thead>
+            ) : null}
+            {Array.isArray(tableBodies) && tableBodies.length > 0 ? (
+              <tbody>
+                {tableBodies.map((tbody: any, tbodyIdx: number) => {
+                  // TableBody: [Attr, RowHeadColumns, [HeaderRow], [BodyRow]]
+                  if (!Array.isArray(tbody) || tbody.length < 4) return null
+                  const [, , headerRows, bodyRows] = tbody
+                  return (
+                    <React.Fragment key={tbodyIdx}>
+                      {Array.isArray(headerRows) ? headerRows.map((row: any, i: number) => renderRow(row, `tbody-${tbodyIdx}-h-${i}`, true)) : null}
+                      {Array.isArray(bodyRows) ? bodyRows.map((row: any, i: number) => renderRow(row, `tbody-${tbodyIdx}-b-${i}`, false)) : null}
+                    </React.Fragment>
+                  )
+                })}
+              </tbody>
+            ) : null}
+            {tableFoot && Array.isArray(tableFoot) && tableFoot.length > 1 && Array.isArray(tableFoot[1]) && tableFoot[1].length > 0 ? (
+              <tfoot>
+                {tableFoot[1].map((row: any, i: number) => renderRow(row, i, false))}
+              </tfoot>
+            ) : null}
+          </table>
+          {captionInlines && captionInlines.length > 0 ? (
+            <div className="text-sm text-gray-600 italic mt-2 text-center">
+              {renderInlines(captionInlines)}
+            </div>
+          ) : null}
+        </div>
       )
     }
     default:

@@ -61,12 +61,12 @@ platforms = ["win-64", "linux-64", "osx-64"]
 
 [tool.pixi.environments]
 prod = { features = ["prod"], solve-group = "prod", no-default-feature = true }
-tests-core = { features = ["tests-core"], solve-group = "prod", no-default-feature = true }
-tests = { features = ["tests", "tests-core", "prod"], solve-group = "prod", no-default-feature = true }
+test-core = { features = ["test-core"], solve-group = "prod", no-default-feature = true }
+test = { features = ["test", "test-core", "prod"], solve-group = "prod", no-default-feature = true }
 lint = { features = ["lint"], no-default-feature = true }
 profile = { features = ["profile", "prod"], solve-group = "prod", no-default-feature = true }
 frontend = { features = ["frontend"], no-default-feature = true }
-docs = { features = ["docs", "prod", "tests-core"], no-default-feature = true }
+docs = { features = ["docs", "prod", "test-core"], no-default-feature = true }
 
 
 [tool.pixi.feature.prod.dependencies]
@@ -88,7 +88,7 @@ websockets = "*"
 plotly = "*"
 python-kaleido = "*"
 
-[tool.pixi.feature.tests-core.dependencies]
+[tool.pixi.feature.test-core.dependencies]
 pytest = "*"
 
 [tool.pixi.feature.frontend.dependencies]
@@ -119,7 +119,7 @@ mkdocs-material = "*"
 mkdocs-jupyter = "*"
 mkdocs-glightbox = "*"
 
-[tool.pixi.feature.tests.tasks]
+[tool.pixi.feature.test.tasks]
 test = { cmd = "pytest tests", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
 test-doc = { cmd = "python send_to_frontend.py", cwd = "examples"}
 
@@ -133,5 +133,5 @@ serve = { cmd = "mkdocs serve -a localhost:8080", env = { "PYTHONPATH" = "$PIXI_
 [tool.pixi.feature.prod.target.win-64.activation.env]
 PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
 
-[tool.pixi.feature.tests.target.win-64.activation.env]
+[tool.pixi.feature.test.target.win-64.activation.env]
 PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
