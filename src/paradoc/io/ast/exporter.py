@@ -83,21 +83,27 @@ class ASTExporter:
 
     def slice_sections(self, ast: Dict[str, Any]) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         """
-        Split the document into sections by top-level (level==1) headers.
+        Split the document into sections by top-level (level==1) headers for content bundles.
+        Extract ALL headers (H1-H6) for the manifest to enable nested outline/TOC in frontend.
 
         Returns (manifest, section_bundles)
-        - manifest: { docId, sections: [{ id, title, level, index }] }
-        - section_bundles: list of { section: meta, doc: { blocks: [...] } }
+        - manifest: { docId, sections: [{ id, title, level, index }] } - includes ALL headers
+        - section_bundles: list of { section: meta, doc: { blocks: [...] } } - split by H1 only
         """
         blocks = ast.get("blocks") or ast.get("pandoc-api-version") and ast.get("blocks")
         # Some Pandoc versions wrap under {"blocks": ...}; ensure we have a list
         if not isinstance(blocks, list):
             blocks = ast.get("blocks", [])
 
+        # Section bundles: split by H1 for content delivery
         sections: List[Dict[str, Any]] = []
         current: List[Any] = []
         current_meta: Dict[str, Any] | None = None
         section_index = -1
+
+        # All headers: for manifest (includes all levels)
+        all_headers: List[Dict[str, Any]] = []
+        header_index = 0
 
         def push_current():
             if current_meta is None:
@@ -131,27 +137,39 @@ class ASTExporter:
                 attrs = blk[2] if len(blk) > 2 else ["", [], []]
                 inlines = blk[3] if len(blk) > 3 else []
 
+            # If this is any header level, add to all_headers for manifest
+            if level is not None:
+                # Extract id from attrs for both forms
+                try:
+                    if isinstance(attrs, list) and attrs:
+                        sec_id = attrs[0] or f"sec-{header_index}"
+                    elif isinstance(attrs, dict):
+                        sec_id = attrs.get("id") or f"sec-{header_index}"
+                    else:
+                        sec_id = f"sec-{header_index}"
+                except Exception:
+                    sec_id = f"sec-{header_index}"
+
+                title = self._header_text(inlines)
+                all_headers.append({
+                    "id": sec_id,
+                    "title": title or f"Section {header_index + 1}",
+                    "level": level,
+                    "index": header_index
+                })
+                header_index += 1
+
+            # H1 headers create new section bundles
             if level == 1:
                 # Finish previous
                 push_current()
                 current = []
                 section_index += 1
-                sec_id = ""
-                # Extract id from attrs for both forms
-                try:
-                    if isinstance(attrs, list) and attrs:
-                        sec_id = attrs[0] or f"sec-{section_index}"
-                    elif isinstance(attrs, dict):
-                        # Some tools might give {"id": "...", "classes": [...], "keyvals": [...]}
-                        sec_id = attrs.get("id") or f"sec-{section_index}"
-                    else:
-                        sec_id = f"sec-{section_index}"
-                except Exception:
-                    sec_id = f"sec-{section_index}"
-                title = self._header_text(inlines)
-                current_meta = {"id": sec_id, "title": title or f"Section {section_index + 1}", "level": 1,
-                                "index": section_index}
-            # Accumulate
+                # Reuse the header metadata we just added
+                current_meta = all_headers[-1].copy()
+                current_meta["index"] = section_index  # Section bundle index (different from header index)
+
+            # Accumulate blocks into current H1 section bundle
             if current_meta is None:
                 # Before first H1, skip content (optional: could create a preface section)
                 continue
@@ -197,11 +215,11 @@ class ASTExporter:
                 "doc": {"blocks": list(all_blocks)},
             })
 
-        # Build manifest
+        # Build manifest with ALL headers (not just H1s)
         doc_id = self._infer_doc_id()
         manifest = {
             "docId": doc_id,
-            "sections": [s["section"] for s in sections],
+            "sections": all_headers if all_headers else [s["section"] for s in sections],
         }
         return manifest, sections
 
