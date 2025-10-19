@@ -53,24 +53,38 @@ export function attrs(a: Attr | undefined): { id?: string; className?: string; [
   // Handle both array form [id, classes, attributes] and object form {id, classes, attributes}
   let id: string | undefined
   let classes: string[] = []
-  let attributes: Record<string, any> = {}
+  let attributes: Array<[string, string]> | Record<string, any> = []
 
   if (Array.isArray(a)) {
-    // Array form: [id, [classes], {attributes}]
+    // Array form: [id, [classes], [[key, value], ...]]
     id = (a[0] && typeof a[0] === 'string') ? a[0] : undefined
     classes = (Array.isArray(a[1])) ? a[1] : []
-    attributes = (a[2] && typeof a[2] === 'object') ? a[2] : {}
+    attributes = (a[2]) ? a[2] : []
   } else {
     // Object form: {id, classes, attributes}
     id = a.id
     classes = a.classes || []
-    attributes = a.attributes || {}
+    attributes = a.attributes || []
   }
 
   const other: Record<string, string> = {}
-  for (const k in attributes || {}) {
-    const v = attributes[k]
-    if (typeof v === 'string') other[k] = v
+
+  // Handle attributes as array of [key, value] pairs (Pandoc format)
+  if (Array.isArray(attributes)) {
+    for (const attr of attributes) {
+      if (Array.isArray(attr) && attr.length >= 2) {
+        const [k, v] = attr
+        if (typeof k === 'string' && typeof v === 'string') {
+          other[k] = v
+        }
+      }
+    }
+  } else {
+    // Handle attributes as object (legacy format)
+    for (const k in attributes || {}) {
+      const v = attributes[k]
+      if (typeof v === 'string') other[k] = v
+    }
   }
 
   return {
@@ -79,4 +93,3 @@ export function attrs(a: Attr | undefined): { id?: string; className?: string; [
     ...other
   }
 }
-

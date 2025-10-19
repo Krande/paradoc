@@ -90,7 +90,75 @@ class ASTExporter:
         # Parse the AST and map blocks to source files using the markers
         self._map_blocks_to_sources(ast, source_markers)
 
+        # Add interactive plot markers if this is a frontend export
+        if one._is_frontend_export:
+            self._inject_plot_keys(ast)
+
         return ast
+
+    def _inject_plot_keys(self, ast: Dict[str, Any]):
+        """
+        Walk through the AST and add data-plot-key attributes to Figure blocks
+        that correspond to plots in the database.
+
+        This enables the frontend to identify which figures should be rendered
+        as interactive Plotly plots instead of static images.
+        """
+        # Get list of plot keys from database
+        try:
+            plot_keys = set(self.one_doc.db_manager.list_plots())
+        except Exception as e:
+            logger.warning(f"Failed to get plot keys from database: {e}")
+            return
+
+        if not plot_keys:
+            return
+
+        def process_blocks(blocks: List[Any]):
+            """Recursively process blocks to find and annotate Figures."""
+            for block in blocks:
+                if not isinstance(block, dict):
+                    continue
+
+                block_type = block.get("t")
+
+                # Process Figure blocks
+                if block_type == "Figure":
+                    # Figure structure: {"t": "Figure", "c": [Attr, Caption, Content]}
+                    c = block.get("c")
+                    if isinstance(c, list) and len(c) >= 3:
+                        attr = c[0]
+                        # Attr structure: [id, [classes], [[key, value], ...]]
+                        if isinstance(attr, list) and len(attr) >= 3:
+                            fig_id = attr[0]
+                            # Check if this figure ID corresponds to a plot (fig:plot_key format)
+                            if isinstance(fig_id, str) and fig_id.startswith("fig:"):
+                                plot_key = fig_id[4:]  # Remove "fig:" prefix
+                                if plot_key in plot_keys:
+                                    # Add data-plot-key to the attributes
+                                    attr_dict = attr[2] if len(attr) > 2 and isinstance(attr[2], list) else []
+                                    # Add the attribute if it doesn't already exist
+                                    attr_dict.append(["data-plot-key", plot_key])
+                                    logger.debug(f"Added data-plot-key='{plot_key}' to Figure {fig_id}")
+
+                # Recursively process nested blocks
+                if block_type in ["Div", "BlockQuote", "BulletList", "OrderedList"]:
+                    nested = block.get("c")
+                    if isinstance(nested, list):
+                        # For Div and BlockQuote: c = [Attr, [blocks]]
+                        if block_type in ["Div", "BlockQuote"] and len(nested) >= 2:
+                            nested_blocks = nested[1] if isinstance(nested[1], list) else []
+                            process_blocks(nested_blocks)
+                        # For lists: c = [[blocks], [blocks], ...]
+                        elif block_type in ["BulletList", "OrderedList"]:
+                            for item in nested:
+                                if isinstance(item, list):
+                                    process_blocks(item)
+
+        # Process all top-level blocks
+        blocks = ast.get("blocks", [])
+        if blocks:
+            process_blocks(blocks)
 
     def _map_blocks_to_sources(self, ast: Dict[str, Any], source_markers: List[Dict[str, str]]):
         """
