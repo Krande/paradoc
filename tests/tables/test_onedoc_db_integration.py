@@ -152,7 +152,7 @@ def test_onedoc_db_prefers_database_over_memory(files_dir, tmp_path):
 
 
 def test_onedoc_db_location(files_dir, tmp_path):
-    """Test that database is created at source_dir/data.db."""
+    """Test that database is only created when data is written to it."""
     test_dir = tmp_path / "test_db_location"
     test_dir.mkdir()
 
@@ -162,15 +162,22 @@ def test_onedoc_db_location(files_dir, tmp_path):
     # Create OneDoc instance
     one = OneDoc(test_dir, work_dir=tmp_path / "work")
 
-    # Check that database exists at correct location
+    # Check that database does NOT exist yet (lazy initialization)
     db_path = test_dir / "data.db"
-    assert db_path.exists(), f"Database should be created at {db_path}"
+    assert not db_path.exists(), f"Database should NOT be created until data is written"
+
+    # Now add data to the database
+    df = pd.DataFrame({'col': [1, 2, 3]})
+    table_data = dataframe_to_table_data('test_table', df, 'Test')
+    one.db_manager.add_table(table_data)
+
+    # NOW the database should exist
+    assert db_path.exists(), f"Database should be created at {db_path} after writing data"
 
     # Verify it's a valid database by querying it
     tables = one.db_manager.list_tables()
-    assert isinstance(tables, list)
+    assert 'test_table' in tables
 
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
-
