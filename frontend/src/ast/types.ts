@@ -4,7 +4,7 @@
 export type PandocInline = Str | Space | SoftBreak | LineBreak | Emph | Strong | Code | Link | Image | Span | Math
 export type PandocBlock = Para | Plain | Figure | Header | BulletList | OrderedList | CodeBlock | BlockQuote | HorizontalRule | RawBlock | Div | Table
 
-// Attr can be in object form {id, classes, attributes} or array form [id, [classes], {attributes}]
+// Attr can be in object form {id, classes, attributes} or array form [id, [classes], [[key, value], ...]]
 export type Attr = AttrObject | AttrArray
 
 export interface AttrObject {
@@ -14,9 +14,10 @@ export interface AttrObject {
   attributes: Record<string, any>
 }
 
-// Array form: [id, [classes], {attributes}]
+// Array form: [id, [classes], [[key, value], ...]]
+// The third element is an array of [key, value] pairs, not a Record
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AttrArray = [string, string[], Record<string, any>]
+export type AttrArray = [string, string[], Array<[string, string]>]
 
 export interface Str { t: 'Str'; c: string }
 export interface Space { t: 'Space' }

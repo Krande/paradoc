@@ -48,12 +48,33 @@ export function renderFigure(b: any, renderBlock: (b: any, k?: React.Key, hn?: H
   const figAttrs = attrs(a)
   const className = ['my-4', figAttrs.className].filter(Boolean).join(' ')
 
-  // Check if this figure has a data-plot-key attribute (for interactive plots)
-  const plotKey = figAttrs['data-plot-key']
+  // Extract plot key from figure ID (format: fig:plot_key or fig:plot_key_1)
+  // Check if this figure corresponds to a plot from the database
+  let plotKey: string | undefined
   const docId = useDocId()
 
+  if (figAttrs.id && figAttrs.id.startsWith('fig:')) {
+    // Remove 'fig:' prefix to get the plot key (possibly with suffix like _1, _2)
+    const figKey = figAttrs.id.substring(4)
+
+    // For now, assume the figKey directly matches a plot key
+    // If the plot has been used multiple times, it might have a suffix like plot_key_1
+    // We'll check if it exists in the plot data by trying the full key first,
+    // then trying without numeric suffix
+    plotKey = figKey
+
+    console.log('[renderFigure] Figure with ID:', {
+      figureId: figAttrs.id,
+      extractedPlotKey: plotKey,
+      docId: docId,
+      hasDocId: !!docId
+    })
+  }
+
   if (plotKey && docId) {
-    // This is an interactive plot - wrap it with InteractiveFigure component
+    // This is potentially an interactive plot - wrap it with InteractiveFigure component
+    // The InteractiveFigure component will check if the plot exists in the database
+    console.log('[renderFigure] Rendering as interactive plot candidate:', { plotKey, figureId: figAttrs.id })
     const caption = captionInlines && captionInlines.length > 0 ? renderInlines(captionInlines as any) : undefined
 
     return (
@@ -69,7 +90,7 @@ export function renderFigure(b: any, renderBlock: (b: any, k?: React.Key, hn?: H
     )
   }
 
-  // Regular figure without interactive plot
+  // Regular figure without plot key (not a fig: ID or no docId)
   return (
     <figure key={key} {...figAttrs} className={className}>
       {Array.isArray(content) ? content.map((bb, j) => renderBlock(bb as any, j)) : null}
