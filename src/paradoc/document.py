@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import shutil
 from itertools import chain
 from typing import Callable, Dict, Iterable
@@ -18,6 +19,7 @@ from .common import (
     TableFormat,
 )
 from .config import logger
+from .db import DbManager, parse_table_reference, table_data_to_dataframe, apply_table_annotation
 from .equations import Equation
 from .exceptions import LatexNotInstalled
 from .utils import get_list_of_files
@@ -89,6 +91,11 @@ class OneDoc:
         self.md_files_app = []
         self.metadata_file = None
         self.use_default_html_style = use_default_html_style
+
+        # Initialize database manager at source_dir/data.db
+        db_path = self.source_dir / "data.db"
+        self.db_manager = DbManager(db_path)
+
         self._setup(create_dirs, clean_build_dir)
 
     def _iter_md_files(self) -> Iterable[pathlib.Path]:
@@ -270,6 +277,58 @@ class OneDoc:
         self._uniqueness_check(name)
         self.equations[name] = Equation(name, func, custom_eq_str_compiler=custom_eq_str_compiler, **kwargs)
 
+    def _get_table_markdown_from_db(self, full_reference: str, key_clean: str, use_table_var_substitution: bool):
+        """
+        Generate markdown table from database using annotations.
+
+        Args:
+            full_reference: Full markdown reference including annotations (e.g., {{__my_table__}}{tbl:index:no})
+            key_clean: Clean table key (without __ markers)
+            use_table_var_substitution: Whether to include table name in first cell
+
+        Returns:
+            Markdown table string or None if not found in database
+        """
+        # Check if table exists in database
+        table_data = self.db_manager.get_table(key_clean)
+        if table_data is None:
+            return None
+
+        # Parse annotation from full reference if present
+        annotation = None
+        try:
+            _, annotation = parse_table_reference(full_reference)
+        except (ValueError, AttributeError):
+            # No annotation or invalid format
+            pass
+
+        # Convert to DataFrame
+        df = table_data_to_dataframe(table_data)
+
+        # Apply annotation transformations (sorting, filtering)
+        show_index = table_data.show_index_default
+        if annotation:
+            df, show_index = apply_table_annotation(df, annotation, table_data.show_index_default)
+
+        # Handle table name in first cell for DOCX compatibility
+        if use_table_var_substitution:
+            col_name = df.columns[0]
+            col_index = df.columns.get_loc(col_name)
+            df = df.copy()
+            df[col_name] = df[col_name].astype(object)
+            df.iloc[0, int(col_index)] = key_clean
+
+        # Convert to markdown
+        props = dict(index=show_index, tablefmt="grid")
+        tbl_str = df.to_markdown(**props)
+
+        # Add caption unless nocaption flag is set
+        if not (annotation and annotation.no_caption):
+            tbl_str += f"\n\nTable: {table_data.caption}"
+            tbl_str += f" {{#tbl:{key_clean}}}"
+
+        return tbl_str
+
     def _perform_variable_substitution(self, use_table_var_substitution):
         logger.info("Performing variable substitution")
         for mdf in self.md_files_main + self.md_files_app:
@@ -281,8 +340,29 @@ class OneDoc:
                 res = m.group(1)
                 key = res.split("|")[0] if "|" in res else res
                 list_of_flags = res.split("|")[1:] if "|" in res else None
-                key_clean = key[2:-2]
+                key_clean = key[2:-2] if key.startswith("__") and key.endswith("__") else key
 
+                # Check database first for table keys (keys with __ markers)
+                if key.startswith("__") and key.endswith("__"):
+                    # Get full reference including any annotation that follows
+                    full_reference = m.group(0)
+                    # Look ahead in the string to find annotation pattern
+                    match_end = m.end()
+                    remaining_str = md_str[match_end:]
+                    annotation_match = re.match(r'^(\{tbl:.*?\})', remaining_str)
+                    if annotation_match:
+                        full_reference += annotation_match.group(1)
+
+                    db_table_markdown = self._get_table_markdown_from_db(full_reference, key_clean, use_table_var_substitution)
+                    if db_table_markdown is not None:
+                        logger.info(f'Substituting table "{key_clean}" from database')
+                        new_str = db_table_markdown
+                        # Replace both the variable and annotation if present
+                        replacement_str = full_reference
+                        md_str = md_str.replace(replacement_str, new_str, 1)
+                        continue
+
+                # Fall back to in-memory dictionaries
                 tbl = self.tables.get(key_clean, None)
                 eq = self.equations.get(key_clean, None)
                 variables = self.variables.get(key_clean, None)
