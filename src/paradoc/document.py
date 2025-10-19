@@ -396,19 +396,23 @@ class OneDoc:
             self._plot_key_usage_count[key_clean] += 1
             unique_key = f"{key_clean}_{self._plot_key_usage_count[key_clean]}"
 
-        # Determine output path for the plot image
-        # Save to build directory relative to the markdown file
+        # Determine output path for the plot image - save in images subdirectory
         plot_filename = f"{unique_key}.png"
 
-        # Get the relative path from markdown file to images
+        # Get the relative path from markdown file to images subdirectory
         md_rel_path = mdf.build_file.relative_to(self.build_dir)
-        plot_dir = self.build_dir / md_rel_path.parent
-        plot_path = plot_dir / plot_filename
+        md_parent_dir = self.build_dir / md_rel_path.parent
+
+        # Create images directory next to the markdown file
+        images_dir_build = md_parent_dir / "images"
+        images_dir_build.mkdir(parents=True, exist_ok=True)
+        plot_path = images_dir_build / plot_filename
 
         # Also save to dist dir for final output
-        dist_plot_dir = self.dist_dir / md_rel_path.parent
-        dist_plot_dir.mkdir(parents=True, exist_ok=True)
-        dist_plot_path = dist_plot_dir / plot_filename
+        dist_md_parent = self.dist_dir / md_rel_path.parent
+        images_dir_dist = dist_md_parent / "images"
+        images_dir_dist.mkdir(parents=True, exist_ok=True)
+        dist_plot_path = images_dir_dist / plot_filename
 
         # Render plot to image
         try:
@@ -423,7 +427,11 @@ class OneDoc:
             if plot_path.exists():
                 shutil.copy(plot_path, dist_plot_path)
 
-            logger.info(f'Rendered plot "{key_clean}" to {plot_filename}')
+            # Update the markdown reference to include the images/ prefix
+            # The renderer returns just the filename, we need to prepend images/
+            img_markdown = img_markdown.replace(f"]({plot_filename})", f"](images/{plot_filename})")
+
+            logger.info(f'Rendered plot "{key_clean}" to images/{plot_filename}')
             return img_markdown
 
         except Exception as e:

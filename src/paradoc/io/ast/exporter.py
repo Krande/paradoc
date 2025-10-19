@@ -418,9 +418,22 @@ class ASTExporter:
                 if resolved_path is None:
                     for base in [self.one_doc.dist_dir, self.one_doc.build_dir, self.one_doc.source_dir]:
                         for path_variant in [img_path, normalized_path]:
+                            # Try direct path first
                             candidate = base / path_variant
                             if candidate.exists() and candidate.is_file():
                                 resolved_path = candidate
+                                break
+
+                            # Try searching in subdirectories (for images in 00-main/images/, etc.)
+                            # Extract just the filename from the path
+                            filename = pathlib.Path(path_variant).name
+                            for subdir_candidate in base.rglob(filename):
+                                if subdir_candidate.is_file():
+                                    resolved_path = subdir_candidate
+                                    logger.info(f"Resolved {img_path} via recursive search: {subdir_candidate}")
+                                    break
+
+                            if resolved_path:
                                 break
                         if resolved_path:
                             break

@@ -77,7 +77,7 @@ class PlotRenderer:
         # Export to image
         if output_path:
             # Save to file
-            get_chrome()
+            #get_chrome()
             if img_format == 'svg':
                 fig.write_image(str(output_path), format='svg')
             elif img_format == 'jpeg':
@@ -85,12 +85,14 @@ class PlotRenderer:
             else:
                 fig.write_image(str(output_path), format='png')
 
-            # Return markdown reference
+            # Return markdown reference with proper pandoc-crossref syntax
+            # The correct syntax is: ![caption](path){#fig:key}
             caption = "" if (annotation and annotation.no_caption) else plot_data.caption
-            md_str = f"![{caption}]({output_path.name})"
 
             if caption and not (annotation and annotation.no_caption):
-                md_str += f"\n\nFigure: {caption} {{#fig:{plot_data.key}}}"
+                md_str = f"![{caption}]({output_path.name}){{#fig:{plot_data.key}}}"
+            else:
+                md_str = f"![]({output_path.name})"
 
             return md_str
         else:
@@ -99,10 +101,11 @@ class PlotRenderer:
             img_b64 = base64.b64encode(img_bytes).decode()
 
             caption = "" if (annotation and annotation.no_caption) else plot_data.caption
-            md_str = f"![{caption}](data:image/{img_format};base64,{img_b64})"
 
             if caption and not (annotation and annotation.no_caption):
-                md_str += f"\n\nFigure: {caption} {{#fig:{plot_data.key}}}"
+                md_str = f"![{caption}](data:image/{img_format};base64,{img_b64}){{#fig:{plot_data.key}}}"
+            else:
+                md_str = f"![](data:image/{img_format};base64,{img_b64})"
 
             return md_str
 

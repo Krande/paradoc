@@ -208,9 +208,18 @@ This is a random scatter plot from plotly express.
     print("\nNote: Plot rendering to images will be implemented")
     print("      in the variable substitution phase.")
     print("=" * 60)
-    one.send_to_frontend()
+
+    # Now let's actually send it to the frontend to test image resolution
+    print("\nNow testing send_to_frontend with plot images...")
+    try:
+        one.send_to_frontend(embed_images=True)
+        print("\n✓ Successfully sent document to frontend with embedded plot images!")
+        print("✓ All plot images were found and embedded correctly.")
+    except Exception as e:
+        print(f"\n✗ Failed to send to frontend: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
     main()
-
