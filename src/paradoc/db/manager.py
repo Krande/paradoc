@@ -21,10 +21,13 @@ class DbManager:
         """
         self.db_path = Path(db_path)
         self.connection: Optional[sqlite3.Connection] = None
-        self._init_db()
+        self._initialized = False
 
     def _init_db(self):
-        """Initialize database schema."""
+        """Initialize database schema. Only called when data is written."""
+        if self._initialized:
+            return
+
         self.connection = sqlite3.connect(str(self.db_path))
         self.connection.row_factory = sqlite3.Row
 
@@ -98,6 +101,14 @@ class DbManager:
         """)
 
         self.connection.commit()
+        self._initialized = True
+
+    def _ensure_connection(self):
+        """Ensure database connection exists for read operations."""
+        if self.connection is None and self.db_path.exists():
+            self.connection = sqlite3.connect(str(self.db_path))
+            self.connection.row_factory = sqlite3.Row
+            self._initialized = True
 
     def add_table(self, table_data: TableData) -> None:
         """
@@ -106,6 +117,9 @@ class DbManager:
         Args:
             table_data: TableData model instance
         """
+        # Initialize database if not already done
+        self._init_db()
+
         cursor = self.connection.cursor()
 
         # Insert or update main table record
@@ -172,6 +186,12 @@ class DbManager:
         Returns:
             TableData instance or None if not found
         """
+        # Ensure connection exists for reading
+        self._ensure_connection()
+
+        if self.connection is None:
+            return None
+
         cursor = self.connection.cursor()
 
         # Get main table record
@@ -231,12 +251,24 @@ class DbManager:
 
     def list_tables(self) -> List[str]:
         """List all table keys in the database."""
+        # Ensure connection exists for reading
+        self._ensure_connection()
+
+        if self.connection is None:
+            return []
+
         cursor = self.connection.cursor()
         cursor.execute("SELECT key FROM tables ORDER BY key")
         return [row['key'] for row in cursor.fetchall()]
 
     def delete_table(self, key: str) -> None:
         """Delete a table and all associated data."""
+        # Initialize database if not already done (in case we're deleting from existing DB)
+        self._ensure_connection()
+
+        if self.connection is None:
+            return
+
         cursor = self.connection.cursor()
         cursor.execute("DELETE FROM tables WHERE key = ?", (key,))
         self.connection.commit()
@@ -248,6 +280,9 @@ class DbManager:
         Args:
             plot_data: PlotData model instance
         """
+        # Initialize database if not already done
+        self._init_db()
+
         cursor = self.connection.cursor()
         cursor.execute("""
             INSERT OR REPLACE INTO plots (key, plot_type, data, caption, metadata, updated_at)
@@ -271,6 +306,12 @@ class DbManager:
         Returns:
             PlotData instance or None if not found
         """
+        # Ensure connection exists for reading
+        self._ensure_connection()
+
+        if self.connection is None:
+            return None
+
         cursor = self.connection.cursor()
         cursor.execute("SELECT * FROM plots WHERE key = ?", (key,))
         row = cursor.fetchone()
@@ -288,12 +329,24 @@ class DbManager:
 
     def list_plots(self) -> List[str]:
         """List all plot keys in the database."""
+        # Ensure connection exists for reading
+        self._ensure_connection()
+
+        if self.connection is None:
+            return []
+
         cursor = self.connection.cursor()
         cursor.execute("SELECT key FROM plots ORDER BY key")
         return [row['key'] for row in cursor.fetchall()]
 
     def delete_plot(self, key: str) -> None:
         """Delete a plot."""
+        # Ensure connection exists
+        self._ensure_connection()
+
+        if self.connection is None:
+            return
+
         cursor = self.connection.cursor()
         cursor.execute("DELETE FROM plots WHERE key = ?", (key,))
         self.connection.commit()
@@ -311,4 +364,3 @@ class DbManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         self.close()
-
