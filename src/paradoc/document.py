@@ -107,6 +107,9 @@ class OneDoc:
         self._table_key_usage_count: Dict[str, int] = {}
         self._plot_key_usage_count: Dict[str, int] = {}
 
+        # Track whether we're doing a frontend export (for interactive plots)
+        self._is_frontend_export: bool = False
+
         self._setup(create_dirs, clean_build_dir)
 
     def _iter_md_files(self) -> Iterable[pathlib.Path]:
@@ -181,7 +184,10 @@ class OneDoc:
         from paradoc.io.ast.exporter import ASTExporter
         shutil.rmtree(self.dist_dir, ignore_errors=True)
         self._prep_compilation(metadata_file=metadata_file)
+        # Set frontend export flag before variable substitution
+        self._is_frontend_export = True
         self._perform_variable_substitution(False)
+        self._is_frontend_export = False
         html = ASTExporter(self)
         html.send_to_frontend(embed_images=embed_images, use_static_html=use_static_html)
 
@@ -420,7 +426,8 @@ class OneDoc:
                 plot_data=plot_data,
                 annotation=annotation,
                 output_path=plot_path,
-                format='png'
+                format='png',
+                include_interactive_marker=self._is_frontend_export
             )
 
             # Copy to dist directory

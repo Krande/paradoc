@@ -8,6 +8,7 @@ import type { HeadingNumbering } from './headingNumbers'
 import { getEmbeddedImage } from '../sections/store'
 import { PlotRenderer } from '../components/PlotRenderer'
 import { TableRenderer } from '../components/TableRenderer'
+import { InteractiveFigure } from '../components/InteractiveFigure'
 
 // Create a context to pass docId through the render tree
 const DocIdContext = React.createContext<string | undefined>(undefined)
@@ -343,6 +344,29 @@ export function renderBlock(b: PandocBlock, key?: React.Key, headingNumber?: Hea
       }
       const figAttrs = attrs(a)
       const className = ['my-4', ...(a?.classes || [])].filter(Boolean).join(' ')
+
+      // Check if this figure has a data-plot-key attribute (for interactive plots)
+      const plotKey = figAttrs['data-plot-key']
+      const docId = useDocId()
+
+      if (plotKey && docId) {
+        // This is an interactive plot - wrap it with InteractiveFigure component
+        const caption = captionInlines && captionInlines.length > 0 ? renderInlines(captionInlines as any) : undefined
+
+        return (
+          <InteractiveFigure
+            key={key}
+            figureId={figAttrs.id}
+            className={className}
+            plotKey={plotKey}
+            docId={docId}
+            content={content}
+            caption={caption}
+          />
+        )
+      }
+
+      // Regular figure without interactive plot
       return (
         <figure key={key} {...figAttrs} className={className}>
           {Array.isArray(content) ? content.map((bb, j) => renderBlock(bb as any, j)) : null}

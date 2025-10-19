@@ -42,7 +42,8 @@ class PlotRenderer:
         plot_data: PlotData,
         annotation: Optional[PlotAnnotation] = None,
         output_path: Optional[Path] = None,
-        format: str = "png"
+        format: str = "png",
+        include_interactive_marker: bool = False
     ) -> str:
         """
         Render plot to an image and return markdown image reference.
@@ -52,6 +53,7 @@ class PlotRenderer:
             annotation: Optional annotation overrides
             output_path: Optional path to save image
             format: Image format ('png', 'svg', 'jpeg')
+            include_interactive_marker: If True, add data attribute for interactive rendering
 
         Returns:
             Markdown image string
@@ -89,10 +91,20 @@ class PlotRenderer:
             # The correct syntax is: ![caption](path){#fig:key}
             caption = "" if (annotation and annotation.no_caption) else plot_data.caption
 
+            # Build the figure ID with optional interactive marker
+            fig_id = f"fig:{plot_data.key}"
+
             if caption and not (annotation and annotation.no_caption):
-                md_str = f"![{caption}]({output_path.name}){{#fig:{plot_data.key}}}"
+                if include_interactive_marker:
+                    # Add data-plot-key attribute for frontend interactive rendering
+                    md_str = f"![{caption}]({output_path.name}){{#{fig_id} data-plot-key=\"{plot_data.key}\"}}"
+                else:
+                    md_str = f"![{caption}]({output_path.name}){{#{fig_id}}}"
             else:
-                md_str = f"![]({output_path.name})"
+                if include_interactive_marker:
+                    md_str = f"![]({output_path.name}){{#{fig_id} data-plot-key=\"{plot_data.key}\"}}"
+                else:
+                    md_str = f"![]({output_path.name}){{#{fig_id}}}"
 
             return md_str
         else:
@@ -102,10 +114,19 @@ class PlotRenderer:
 
             caption = "" if (annotation and annotation.no_caption) else plot_data.caption
 
+            # Build the figure ID with optional interactive marker
+            fig_id = f"fig:{plot_data.key}"
+
             if caption and not (annotation and annotation.no_caption):
-                md_str = f"![{caption}](data:image/{img_format};base64,{img_b64}){{#fig:{plot_data.key}}}"
+                if include_interactive_marker:
+                    md_str = f"![{caption}](data:image/{img_format};base64,{img_b64}){{#{fig_id} data-plot-key=\"{plot_data.key}\"}}"
+                else:
+                    md_str = f"![{caption}](data:image/{img_format};base64,{img_b64}){{#{fig_id}}}"
             else:
-                md_str = f"![](data:image/{img_format};base64,{img_b64})"
+                if include_interactive_marker:
+                    md_str = f"![](data:image/{img_format};base64,{img_b64}){{#{fig_id} data-plot-key=\"{plot_data.key}\"}}"
+                else:
+                    md_str = f"![](data:image/{img_format};base64,{img_b64}){{#{fig_id}}}"
 
             return md_str
 
@@ -197,4 +218,3 @@ class PlotRenderer:
             raise ValueError(f"Unsupported plot type: {plot_data.plot_type}")
 
         return fig
-
