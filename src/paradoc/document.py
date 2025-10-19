@@ -96,6 +96,9 @@ class OneDoc:
         db_path = self.source_dir / "data.db"
         self.db_manager = DbManager(db_path)
 
+        # Track table key usage to ensure unique keys when tables are reused with different filters/sorts
+        self._table_key_usage_count: Dict[str, int] = {}
+
         self._setup(create_dirs, clean_build_dir)
 
     def _iter_md_files(self) -> Iterable[pathlib.Path]:
@@ -332,16 +335,29 @@ class OneDoc:
         props = dict(index=show_index, tablefmt="grid")
         tbl_str = df.to_markdown(**props)
 
+        # Generate unique key for this table instance
+        # Track usage count and append numeric suffix for reused tables
+        if key_clean not in self._table_key_usage_count:
+            self._table_key_usage_count[key_clean] = 0
+            unique_key = key_clean
+        else:
+            self._table_key_usage_count[key_clean] += 1
+            unique_key = f"{key_clean}_{self._table_key_usage_count[key_clean]}"
+
         # Add caption unless nocaption flag is set
         # NOTE: Do NOT include the annotation in the caption - it's only for transformation
         if not (annotation and annotation.no_caption):
             tbl_str += f"\n\nTable: {table_data.caption}"
-            tbl_str += f" {{#tbl:{key_clean}}}"
+            tbl_str += f" {{#tbl:{unique_key}}}"
 
         return tbl_str
 
     def _perform_variable_substitution(self, use_table_var_substitution):
         logger.info("Performing variable substitution")
+
+        # Reset table key usage counter for each compilation
+        self._table_key_usage_count.clear()
+
         for mdf in self.md_files_main + self.md_files_app:
             md_file = mdf.path
             os.makedirs(mdf.new_file.parent, exist_ok=True)
