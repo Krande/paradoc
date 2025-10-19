@@ -19,7 +19,8 @@ from .common import (
     TableFormat,
 )
 from .config import logger
-from .db import DbManager, parse_table_reference, table_data_to_dataframe, apply_table_annotation
+from .db import DbManager, parse_table_reference, table_data_to_dataframe, apply_table_annotation, parse_plot_reference
+from .db.plot_renderer import PlotRenderer
 from .equations import Equation
 from .exceptions import LatexNotInstalled
 from .utils import get_list_of_files
@@ -74,6 +75,9 @@ class OneDoc:
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
         self.work_dir = pathlib.Path(work_dir).resolve().absolute()
         self.work_dir = self.work_dir.resolve().absolute()
+        # check if work_dir is a subdirectory of source_dir, then raise an error
+        if self.source_dir in self.work_dir.parents:
+            raise ValueError(f"work_dir '{self.work_dir}' cannot be a subdirectory of source_dir '{self.source_dir}'")
 
         self._main_prefix = main_prefix
         self._app_prefix = app_prefix
@@ -96,8 +100,12 @@ class OneDoc:
         db_path = self.source_dir / "data.db"
         self.db_manager = DbManager(db_path)
 
+        # Initialize plot renderer
+        self.plot_renderer = PlotRenderer()
+
         # Track table key usage to ensure unique keys when tables are reused with different filters/sorts
         self._table_key_usage_count: Dict[str, int] = {}
+        self._plot_key_usage_count: Dict[str, int] = {}
 
         self._setup(create_dirs, clean_build_dir)
 
@@ -352,11 +360,82 @@ class OneDoc:
 
         return tbl_str
 
+    def _get_plot_markdown_from_db(self, full_reference: str, key_clean: str, mdf) -> str:
+        """
+        Generate markdown image from database plot using annotations.
+
+        Args:
+            full_reference: Full markdown reference including annotations (e.g., {{__my_plot__}}{plt:width:800})
+            key_clean: Clean plot key (without __ markers)
+            mdf: MarkDownFile instance for path context
+
+        Returns:
+            Markdown image string or None if not found in database
+        """
+        from .db import parse_plot_reference
+
+        # Check if plot exists in database
+        plot_data = self.db_manager.get_plot(key_clean)
+        if plot_data is None:
+            return None
+
+        # Parse annotation from full reference if present
+        annotation = None
+        try:
+            _, annotation = parse_plot_reference(full_reference)
+            if annotation:
+                logger.info(f"Parsed plot annotation for {key_clean}: width={annotation.width}, height={annotation.height}")
+        except (ValueError, AttributeError) as e:
+            logger.warning(f"Failed to parse plot annotation: {e}")
+
+        # Generate unique key for this plot instance
+        if key_clean not in self._plot_key_usage_count:
+            self._plot_key_usage_count[key_clean] = 0
+            unique_key = key_clean
+        else:
+            self._plot_key_usage_count[key_clean] += 1
+            unique_key = f"{key_clean}_{self._plot_key_usage_count[key_clean]}"
+
+        # Determine output path for the plot image
+        # Save to build directory relative to the markdown file
+        plot_filename = f"{unique_key}.png"
+
+        # Get the relative path from markdown file to images
+        md_rel_path = mdf.build_file.relative_to(self.build_dir)
+        plot_dir = self.build_dir / md_rel_path.parent
+        plot_path = plot_dir / plot_filename
+
+        # Also save to dist dir for final output
+        dist_plot_dir = self.dist_dir / md_rel_path.parent
+        dist_plot_dir.mkdir(parents=True, exist_ok=True)
+        dist_plot_path = dist_plot_dir / plot_filename
+
+        # Render plot to image
+        try:
+            img_markdown = self.plot_renderer.render_to_image(
+                plot_data=plot_data,
+                annotation=annotation,
+                output_path=plot_path,
+                format='png'
+            )
+
+            # Copy to dist directory
+            if plot_path.exists():
+                shutil.copy(plot_path, dist_plot_path)
+
+            logger.info(f'Rendered plot "{key_clean}" to {plot_filename}')
+            return img_markdown
+
+        except Exception as e:
+            logger.error(f'Failed to render plot "{key_clean}": {e}')
+            return f"[Error rendering plot: {key_clean}]"
+
     def _perform_variable_substitution(self, use_table_var_substitution):
         logger.info("Performing variable substitution")
 
-        # Reset table key usage counter for each compilation
+        # Reset table and plot key usage counters for each compilation
         self._table_key_usage_count.clear()
+        self._plot_key_usage_count.clear()
 
         for mdf in self.md_files_main + self.md_files_app:
             md_file = mdf.path
@@ -370,7 +449,7 @@ class OneDoc:
                 list_of_flags = res.split("|")[1:] if "|" in res else None
                 key_clean = key[2:-2] if key.startswith("__") and key.endswith("__") else key
 
-                # Check database first for table keys (keys with __ markers)
+                # Check database first for table/plot keys (keys with __ markers)
                 if key.startswith("__") and key.endswith("__"):
                     # Get full reference including any annotation that follows
                     full_reference = m.group(0)
@@ -379,8 +458,8 @@ class OneDoc:
                     match_end = m.end()
                     remaining_str = md_str_original[match_end:]
 
-                    # Check if there's a {tbl:...} annotation following
-                    if remaining_str.startswith('{tbl:'):
+                    # Check if there's a {tbl:...} or {plt:...} annotation following
+                    if remaining_str.startswith('{tbl:') or remaining_str.startswith('{plt:'):
                         # Find the matching closing brace by counting brace depth
                         brace_depth = 0
                         annotation_end = 0
@@ -396,10 +475,21 @@ class OneDoc:
                         if annotation_end > 0:
                             full_reference += remaining_str[:annotation_end]
 
+                    # Try table substitution first
                     db_table_markdown = self._get_table_markdown_from_db(full_reference, key_clean, use_table_var_substitution)
                     if db_table_markdown is not None:
                         logger.info(f'Substituting table "{key_clean}" from database')
                         new_str = db_table_markdown
+                        # Replace both the variable and annotation if present
+                        replacement_str = full_reference
+                        md_str = md_str.replace(replacement_str, new_str, 1)
+                        continue
+
+                    # Try plot substitution
+                    db_plot_markdown = self._get_plot_markdown_from_db(full_reference, key_clean, mdf)
+                    if db_plot_markdown is not None:
+                        logger.info(f'Substituting plot "{key_clean}" from database')
+                        new_str = db_plot_markdown
                         # Replace both the variable and annotation if present
                         replacement_str = full_reference
                         md_str = md_str.replace(replacement_str, new_str, 1)

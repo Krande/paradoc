@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import re
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Callable, Any
 
 import pandas as pd
 
-from .models import TableAnnotation, TableCell, TableColumn, TableData
+from .models import TableAnnotation, TableCell, TableColumn, TableData, PlotData, PlotAnnotation
 
 
 def dataframe_to_table_data(
@@ -210,3 +210,170 @@ def apply_table_annotation(
     show_index = annotation.show_index if annotation else default_show_index
 
     return df_result, show_index
+
+
+# ============================================================================
+# Plot utilities
+# ============================================================================
+
+def dataframe_to_plot_data(
+    key: str,
+    df: pd.DataFrame,
+    plot_type: str,
+    caption: str,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    **kwargs
+) -> PlotData:
+    """
+    Convert a pandas DataFrame to a PlotData model for default plot types.
+
+    Args:
+        key: Unique plot key (without __ markers)
+        df: pandas DataFrame
+        plot_type: Type of plot ('line', 'bar', 'scatter', 'histogram', etc.)
+        caption: Plot caption
+        width: Plot width in pixels
+        height: Plot height in pixels
+        **kwargs: Additional metadata
+
+    Returns:
+        PlotData instance
+    """
+    # Convert DataFrame to JSON-serializable dict
+    data = {
+        'columns': df.columns.tolist(),
+        'data': df.to_dict(orient='records'),
+        'index': df.index.tolist()
+    }
+
+    return PlotData(
+        key=key,
+        plot_type=plot_type,
+        data=data,
+        caption=caption,
+        width=width,
+        height=height,
+        metadata=kwargs
+    )
+
+
+def custom_function_to_plot_data(
+    key: str,
+    function_name: str,
+    caption: str,
+    data: Optional[dict] = None,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    **kwargs
+) -> PlotData:
+    """
+    Create a PlotData model for a custom Python function that returns a plotly figure.
+
+    Args:
+        key: Unique plot key (without __ markers)
+        function_name: Name of the custom function (must be registered separately)
+        caption: Plot caption
+        data: Optional data to pass to the function
+        width: Plot width in pixels
+        height: Plot height in pixels
+        **kwargs: Additional metadata
+
+    Returns:
+        PlotData instance
+    """
+    return PlotData(
+        key=key,
+        plot_type='custom',
+        custom_function_name=function_name,
+        data=data or {},
+        caption=caption,
+        width=width,
+        height=height,
+        metadata=kwargs
+    )
+
+
+def plotly_figure_to_plot_data(
+    key: str,
+    fig: Any,  # plotly.graph_objects.Figure
+    caption: str,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
+    **kwargs
+) -> PlotData:
+    """
+    Convert a plotly figure directly to PlotData.
+
+    Args:
+        key: Unique plot key (without __ markers)
+        fig: Plotly figure object
+        caption: Plot caption
+        width: Plot width in pixels
+        height: Plot height in pixels
+        **kwargs: Additional metadata
+
+    Returns:
+        PlotData instance
+    """
+    # Store the figure as a dict (plotly figures have a to_dict() method)
+    fig_dict = fig.to_dict() if hasattr(fig, 'to_dict') else dict(fig)
+
+    return PlotData(
+        key=key,
+        plot_type='plotly',
+        data=fig_dict,
+        caption=caption,
+        width=width,
+        height=height,
+        metadata=kwargs
+    )
+
+
+def parse_plot_reference(reference_str: str) -> Tuple[str, Optional[PlotAnnotation]]:
+    """
+    Parse a plot reference string from markdown.
+
+    Examples:
+        {{__my_plot__}} -> ('my_plot', None)
+        {{__my_plot__}}{plt:width:800} -> ('my_plot', PlotAnnotation(width=800))
+        {{__my_plot__}}{plt:width:800;height:600} -> ('my_plot', PlotAnnotation(...))
+
+    Args:
+        reference_str: Full reference string from markdown
+
+    Returns:
+        Tuple of (plot_key, annotation_config or None)
+    """
+    # Extract plot key
+    key_match = re.search(r'{{__(\w+)__}}', reference_str)
+    if not key_match:
+        raise ValueError(f"Invalid plot reference format: {reference_str}")
+
+    plot_key = key_match.group(1)
+
+    # Extract annotation if present - look for {plt:...} after the key
+    annotation_start = reference_str.find('{plt:')
+    annotation = None
+
+    if annotation_start != -1:
+        # Count braces to find the matching closing brace
+        brace_depth = 0
+        annotation_end = annotation_start
+
+        for i in range(annotation_start, len(reference_str)):
+            char = reference_str[i]
+            if char == '{':
+                brace_depth += 1
+            elif char == '}':
+                brace_depth -= 1
+                if brace_depth == 0:
+                    annotation_end = i + 1
+                    break
+
+        if annotation_end > annotation_start:
+            annotation_str = reference_str[annotation_start:annotation_end]
+            annotation = PlotAnnotation.from_annotation_string(annotation_str)
+
+    return plot_key, annotation
+

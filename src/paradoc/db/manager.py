@@ -4,9 +4,10 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Callable
 
 from .models import PlotData, TableCell, TableColumn, TableData, TableSortConfig, TableFilterConfig
+from .plot_renderer import PlotRenderer
 
 
 class DbManager:
@@ -94,6 +95,9 @@ class DbManager:
                 plot_type TEXT NOT NULL,
                 data TEXT NOT NULL,
                 caption TEXT NOT NULL,
+                width INTEGER,
+                height INTEGER,
+                custom_function_name TEXT,
                 metadata TEXT DEFAULT '{}',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -285,13 +289,16 @@ class DbManager:
 
         cursor = self.connection.cursor()
         cursor.execute("""
-            INSERT OR REPLACE INTO plots (key, plot_type, data, caption, metadata, updated_at)
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT OR REPLACE INTO plots (key, plot_type, data, caption, width, height, custom_function_name, metadata, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         """, (
             plot_data.key,
             plot_data.plot_type,
             json.dumps(plot_data.data),
             plot_data.caption,
+            plot_data.width,
+            plot_data.height,
+            plot_data.custom_function_name,
             json.dumps(plot_data.metadata)
         ))
         self.connection.commit()
@@ -324,6 +331,9 @@ class DbManager:
             plot_type=row['plot_type'],
             data=json.loads(row['data']),
             caption=row['caption'],
+            width=row['width'],
+            height=row['height'],
+            custom_function_name=row['custom_function_name'],
             metadata=json.loads(row['metadata'])
         )
 

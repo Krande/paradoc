@@ -135,12 +135,91 @@ class TableData(BaseModel):
 
 
 class PlotData(BaseModel):
-    """Complete plot data stored in database (placeholder for future use)."""
+    """Complete plot data stored in database."""
     key: str = Field(..., description="Unique key for the plot (without __ markers)")
-    plot_type: str  # e.g., 'line', 'bar', 'scatter', etc.
-    data: dict  # JSON-serializable plot data
+    plot_type: str  # e.g., 'line', 'bar', 'scatter', 'custom', etc.
+    data: dict  # JSON-serializable plot data (can store dataframe-like structure or plotly figure dict)
     caption: str
+    width: Optional[int] = None  # Width in pixels
+    height: Optional[int] = None  # Height in pixels
+    custom_function_name: Optional[str] = None  # Name of custom Python function that returns plotly figure
     metadata: dict = Field(default_factory=dict)
 
     model_config = {"frozen": False}
 
+    @field_validator("key")
+    @classmethod
+    def validate_key(cls, v: str) -> str:
+        """Ensure key doesn't contain __ markers."""
+        if v.startswith("__") or v.endswith("__"):
+            raise ValueError("Plot key should not contain __ markers (they are added in markdown)")
+        return v
+
+
+class PlotAnnotation(BaseModel):
+    """Custom annotations for plot display options."""
+    width: Optional[int] = None
+    height: Optional[int] = None
+    no_caption: bool = False
+    format: Optional[str] = None  # 'png', 'svg', etc.
+
+    model_config = {"frozen": False}
+
+    @classmethod
+    def from_annotation_string(cls, annotation_str: str) -> PlotAnnotation:
+        """
+        Parse annotation string like '{plt:width:800;height:600}'.
+
+        Examples:
+            {plt:width:800}
+            {plt:height:600}
+            {plt:width:800;height:600}
+            {plt:nocaption}
+            {plt:format:svg}
+        """
+        config = cls()
+
+        if not annotation_str:
+            return config
+
+        # Remove outer braces and 'plt:' prefix
+        annotation_str = annotation_str.strip()
+        if annotation_str.startswith("{") and annotation_str.endswith("}"):
+            annotation_str = annotation_str[1:-1]
+
+        if annotation_str.startswith("plt:"):
+            annotation_str = annotation_str[4:]
+
+        # Split by semicolon for multiple options
+        parts = annotation_str.split(";")
+
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+
+            # Split by colon
+            tokens = [t.strip() for t in part.split(":")]
+
+            if tokens[0] == "width":
+                if len(tokens) > 1:
+                    try:
+                        config.width = int(tokens[1])
+                    except ValueError:
+                        pass
+
+            elif tokens[0] == "height":
+                if len(tokens) > 1:
+                    try:
+                        config.height = int(tokens[1])
+                    except ValueError:
+                        pass
+
+            elif tokens[0] == "nocaption":
+                config.no_caption = True
+
+            elif tokens[0] == "format":
+                if len(tokens) > 1:
+                    config.format = tokens[1]
+
+        return config
