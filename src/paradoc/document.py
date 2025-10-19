@@ -298,17 +298,27 @@ class OneDoc:
         annotation = None
         try:
             _, annotation = parse_table_reference(full_reference)
-        except (ValueError, AttributeError):
-            # No annotation or invalid format
+            if annotation:
+                print(f"DEBUG: Parsed annotation for {key_clean}")
+                print(f"  - show_index: {annotation.show_index}")
+                print(f"  - sort_by: {annotation.sort_by}")
+                print(f"  - filter_pattern: {annotation.filter_pattern}")
+        except (ValueError, AttributeError) as e:
+            print(f"DEBUG: Failed to parse annotation: {e}")
             pass
 
         # Convert to DataFrame
         df = table_data_to_dataframe(table_data)
+        print(f"DEBUG: Original DataFrame shape for {key_clean}: {df.shape}")
+        print(f"DEBUG: First row: {df.iloc[0].to_dict() if len(df) > 0 else 'empty'}")
 
         # Apply annotation transformations (sorting, filtering)
         show_index = table_data.show_index_default
         if annotation:
+            print(f"DEBUG: Applying annotation transformations...")
             df, show_index = apply_table_annotation(df, annotation, table_data.show_index_default)
+            print(f"DEBUG: After transformation shape: {df.shape}")
+            print(f"DEBUG: First row after transform: {df.iloc[0].to_dict() if len(df) > 0 else 'empty'}")
 
         # Handle table name in first cell for DOCX compatibility
         if use_table_var_substitution:
@@ -323,6 +333,7 @@ class OneDoc:
         tbl_str = df.to_markdown(**props)
 
         # Add caption unless nocaption flag is set
+        # NOTE: Do NOT include the annotation in the caption - it's only for transformation
         if not (annotation and annotation.no_caption):
             tbl_str += f"\n\nTable: {table_data.caption}"
             tbl_str += f" {{#tbl:{key_clean}}}"
@@ -342,16 +353,36 @@ class OneDoc:
                 list_of_flags = res.split("|")[1:] if "|" in res else None
                 key_clean = key[2:-2] if key.startswith("__") and key.endswith("__") else key
 
+                print(f"DEBUG VAR SUB: Processing key='{key}', key_clean='{key_clean}'")
+                print(f"DEBUG VAR SUB: Starts with __? {key.startswith('__')}, Ends with __? {key.endswith('__')}")
+
                 # Check database first for table keys (keys with __ markers)
                 if key.startswith("__") and key.endswith("__"):
+                    print(f"DEBUG VAR SUB: Checking database for '{key_clean}'")
                     # Get full reference including any annotation that follows
                     full_reference = m.group(0)
+                    print(f"DEBUG VAR SUB: full_reference = '{full_reference}'")
+
                     # Look ahead in the string to find annotation pattern
                     match_end = m.end()
                     remaining_str = md_str[match_end:]
-                    annotation_match = re.match(r'^(\{tbl:.*?\})', remaining_str)
-                    if annotation_match:
-                        full_reference += annotation_match.group(1)
+
+                    # Check if there's a {tbl:...} annotation following
+                    if remaining_str.startswith('{tbl:'):
+                        # Find the matching closing brace by counting brace depth
+                        brace_depth = 0
+                        annotation_end = 0
+                        for i, char in enumerate(remaining_str):
+                            if char == '{':
+                                brace_depth += 1
+                            elif char == '}':
+                                brace_depth -= 1
+                                if brace_depth == 0:
+                                    annotation_end = i + 1
+                                    break
+
+                        if annotation_end > 0:
+                            full_reference += remaining_str[:annotation_end]
 
                     db_table_markdown = self._get_table_markdown_from_db(full_reference, key_clean, use_table_var_substitution)
                     if db_table_markdown is not None:

@@ -132,12 +132,29 @@ def parse_table_reference(reference_str: str) -> Tuple[str, Optional[TableAnnota
 
     table_key = key_match.group(1)
 
-    # Extract annotation if present
-    annotation_match = re.search(r'{{__\w+__}}(\{tbl:.*?\})', reference_str)
+    # Extract annotation if present - look for {tbl:...} after the key
+    # Find where the annotation starts
+    annotation_start = reference_str.find('{tbl:')
     annotation = None
-    if annotation_match:
-        annotation_str = annotation_match.group(1)
-        annotation = TableAnnotation.from_annotation_string(annotation_str)
+
+    if annotation_start != -1:
+        # Count braces to find the matching closing brace
+        brace_depth = 0
+        annotation_end = annotation_start
+
+        for i in range(annotation_start, len(reference_str)):
+            char = reference_str[i]
+            if char == '{':
+                brace_depth += 1
+            elif char == '}':
+                brace_depth -= 1
+                if brace_depth == 0:
+                    annotation_end = i + 1
+                    break
+
+        if annotation_end > annotation_start:
+            annotation_str = reference_str[annotation_start:annotation_end]
+            annotation = TableAnnotation.from_annotation_string(annotation_str)
 
     return table_key, annotation
 
@@ -187,7 +204,9 @@ def apply_table_annotation(
             ).any(axis=1)
             df_result = df_result[mask]
 
+    # Reset index after transformations so indices are sequential
+    df_result = df_result.reset_index(drop=True)
+
     show_index = annotation.show_index if annotation else default_show_index
 
     return df_result, show_index
-

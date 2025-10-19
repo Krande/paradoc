@@ -139,6 +139,7 @@ def main():
     # Step 5: Compile the document
     print("Step 5: Compiling document with database tables")
     print("-" * 70)
+    one.send_to_frontend()
     one.compile("SalesReport", export_format="html")
     print()
 
