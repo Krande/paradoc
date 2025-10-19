@@ -346,6 +346,7 @@ class OneDoc:
             md_file = mdf.path
             os.makedirs(mdf.new_file.parent, exist_ok=True)
             md_str = mdf.read_original_file()
+            md_str_original = md_str
 
             for m in mdf.get_variables():
                 res = m.group(1)
@@ -353,19 +354,14 @@ class OneDoc:
                 list_of_flags = res.split("|")[1:] if "|" in res else None
                 key_clean = key[2:-2] if key.startswith("__") and key.endswith("__") else key
 
-                print(f"DEBUG VAR SUB: Processing key='{key}', key_clean='{key_clean}'")
-                print(f"DEBUG VAR SUB: Starts with __? {key.startswith('__')}, Ends with __? {key.endswith('__')}")
-
                 # Check database first for table keys (keys with __ markers)
                 if key.startswith("__") and key.endswith("__"):
-                    print(f"DEBUG VAR SUB: Checking database for '{key_clean}'")
                     # Get full reference including any annotation that follows
                     full_reference = m.group(0)
-                    print(f"DEBUG VAR SUB: full_reference = '{full_reference}'")
 
                     # Look ahead in the string to find annotation pattern
                     match_end = m.end()
-                    remaining_str = md_str[match_end:]
+                    remaining_str = md_str_original[match_end:]
 
                     # Check if there's a {tbl:...} annotation following
                     if remaining_str.startswith('{tbl:'):
