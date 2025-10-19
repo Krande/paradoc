@@ -133,8 +133,9 @@ export async function fetchSection(docId: string, sectionId: string, index?: num
 export function predictivePrefetch(docId: string, manifest: DocManifest, visibleIndex: number) {
   const next = manifest.sections[visibleIndex + 1]
   const prev = visibleIndex > 0 ? manifest.sections[visibleIndex - 1] : undefined
-  if (next) void fetchSection(docId, next.id, next.index)
-  if (prev) void fetchSection(docId, prev.id, prev.index)
+  // Silently attempt to prefetch - errors are expected when using WebSocket mode
+  if (next) void fetchSection(docId, next.id, next.index).catch(() => {})
+  if (prev) void fetchSection(docId, prev.id, prev.index).catch(() => {})
 }
 
 // Image storage helpers for embedded images

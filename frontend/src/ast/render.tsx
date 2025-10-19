@@ -6,6 +6,8 @@ import type {
 } from './types'
 import type { HeadingNumbering } from './headingNumbers'
 import { getEmbeddedImage } from '../sections/store'
+import { PlotRenderer } from '../components/PlotRenderer'
+import { TableRenderer } from '../components/TableRenderer'
 
 // Create a context to pass docId through the render tree
 const DocIdContext = React.createContext<string | undefined>(undefined)
@@ -218,6 +220,34 @@ function renderInlines(xs: PandocInline[]): React.ReactNode {
   return out
 }
 
+/**
+ * Component to detect and render plot/table references in paragraph content
+ */
+function InteractiveParagraph({ inlines, pKey }: { inlines: PandocInline[]; pKey?: React.Key }) {
+  const docId = useDocId()
+
+  // Check if paragraph contains a plot or table reference
+  // Pattern: {{__key__}} optionally followed by {plt:...} or {tbl:...}
+  const text = inlines.map(x => x.t === 'Str' ? x.c : x.t === 'Space' ? ' ' : '').join('')
+
+  // Match plot references: {{__plot_key__}} with optional {plt:...} annotation
+  const plotMatch = text.match(/\{\{__([^_][^}]*)__\}\}(?:\{plt:[^}]*\})?/)
+  if (plotMatch) {
+    const plotKey = plotMatch[1]
+    return <PlotRenderer plotKey={plotKey} docId={docId} />
+  }
+
+  // Match table references: {{__table_key__}} with optional {tbl:...} annotation
+  const tableMatch = text.match(/\{\{__([^_][^}]*)__\}\}(?:\{tbl:[^}]*\})?/)
+  if (tableMatch) {
+    const tableKey = tableMatch[1]
+    return <TableRenderer tableKey={tableKey} docId={docId} />
+  }
+
+  // Regular paragraph - no interactive content
+  return <p className="my-3">{renderInlines(inlines)}</p>
+}
+
 export function renderBlock(b: PandocBlock, key?: React.Key, headingNumber?: HeadingNumbering): React.ReactElement | null {
   switch (b.t) {
     case 'Plain':
@@ -228,7 +258,8 @@ export function renderBlock(b: PandocBlock, key?: React.Key, headingNumber?: Hea
       if (inlines.length === 1 && inlines[0].t === 'Str' && inlines[0].c === '\\appendix') {
         return null
       }
-      return <p key={key} className="my-3">{renderInlines(inlines)}</p>
+      // Check for plot/table references - wrap in a div with the key
+      return <div key={key}><InteractiveParagraph inlines={inlines} /></div>
     }
     case 'Header': {
       const [level, a, inls] = (b as Header).c
