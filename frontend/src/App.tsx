@@ -5,7 +5,7 @@ import { Navbar, TocItem } from './components/Navbar'
 // Inline the worker so it's embedded in the bundle
 import InlineWorker from './ws/worker.ts?worker&inline'
 
-import { useSectionStore, fetchManifest, fetchSection, storeEmbeddedImage } from './sections/store'
+import { useSectionStore, fetchManifest, fetchSection, storeEmbeddedImage, storePlotData, storeTableData } from './sections/store'
 import type { DocManifest, SectionBundle } from './ast/types'
 import { VirtualReader } from './components/VirtualReader'
 import { calculateHeadingNumbers } from './ast/headingNumbers'
@@ -84,6 +84,22 @@ export default function App() {
         for (const [path, imgData] of Object.entries(images)) {
           storeEmbeddedImage(currentDocId, path, imgData.data, imgData.mimeType).catch(err => {
             console.warn(`Failed to store embedded image ${path} for docId ${currentDocId}:`, err)
+          })
+        }
+      } else if (msg.type === 'plot_data' && msg.plots) {
+        // Store plot data in IndexedDB
+        const plots = msg.plots as Record<string, any>
+        for (const [plotKey, plotData] of Object.entries(plots)) {
+          storePlotData(currentDocId, plotKey, plotData).catch(err => {
+            console.warn(`Failed to store plot data ${plotKey} for docId ${currentDocId}:`, err)
+          })
+        }
+      } else if (msg.type === 'table_data' && msg.tables) {
+        // Store table data in IndexedDB
+        const tables = msg.tables as Record<string, any>
+        for (const [tableKey, tableData] of Object.entries(tables)) {
+          storeTableData(currentDocId, tableKey, tableData).catch(err => {
+            console.warn(`Failed to store table data ${tableKey} for docId ${currentDocId}:`, err)
           })
         }
       } else if (msg.type === 'process_info') {

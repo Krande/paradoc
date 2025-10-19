@@ -4,12 +4,14 @@ import type { DocManifest, SectionBundle } from '../ast/types'
 // Very small IndexedDB helper
 function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('paradoc-cache', 2)
+    const req = indexedDB.open('paradoc-cache', 3) // Increment version for new stores
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains('sections')) db.createObjectStore('sections')
       if (!db.objectStoreNames.contains('manifests')) db.createObjectStore('manifests')
       if (!db.objectStoreNames.contains('images')) db.createObjectStore('images')
+      if (!db.objectStoreNames.contains('plots')) db.createObjectStore('plots')
+      if (!db.objectStoreNames.contains('tables')) db.createObjectStore('tables')
     }
     req.onerror = () => reject(req.error)
     req.onsuccess = () => {
@@ -19,7 +21,7 @@ function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
   })
 }
 
-export async function dbPut(store: 'sections' | 'manifests' | 'images', key: string, value: unknown): Promise<void> {
+export async function dbPut(store: 'sections' | 'manifests' | 'images' | 'plots' | 'tables', key: string, value: unknown): Promise<void> {
   return withDb<void>((db) => new Promise((resolve, reject) => {
     const tx = db.transaction(store, 'readwrite')
     const os = tx.objectStore(store)
@@ -29,7 +31,7 @@ export async function dbPut(store: 'sections' | 'manifests' | 'images', key: str
   }))
 }
 
-export async function dbGet<T>(store: 'sections' | 'manifests' | 'images', key: string): Promise<T | undefined> {
+export async function dbGet<T>(store: 'sections' | 'manifests' | 'images' | 'plots' | 'tables', key: string): Promise<T | undefined> {
   return withDb<T | undefined>((db) => new Promise((resolve, reject) => {
     const tx = db.transaction(store, 'readonly')
     const os = tx.objectStore(store)
@@ -147,4 +149,48 @@ export async function getEmbeddedImage(docId: string, imagePath: string): Promis
   const normalizedPath = imagePath.replace(/^\.\//, '').replace(/^\//, '')
   const key = `${docId}:${normalizedPath}`
   return await dbGet<string>('images', key)
+}
+
+// Plot data storage helpers
+export interface PlotData {
+  key: string
+  plot_type: string
+  data: any
+  caption: string
+  width?: number
+  height?: number
+  custom_function_name?: string
+  metadata?: Record<string, any>
+}
+
+export async function storePlotData(docId: string, plotKey: string, plotData: PlotData): Promise<void> {
+  const key = `${docId}:${plotKey}`
+  await dbPut('plots', key, plotData)
+}
+
+export async function getPlotData(docId: string, plotKey: string): Promise<PlotData | undefined> {
+  const key = `${docId}:${plotKey}`
+  return await dbGet<PlotData>('plots', key)
+}
+
+// Table data storage helpers
+export interface TableData {
+  key: string
+  columns: Array<{ name: string; data_type: string }>
+  cells: Array<{ row_index: number; column_name: string; value: any }>
+  caption: string
+  default_sort?: { column_name: string; ascending: boolean }
+  default_filter?: { column_name: string; pattern: string; is_regex: boolean }
+  show_index_default: boolean
+  metadata?: Record<string, any>
+}
+
+export async function storeTableData(docId: string, tableKey: string, tableData: TableData): Promise<void> {
+  const key = `${docId}:${tableKey}`
+  await dbPut('tables', key, tableData)
+}
+
+export async function getTableData(docId: string, tableKey: string): Promise<TableData | undefined> {
+  const key = `${docId}:${tableKey}`
+  return await dbGet<TableData>('tables', key)
 }

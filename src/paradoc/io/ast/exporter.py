@@ -568,6 +568,10 @@ class ASTExporter:
         # Get doc_id early so it's available in all scopes
         doc_id = manifest.get("docId") or self._infer_doc_id()
 
+        # Send plot and table data if available
+        plot_data_dict = self._extract_plot_data_from_db()
+        table_data_dict = self._extract_table_data_from_db()
+
         # Only start HTTP server if not embedding images
         # When embed_images=True, images are sent via WebSocket and stored in IndexedDB
         if not embed_images:
@@ -643,6 +647,16 @@ class ASTExporter:
                         img_msg = {"kind": "embedded_images", "images": embedded_images}
                         ws.send(json.dumps(img_msg))
 
+            # Send plot data if available
+            if plot_data_dict:
+                plot_msg = {"kind": "plot_data", "data": plot_data_dict}
+                ws.send(json.dumps(plot_msg))
+
+            # Send table data if available
+            if table_data_dict:
+                table_msg = {"kind": "table_data", "data": table_data_dict}
+                ws.send(json.dumps(table_msg))
+
             return True
         except Exception as e:
             print(f"Failed to send AST to frontend over WebSocket: {e}")
@@ -709,6 +723,10 @@ class ASTExporter:
         manifest, sections = self.slice_sections(ast)
         doc_id = manifest.get("docId") or self._infer_doc_id()
 
+        # Extract plot and table data
+        plot_data_dict = self._extract_plot_data_from_db()
+        table_data_dict = self._extract_table_data_from_db()
+
         http_port = int(port) + 1  # Initialize http_port early
 
         # Start HTTP server if not embedding images
@@ -756,6 +774,19 @@ class ASTExporter:
                     if embedded_images:
                         img_msg = {"kind": "embedded_images", "images": embedded_images}
                         ws.send(json.dumps(img_msg))
+
+            # Send plot data if available
+            if plot_data_dict:
+                plot_msg = {"kind": "plot_data", "data": plot_data_dict}
+                ws.send(json.dumps(plot_msg))
+                logger.info(f"Sent {len(plot_data_dict)} plots to frontend")
+
+            # Send table data if available
+            if table_data_dict:
+                table_msg = {"kind": "table_data", "data": table_data_dict}
+                ws.send(json.dumps(table_msg))
+                logger.info(f"Sent {len(table_data_dict)} tables to frontend")
+
             ws.close()
         except Exception as e:
             logger.error(f"Failed to send AST to frontend over WebSocket: {e}")
@@ -789,3 +820,97 @@ class ASTExporter:
         with open(hash_file, "w") as f:
             f.write(hash_content)
         logger.info("Frontend extraction complete")
+
+    def _extract_plot_data_from_db(self) -> Dict[str, Any]:
+        """
+        Extract all plot data from the database and return as a dictionary.
+        Converts plot data to Plotly figure dictionaries for frontend rendering.
+
+        Returns:
+            Dictionary mapping plot keys to their data (compatible with Plotly.js)
+        """
+        try:
+            plot_keys = self.one_doc.db_manager.list_plots()
+            plot_data_dict = {}
+
+            for key in plot_keys:
+                plot_data = self.one_doc.db_manager.get_plot(key)
+                if plot_data:
+                    # Convert plot data to Plotly figure using the renderer
+                    try:
+                        fig = self.one_doc.plot_renderer._create_figure(plot_data)
+                        # Convert figure to JSON-compatible dict
+                        # Use plotly's to_json() then parse to ensure all numpy arrays are converted
+                        import plotly
+                        fig_json_str = plotly.io.to_json(fig)
+                        fig_dict = json.loads(fig_json_str)
+
+                        plot_data_dict[key] = {
+                            "key": plot_data.key,
+                            "plot_type": plot_data.plot_type,
+                            "figure": fig_dict,  # Plotly figure dict ready for Plotly.js
+                            "caption": plot_data.caption,
+                            "width": plot_data.width or 800,
+                            "height": plot_data.height or 600,
+                            "metadata": plot_data.metadata
+                        }
+                        logger.debug(f"Successfully converted plot {key} to Plotly figure")
+                    except Exception as e:
+                        logger.warning(f"Failed to convert plot {key} to figure: {e}")
+                        # Fall back to sending raw data
+                        plot_data_dict[key] = {
+                            "key": plot_data.key,
+                            "plot_type": plot_data.plot_type,
+                            "data": plot_data.data,
+                            "caption": plot_data.caption,
+                            "width": plot_data.width,
+                            "height": plot_data.height,
+                            "metadata": plot_data.metadata
+                        }
+
+            logger.info(f"Extracted {len(plot_data_dict)} plots from database")
+            return plot_data_dict
+        except Exception as e:
+            logger.error(f"Failed to extract plot data from database: {e}")
+            return {}
+
+    def _extract_table_data_from_db(self) -> Dict[str, Any]:
+        """
+        Extract all table data from the database and return as a dictionary.
+
+        Returns:
+            Dictionary mapping table keys to their data
+        """
+        try:
+            table_keys = self.one_doc.db_manager.list_tables()
+            table_data_dict = {}
+
+            for key in table_keys:
+                table_data = self.one_doc.db_manager.get_table(key)
+                if table_data:
+                    # Convert TableData model to dict for JSON serialization
+                    # Keep cells as array to match frontend interface
+                    table_data_dict[key] = {
+                        "key": table_data.key,
+                        "caption": table_data.caption,
+                        "columns": [{"name": col.name, "data_type": col.data_type} for col in table_data.columns],
+                        "cells": [{"row_index": cell.row_index, "column_name": cell.column_name, "value": cell.value} for cell in table_data.cells],
+                        "show_index_default": table_data.show_index_default,
+                        "default_sort": {
+                            "column_name": table_data.default_sort.column_name,
+                            "ascending": table_data.default_sort.ascending
+                        } if table_data.default_sort else None,
+                        "default_filter": {
+                            "column_name": table_data.default_filter.column_name,
+                            "pattern": table_data.default_filter.pattern,
+                            "is_regex": table_data.default_filter.is_regex
+                        } if table_data.default_filter else None,
+                        "metadata": table_data.metadata
+                    }
+
+            logger.info(f"Extracted {len(table_data_dict)} tables from database")
+            return table_data_dict
+        except Exception as e:
+            logger.error(f"Failed to extract table data from database: {e}")
+            return {}
+

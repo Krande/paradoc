@@ -95,6 +95,16 @@ function connect() {
           ctx.postMessage({ type: 'embedded_images', images: obj.images })
           return
         }
+        // New: Plot data support
+        if (obj && obj.kind === 'plot_data' && obj.data) {
+          ctx.postMessage({ type: 'plot_data', plots: obj.data })
+          return
+        }
+        // New: Table data support
+        if (obj && obj.kind === 'table_data' && obj.data) {
+          ctx.postMessage({ type: 'table_data', tables: obj.data })
+          return
+        }
         // New: Process info response
         if (obj && obj.kind === 'process_info') {
           ctx.postMessage({ type: 'process_info', pid: obj.pid, thread_id: obj.thread_id })
