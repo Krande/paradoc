@@ -5,6 +5,7 @@ edit_uri: edit/main/docs/
 
 nav:
   - Home: index.md
+  - Tables: table_database.md
 
 plugins:
   - mkdocstrings:

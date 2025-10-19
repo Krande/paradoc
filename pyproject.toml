@@ -87,6 +87,7 @@ websocket-client = "*"
 websockets = "*"
 plotly = "*"
 python-kaleido = "*"
+pydantic = ">=2.0"
 
 [tool.pixi.feature.test-core.dependencies]
 pytest = "*"
