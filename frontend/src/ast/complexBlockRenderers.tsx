@@ -3,6 +3,7 @@ import type { Attr, PandocBlock, Table } from './types'
 import { attrs } from './utils'
 import { renderInlines } from './inlineRenderers'
 import { InteractiveFigure } from '../components/InteractiveFigure'
+import { InteractiveTable } from '../components/InteractiveTable'
 import { useDocId } from './context'
 import type { HeadingNumbering } from './headingNumbers'
 
@@ -162,9 +163,25 @@ export function renderTable(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
   }
 
   const tableAttrs = attrs(a)
+  const docId = useDocId()
 
-  return (
-    <div key={key} className="my-4 overflow-x-auto">
+  // Check if this table has a tbl: ID for interactive rendering
+  let tableKey: string | undefined
+  if (tableAttrs.id && tableAttrs.id.startsWith('tbl:')) {
+    // Remove 'tbl:' prefix to get the table key (possibly with suffix like _1, _2)
+    tableKey = tableAttrs.id.substring(4)
+
+    console.log('[renderTable] Table with ID:', {
+      tableId: tableAttrs.id,
+      extractedTableKey: tableKey,
+      docId: docId,
+      hasDocId: !!docId
+    })
+  }
+
+  // Build the static table content (used in both interactive and non-interactive modes)
+  const staticTableContent = (
+    <div className="overflow-x-auto">
       <table
         {...tableAttrs}
         className={'min-w-full border-collapse border border-gray-300 ' + (tableAttrs.className || '')}
@@ -195,11 +212,36 @@ export function renderTable(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
           </tfoot>
         ) : null}
       </table>
-      {captionInlines && captionInlines.length > 0 ? (
-        <div className="text-sm text-gray-600 italic mt-2 text-center">
-          {renderInlines(captionInlines)}
-        </div>
-      ) : null}
+    </div>
+  )
+
+  const captionContent = captionInlines && captionInlines.length > 0 ? (
+    <div className="text-sm text-gray-600 italic mt-2 text-center">
+      {renderInlines(captionInlines)}
+    </div>
+  ) : null
+
+  // If table has a key and docId, try to render as interactive
+  if (tableKey && docId) {
+    console.log('[renderTable] Rendering as interactive table candidate:', { tableKey, tableId: tableAttrs.id })
+    return (
+      <InteractiveTable
+        key={key}
+        tableId={tableAttrs.id}
+        className="my-4"
+        tableKey={tableKey}
+        docId={docId}
+        staticContent={staticTableContent}
+        caption={captionContent}
+      />
+    )
+  }
+
+  // Regular table without interactive capability
+  return (
+    <div key={key} className="my-4 overflow-x-auto">
+      {staticTableContent}
+      {captionContent}
     </div>
   )
 }
