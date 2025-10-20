@@ -14,6 +14,7 @@ export default function App() {
   const [connected, setConnected] = useState<boolean>(false)
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
   const [processInfo, setProcessInfo] = useState<{ pid: number; thread_id: number } | null>(null)
+  const [frontendId, setFrontendId] = useState<string>('')
   const workerRef = useRef<Worker | null>(null)
 
   // AST/Sections store
@@ -40,6 +41,14 @@ export default function App() {
     }
   }, [state.manifest])
 
+  // Load frontend ID from localStorage on mount
+  useEffect(() => {
+    const storedId = localStorage.getItem('paradoc_frontend_id')
+    if (storedId) {
+      setFrontendId(storedId)
+    }
+  }, [])
+
   useEffect(() => {
     // Use inline worker for single-file builds that work from filesystem
     const worker = new InlineWorker()
@@ -53,10 +62,21 @@ export default function App() {
       if (!msg) return
       if (msg.type === 'status') {
         setConnected(!!msg.connected)
+        // Store and update frontend ID when we get it from worker
+        if (msg.frontendId && typeof msg.frontendId === 'string') {
+          setFrontendId(msg.frontendId)
+          localStorage.setItem('paradoc_frontend_id', msg.frontendId)
+        }
         // Clear process info when disconnected
         if (!msg.connected) {
           setProcessInfo(null)
         }
+      } else if (msg.type === 'frontend_id' && msg.frontendId) {
+        setFrontendId(msg.frontendId)
+        localStorage.setItem('paradoc_frontend_id', msg.frontendId)
+      } else if (msg.type === 'frontend_id_updated' && msg.frontendId) {
+        setFrontendId(msg.frontendId)
+        localStorage.setItem('paradoc_frontend_id', msg.frontendId)
       } else if (msg.type === 'manifest' && msg.manifest) {
         const man = msg.manifest as DocManifest
         setManifest(man)
@@ -111,6 +131,9 @@ export default function App() {
 
     worker.addEventListener('message', onMessage)
 
+    // Request frontend ID from worker
+    worker.postMessage({ type: 'get_frontend_id' })
+
     return () => {
       try { worker.postMessage({ type: 'stop' }) } catch {}
       worker.removeEventListener('message', onMessage)
@@ -157,15 +180,24 @@ export default function App() {
     }
   }
 
+  const handleSetFrontendId = (newId: string) => {
+    const worker = workerRef.current
+    if (worker) {
+      worker.postMessage({ type: 'set_frontend_id', frontendId: newId })
+    }
+  }
+
   return (
     <div className="flex min-h-screen">
       <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col">
         <Topbar
           connected={connected}
+          frontendId={frontendId}
           processInfo={processInfo}
           onRequestProcessInfo={handleRequestProcessInfo}
           onKillServer={handleKillServer}
+          onSetFrontendId={handleSetFrontendId}
           onSendMock={() => {
           // Build and broadcast a minimal AST manifest + section over WS for demo purposes
           const manifest = {

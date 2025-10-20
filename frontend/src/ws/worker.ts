@@ -11,6 +11,29 @@ let ws: WebSocket | null = null
 let stopped = false
 let reconnectAttempts = 0
 let heartbeatTimer: number | null = null
+let frontendHeartbeatTimer: number | null = null
+
+// Generate or retrieve frontend ID from localStorage
+function getFrontendId(): string {
+  let frontendId = ''
+
+  try {
+    // Try to get existing ID from a synchronous message to main thread
+    // We'll initialize it from main thread instead
+    frontendId = ''
+  } catch {
+    // Ignore
+  }
+
+  if (!frontendId) {
+    // Generate new ID: timestamp + random
+    frontendId = `frontend_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  }
+
+  return frontendId
+}
+
+let FRONTEND_ID = getFrontendId()
 
 function scheduleReconnect() {
   if (stopped) return
@@ -23,6 +46,13 @@ function clearHeartbeat() {
   if (heartbeatTimer !== null) {
     clearInterval(heartbeatTimer)
     heartbeatTimer = null
+  }
+}
+
+function clearFrontendHeartbeat() {
+  if (frontendHeartbeatTimer !== null) {
+    clearInterval(frontendHeartbeatTimer)
+    frontendHeartbeatTimer = null
   }
 }
 
@@ -40,6 +70,28 @@ function startHeartbeat() {
   }, 20000) as unknown as number
 }
 
+function startFrontendHeartbeat() {
+  clearFrontendHeartbeat()
+
+  // Send initial heartbeat immediately
+  sendFrontendHeartbeat()
+
+  // Send frontend heartbeat every 10s to register with server
+  frontendHeartbeatTimer = setInterval(() => {
+    sendFrontendHeartbeat()
+  }, 10000) as unknown as number
+}
+
+function sendFrontendHeartbeat() {
+  try {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ kind: 'frontend_heartbeat', frontend_id: FRONTEND_ID }))
+    }
+  } catch {
+    // ignore
+  }
+}
+
 function connect() {
   if (stopped) return
 
@@ -54,17 +106,19 @@ function connect() {
   ws.addEventListener('open', () => {
     reconnectAttempts = 0
     startHeartbeat()
-    ctx.postMessage({ type: 'status', connected: true })
+    startFrontendHeartbeat()
+    ctx.postMessage({ type: 'status', connected: true, frontendId: FRONTEND_ID })
   })
 
   ws.addEventListener('close', () => {
-    ctx.postMessage({ type: 'status', connected: false })
+    ctx.postMessage({ type: 'status', connected: false, frontendId: FRONTEND_ID })
     clearHeartbeat()
+    clearFrontendHeartbeat()
     scheduleReconnect()
   })
 
   ws.addEventListener('error', () => {
-    ctx.postMessage({ type: 'status', connected: false })
+    ctx.postMessage({ type: 'status', connected: false, frontendId: FRONTEND_ID })
   })
 
   ws.addEventListener('message', (event: MessageEvent) => {
@@ -115,6 +169,11 @@ function connect() {
           ctx.postMessage({ type: 'shutdown_ack' })
           return
         }
+        // New: Heartbeat acknowledgment
+        if (obj && obj.kind === 'heartbeat_ack') {
+          // Silently acknowledge - no need to notify main thread
+          return
+        }
       } catch {
         // fall through to plain html
       }
@@ -131,6 +190,7 @@ ctx.addEventListener('message', (event: MessageEvent) => {
     stopped = true
     try { ws?.close() } catch {}
     clearHeartbeat()
+    clearFrontendHeartbeat()
     return
   }
   if (msg.type === 'send' && typeof msg.html === 'string') {
@@ -155,6 +215,17 @@ ctx.addEventListener('message', (event: MessageEvent) => {
         ws.send(JSON.stringify({ kind: 'shutdown' }))
       }
     } catch {}
+  }
+  // New: Set frontend ID
+  if (msg.type === 'set_frontend_id' && typeof msg.frontendId === 'string') {
+    FRONTEND_ID = msg.frontendId
+    // Send heartbeat with new ID immediately
+    sendFrontendHeartbeat()
+    ctx.postMessage({ type: 'frontend_id_updated', frontendId: FRONTEND_ID })
+  }
+  // New: Get frontend ID
+  if (msg.type === 'get_frontend_id') {
+    ctx.postMessage({ type: 'frontend_id', frontendId: FRONTEND_ID })
   }
 })
 

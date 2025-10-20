@@ -185,7 +185,16 @@ class OneDoc:
         if clean_build_dir is True:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
-    def send_to_frontend(self, metadata_file=None, embed_images=True, use_static_html=False):
+    def send_to_frontend(self, metadata_file=None, embed_images=True, use_static_html=False, frontend_id=None):
+        """
+        Send document to Paradoc frontend reader via WebSocket.
+
+        Args:
+            metadata_file: Optional metadata file path
+            embed_images: If True, embed images as base64 in WebSocket messages
+            use_static_html: If True, extract frontend.zip and open in browser
+            frontend_id: Optional frontend ID to target specific frontend instance. If None, sends to all connected frontends.
+        """
         from paradoc.io.ast.exporter import ASTExporter
 
         shutil.rmtree(self.dist_dir, ignore_errors=True)
@@ -195,7 +204,7 @@ class OneDoc:
         self._perform_variable_substitution(False)
         self._is_frontend_export = False
         html = ASTExporter(self)
-        html.send_to_frontend(embed_images=embed_images, use_static_html=use_static_html)
+        html.send_to_frontend(embed_images=embed_images, use_static_html=use_static_html, frontend_id=frontend_id)
 
     def _prep_compilation(self, metadata_file=None):
         self.build_dir.mkdir(exist_ok=True, parents=True)
@@ -389,13 +398,13 @@ class OneDoc:
             mdf: MarkDownFile instance for path context
 
         Returns:
-            Markdown image string or None if not found in database
+            Markdown image string or empty string if not found in database
         """
 
         # Check if plot exists in database
         plot_data = self.db_manager.get_plot(key_clean)
         if plot_data is None:
-            return None
+            return ""
 
         # Parse annotation from full reference if present
         annotation = None

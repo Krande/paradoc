@@ -532,7 +532,13 @@ class ASTExporter:
     # WebSocket streaming
     # -------------------------------
     def send_to_frontend(
-        self, host: str = "localhost", port: int = 13579, embed_images: bool = True, use_static_html: bool = False
+        self,
+        host: str = "localhost",
+        port: int = 13579,
+        embed_images: bool = True,
+        use_static_html: bool = False,
+        frontend_id: str | None = None,
+        check_frontend_active: bool = True
     ) -> bool:
         """
         Build AST, slice it into sections, and stream manifest + sections over the
@@ -543,6 +549,11 @@ class ASTExporter:
             port: WebSocket server port
             embed_images: If True, embed images as base64 in WebSocket messages instead of serving via HTTP
             use_static_html: If True, extract frontend.zip to resources folder and open in browser
+            frontend_id: Optional frontend ID to send to specific frontend. If None, sends to all connected frontends.
+            check_frontend_active: If True, check if any frontends are connected before sending. Default True.
+
+        Returns:
+            True if successful, False otherwise
         """
         # If use_static_html is True, extract the frontend and open it in a browser
         if use_static_html:
@@ -550,9 +561,31 @@ class ASTExporter:
 
         # Ensure WS background server is running
         try:
-            from paradoc.frontend.ws_server import ensure_ws_server  # lazy import
+            from paradoc.frontend.ws_server import ensure_ws_server, has_active_frontends, get_connected_frontends  # lazy import
 
-            _ = ensure_ws_server(host=host, port=port)
+            server_ok = ensure_ws_server(host=host, port=port)
+            if not server_ok:
+                logger.error("WebSocket server could not be started or reached")
+                return False
+
+            # Check if any frontends are connected
+            if check_frontend_active:
+                if not has_active_frontends(host=host, port=port):
+                    logger.warning("No active frontends connected to WebSocket server. Document will not be displayed.")
+                    print("Warning: No active frontends connected. Please open a Paradoc Reader frontend first.")
+                    return False
+
+                # If a specific frontend_id is requested, verify it exists
+                if frontend_id:
+                    connected = get_connected_frontends(host=host, port=port)
+                    if frontend_id not in connected:
+                        logger.warning(f"Frontend ID '{frontend_id}' not found. Connected frontends: {connected}")
+                        print(f"Warning: Frontend ID '{frontend_id}' not found. Connected: {connected}")
+                        return False
+                    print(f"Sending document to frontend: {frontend_id}")
+                else:
+                    connected = get_connected_frontends(host=host, port=port)
+                    print(f"Sending document to {len(connected)} connected frontend(s): {connected}")
         except Exception as e:
             logger.error(f"Could not ensure WebSocket server is running: {e}")
             # Continue; we might still connect to an external server

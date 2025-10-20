@@ -2,26 +2,49 @@ import React, {useState} from 'react'
 
 export function Topbar({
                            connected,
+                           frontendId,
                            onSendMock,
                            onToggleSidebar,
                            onRequestProcessInfo,
                            onKillServer,
+                           onSetFrontendId,
                            processInfo
                        }: {
     connected: boolean
+    frontendId: string
     onSendMock: () => void
     onToggleSidebar: () => void
     onRequestProcessInfo: () => void
     onKillServer: () => void
+    onSetFrontendId: (newId: string) => void
     processInfo: { pid: number; thread_id: number } | null
 }) {
     const [menuOpen, setMenuOpen] = useState(false)
+    const [editingId, setEditingId] = useState(false)
+    const [tempId, setTempId] = useState('')
 
     const handleInfoClick = () => {
         if (!menuOpen && connected) {
             onRequestProcessInfo()
         }
         setMenuOpen(!menuOpen)
+    }
+
+    const handleEditId = () => {
+        setTempId(frontendId)
+        setEditingId(true)
+    }
+
+    const handleSaveId = () => {
+        if (tempId && tempId !== frontendId) {
+            onSetFrontendId(tempId)
+        }
+        setEditingId(false)
+    }
+
+    const handleCancelEdit = () => {
+        setEditingId(false)
+        setTempId('')
     }
 
     return (
@@ -58,30 +81,74 @@ export function Topbar({
                                     onClick={() => setMenuOpen(false)}
                                 />
                                 <div
-                                    className="absolute top-full left-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-30 p-3">
-                                    <div className="text-sm font-semibold text-gray-700 mb-2">WebSocket Server</div>
-                                    <div className="text-xs text-gray-600 space-y-1 mb-3">
-                                        <div className="flex justify-between">
-                                            <span className="font-medium">Status:</span>
-                                            <span className={connected ? 'text-green-600' : 'text-red-600'}>
-                        {connected ? 'Connected' : 'Disconnected'}
-                      </span>
+                                    className="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-30 p-3">
+                                    <div className="text-sm font-semibold text-gray-700 mb-2">Paradoc Reader Info</div>
+                                    <div className="text-xs text-gray-600 space-y-2 mb-3">
+                                        <div className="border-b border-gray-200 pb-2">
+                                            <div className="font-medium text-gray-700 mb-1">Frontend Instance</div>
+                                            {!editingId ? (
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="font-mono text-xs truncate flex-1" title={frontendId}>
+                                                        {frontendId || 'Loading...'}
+                                                    </span>
+                                                    <button
+                                                        className="cursor-pointer text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                                        onClick={handleEditId}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    <input
+                                                        type="text"
+                                                        className="w-full text-xs font-mono px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        value={tempId}
+                                                        onChange={(e) => setTempId(e.target.value)}
+                                                        placeholder="Enter frontend ID"
+                                                    />
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            className="cursor-pointer flex-1 text-xs px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700"
+                                                            onClick={handleSaveId}
+                                                        >
+                                                            Save
+                                                        </button>
+                                                        <button
+                                                            className="cursor-pointer flex-1 text-xs px-2 py-1 rounded bg-gray-300 text-gray-700 hover:bg-gray-400"
+                                                            onClick={handleCancelEdit}
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
-                                        {processInfo && (
-                                            <>
-                                                <div className="flex justify-between">
-                                                    <span className="font-medium">Process ID:</span>
-                                                    <span className="font-mono">{processInfo.pid}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="font-medium">Thread ID:</span>
-                                                    <span className="font-mono">{processInfo.thread_id}</span>
-                                                </div>
-                                            </>
-                                        )}
-                                        {!processInfo && connected && (
-                                            <div className="text-gray-400 italic">Loading server info...</div>
-                                        )}
+
+                                        <div className="border-b border-gray-200 pb-2">
+                                            <div className="font-medium text-gray-700 mb-1">WebSocket Server</div>
+                                            <div className="flex justify-between">
+                                                <span className="font-medium">Status:</span>
+                                                <span className={connected ? 'text-green-600' : 'text-red-600'}>
+                                                    {connected ? 'Connected' : 'Disconnected'}
+                                                </span>
+                                            </div>
+                                            {processInfo && (
+                                                <>
+                                                    <div className="flex justify-between">
+                                                        <span className="font-medium">Process ID:</span>
+                                                        <span className="font-mono">{processInfo.pid}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="font-medium">Thread ID:</span>
+                                                        <span className="font-mono">{processInfo.thread_id}</span>
+                                                    </div>
+                                                </>
+                                            )}
+                                            {!processInfo && connected && (
+                                                <div className="text-gray-400 italic">Loading server info...</div>
+                                            )}
+                                        </div>
                                     </div>
                                     {connected && (
                                         <button
