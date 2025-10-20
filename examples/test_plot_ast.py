@@ -14,9 +14,6 @@ if not demo_dir.exists():
 # Create OneDoc instance
 one = OneDoc(demo_dir)
 
-# Set frontend export flag
-one._is_frontend_export = True
-
 # Perform variable substitution
 one._prep_compilation()
 one._perform_variable_substitution(False)

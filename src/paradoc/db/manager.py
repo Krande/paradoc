@@ -370,6 +370,56 @@ class DbManager:
             metadata=json.loads(row["metadata"]),
         )
 
+    def get_plot_with_timestamp(self, key: str) -> Optional[tuple[PlotData, float]]:
+        """
+        Retrieve plot data by key along with its last updated timestamp.
+
+        Args:
+            key: Plot key (without __ markers)
+
+        Returns:
+            Tuple of (PlotData, timestamp) or None if not found.
+            Timestamp is a Unix timestamp (seconds since epoch).
+        """
+        # Ensure connection exists for reading
+        self._ensure_connection()
+
+        if self.connection is None:
+            return None
+
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT * FROM plots WHERE key = ?", (key,))
+        row = cursor.fetchone()
+
+        if not row:
+            return None
+
+        plot_data = PlotData(
+            key=row["key"],
+            plot_type=row["plot_type"],
+            data=json.loads(row["data"]),
+            caption=row["caption"],
+            width=row["width"],
+            height=row["height"],
+            custom_function_name=row["custom_function_name"],
+            metadata=json.loads(row["metadata"]),
+        )
+
+        # Parse the timestamp - SQLite stores it as a string in ISO format
+        # Convert to Unix timestamp (float)
+        import datetime
+
+        updated_at_str = row["updated_at"]
+        try:
+            # SQLite CURRENT_TIMESTAMP format: 'YYYY-MM-DD HH:MM:SS'
+            dt = datetime.datetime.strptime(updated_at_str, "%Y-%m-%d %H:%M:%S")
+            timestamp = dt.timestamp()
+        except Exception:
+            # Fallback to current time if parsing fails
+            timestamp = datetime.datetime.now().timestamp()
+
+        return plot_data, timestamp
+
     def list_plots(self) -> List[str]:
         """List all plot keys in the database."""
         # Ensure connection exists for reading

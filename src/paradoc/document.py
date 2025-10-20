@@ -105,15 +105,13 @@ class OneDoc:
         db_path = self.source_dir / "data.db"
         self.db_manager = DbManager(db_path)
 
-        # Initialize plot renderer
-        self.plot_renderer = PlotRenderer()
+        # Initialize plot renderer with caching
+        cache_dir = self.work_dir / ".paradoc_cache"
+        self.plot_renderer = PlotRenderer(cache_dir=cache_dir)
 
         # Track table key usage to ensure unique keys when tables are reused with different filters/sorts
         self._table_key_usage_count: Dict[str, int] = {}
         self._plot_key_usage_count: Dict[str, int] = {}
-
-        # Track whether we're doing a frontend export (for interactive plots)
-        self._is_frontend_export: bool = False
 
         self._setup(create_dirs, clean_build_dir)
 
@@ -200,9 +198,7 @@ class OneDoc:
         shutil.rmtree(self.dist_dir, ignore_errors=True)
         self._prep_compilation(metadata_file=metadata_file)
         # Set frontend export flag before variable substitution
-        self._is_frontend_export = True
         self._perform_variable_substitution(False)
-        self._is_frontend_export = False
         html = ASTExporter(self)
         html.send_to_frontend(embed_images=embed_images, use_static_html=use_static_html, frontend_id=frontend_id)
 
@@ -337,27 +333,16 @@ class OneDoc:
         annotation = None
         try:
             _, annotation = parse_table_reference(full_reference)
-            if annotation:
-                print(f"DEBUG: Parsed annotation for {key_clean}")
-                print(f"  - show_index: {annotation.show_index}")
-                print(f"  - sort_by: {annotation.sort_by}")
-                print(f"  - filter_pattern: {annotation.filter_pattern}")
-        except (ValueError, AttributeError) as e:
-            print(f"DEBUG: Failed to parse annotation: {e}")
+        except (ValueError, AttributeError):
             pass
 
         # Convert to DataFrame
         df = table_data_to_dataframe(table_data)
-        print(f"DEBUG: Original DataFrame shape for {key_clean}: {df.shape}")
-        print(f"DEBUG: First row: {df.iloc[0].to_dict() if len(df) > 0 else 'empty'}")
 
         # Apply annotation transformations (sorting, filtering)
         show_index = table_data.show_index_default
         if annotation:
-            print("DEBUG: Applying annotation transformations...")
             df, show_index = apply_table_annotation(df, annotation, table_data.show_index_default)
-            print(f"DEBUG: After transformation shape: {df.shape}")
-            print(f"DEBUG: First row after transform: {df.iloc[0].to_dict() if len(df) > 0 else 'empty'}")
 
         # Handle table name in first cell for DOCX compatibility
         if use_table_var_substitution:
@@ -450,7 +435,6 @@ class OneDoc:
                 annotation=annotation,
                 output_path=plot_path,
                 format="png",
-                include_interactive_marker=self._is_frontend_export,
             )
 
             # Copy to dist directory

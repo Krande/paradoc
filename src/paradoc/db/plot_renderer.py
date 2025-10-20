@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import base64
+import json
+import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
@@ -18,13 +20,31 @@ import pandas as pd
 
 from .models import PlotAnnotation, PlotData
 
+logger = logging.getLogger(__name__)
+
 
 class PlotRenderer:
     """Handles rendering of plots to various formats."""
 
-    def __init__(self):
-        """Initialize plot renderer with custom function registry."""
+    def __init__(self, cache_dir: Optional[Path] = None):
+        """
+        Initialize plot renderer with custom function registry.
+
+        Args:
+            cache_dir: Optional directory for caching rendered figures
+        """
         self._custom_functions: Dict[str, Callable] = {}
+        self._figure_cache = None
+
+        # Initialize cache if directory provided
+        if cache_dir:
+            try:
+                from paradoc.cache import PlotFigureCache
+
+                self._figure_cache = PlotFigureCache(cache_dir)
+                logger.debug(f"Initialized plot figure cache at {cache_dir}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize plot cache: {e}")
 
     def register_custom_function(self, name: str, func: Callable) -> None:
         """
@@ -42,7 +62,6 @@ class PlotRenderer:
         annotation: Optional[PlotAnnotation] = None,
         output_path: Optional[Path] = None,
         format: str = "png",
-        include_interactive_marker: bool = False,
     ) -> str:
         """
         Render plot to an image and return markdown image reference.
@@ -115,7 +134,7 @@ class PlotRenderer:
 
     def _create_figure(self, plot_data: PlotData) -> Any:
         """
-        Create a plotly figure from PlotData.
+        Create a plotly figure from PlotData with timestamp-based caching.
 
         Args:
             plot_data: PlotData instance
@@ -123,6 +142,12 @@ class PlotRenderer:
         Returns:
             Plotly figure object
         """
+        # Try to get from cache if available
+        # Note: We need the database timestamp to validate the cache
+        # This method is called with just PlotData, so we can't use caching here directly
+        # The caching is better handled at a higher level where we have access to timestamps
+
+        # Create figure based on plot type
         if plot_data.plot_type == "custom":
             # Use custom function
             if not plot_data.custom_function_name:
@@ -135,15 +160,43 @@ class PlotRenderer:
                     f"Use renderer.register_custom_function() to register it."
                 )
 
-            return func(plot_data.data)
+            fig = func(plot_data.data)
 
         elif plot_data.plot_type == "plotly":
             # Reconstruct plotly figure from dict
-            return go.Figure(plot_data.data)
+            fig = go.Figure(plot_data.data)
 
         else:
             # Use default plot types
-            return self._create_default_plot(plot_data)
+            fig = self._create_default_plot(plot_data)
+
+        return fig
+
+    def _create_figure_with_cache(self, plot_data: PlotData, db_timestamp: float) -> Any:
+        """
+        Create a plotly figure from PlotData with caching support.
+
+        Args:
+            plot_data: PlotData instance
+            db_timestamp: Unix timestamp of when the plot was last updated in the database
+
+        Returns:
+            Plotly figure object
+        """
+        # Try to get from cache if available
+        if self._figure_cache:
+            cached_fig = self._figure_cache.get_figure(plot_data.key, db_timestamp)
+            if cached_fig:
+                return cached_fig
+
+        # Cache miss - create figure
+        fig = self._create_figure(plot_data)
+
+        # Cache the figure if caching is enabled
+        if self._figure_cache:
+            self._figure_cache.set_figure(plot_data.key, db_timestamp, fig)
+
+        return fig
 
     def _create_default_plot(self, plot_data: PlotData) -> Any:
         """
@@ -200,3 +253,23 @@ class PlotRenderer:
             raise ValueError(f"Unsupported plot type: {plot_data.plot_type}")
 
         return fig
+
+    def _get_plot_spec_dict(self, plot_data: PlotData) -> Dict[str, Any]:
+        """
+        Convert PlotData to a complete specification dictionary for hashing.
+
+        This includes all data and styling that affects the rendered output.
+        """
+        spec = {
+            "plot_type": plot_data.plot_type,
+            "data": plot_data.data,
+            "caption": plot_data.caption,
+            "width": plot_data.width,
+            "height": plot_data.height,
+            "metadata": plot_data.metadata,
+        }
+
+        if plot_data.plot_type == "custom":
+            spec["custom_function_name"] = plot_data.custom_function_name
+
+        return spec

@@ -1,4 +1,3 @@
-import base64
 import json
 import mimetypes
 import pathlib
@@ -379,12 +378,14 @@ class ASTExporter:
         extract_from_blocks(blocks)
         return list(set(image_paths))  # Remove duplicates
 
-    def _embed_images_in_bundle(self, bundle: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+    def _embed_images_in_bundle(self, bundle: Dict[str, Dict[str, str]]) -> Dict[str, Dict[str, str]]:
         """
         Extract image paths from bundle and return embedded image data.
         Uses source file tracking to resolve images relative to their original markdown file.
         Returns dict mapping image path -> {data: base64_data, mimeType: mime_type}
         """
+        import base64
+
         embedded_images = {}
         doc = bundle.get("doc", {})
         blocks = doc.get("blocks", [])
@@ -413,7 +414,7 @@ class ASTExporter:
                         candidate = source_dir_path / path_variant
                         if candidate.exists() and candidate.is_file():
                             resolved_path = candidate
-                            logger.info(f"Resolved {img_path} using source dir: {source_dir}")
+                            logger.debug(f"Resolved {img_path} using source dir: {source_dir}")
                             break
 
                 # Strategy 2: Fall back to searching in dist_dir, build_dir, source_dir
@@ -432,7 +433,7 @@ class ASTExporter:
                             for subdir_candidate in base.rglob(filename):
                                 if subdir_candidate.is_file():
                                     resolved_path = subdir_candidate
-                                    logger.info(f"Resolved {img_path} via recursive search: {subdir_candidate}")
+                                    logger.debug(f"Resolved {img_path} via recursive search: {subdir_candidate}")
                                     break
 
                             if resolved_path:
@@ -446,7 +447,7 @@ class ASTExporter:
                     )
                     continue
 
-                # Read and encode image
+                # Read and encode image (no caching for static images - they're typically small)
                 with open(resolved_path, "rb") as f:
                     img_data = f.read()
 
@@ -456,8 +457,8 @@ class ASTExporter:
                 # Store with normalized path (without ./)
                 embedded_images[normalized_path] = {"data": b64_data, "mimeType": mime_type}
 
-                logger.info(
-                    f"Successfully embedded image: {img_path} -> {normalized_path} ({len(b64_data)} bytes, {mime_type})"
+                logger.debug(
+                    f"Embedded image: {img_path} -> {normalized_path} ({len(img_data)} bytes, {mime_type})"
                 )
 
             except Exception as e:
@@ -671,6 +672,10 @@ class ASTExporter:
             return False
 
         try:
+            # Send plot and table data if available
+            plot_data_dict = self._extract_plot_data_from_db()
+            table_data_dict = self._extract_table_data_from_db()
+
             # Send manifest first
             ws.send(json.dumps({"kind": "manifest", "manifest": manifest}))
             # Then each section
@@ -869,6 +874,7 @@ class ASTExporter:
         """
         Extract all plot data from the database and return as a dictionary.
         Converts plot data to Plotly figure dictionaries for frontend rendering.
+        Uses timestamp-based caching for efficient figure generation.
 
         Returns:
             Dictionary mapping plot keys to their data (compatible with Plotly.js)
@@ -878,11 +884,16 @@ class ASTExporter:
             plot_data_dict = {}
 
             for key in plot_keys:
-                plot_data = self.one_doc.db_manager.get_plot(key)
-                if plot_data:
-                    # Convert plot data to Plotly figure using the renderer
+                # Get plot data with timestamp for cache validation
+                result = self.one_doc.db_manager.get_plot_with_timestamp(key)
+                if result:
+                    plot_data, db_timestamp = result
+
+                    # Convert plot data to Plotly figure using the renderer with caching
                     try:
-                        fig = self.one_doc.plot_renderer._create_figure(plot_data)
+                        # Use the timestamp-aware method for caching
+                        fig = self.one_doc.plot_renderer._create_figure_with_cache(plot_data, db_timestamp)
+
                         # Convert figure to JSON-compatible dict
                         # Use plotly's to_json() then parse to ensure all numpy arrays are converted
                         import plotly

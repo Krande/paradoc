@@ -134,6 +134,9 @@ mkdocs-glightbox = "*"
 test = { cmd = "pytest tests", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
 test-doc = { cmd = "python send_to_frontend.py", cwd = "examples"}
 
+[tool.pixi.feature.profile.tasks]
+test-doc-profile = { cmd = ["pyinstrument", "-r", "html", "-o", "profile_doc.html", "$PIXI_PROJECT_ROOT/examples/send_to_frontend.py"], cwd= "examples" }
+
 [tool.pixi.feature.lint.tasks]
 lint = "black . --config pyproject.toml && ruff check . --fix && isort ."
 
@@ -145,4 +148,7 @@ serve = { cmd = "mkdocs serve -a localhost:8080", env = { "PYTHONPATH" = "$PIXI_
 PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
 
 [tool.pixi.feature.test.target.win-64.activation.env]
+PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
+
+[tool.pixi.feature.profile.target.win-64.activation.env]
 PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
