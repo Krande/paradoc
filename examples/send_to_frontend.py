@@ -7,10 +7,10 @@ import paradoc as pa
 
 def main():
     """Send a Paradoc document to the Reader app."""
-    chrome_exe = shutil.which("chrome.exe")
-    if chrome_exe is None:
-        from plotly.io._kaleido import plotly_get_chrome
-        plotly_get_chrome()
+    # chrome_exe = shutil.which("chrome.exe")
+    # if chrome_exe is None:
+    #     from plotly.io._kaleido import plotly_get_chrome
+    #     plotly_get_chrome()
 
     parser = argparse.ArgumentParser(description="Send a Paradoc document to the Reader app.")
     parser.add_argument("--doc", default="doc_lorum", help="Path to Paradoc document dir to send.")

@@ -376,6 +376,7 @@ class OneDoc:
     def _get_plot_markdown_from_db(self, full_reference: str, key_clean: str, mdf) -> str:
         """
         Generate markdown image from database plot using annotations.
+        Uses timestamp-based caching to avoid re-rendering unchanged plots.
 
         Args:
             full_reference: Full markdown reference including annotations (e.g., {{__my_plot__}}{plt:width:800})
@@ -386,17 +387,19 @@ class OneDoc:
             Markdown image string or empty string if not found in database
         """
 
-        # Check if plot exists in database
-        plot_data = self.db_manager.get_plot(key_clean)
-        if plot_data is None:
+        # Get plot data with timestamp for cache validation
+        result = self.db_manager.get_plot_with_timestamp(key_clean)
+        if result is None:
             return ""
+
+        plot_data, db_timestamp = result
 
         # Parse annotation from full reference if present
         annotation = None
         try:
             _, annotation = parse_plot_reference(full_reference)
             if annotation:
-                logger.info(
+                logger.debug(
                     f"Parsed plot annotation for {key_clean}: width={annotation.width}, height={annotation.height}"
                 )
         except (ValueError, AttributeError) as e:
@@ -410,7 +413,46 @@ class OneDoc:
             self._plot_key_usage_count[key_clean] += 1
             unique_key = f"{key_clean}_{self._plot_key_usage_count[key_clean]}"
 
-        # Determine output path for the plot image - save in images subdirectory
+        # Cache directory for rendered plots
+        cache_dir = self.work_dir / ".paradoc_cache" / "rendered_plots"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # Cache files: PNG image + timestamp
+        cache_png = cache_dir / f"{key_clean}.png"
+        cache_timestamp = cache_dir / f"{key_clean}.timestamp"
+
+        # Check if cache is valid
+        cache_valid = False
+        if cache_png.exists() and cache_timestamp.exists():
+            try:
+                cached_ts = float(cache_timestamp.read_text(encoding="utf-8").strip())
+                if cached_ts >= db_timestamp:
+                    cache_valid = True
+                    logger.debug(f"Cache hit for plot {key_clean}")
+            except Exception as e:
+                logger.debug(f"Cache validation failed for {key_clean}: {e}")
+
+        # Render plot if cache is invalid
+        if not cache_valid:
+            logger.debug(f"Rendering plot {key_clean} (cache miss or stale)")
+            try:
+                # Create Plotly figure
+                fig = self.plot_renderer._create_figure(plot_data)
+
+                # Apply size overrides from annotation or plot_data
+                width = annotation.width if annotation and annotation.width else plot_data.width or 800
+                height = annotation.height if annotation and annotation.height else plot_data.height or 600
+                fig.update_layout(width=width, height=height)
+
+                # Write to cache
+                fig.write_image(str(cache_png), format="png")
+                cache_timestamp.write_text(str(db_timestamp), encoding="utf-8")
+                logger.info(f'Rendered and cached plot "{key_clean}"')
+            except Exception as e:
+                logger.error(f'Failed to render plot "{key_clean}": {e}')
+                return f"[Error rendering plot: {key_clean}]"
+
+        # Now copy cached PNG to output locations
         plot_filename = f"{unique_key}.png"
 
         # Get the relative path from markdown file to images subdirectory
@@ -428,29 +470,21 @@ class OneDoc:
         images_dir_dist.mkdir(parents=True, exist_ok=True)
         dist_plot_path = images_dir_dist / plot_filename
 
-        # Render plot to image
-        try:
-            img_markdown = self.plot_renderer.render_to_image(
-                plot_data=plot_data,
-                annotation=annotation,
-                output_path=plot_path,
-                format="png",
-            )
+        # Copy from cache to output directories
+        shutil.copy(cache_png, plot_path)
+        shutil.copy(cache_png, dist_plot_path)
 
-            # Copy to dist directory
-            if plot_path.exists():
-                shutil.copy(plot_path, dist_plot_path)
+        # Build markdown reference with proper pandoc-crossref syntax
+        caption = "" if (annotation and annotation.no_caption) else plot_data.caption
+        fig_id = f"fig:{unique_key}"
 
-            # Update the markdown reference to include the images/ prefix
-            # The renderer returns just the filename, we need to prepend images/
-            img_markdown = img_markdown.replace(f"]({plot_filename})", f"](images/{plot_filename})")
+        if caption and not (annotation and annotation.no_caption):
+            img_markdown = f"![{caption}](images/{plot_filename}){{#{fig_id}}}"
+        else:
+            img_markdown = f"![](images/{plot_filename}){{#{fig_id}}}"
 
-            logger.info(f'Rendered plot "{key_clean}" to images/{plot_filename}')
-            return img_markdown
+        return img_markdown
 
-        except Exception as e:
-            logger.error(f'Failed to render plot "{key_clean}": {e}')
-            return f"[Error rendering plot: {key_clean}]"
 
     def _perform_variable_substitution(self, use_table_var_substitution):
         logger.info("Performing variable substitution")

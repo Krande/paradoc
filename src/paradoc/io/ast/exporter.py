@@ -889,10 +889,10 @@ class ASTExporter:
                 if result:
                     plot_data, db_timestamp = result
 
-                    # Convert plot data to Plotly figure using the renderer with caching
+                    # Convert plot data to Plotly figure using the renderer
                     try:
-                        # Use the timestamp-aware method for caching
-                        fig = self.one_doc.plot_renderer._create_figure_with_cache(plot_data, db_timestamp)
+                        # Create figure directly (caching is handled elsewhere for file output)
+                        fig = self.one_doc.plot_renderer._create_figure(plot_data)
 
                         # Convert figure to JSON-compatible dict
                         # Use plotly's to_json() then parse to ensure all numpy arrays are converted
