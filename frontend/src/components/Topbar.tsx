@@ -8,7 +8,8 @@ export function Topbar({
                            onRequestProcessInfo,
                            onKillServer,
                            onSetFrontendId,
-                           processInfo
+                           processInfo,
+                           connectedFrontends
                        }: {
     connected: boolean
     frontendId: string
@@ -18,10 +19,12 @@ export function Topbar({
     onKillServer: () => void
     onSetFrontendId: (newId: string) => void
     processInfo: { pid: number; thread_id: number } | null
+    connectedFrontends: string[]
 }) {
     const [menuOpen, setMenuOpen] = useState(false)
     const [editingId, setEditingId] = useState(false)
     const [tempId, setTempId] = useState('')
+    const [showFrontendsList, setShowFrontendsList] = useState(false)
 
     const handleInfoClick = () => {
         if (!menuOpen && connected) {
@@ -133,6 +136,42 @@ export function Topbar({
                                                     {connected ? 'Connected' : 'Disconnected'}
                                                 </span>
                                             </div>
+                                            {connected && (
+                                                <div className="flex justify-between items-center mt-1">
+                                                    <span className="font-medium">Connected Frontends:</span>
+                                                    <button
+                                                        className="cursor-pointer text-blue-600 hover:text-blue-800 font-medium"
+                                                        onClick={() => setShowFrontendsList(!showFrontendsList)}
+                                                        title="Click to show/hide frontend list"
+                                                    >
+                                                        {connectedFrontends.length}
+                                                        <span className="ml-1 text-xs">
+                                                            {showFrontendsList ? '▼' : '▶'}
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {showFrontendsList && connectedFrontends.length > 0 && (
+                                                <div className="mt-2 pl-2 border-l-2 border-blue-200">
+                                                    <div className="text-xs text-gray-500 mb-1">Frontend Instances:</div>
+                                                    {connectedFrontends.map((fid) => (
+                                                        <div
+                                                            key={fid}
+                                                            className={`text-xs font-mono px-2 py-1 rounded mb-1 ${
+                                                                fid === frontendId
+                                                                    ? 'bg-blue-100 text-blue-900 font-semibold'
+                                                                    : 'bg-gray-50 text-gray-700'
+                                                            }`}
+                                                            title={fid}
+                                                        >
+                                                            {fid === frontendId && (
+                                                                <span className="text-blue-600 mr-1">●</span>
+                                                            )}
+                                                            {fid.length > 30 ? fid.substring(0, 30) + '...' : fid}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                             {processInfo && (
                                                 <>
                                                     <div className="flex justify-between">

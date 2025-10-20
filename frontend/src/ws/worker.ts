@@ -174,6 +174,11 @@ function connect() {
           // Silently acknowledge - no need to notify main thread
           return
         }
+        // New: Connected frontends list
+        if (obj && obj.kind === 'connected_frontends') {
+          ctx.postMessage({ type: 'connected_frontends', frontendIds: obj.frontend_ids || [], count: obj.count || 0 })
+          return
+        }
       } catch {
         // fall through to plain html
       }

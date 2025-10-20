@@ -15,6 +15,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
   const [processInfo, setProcessInfo] = useState<{ pid: number; thread_id: number } | null>(null)
   const [frontendId, setFrontendId] = useState<string>('')
+  const [connectedFrontends, setConnectedFrontends] = useState<string[]>([])
   const workerRef = useRef<Worker | null>(null)
 
   // AST/Sections store
@@ -77,6 +78,8 @@ export default function App() {
       } else if (msg.type === 'frontend_id_updated' && msg.frontendId) {
         setFrontendId(msg.frontendId)
         localStorage.setItem('paradoc_frontend_id', msg.frontendId)
+      } else if (msg.type === 'connected_frontends') {
+        setConnectedFrontends(msg.frontendIds || [])
       } else if (msg.type === 'manifest' && msg.manifest) {
         const man = msg.manifest as DocManifest
         setManifest(man)
@@ -187,6 +190,13 @@ export default function App() {
     }
   }
 
+  const handleRequestConnectedFrontends = () => {
+    const worker = workerRef.current
+    if (worker && connected) {
+      worker.postMessage({ type: 'get_connected_frontends' })
+    }
+  }
+
   return (
     <div className="flex min-h-screen">
       <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -194,8 +204,10 @@ export default function App() {
         <Topbar
           connected={connected}
           frontendId={frontendId}
+          connectedFrontends={connectedFrontends}
           processInfo={processInfo}
           onRequestProcessInfo={handleRequestProcessInfo}
+          onRequestConnectedFrontends={handleRequestConnectedFrontends}
           onKillServer={handleKillServer}
           onSetFrontendId={handleSetFrontendId}
           onSendMock={() => {
