@@ -18,23 +18,15 @@ Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliqu
 
 Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.
 
-![Historical trends visualization](./images/plot1.png){#fig:historical-trends}
+{{__historical_trends__}}
 
-As shown in [@fig:historical-trends], the historical trends demonstrate a clear pattern over time. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+As shown in [@fig:historical_trends], the historical trends demonstrate a clear pattern over time. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
 
 ### Current State Analysis
 
-At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecat cupidatat non proident. The current metrics are summarized in [@tbl:current-metrics].
+At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecat cupidatat non proident. The current metrics are summarized in [@tbl:current_metrics].
 
-| Metric Name          | Value | Unit  | Status    |
-|:---------------------|------:|:------|:----------|
-| Performance Index    | 94.5  | %     | Excellent |
-| Efficiency Rating    | 87.2  | %     | Good      |
-| Reliability Score    | 91.8  | %     | Excellent |
-| Cost Effectiveness   | 78.5  | %     | Good      |
-| User Satisfaction    | 89.3  | %     | Excellent |
-
-Table: Current performance metrics summary {#tbl:current-metrics}
+{{__current_metrics__}}
 
 ## Research Objectives
 
@@ -51,9 +43,9 @@ Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad mi
 
 ## Data Collection
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec sed odio dui. Etiam porta sem malesuada magna mollis euismod. Nullam id dolor id nibh ultricies vehicula ut id elit. The data collection framework is illustrated in [@fig:data-framework].
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec sed odio dui. Etiam porta sem malesuada magna mollis euismod. Nullam id dolor id nibh ultricies vehicula ut id elit. The data collection framework is illustrated in [@fig:data_framework].
 
-![Data collection framework architecture](./images/plot2.png){#fig:data-framework}
+{{__data_framework__}}
 
 ### Sample Selection Criteria
 
@@ -66,17 +58,9 @@ Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Vivamus sagi
 
 ### Measurement Protocols
 
-Cras mattis consectetur purus sit amet fermentum. Cras justo odio, dapibus ac facilisis in, egestas eget quam. Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Detailed measurement specifications are provided in [@tbl:measurement-specs].
+Cras mattis consectetur purus sit amet fermentum. Cras justo odio, dapibus ac facilisis in, egestas eget quam. Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Detailed measurement specifications are provided in [@tbl:measurement_specs].
 
-| Parameter          | Range      | Precision | Frequency | Method   |
-|:-------------------|:-----------|:----------|:----------|:---------|
-| Temperature        | 20-80 °C   | ±0.5 °C   | 1 Hz      | Digital  |
-| Pressure           | 0-100 bar  | ±0.1 bar  | 10 Hz     | Analog   |
-| Flow Rate          | 0-500 L/h  | ±2 L/h    | 1 Hz      | Digital  |
-| Viscosity          | 1-100 cP   | ±0.5 cP   | 0.1 Hz    | Manual   |
-| pH Level           | 0-14       | ±0.05     | 0.5 Hz    | Digital  |
-
-Table: Measurement specifications and protocols {#tbl:measurement-specs}
+{{__measurement_specs__}}
 
 ## Analytical Framework
 
@@ -84,25 +68,17 @@ Nullam quis risus eget urna mollis ornare vel eu leo. Cum sociis natoque penatib
 
 ### Statistical Methods
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus posuere velit aliquet. The statistical analysis workflow is demonstrated in [@fig:statistical-workflow].
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus posuere velit aliquet. The statistical analysis workflow is demonstrated in [@fig:statistical_workflow].
 
-![Statistical analysis workflow](./images/plot3.png){#fig:statistical-workflow}
+{{__statistical_workflow__}}
 
 The analysis incorporates multiple statistical techniques including regression analysis, variance decomposition, and Monte Carlo simulations. Maecenas sed diam eget risus varius blandit sit amet non magna.
 
 ### Validation Approach
 
-Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Key validation results are summarized in [@tbl:validation-results].
+Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Key validation results are summarized in [@tbl:validation_results].
 
-| Test Case         | Expected | Observed | Variance | Pass/Fail |
-|:------------------|:---------|:---------|:---------|:----------|
-| Baseline Test A   | 100.0    | 99.8     | -0.2%    | Pass      |
-| Stress Test B     | 85.0     | 86.3     | +1.5%    | Pass      |
-| Edge Case C       | 75.0     | 74.1     | -1.2%    | Pass      |
-| Integration Test  | 90.0     | 91.5     | +1.7%    | Pass      |
-| Performance Test  | 95.0     | 93.8     | -1.3%    | Pass      |
-
-Table: Validation test results summary {#tbl:validation-results}
+{{__validation_results__}}
 
 # Results and Analysis
 
@@ -110,25 +86,17 @@ Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus
 
 ## Primary Findings
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras mattis consectetur purus sit amet fermentum. Cras justo odio, dapibus ac facilisis in, egestas eget quam. The primary results are visualized in [@fig:primary-results].
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras mattis consectetur purus sit amet fermentum. Cras justo odio, dapibus ac facilisis in, egestas eget quam. The primary results are visualized in [@fig:primary_results].
 
-![Primary experimental results and trends](./images/plot4.png){#fig:primary-results}
+{{__primary_results__}}
 
-As demonstrated in [@fig:primary-results], the experimental data reveals several significant trends. Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Praesent commodo cursus magna, vel scelerisque nisl consectetur et[^2].
+As demonstrated in [@fig:primary_results], the experimental data reveals several significant trends. Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Praesent commodo cursus magna, vel scelerisque nisl consectetur et[^2].
 
 ### Quantitative Analysis
 
-Aenean lacinia bibendum nulla sed consectetur. Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Donec sed odio dui. Comprehensive quantitative metrics are presented in [@tbl:quantitative-metrics].
+Aenean lacinia bibendum nulla sed consectetur. Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Donec sed odio dui. Comprehensive quantitative metrics are presented in [@tbl:quantitative_metrics].
 
-| Category           | Minimum | Maximum | Mean  | Std Dev | Median |
-|:-------------------|--------:|--------:|------:|--------:|-------:|
-| Performance Score  | 72.3    | 98.7    | 87.5  | 6.2     | 88.1   |
-| Efficiency Index   | 65.8    | 95.4    | 82.3  | 7.8     | 83.2   |
-| Quality Rating     | 78.2    | 99.1    | 90.2  | 5.1     | 91.0   |
-| Cost Factor        | 45.6    | 88.9    | 70.5  | 10.3    | 71.2   |
-| Time Efficiency    | 68.4    | 96.3    | 84.7  | 6.9     | 85.5   |
-
-Table: Quantitative analysis metrics {#tbl:quantitative-metrics}
+{{__quantitative_metrics__}}
 
 ### Qualitative Observations
 
@@ -141,29 +109,21 @@ Nullam quis risus eget urna mollis ornare vel eu leo. Integer posuere erat a ant
 
 ## Comparative Analysis
 
-Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. The comparative analysis across different conditions is illustrated in [@fig:comparative-analysis].
+Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. The comparative analysis across different conditions is illustrated in [@fig:comparative_analysis].
 
-![Comparative analysis across experimental conditions](./images/plot5.png){#fig:comparative-analysis}
+{{__comparative_analysis__}}
 
-Sed posuere consectetur est at lobortis. Aenean lacinia bibendum nulla sed consectetur. Integer posuere erat a ante venenatis dapibus posuere velit aliquet. The comparison data is detailed in [@tbl:comparison-data].
+Sed posuere consectetur est at lobortis. Aenean lacinia bibendum nulla sed consectetur. Integer posuere erat a ante venenatis dapibus posuere velit aliquet. The comparison data is detailed in [@tbl:comparison_data].
 
-| Condition    | Group A | Group B | Group C | Delta A-B | Delta B-C |
-|:-------------|--------:|--------:|--------:|----------:|----------:|
-| Scenario 1   | 88.5    | 92.3    | 85.7    | +3.8      | +6.6      |
-| Scenario 2   | 76.2    | 79.8    | 81.5    | +3.6      | -1.7      |
-| Scenario 3   | 91.7    | 88.4    | 93.2    | -3.3      | -4.8      |
-| Scenario 4   | 84.3    | 86.9    | 87.1    | +2.6      | -0.2      |
-| Scenario 5   | 79.8    | 82.5    | 80.3    | +2.7      | +2.2      |
-
-Table: Comparative analysis data across scenarios {#tbl:comparison-data}
+{{__comparison_data__}}
 
 ## Error Analysis
 
 Maecenas sed diam eget risus varius blandit sit amet non magna. Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh.
 
-![Error distribution and uncertainty analysis](./images/plot6.png){#fig:error-analysis}
+{{__error_analysis__}}
 
-The error distribution shown in [@fig:error-analysis] indicates that the measurement uncertainty remains within acceptable bounds. Sed posuere consectetur est at lobortis.
+The error distribution shown in [@fig:error_analysis] indicates that the measurement uncertainty remains within acceptable bounds. Sed posuere consectetur est at lobortis.
 
 # Discussion
 
@@ -171,9 +131,9 @@ Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Vivamus sagi
 
 ## Interpretation of Results
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam id dolor id nibh ultricies vehicula ut id elit. Sed posuere consectetur est at lobortis. The results align with theoretical predictions as shown in [@fig:theory-comparison].
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam id dolor id nibh ultricies vehicula ut id elit. Sed posuere consectetur est at lobortis. The results align with theoretical predictions as shown in [@fig:theory_comparison].
 
-![Comparison between theoretical predictions and experimental results](./images/plot7.png){#fig:theory-comparison}
+{{__theory_comparison__}}
 
 Aenean eu leo quam. Pellentesque ornare sem lacinia quam venenatis vestibulum. Cras mattis consectetur purus sit amet fermentum. Integer posuere erat a ante venenatis dapibus posuere velit aliquet.
 
@@ -188,17 +148,9 @@ Donec sed odio dui. Etiam porta sem malesuada magna mollis euismod. Nullam quis 
 
 ## Implications for Practice
 
-Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec ullamcorper nulla non metus auctor fringilla. Maecenas faucibus mollis interdum. Practical implementation guidelines are summarized in [@tbl:implementation-guide].
+Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec ullamcorper nulla non metus auctor fringilla. Maecenas faucibus mollis interdum. Practical implementation guidelines are summarized in [@tbl:implementation_guide].
 
-| Phase        | Duration | Resources | Priority | Risk Level |
-|:-------------|:---------|:----------|:---------|:-----------|
-| Planning     | 2 weeks  | 5 FTE     | High     | Low        |
-| Development  | 8 weeks  | 12 FTE    | Critical | Medium     |
-| Testing      | 4 weeks  | 8 FTE     | High     | Medium     |
-| Deployment   | 3 weeks  | 6 FTE     | Critical | High       |
-| Monitoring   | Ongoing  | 3 FTE     | Medium   | Low        |
-
-Table: Implementation phase guidelines {#tbl:implementation-guide}
+{{__implementation_guide__}}
 
 # Conclusions
 
@@ -238,4 +190,3 @@ Aenean lacinia bibendum nulla sed consectetur. Praesent commodo cursus magna, ve
 
 [^1]: This is an important footnote providing additional context about the executive summary findings.
 [^2]: Statistical significance was determined using p < 0.05 with Bonferroni correction for multiple comparisons.
-

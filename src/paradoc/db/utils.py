@@ -303,8 +303,16 @@ def plotly_figure_to_plot_data(
     Returns:
         PlotData instance
     """
-    # Store the figure as a dict (plotly figures have a to_dict() method)
-    fig_dict = fig.to_dict() if hasattr(fig, "to_dict") else dict(fig)
+    # Store the figure as a dict using plotly's JSON serialization
+    # This handles numpy arrays properly
+    import json as json_lib
+
+    if hasattr(fig, "to_json"):
+        fig_dict = json_lib.loads(fig.to_json())
+    elif hasattr(fig, "to_dict"):
+        fig_dict = fig.to_dict()
+    else:
+        fig_dict = dict(fig)
 
     return PlotData(
         key=key, plot_type="plotly", data=fig_dict, caption=caption, width=width, height=height, metadata=kwargs
