@@ -24,6 +24,7 @@ class WordExporter:
         self.main_tmpl = main_tmpl
         self.app_tmpl = app_tmpl
         self.use_custom_docx_compile = kwargs.get("use_custom_docx_compile", True)
+        self.enable_word_com_automation = kwargs.get("enable_word_com_automation", False)
 
     def export(self, output_name, dest_file, check_open_docs=False):
         if self.use_custom_docx_compile:
@@ -68,13 +69,16 @@ class WordExporter:
         fix_headers_after_compose(composer_main.doc)
 
         print("Close Existing Word documents")
-        if check_open_docs:
+        if check_open_docs and self.enable_word_com_automation:
             close_word_docs_by_name([output_name, f"{output_name}.docx"])
 
         print(f'Saving Composed Document to "{dest_file}"')
         composer_main.save(dest_file)
 
-        docx_update(str(dest_file))
+        # Only attempt Word COM automation if explicitly enabled
+        # This is disabled by default to avoid fatal COM errors in test/CI environments
+        if self.enable_word_com_automation:
+            docx_update(str(dest_file))
 
     def format_tables(self, composer_doc: Document, is_appendix):
         for i, docx_tbl in enumerate(self.get_all_tables(composer_doc)):
