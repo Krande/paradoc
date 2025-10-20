@@ -89,6 +89,9 @@ plotly = "*"
 python-kaleido = "*"
 pydantic = ">=2.0"
 
+[tool.pixi.feature.prod.target.win-64.dependencies]
+pywin32 = "*"
+
 [tool.pixi.feature.test-core.dependencies]
 pytest = "*"
 

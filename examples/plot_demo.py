@@ -4,6 +4,7 @@ import numpy as np
 from pathlib import Path
 
 from paradoc import OneDoc
+from paradoc.common import ExportFormats
 from paradoc.db import dataframe_to_plot_data, custom_function_to_plot_data, plotly_figure_to_plot_data
 
 # Example 1: Create a simple line plot from DataFrame
@@ -211,6 +212,7 @@ This is a random scatter plot from plotly express.
 
     # Now let's actually send it to the frontend to test image resolution
     print("\nNow testing send_to_frontend with plot images...")
+
     try:
         one.send_to_frontend(embed_images=True)
         print("\n✓ Successfully sent document to frontend with embedded plot images!")
@@ -219,6 +221,8 @@ This is a random scatter plot from plotly express.
         print(f"\n✗ Failed to send to frontend: {e}")
         import traceback
         traceback.print_exc()
+
+    one.compile("plot_demo_2", export_format=ExportFormats.DOCX)
 
 
 if __name__ == "__main__":
