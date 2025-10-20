@@ -16,6 +16,7 @@ export default function App() {
   const [processInfo, setProcessInfo] = useState<{ pid: number; thread_id: number } | null>(null)
   const [frontendId, setFrontendId] = useState<string>('')
   const [connectedFrontends, setConnectedFrontends] = useState<string[]>([])
+  const [logFilePath, setLogFilePath] = useState<string>('')
   const workerRef = useRef<Worker | null>(null)
 
   // AST/Sections store
@@ -129,6 +130,8 @@ export default function App() {
         setProcessInfo({ pid: msg.pid, thread_id: msg.thread_id })
       } else if (msg.type === 'shutdown_ack') {
         console.log('WebSocket server acknowledged shutdown request')
+      } else if (msg.type === 'log_file_path' && msg.path) {
+        setLogFilePath(msg.path)
       }
     }
 
@@ -197,6 +200,13 @@ export default function App() {
     }
   }
 
+  const handleRequestLogFilePath = () => {
+    const worker = workerRef.current
+    if (worker && connected) {
+      worker.postMessage({ type: 'get_log_file_path' })
+    }
+  }
+
   return (
     <div className="flex min-h-screen">
       <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -206,8 +216,10 @@ export default function App() {
           frontendId={frontendId}
           connectedFrontends={connectedFrontends}
           processInfo={processInfo}
+          logFilePath={logFilePath}
           onRequestProcessInfo={handleRequestProcessInfo}
           onRequestConnectedFrontends={handleRequestConnectedFrontends}
+          onRequestLogFilePath={handleRequestLogFilePath}
           onKillServer={handleKillServer}
           onSetFrontendId={handleSetFrontendId}
           onSendMock={() => {

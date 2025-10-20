@@ -179,6 +179,11 @@ function connect() {
           ctx.postMessage({ type: 'connected_frontends', frontendIds: obj.frontend_ids || [], count: obj.count || 0 })
           return
         }
+        // New: Log file path response
+        if (obj && obj.kind === 'log_file_path') {
+          ctx.postMessage({ type: 'log_file_path', path: obj.path })
+          return
+        }
       } catch {
         // fall through to plain html
       }
@@ -231,6 +236,22 @@ ctx.addEventListener('message', (event: MessageEvent) => {
   // New: Get frontend ID
   if (msg.type === 'get_frontend_id') {
     ctx.postMessage({ type: 'frontend_id', frontendId: FRONTEND_ID })
+  }
+  // New: Get log file path
+  if (msg.type === 'get_log_file_path') {
+    try {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ kind: 'get_log_file_path' }))
+      }
+    } catch {}
+  }
+  // New: Get connected frontends
+  if (msg.type === 'get_connected_frontends') {
+    try {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ kind: 'get_connected_frontends' }))
+      }
+    } catch {}
   }
 })
 

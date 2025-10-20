@@ -3,10 +3,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 import os
 import sys
 import threading
 import time
+from pathlib import Path
 from typing import (
     Any as _Any,  # fallback for type hints; avoid hard dependency on internals
 )
@@ -20,6 +22,29 @@ try:
 except Exception:  # pragma: no cover - only used for ensure/ping
     ws_client = None  # type: ignore
 
+
+# Setup logging
+LOG_DIR = Path.home() / ".paradoc" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "ws_server.log"
+
+# Configure logger
+logger = logging.getLogger("paradoc.ws_server")
+logger.setLevel(logging.DEBUG)
+
+# File handler
+file_handler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
+file_handler.setLevel(logging.DEBUG)
+file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
+
+# Console handler (optional, for when run directly)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_formatter = logging.Formatter('%(levelname)s - %(message)s')
+console_handler.setFormatter(console_formatter)
+logger.addHandler(console_handler)
 
 ProtocolType = _Any
 CLIENTS: Set[ProtocolType] = set()
@@ -48,12 +73,15 @@ async def _cleanup_stale_frontends() -> None:
 
         for frontend_id in stale_frontends:
             CONNECTED_FRONTENDS.pop(frontend_id, None)
-            print(f"Removed stale frontend: {frontend_id}")
+            logger.warning(f"Removed stale frontend: {frontend_id}")
 
 
 async def _handle_client(ws: ProtocolType) -> None:
     CLIENTS.add(ws)
     client_frontend_id = None  # Track this client's frontend_id for cleanup
+    client_addr = ws.remote_address if hasattr(ws, 'remote_address') else 'unknown'
+
+    logger.info(f"New client connected from {client_addr}. Total clients: {len(CLIENTS)}")
 
     try:
         async for message in ws:
@@ -67,6 +95,7 @@ async def _handle_client(ws: ProtocolType) -> None:
                     obj = json.loads(message)
                     if isinstance(obj, dict):
                         kind = obj.get("kind")
+                        logger.debug(f"Received message kind: {kind} from {client_addr}")
 
                         # Handle ping
                         if kind == "ping":
@@ -77,18 +106,24 @@ async def _handle_client(ws: ProtocolType) -> None:
                         if kind == "frontend_heartbeat":
                             frontend_id = obj.get("frontend_id")
                             if frontend_id:
+                                was_new = frontend_id not in CONNECTED_FRONTENDS
                                 client_frontend_id = frontend_id
                                 CONNECTED_FRONTENDS[frontend_id] = {
                                     "ws": ws,
                                     "last_heartbeat": time.time(),
                                     "frontend_id": frontend_id
                                 }
+                                if was_new:
+                                    logger.info(f"Frontend registered: {frontend_id}. Total frontends: {len(CONNECTED_FRONTENDS)}")
+                                else:
+                                    logger.debug(f"Frontend heartbeat updated: {frontend_id}")
                                 await ws.send(json.dumps({"kind": "heartbeat_ack", "frontend_id": frontend_id}))
                             continue
 
                         # Handle get_connected_frontends request
                         if kind == "get_connected_frontends":
                             frontend_ids = list(CONNECTED_FRONTENDS.keys())
+                            logger.debug(f"Connected frontends requested. Count: {len(frontend_ids)}, IDs: {frontend_ids}")
                             response = {
                                 "kind": "connected_frontends",
                                 "frontend_ids": frontend_ids,
@@ -97,8 +132,20 @@ async def _handle_client(ws: ProtocolType) -> None:
                             await ws.send(json.dumps(response))
                             continue
 
+                        # Handle log file path request
+                        if kind == "get_log_file_path":
+                            log_path = str(LOG_FILE.absolute())
+                            logger.debug(f"Log file path requested: {log_path}")
+                            response = {
+                                "kind": "log_file_path",
+                                "path": log_path
+                            }
+                            await ws.send(json.dumps(response))
+                            continue
+
                         # Handle process info request
                         if kind == "get_process_info":
+                            logger.debug(f"Process info requested from {client_addr}")
                             process_info = {
                                 "kind": "process_info",
                                 "pid": os.getpid(),
@@ -109,6 +156,7 @@ async def _handle_client(ws: ProtocolType) -> None:
 
                         # Handle shutdown request
                         if kind == "shutdown":
+                            logger.warning(f"Shutdown requested from {client_addr}")
                             global SHUTDOWN_REQUESTED
                             SHUTDOWN_REQUESTED = True
                             await ws.send(json.dumps({"kind": "shutdown_ack"}))
@@ -119,17 +167,24 @@ async def _handle_client(ws: ProtocolType) -> None:
                                 except Exception:
                                     pass
                             return
-            except Exception:
+            except Exception as e:
                 # Not JSON or other error; just treat as broadcast content
+                logger.debug(f"Non-JSON message or parse error: {e}")
                 pass
 
             # Broadcast to all connected clients (including sender)
+            logger.debug(f"Broadcasting message from {client_addr} to {len(CLIENTS)} clients")
             await _broadcast(message)
+    except Exception as e:
+        logger.error(f"Error handling client {client_addr}: {e}", exc_info=True)
     finally:
         CLIENTS.discard(ws)
         # Remove frontend from tracking when connection closes
         if client_frontend_id:
             CONNECTED_FRONTENDS.pop(client_frontend_id, None)
+            logger.info(f"Frontend disconnected: {client_frontend_id}. Remaining frontends: {len(CONNECTED_FRONTENDS)}")
+        else:
+            logger.info(f"Client disconnected from {client_addr}. Remaining clients: {len(CLIENTS)}")
 
 
 async def _broadcast(message: str | bytes) -> None:
@@ -156,30 +211,42 @@ async def _safe_send(ws: ProtocolType, message: str | bytes) -> None:
 
 
 async def _serve_forever(host: str, port: int) -> None:
+    logger.info(f"Starting WebSocket server on ws://{host}:{port}")
+    logger.info(f"Log file location: {LOG_FILE.absolute()}")
+
     # Start the cleanup task
     cleanup_task = asyncio.create_task(_cleanup_stale_frontends())
 
     async with websockets.serve(_handle_client, host, port, ping_interval=20, ping_timeout=20):
+        logger.info(f"WebSocket server is now listening on ws://{host}:{port}")
         # Keep the server running until shutdown is requested
         try:
             while not SHUTDOWN_REQUESTED:
                 await asyncio.sleep(0.5)
         except asyncio.CancelledError:
+            logger.info("Server received cancellation request")
             pass
         finally:
+            logger.info("Shutting down WebSocket server")
             cleanup_task.cancel()
             try:
                 await cleanup_task
             except asyncio.CancelledError:
                 pass
+            logger.info("WebSocket server shutdown complete")
 
 
 def run_server(host: str = "localhost", port: int = 13579) -> None:
     """Run the websocket relay server (blocking)."""
+    logger.info(f"Initializing WebSocket server on {host}:{port}")
     try:
         asyncio.run(_serve_forever(host, port))
     except KeyboardInterrupt:
+        logger.info("Server interrupted by user")
         pass
+    except Exception as e:
+        logger.error(f"Server error: {e}", exc_info=True)
+        raise
 
 
 def ping_ws_server(host: str = "localhost", port: int = 13579, timeout: float = 1.5) -> bool:

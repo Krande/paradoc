@@ -6,20 +6,26 @@ export function Topbar({
                            onSendMock,
                            onToggleSidebar,
                            onRequestProcessInfo,
+                           onRequestConnectedFrontends,
+                           onRequestLogFilePath,
                            onKillServer,
                            onSetFrontendId,
                            processInfo,
-                           connectedFrontends
+                           connectedFrontends,
+                           logFilePath
                        }: {
     connected: boolean
     frontendId: string
     onSendMock: () => void
     onToggleSidebar: () => void
     onRequestProcessInfo: () => void
+    onRequestConnectedFrontends: () => void
+    onRequestLogFilePath: () => void
     onKillServer: () => void
     onSetFrontendId: (newId: string) => void
     processInfo: { pid: number; thread_id: number } | null
     connectedFrontends: string[]
+    logFilePath: string
 }) {
     const [menuOpen, setMenuOpen] = useState(false)
     const [editingId, setEditingId] = useState(false)
@@ -29,6 +35,8 @@ export function Topbar({
     const handleInfoClick = () => {
         if (!menuOpen && connected) {
             onRequestProcessInfo()
+            onRequestConnectedFrontends()
+            onRequestLogFilePath()
         }
         setMenuOpen(!menuOpen)
     }
@@ -187,6 +195,12 @@ export function Topbar({
                                             {!processInfo && connected && (
                                                 <div className="text-gray-400 italic">Loading server info...</div>
                                             )}
+                                        </div>
+                                        <div className="border-b border-gray-200 pb-2">
+                                            <div className="font-medium text-gray-700 mb-1">Log File Path</div>
+                                            <div className="text-xs font-mono text-gray-600 break-words">
+                                                {logFilePath || 'N/A'}
+                                            </div>
                                         </div>
                                     </div>
                                     {connected && (
