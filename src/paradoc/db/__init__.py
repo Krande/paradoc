@@ -1,4 +1,5 @@
 """Database module for paradoc table and plot data storage."""
+
 from .manager import DbManager
 from .models import (
     PlotAnnotation,

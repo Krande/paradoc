@@ -1,13 +1,20 @@
 """Database manager for handling table and plot data storage."""
+
 from __future__ import annotations
 
 import json
 import sqlite3
 from pathlib import Path
-from typing import List, Optional, Callable
+from typing import List, Optional
 
-from .models import PlotData, TableCell, TableColumn, TableData, TableSortConfig, TableFilterConfig
-from .plot_renderer import PlotRenderer
+from .models import (
+    PlotData,
+    TableCell,
+    TableColumn,
+    TableData,
+    TableFilterConfig,
+    TableSortConfig,
+)
 
 
 class DbManager:
@@ -35,7 +42,8 @@ class DbManager:
         cursor = self.connection.cursor()
 
         # Tables schema
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS tables (
                 key TEXT PRIMARY KEY,
                 caption TEXT NOT NULL,
@@ -44,9 +52,11 @@ class DbManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS table_columns (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 table_key TEXT NOT NULL,
@@ -55,9 +65,11 @@ class DbManager:
                 FOREIGN KEY (table_key) REFERENCES tables(key) ON DELETE CASCADE,
                 UNIQUE(table_key, name)
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS table_cells (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 table_key TEXT NOT NULL,
@@ -67,18 +79,22 @@ class DbManager:
                 FOREIGN KEY (table_key) REFERENCES tables(key) ON DELETE CASCADE,
                 UNIQUE(table_key, row_index, column_name)
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS table_sort_config (
                 table_key TEXT PRIMARY KEY,
                 column_name TEXT NOT NULL,
                 ascending INTEGER DEFAULT 1,
                 FOREIGN KEY (table_key) REFERENCES tables(key) ON DELETE CASCADE
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS table_filter_config (
                 table_key TEXT PRIMARY KEY,
                 column_name TEXT NOT NULL,
@@ -86,10 +102,12 @@ class DbManager:
                 is_regex INTEGER DEFAULT 1,
                 FOREIGN KEY (table_key) REFERENCES tables(key) ON DELETE CASCADE
             )
-        """)
+        """
+        )
 
         # Plots schema (placeholder for future)
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS plots (
                 key TEXT PRIMARY KEY,
                 plot_type TEXT NOT NULL,
@@ -102,7 +120,8 @@ class DbManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """)
+        """
+        )
 
         self.connection.commit()
         self._initialized = True
@@ -127,15 +146,18 @@ class DbManager:
         cursor = self.connection.cursor()
 
         # Insert or update main table record
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT OR REPLACE INTO tables (key, caption, show_index_default, metadata, updated_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-        """, (
-            table_data.key,
-            table_data.caption,
-            1 if table_data.show_index_default else 0,
-            json.dumps(table_data.metadata)
-        ))
+        """,
+            (
+                table_data.key,
+                table_data.caption,
+                1 if table_data.show_index_default else 0,
+                json.dumps(table_data.metadata),
+            ),
+        )
 
         # Delete existing columns and cells for this table
         cursor.execute("DELETE FROM table_columns WHERE table_key = ?", (table_data.key,))
@@ -143,40 +165,48 @@ class DbManager:
 
         # Insert columns
         for column in table_data.columns:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO table_columns (table_key, name, data_type)
                 VALUES (?, ?, ?)
-            """, (table_data.key, column.name, column.data_type))
+            """,
+                (table_data.key, column.name, column.data_type),
+            )
 
         # Insert cells
         for cell in table_data.cells:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO table_cells (table_key, row_index, column_name, value)
                 VALUES (?, ?, ?, ?)
-            """, (table_data.key, cell.row_index, cell.column_name, str(cell.value)))
+            """,
+                (table_data.key, cell.row_index, cell.column_name, str(cell.value)),
+            )
 
         # Handle sort config
         if table_data.default_sort:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO table_sort_config (table_key, column_name, ascending)
                 VALUES (?, ?, ?)
-            """, (
-                table_data.key,
-                table_data.default_sort.column_name,
-                1 if table_data.default_sort.ascending else 0
-            ))
+            """,
+                (table_data.key, table_data.default_sort.column_name, 1 if table_data.default_sort.ascending else 0),
+            )
 
         # Handle filter config
         if table_data.default_filter:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO table_filter_config (table_key, column_name, pattern, is_regex)
                 VALUES (?, ?, ?, ?)
-            """, (
-                table_data.key,
-                table_data.default_filter.column_name,
-                table_data.default_filter.pattern,
-                1 if table_data.default_filter.is_regex else 0
-            ))
+            """,
+                (
+                    table_data.key,
+                    table_data.default_filter.column_name,
+                    table_data.default_filter.pattern,
+                    1 if table_data.default_filter.is_regex else 0,
+                ),
+            )
 
         self.connection.commit()
 
@@ -207,17 +237,20 @@ class DbManager:
 
         # Get columns
         cursor.execute("SELECT name, data_type FROM table_columns WHERE table_key = ?", (key,))
-        columns = [TableColumn(name=r['name'], data_type=r['data_type']) for r in cursor.fetchall()]
+        columns = [TableColumn(name=r["name"], data_type=r["data_type"]) for r in cursor.fetchall()]
 
         # Get cells
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT row_index, column_name, value 
             FROM table_cells 
             WHERE table_key = ?
             ORDER BY row_index, column_name
-        """, (key,))
+        """,
+            (key,),
+        )
         cells = [
-            TableCell(row_index=r['row_index'], column_name=r['column_name'], value=r['value'])
+            TableCell(row_index=r["row_index"], column_name=r["column_name"], value=r["value"])
             for r in cursor.fetchall()
         ]
 
@@ -226,10 +259,7 @@ class DbManager:
         sort_row = cursor.fetchone()
         default_sort = None
         if sort_row:
-            default_sort = TableSortConfig(
-                column_name=sort_row['column_name'],
-                ascending=bool(sort_row['ascending'])
-            )
+            default_sort = TableSortConfig(column_name=sort_row["column_name"], ascending=bool(sort_row["ascending"]))
 
         # Get filter config
         cursor.execute("SELECT * FROM table_filter_config WHERE table_key = ?", (key,))
@@ -237,20 +267,20 @@ class DbManager:
         default_filter = None
         if filter_row:
             default_filter = TableFilterConfig(
-                column_name=filter_row['column_name'],
-                pattern=filter_row['pattern'],
-                is_regex=bool(filter_row['is_regex'])
+                column_name=filter_row["column_name"],
+                pattern=filter_row["pattern"],
+                is_regex=bool(filter_row["is_regex"]),
             )
 
         return TableData(
-            key=row['key'],
-            caption=row['caption'],
+            key=row["key"],
+            caption=row["caption"],
             columns=columns,
             cells=cells,
             default_sort=default_sort,
             default_filter=default_filter,
-            show_index_default=bool(row['show_index_default']),
-            metadata=json.loads(row['metadata'])
+            show_index_default=bool(row["show_index_default"]),
+            metadata=json.loads(row["metadata"]),
         )
 
     def list_tables(self) -> List[str]:
@@ -263,7 +293,7 @@ class DbManager:
 
         cursor = self.connection.cursor()
         cursor.execute("SELECT key FROM tables ORDER BY key")
-        return [row['key'] for row in cursor.fetchall()]
+        return [row["key"] for row in cursor.fetchall()]
 
     def delete_table(self, key: str) -> None:
         """Delete a table and all associated data."""
@@ -288,19 +318,22 @@ class DbManager:
         self._init_db()
 
         cursor = self.connection.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT OR REPLACE INTO plots (key, plot_type, data, caption, width, height, custom_function_name, metadata, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        """, (
-            plot_data.key,
-            plot_data.plot_type,
-            json.dumps(plot_data.data),
-            plot_data.caption,
-            plot_data.width,
-            plot_data.height,
-            plot_data.custom_function_name,
-            json.dumps(plot_data.metadata)
-        ))
+        """,
+            (
+                plot_data.key,
+                plot_data.plot_type,
+                json.dumps(plot_data.data),
+                plot_data.caption,
+                plot_data.width,
+                plot_data.height,
+                plot_data.custom_function_name,
+                json.dumps(plot_data.metadata),
+            ),
+        )
         self.connection.commit()
 
     def get_plot(self, key: str) -> Optional[PlotData]:
@@ -327,14 +360,14 @@ class DbManager:
             return None
 
         return PlotData(
-            key=row['key'],
-            plot_type=row['plot_type'],
-            data=json.loads(row['data']),
-            caption=row['caption'],
-            width=row['width'],
-            height=row['height'],
-            custom_function_name=row['custom_function_name'],
-            metadata=json.loads(row['metadata'])
+            key=row["key"],
+            plot_type=row["plot_type"],
+            data=json.loads(row["data"]),
+            caption=row["caption"],
+            width=row["width"],
+            height=row["height"],
+            custom_function_name=row["custom_function_name"],
+            metadata=json.loads(row["metadata"]),
         )
 
     def list_plots(self) -> List[str]:
@@ -347,7 +380,7 @@ class DbManager:
 
         cursor = self.connection.cursor()
         cursor.execute("SELECT key FROM plots ORDER BY key")
-        return [row['key'] for row in cursor.fetchall()]
+        return [row["key"] for row in cursor.fetchall()]
 
     def delete_plot(self, key: str) -> None:
         """Delete a plot."""

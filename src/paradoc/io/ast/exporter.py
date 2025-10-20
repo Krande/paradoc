@@ -1,8 +1,8 @@
-import json
 import base64
+import json
 import mimetypes
 import pathlib
-from typing import Any, Dict, List, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
 import pypandoc
 
@@ -44,11 +44,9 @@ class ASTExporter:
         # Add main files with markers
         for md_file in one.md_files_main:
             marker = f"<!-- PARADOC_SOURCE_FILE: {md_file.path} -->"
-            source_markers.append({
-                'marker': marker,
-                'source_file': str(md_file.path),
-                'source_dir': str(md_file.path.parent)
-            })
+            source_markers.append(
+                {"marker": marker, "source_file": str(md_file.path), "source_dir": str(md_file.path.parent)}
+            )
             md_parts.append(marker)
             md_parts.append(md_file.read_built_file())
 
@@ -58,11 +56,9 @@ class ASTExporter:
         # Add appendix files with markers
         for md_file in one.md_files_app:
             marker = f"<!-- PARADOC_SOURCE_FILE: {md_file.path} -->"
-            source_markers.append({
-                'marker': marker,
-                'source_file': str(md_file.path),
-                'source_dir': str(md_file.path.parent)
-            })
+            source_markers.append(
+                {"marker": marker, "source_file": str(md_file.path), "source_dir": str(md_file.path.parent)}
+            )
             md_parts.append(marker)
             md_parts.append(md_file.read_built_file())
 
@@ -113,17 +109,17 @@ class ASTExporter:
                     if format_type == "html" and "PARADOC_SOURCE_FILE:" in content:
                         # Found a marker - extract source info
                         for marker_info in source_markers:
-                            if marker_info['marker'] in content:
+                            if marker_info["marker"] in content:
                                 current_source = {
-                                    'source_file': marker_info['source_file'],
-                                    'source_dir': marker_info['source_dir']
+                                    "source_file": marker_info["source_file"],
+                                    "source_dir": marker_info["source_dir"],
                                 }
                                 marker_indices.append(idx)
                                 break
 
             # Annotate block with current source
             if current_source and isinstance(block, dict):
-                block['_paradoc_source'] = current_source
+                block["_paradoc_source"] = current_source
 
         # Remove the marker blocks from the AST (they've served their purpose)
         for idx in reversed(marker_indices):
@@ -184,10 +180,12 @@ class ASTExporter:
         def push_current():
             if current_meta is None:
                 return
-            sections.append({
-                "section": current_meta,
-                "doc": {"blocks": list(current)},
-            })
+            sections.append(
+                {
+                    "section": current_meta,
+                    "doc": {"blocks": list(current)},
+                }
+            )
 
         for blk in blocks:
             # Check for \appendix marker in RawBlock
@@ -238,13 +236,15 @@ class ASTExporter:
                     sec_id = f"sec-{header_index}"
 
                 title = self._header_text(inlines)
-                all_headers.append({
-                    "id": sec_id,
-                    "title": title or f"Section {header_index + 1}",
-                    "level": level,
-                    "index": header_index,
-                    "isAppendix": in_appendix
-                })
+                all_headers.append(
+                    {
+                        "id": sec_id,
+                        "title": title or f"Section {header_index + 1}",
+                        "level": level,
+                        "index": header_index,
+                        "isAppendix": in_appendix,
+                    }
+                )
                 header_index += 1
 
             # H1 headers create new section bundles
@@ -298,10 +298,12 @@ class ASTExporter:
                         break
                 except Exception:
                     continue
-            sections.append({
-                "section": {"id": sec_id, "title": title, "level": 1, "index": 0, "isAppendix": False},
-                "doc": {"blocks": list(all_blocks)},
-            })
+            sections.append(
+                {
+                    "section": {"id": sec_id, "title": title, "level": 1, "index": 0, "isAppendix": False},
+                    "doc": {"blocks": list(all_blocks)},
+                }
+            )
 
         # Build manifest with ALL headers (not just H1s)
         doc_id = self._infer_doc_id()
@@ -335,7 +337,7 @@ class ASTExporter:
                             src_info = content[2]
                             if isinstance(src_info, list) and len(src_info) >= 1:
                                 src = src_info[0]
-                                if isinstance(src, str) and not src.startswith(('http://', 'https://', 'data:')):
+                                if isinstance(src, str) and not src.startswith(("http://", "https://", "data:")):
                                     image_paths.append(src)
                     except Exception:
                         pass
@@ -394,12 +396,12 @@ class ASTExporter:
             logger.info(f"Found {len(images_with_context)} images to embed")
 
         for img_info in images_with_context:
-            img_path = img_info['path']
-            source_dir = img_info.get('source_dir')
+            img_path = img_info["path"]
+            source_dir = img_info.get("source_dir")
 
             try:
                 # Normalize path: remove leading ./ if present
-                normalized_path = img_path.replace('./', '', 1) if img_path.startswith('./') else img_path
+                normalized_path = img_path.replace("./", "", 1) if img_path.startswith("./") else img_path
 
                 # Try to resolve image path
                 resolved_path = None
@@ -439,23 +441,24 @@ class ASTExporter:
                             break
 
                 if resolved_path is None:
-                    logger.warning(f"Could not find image file: {img_path} (source_dir: {source_dir}, also tried: {normalized_path})")
+                    logger.warning(
+                        f"Could not find image file: {img_path} (source_dir: {source_dir}, also tried: {normalized_path})"
+                    )
                     continue
 
                 # Read and encode image
-                with open(resolved_path, 'rb') as f:
+                with open(resolved_path, "rb") as f:
                     img_data = f.read()
 
-                b64_data = base64.b64encode(img_data).decode('ascii')
-                mime_type = mimetypes.guess_type(str(resolved_path))[0] or 'application/octet-stream'
+                b64_data = base64.b64encode(img_data).decode("ascii")
+                mime_type = mimetypes.guess_type(str(resolved_path))[0] or "application/octet-stream"
 
                 # Store with normalized path (without ./)
-                embedded_images[normalized_path] = {
-                    'data': b64_data,
-                    'mimeType': mime_type
-                }
+                embedded_images[normalized_path] = {"data": b64_data, "mimeType": mime_type}
 
-                logger.info(f"Successfully embedded image: {img_path} -> {normalized_path} ({len(b64_data)} bytes, {mime_type})")
+                logger.info(
+                    f"Successfully embedded image: {img_path} -> {normalized_path} ({len(b64_data)} bytes, {mime_type})"
+                )
 
             except Exception as e:
                 logger.warning(f"Failed to embed image {img_path}: {e}")
@@ -479,11 +482,8 @@ class ASTExporter:
                             src_info = content[2]
                             if isinstance(src_info, list) and len(src_info) >= 1:
                                 src = src_info[0]
-                                if isinstance(src, str) and not src.startswith(('http://', 'https://', 'data:')):
-                                    images_with_context.append({
-                                        'path': src,
-                                        'source_dir': source_dir
-                                    })
+                                if isinstance(src, str) and not src.startswith(("http://", "https://", "data:")):
+                                    images_with_context.append({"path": src, "source_dir": source_dir})
                     except Exception:
                         pass
 
@@ -493,8 +493,8 @@ class ASTExporter:
                     continue
 
                 # Extract source directory from block metadata
-                source_info = blk.get('_paradoc_source', {})
-                source_dir = source_info.get('source_dir')
+                source_info = blk.get("_paradoc_source", {})
+                source_dir = source_info.get("source_dir")
 
                 t = blk.get("t")
                 c = blk.get("c", [])
@@ -531,7 +531,9 @@ class ASTExporter:
     # -------------------------------
     # WebSocket streaming
     # -------------------------------
-    def send_to_frontend(self, host: str = "localhost", port: int = 13579, embed_images: bool = True, use_static_html: bool = False) -> bool:
+    def send_to_frontend(
+        self, host: str = "localhost", port: int = 13579, embed_images: bool = True, use_static_html: bool = False
+    ) -> bool:
         """
         Build AST, slice it into sections, and stream manifest + sections over the
         Paradoc WebSocket broadcast server.
@@ -549,6 +551,7 @@ class ASTExporter:
         # Ensure WS background server is running
         try:
             from paradoc.frontend.ws_server import ensure_ws_server  # lazy import
+
             _ = ensure_ws_server(host=host, port=port)
         except Exception as e:
             logger.error(f"Could not ensure WebSocket server is running: {e}")
@@ -558,7 +561,8 @@ class ASTExporter:
             import websocket  # type: ignore
         except Exception:
             print(
-                "websocket-client is not installed. Please add it to your environment to use ASTExporter.send_to_frontend().")
+                "websocket-client is not installed. Please add it to your environment to use ASTExporter.send_to_frontend()."
+            )
             return False
 
         # Build and slice
@@ -577,7 +581,10 @@ class ASTExporter:
         if not embed_images:
             # Ensure a static HTTP server is serving assets from dist_dir so relative image paths load in the SPA
             try:
-                from paradoc.frontend.http_server import ensure_http_server  # lazy import
+                from paradoc.frontend.http_server import (
+                    ensure_http_server,  # lazy import
+                )
+
                 http_port = int(port) + 1
                 # Make sure dist_dir exists
                 try:
@@ -587,7 +594,6 @@ class ASTExporter:
 
                 # Write JSON artifacts expected by the frontend fetch() paths
                 try:
-                    import os
 
                     base_dir = self.one_doc.dist_dir / "doc" / doc_id
                     section_dir = base_dir / "section"
@@ -679,6 +685,7 @@ class ASTExporter:
         """
         import pathlib
         import webbrowser
+
         from paradoc.utils import get_md5_hash_for_file
 
         # Locate the frontend.zip in the resources folder
@@ -708,6 +715,7 @@ class ASTExporter:
         # Start WebSocket server and optionally HTTP server
         try:
             from paradoc.frontend.ws_server import ensure_ws_server
+
             _ = ensure_ws_server(host=host, port=port)
         except Exception as e:
             logger.error(f"Could not ensure WebSocket server is running: {e}")
@@ -733,6 +741,7 @@ class ASTExporter:
         if not embed_images:
             try:
                 from paradoc.frontend.http_server import ensure_http_server
+
                 self.one_doc.dist_dir.mkdir(exist_ok=True, parents=True)
 
                 # Write JSON artifacts
@@ -808,7 +817,9 @@ class ASTExporter:
 
         return True
 
-    def _extract_frontend(self, zip_path: pathlib.Path, dest_dir: pathlib.Path, hash_file: pathlib.Path, hash_content: str):
+    def _extract_frontend(
+        self, zip_path: pathlib.Path, dest_dir: pathlib.Path, hash_file: pathlib.Path, hash_content: str
+    ):
         """Extract frontend.zip to destination directory and update hash file."""
         import zipfile  # Local import to avoid unused import warning
 
@@ -842,6 +853,7 @@ class ASTExporter:
                         # Convert figure to JSON-compatible dict
                         # Use plotly's to_json() then parse to ensure all numpy arrays are converted
                         import plotly
+
                         fig_json_str = plotly.io.to_json(fig)
                         fig_dict = json.loads(fig_json_str)
 
@@ -852,7 +864,7 @@ class ASTExporter:
                             "caption": plot_data.caption,
                             "width": plot_data.width or 800,
                             "height": plot_data.height or 600,
-                            "metadata": plot_data.metadata
+                            "metadata": plot_data.metadata,
                         }
                         logger.debug(f"Successfully converted plot {key} to Plotly figure")
                     except Exception as e:
@@ -865,7 +877,7 @@ class ASTExporter:
                             "caption": plot_data.caption,
                             "width": plot_data.width,
                             "height": plot_data.height,
-                            "metadata": plot_data.metadata
+                            "metadata": plot_data.metadata,
                         }
 
             logger.info(f"Extracted {len(plot_data_dict)} plots from database")
@@ -894,18 +906,29 @@ class ASTExporter:
                         "key": table_data.key,
                         "caption": table_data.caption,
                         "columns": [{"name": col.name, "data_type": col.data_type} for col in table_data.columns],
-                        "cells": [{"row_index": cell.row_index, "column_name": cell.column_name, "value": cell.value} for cell in table_data.cells],
+                        "cells": [
+                            {"row_index": cell.row_index, "column_name": cell.column_name, "value": cell.value}
+                            for cell in table_data.cells
+                        ],
                         "show_index_default": table_data.show_index_default,
-                        "default_sort": {
-                            "column_name": table_data.default_sort.column_name,
-                            "ascending": table_data.default_sort.ascending
-                        } if table_data.default_sort else None,
-                        "default_filter": {
-                            "column_name": table_data.default_filter.column_name,
-                            "pattern": table_data.default_filter.pattern,
-                            "is_regex": table_data.default_filter.is_regex
-                        } if table_data.default_filter else None,
-                        "metadata": table_data.metadata
+                        "default_sort": (
+                            {
+                                "column_name": table_data.default_sort.column_name,
+                                "ascending": table_data.default_sort.ascending,
+                            }
+                            if table_data.default_sort
+                            else None
+                        ),
+                        "default_filter": (
+                            {
+                                "column_name": table_data.default_filter.column_name,
+                                "pattern": table_data.default_filter.pattern,
+                                "is_regex": table_data.default_filter.is_regex,
+                            }
+                            if table_data.default_filter
+                            else None
+                        ),
+                        "metadata": table_data.metadata,
                     }
 
             logger.info(f"Extracted {len(table_data_dict)} tables from database")
@@ -913,4 +936,3 @@ class ASTExporter:
         except Exception as e:
             logger.error(f"Failed to extract table data from database: {e}")
             return {}
-

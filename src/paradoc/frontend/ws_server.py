@@ -5,12 +5,14 @@ import asyncio
 import json
 import os
 import sys
-import time
 import threading
+import time
+from typing import (
+    Any as _Any,  # fallback for type hints; avoid hard dependency on internals
+)
 from typing import Set
 
 import websockets
-from typing import Any as _Any  # fallback for type hints; avoid hard dependency on internals
 
 # Optional client utility depends on websocket-client (already in dependencies)
 try:

@@ -1,6 +1,5 @@
 import os
 import pathlib
-import traceback
 from typing import List
 
 import pypandoc
@@ -44,9 +43,7 @@ def open_word_win32():
         )
         return None
     except Exception as e:
-        logger.warning(
-            f"Unable to start Word COM automation - will be skipped. Error: {e}"
-        )
+        logger.warning(f"Unable to start Word COM automation - will be skipped. Error: {e}")
         return None
 
 

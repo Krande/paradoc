@@ -1,20 +1,23 @@
 """Utilities for converting between pandas DataFrames and database models."""
+
 from __future__ import annotations
 
 import re
-from typing import Optional, Tuple, Callable, Any
+from typing import Any, Optional, Tuple
 
 import pandas as pd
 
-from .models import TableAnnotation, TableCell, TableColumn, TableData, PlotData, PlotAnnotation
+from .models import (
+    PlotAnnotation,
+    PlotData,
+    TableAnnotation,
+    TableCell,
+    TableColumn,
+    TableData,
+)
 
 
-def dataframe_to_table_data(
-    key: str,
-    df: pd.DataFrame,
-    caption: str,
-    show_index: bool = True
-) -> TableData:
+def dataframe_to_table_data(key: str, df: pd.DataFrame, caption: str, show_index: bool = True) -> TableData:
     """
     Convert a pandas DataFrame to a TableData model.
 
@@ -32,14 +35,14 @@ def dataframe_to_table_data(
     for col_name in df.columns:
         dtype = str(df[col_name].dtype)
         # Map pandas dtypes to simpler types
-        if 'int' in dtype:
-            data_type = 'int'
-        elif 'float' in dtype:
-            data_type = 'float'
-        elif 'bool' in dtype:
-            data_type = 'bool'
+        if "int" in dtype:
+            data_type = "int"
+        elif "float" in dtype:
+            data_type = "float"
+        elif "bool" in dtype:
+            data_type = "bool"
         else:
-            data_type = 'string'
+            data_type = "string"
 
         columns.append(TableColumn(name=str(col_name), data_type=data_type))
 
@@ -51,19 +54,15 @@ def dataframe_to_table_data(
             # Handle NaN values
             if pd.isna(cell_value):
                 cell_value = ""
-            cells.append(TableCell(
-                row_index=int(row_idx) if isinstance(row_idx, (int, float)) else len(cells) // len(df.columns),
-                column_name=str(col_name),
-                value=cell_value
-            ))
+            cells.append(
+                TableCell(
+                    row_index=int(row_idx) if isinstance(row_idx, (int, float)) else len(cells) // len(df.columns),
+                    column_name=str(col_name),
+                    value=cell_value,
+                )
+            )
 
-    return TableData(
-        key=key,
-        columns=columns,
-        cells=cells,
-        caption=caption,
-        show_index_default=show_index
-    )
+    return TableData(key=key, columns=columns, cells=cells, caption=caption, show_index_default=show_index)
 
 
 def table_data_to_dataframe(table_data: TableData) -> pd.DataFrame:
@@ -91,20 +90,20 @@ def table_data_to_dataframe(table_data: TableData) -> pd.DataFrame:
 
     # Convert types based on column metadata
     for col in table_data.columns:
-        if col.data_type == 'int':
+        if col.data_type == "int":
             try:
-                df[col.name] = pd.to_numeric(df[col.name], errors='coerce').astype('Int64')
-            except:
+                df[col.name] = pd.to_numeric(df[col.name], errors="coerce").astype("Int64")
+            except Exception:
                 pass
-        elif col.data_type == 'float':
+        elif col.data_type == "float":
             try:
-                df[col.name] = pd.to_numeric(df[col.name], errors='coerce')
-            except:
+                df[col.name] = pd.to_numeric(df[col.name], errors="coerce")
+            except Exception:
                 pass
-        elif col.data_type == 'bool':
+        elif col.data_type == "bool":
             try:
                 df[col.name] = df[col.name].astype(bool)
-            except:
+            except Exception:
                 pass
 
     return df
@@ -126,7 +125,7 @@ def parse_table_reference(reference_str: str) -> Tuple[str, Optional[TableAnnota
         Tuple of (table_key, annotation_config or None)
     """
     # Extract table key
-    key_match = re.search(r'{{__(\w+)__}}', reference_str)
+    key_match = re.search(r"{{__(\w+)__}}", reference_str)
     if not key_match:
         raise ValueError(f"Invalid table reference format: {reference_str}")
 
@@ -134,7 +133,7 @@ def parse_table_reference(reference_str: str) -> Tuple[str, Optional[TableAnnota
 
     # Extract annotation if present - look for {tbl:...} after the key
     # Find where the annotation starts
-    annotation_start = reference_str.find('{tbl:')
+    annotation_start = reference_str.find("{tbl:")
     annotation = None
 
     if annotation_start != -1:
@@ -144,9 +143,9 @@ def parse_table_reference(reference_str: str) -> Tuple[str, Optional[TableAnnota
 
         for i in range(annotation_start, len(reference_str)):
             char = reference_str[i]
-            if char == '{':
+            if char == "{":
                 brace_depth += 1
-            elif char == '}':
+            elif char == "}":
                 brace_depth -= 1
                 if brace_depth == 0:
                     annotation_end = i + 1
@@ -160,9 +159,7 @@ def parse_table_reference(reference_str: str) -> Tuple[str, Optional[TableAnnota
 
 
 def apply_table_annotation(
-    df: pd.DataFrame,
-    annotation: Optional[TableAnnotation],
-    default_show_index: bool = True
+    df: pd.DataFrame, annotation: Optional[TableAnnotation], default_show_index: bool = True
 ) -> Tuple[pd.DataFrame, bool]:
     """
     Apply table annotation settings to a DataFrame.
@@ -182,26 +179,25 @@ def apply_table_annotation(
 
     # Apply sorting
     if annotation.sort_by and annotation.sort_by in df_result.columns:
-        df_result = df_result.sort_values(
-            by=annotation.sort_by,
-            ascending=annotation.sort_ascending
-        )
+        df_result = df_result.sort_values(by=annotation.sort_by, ascending=annotation.sort_ascending)
 
     # Apply filtering
     if annotation.filter_pattern:
         if annotation.filter_column and annotation.filter_column in df_result.columns:
             # Filter specific column
-            mask = df_result[annotation.filter_column].astype(str).str.contains(
-                annotation.filter_pattern,
-                regex=True,
-                na=False
+            mask = (
+                df_result[annotation.filter_column]
+                .astype(str)
+                .str.contains(annotation.filter_pattern, regex=True, na=False)
             )
             df_result = df_result[mask]
         else:
             # Filter across all columns
-            mask = df_result.astype(str).apply(
-                lambda x: x.str.contains(annotation.filter_pattern, regex=True, na=False)
-            ).any(axis=1)
+            mask = (
+                df_result.astype(str)
+                .apply(lambda x: x.str.contains(annotation.filter_pattern, regex=True, na=False))
+                .any(axis=1)
+            )
             df_result = df_result[mask]
 
     # Reset index after transformations so indices are sequential
@@ -216,6 +212,7 @@ def apply_table_annotation(
 # Plot utilities
 # ============================================================================
 
+
 def dataframe_to_plot_data(
     key: str,
     df: pd.DataFrame,
@@ -223,7 +220,7 @@ def dataframe_to_plot_data(
     caption: str,
     width: Optional[int] = None,
     height: Optional[int] = None,
-    **kwargs
+    **kwargs,
 ) -> PlotData:
     """
     Convert a pandas DataFrame to a PlotData model for default plot types.
@@ -241,20 +238,10 @@ def dataframe_to_plot_data(
         PlotData instance
     """
     # Convert DataFrame to JSON-serializable dict
-    data = {
-        'columns': df.columns.tolist(),
-        'data': df.to_dict(orient='records'),
-        'index': df.index.tolist()
-    }
+    data = {"columns": df.columns.tolist(), "data": df.to_dict(orient="records"), "index": df.index.tolist()}
 
     return PlotData(
-        key=key,
-        plot_type=plot_type,
-        data=data,
-        caption=caption,
-        width=width,
-        height=height,
-        metadata=kwargs
+        key=key, plot_type=plot_type, data=data, caption=caption, width=width, height=height, metadata=kwargs
     )
 
 
@@ -265,7 +252,7 @@ def custom_function_to_plot_data(
     data: Optional[dict] = None,
     width: Optional[int] = None,
     height: Optional[int] = None,
-    **kwargs
+    **kwargs,
 ) -> PlotData:
     """
     Create a PlotData model for a custom Python function that returns a plotly figure.
@@ -284,13 +271,13 @@ def custom_function_to_plot_data(
     """
     return PlotData(
         key=key,
-        plot_type='custom',
+        plot_type="custom",
         custom_function_name=function_name,
         data=data or {},
         caption=caption,
         width=width,
         height=height,
-        metadata=kwargs
+        metadata=kwargs,
     )
 
 
@@ -300,7 +287,7 @@ def plotly_figure_to_plot_data(
     caption: str,
     width: Optional[int] = None,
     height: Optional[int] = None,
-    **kwargs
+    **kwargs,
 ) -> PlotData:
     """
     Convert a plotly figure directly to PlotData.
@@ -317,16 +304,10 @@ def plotly_figure_to_plot_data(
         PlotData instance
     """
     # Store the figure as a dict (plotly figures have a to_dict() method)
-    fig_dict = fig.to_dict() if hasattr(fig, 'to_dict') else dict(fig)
+    fig_dict = fig.to_dict() if hasattr(fig, "to_dict") else dict(fig)
 
     return PlotData(
-        key=key,
-        plot_type='plotly',
-        data=fig_dict,
-        caption=caption,
-        width=width,
-        height=height,
-        metadata=kwargs
+        key=key, plot_type="plotly", data=fig_dict, caption=caption, width=width, height=height, metadata=kwargs
     )
 
 
@@ -346,14 +327,14 @@ def parse_plot_reference(reference_str: str) -> Tuple[str, Optional[PlotAnnotati
         Tuple of (plot_key, annotation_config or None)
     """
     # Extract plot key
-    key_match = re.search(r'{{__(\w+)__}}', reference_str)
+    key_match = re.search(r"{{__(\w+)__}}", reference_str)
     if not key_match:
         raise ValueError(f"Invalid plot reference format: {reference_str}")
 
     plot_key = key_match.group(1)
 
     # Extract annotation if present - look for {plt:...} after the key
-    annotation_start = reference_str.find('{plt:')
+    annotation_start = reference_str.find("{plt:")
     annotation = None
 
     if annotation_start != -1:
@@ -363,9 +344,9 @@ def parse_plot_reference(reference_str: str) -> Tuple[str, Optional[PlotAnnotati
 
         for i in range(annotation_start, len(reference_str)):
             char = reference_str[i]
-            if char == '{':
+            if char == "{":
                 brace_depth += 1
-            elif char == '}':
+            elif char == "}":
                 brace_depth -= 1
                 if brace_depth == 0:
                     annotation_end = i + 1
@@ -376,4 +357,3 @@ def parse_plot_reference(reference_str: str) -> Tuple[str, Optional[PlotAnnotati
             annotation = PlotAnnotation.from_annotation_string(annotation_str)
 
     return plot_key, annotation
-

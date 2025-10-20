@@ -6,6 +6,7 @@ This example shows how to:
 2. Reference tables in markdown with annotations
 3. Compile documents using database tables
 """
+
 import pandas as pd
 from pathlib import Path
 
@@ -58,35 +59,30 @@ def populate_database(one_doc: OneDoc):
     """Add example tables to the database."""
 
     # Employee data
-    df_employees = pd.DataFrame({
-        'Name': ['Alice Johnson', 'Bob Smith', 'Charlie Brown', 'Diana Prince', 'Eve Wilson'],
-        'Department': ['Sales', 'Engineering', 'Sales', 'Marketing', 'Sales'],
-        'Location': ['New York', 'Boston', 'Chicago', 'New York', 'Seattle'],
-        'Sales': [95000, 0, 87000, 0, 125000],
-        'Years': [5, 3, 7, 4, 6]
-    })
+    df_employees = pd.DataFrame(
+        {
+            "Name": ["Alice Johnson", "Bob Smith", "Charlie Brown", "Diana Prince", "Eve Wilson"],
+            "Department": ["Sales", "Engineering", "Sales", "Marketing", "Sales"],
+            "Location": ["New York", "Boston", "Chicago", "New York", "Seattle"],
+            "Sales": [95000, 0, 87000, 0, 125000],
+            "Years": [5, 3, 7, 4, 6],
+        }
+    )
 
     employee_table = dataframe_to_table_data(
-        key='employee_data',
-        df=df_employees,
-        caption='Employee Directory',
-        show_index=True
+        key="employee_data", df=df_employees, caption="Employee Directory", show_index=True
     )
 
     one_doc.db_manager.add_table(employee_table)
     print("✓ Added 'employee_data' table to database")
 
     # Summary data
-    df_summary = pd.DataFrame({
-        'Metric': ['Total Employees', 'Departments', 'Locations', 'Avg Tenure'],
-        'Value': [5, 3, 4, '5 years']
-    })
+    df_summary = pd.DataFrame(
+        {"Metric": ["Total Employees", "Departments", "Locations", "Avg Tenure"], "Value": [5, 3, 4, "5 years"]}
+    )
 
     summary_table = dataframe_to_table_data(
-        key='summary_data',
-        df=df_summary,
-        caption='Summary Statistics',
-        show_index=False
+        key="summary_data", df=df_summary, caption="Summary Statistics", show_index=False
     )
 
     one_doc.db_manager.add_table(summary_table)
@@ -114,10 +110,7 @@ def main():
     # Step 2: Initialize OneDoc (this creates data.db)
     print("Step 2: Initializing OneDoc")
     print("-" * 70)
-    one = OneDoc(
-        source_dir=example_dir,
-        work_dir="temp/onedoc_work"  # Use simple relative path
-    )
+    one = OneDoc(source_dir=example_dir, work_dir="temp/onedoc_work")  # Use simple relative path
 
     db_location = example_dir / "data.db"
     print(f"✓ Database created at: {db_location}")
@@ -152,7 +145,7 @@ def main():
         content = build_file.read_text()
 
         # Show a snippet
-        lines = content.split('\n')
+        lines = content.split("\n")
         print(f"Generated markdown has {len(lines)} lines")
         print()
         print("First few lines:")
@@ -165,9 +158,9 @@ def main():
     print("✓ Example completed successfully!")
     print("=" * 70)
     print()
-    print(f"Output files:")
+    print("Output files:")
     print(f"  - Database: {db_location}")
-    print(f"  - HTML: temp/onedoc_work/_dist/SalesReport.html")
+    print("  - HTML: temp/onedoc_work/_dist/SalesReport.html")
     print(f"  - Markdown: {build_file}")
     print()
     print("Markdown annotations used:")
@@ -177,5 +170,5 @@ def main():
     print("  - {{__summary_data__}}{{tbl:index:no}} - Hide index")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

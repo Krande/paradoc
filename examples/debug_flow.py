@@ -1,4 +1,5 @@
 """Debug the full flow."""
+
 import pandas as pd
 from pathlib import Path
 
@@ -23,12 +24,9 @@ md_content = """# Test
 one = OneDoc(test_dir, work_dir="temp/debug_work")
 
 # Add data to database
-df = pd.DataFrame({
-    'Name': ['Alice', 'Bob', 'Charlie'],
-    'Sales': [95000, 50000, 125000]
-})
+df = pd.DataFrame({"Name": ["Alice", "Bob", "Charlie"], "Sales": [95000, 50000, 125000]})
 
-table_data = dataframe_to_table_data('test_data', df, 'Test Table', show_index=True)
+table_data = dataframe_to_table_data("test_data", df, "Test Table", show_index=True)
 one.db_manager.add_table(table_data)
 
 print("Original data in database:")
@@ -43,4 +41,3 @@ build_file = Path("temp/debug_work/_build/00-main/test.md")
 content = build_file.read_text()
 print("Generated markdown:")
 print(content)
-

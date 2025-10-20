@@ -1,4 +1,5 @@
 """Pydantic v2 models for table and plot database schema."""
+
 from __future__ import annotations
 
 from typing import Any, List, Optional
@@ -8,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class TableColumn(BaseModel):
     """Represents a single column in a table."""
+
     name: str
     data_type: str = "string"  # string, int, float, bool, etc.
 
@@ -16,6 +18,7 @@ class TableColumn(BaseModel):
 
 class TableCell(BaseModel):
     """Represents a cell value in a table."""
+
     row_index: int
     column_name: str
     value: Any
@@ -25,6 +28,7 @@ class TableCell(BaseModel):
 
 class TableSortConfig(BaseModel):
     """Configuration for table sorting."""
+
     column_name: str
     ascending: bool = True
 
@@ -33,6 +37,7 @@ class TableSortConfig(BaseModel):
 
 class TableFilterConfig(BaseModel):
     """Configuration for table filtering."""
+
     column_name: str
     pattern: str  # regex pattern or simple string match
     is_regex: bool = True
@@ -42,6 +47,7 @@ class TableFilterConfig(BaseModel):
 
 class TableAnnotation(BaseModel):
     """Custom annotations for table display options."""
+
     show_index: bool = True
     sort_by: Optional[str] = None
     sort_ascending: bool = True
@@ -114,6 +120,7 @@ class TableAnnotation(BaseModel):
 
 class TableData(BaseModel):
     """Complete table data stored in database."""
+
     key: str = Field(..., description="Unique key for the table (without __ markers)")
     columns: List[TableColumn]
     cells: List[TableCell]
@@ -136,6 +143,7 @@ class TableData(BaseModel):
 
 class PlotData(BaseModel):
     """Complete plot data stored in database."""
+
     key: str = Field(..., description="Unique key for the plot (without __ markers)")
     plot_type: str  # e.g., 'line', 'bar', 'scatter', 'custom', etc.
     data: dict  # JSON-serializable plot data (can store dataframe-like structure or plotly figure dict)
@@ -158,6 +166,7 @@ class PlotData(BaseModel):
 
 class PlotAnnotation(BaseModel):
     """Custom annotations for plot display options."""
+
     width: Optional[int] = None
     height: Optional[int] = None
     no_caption: bool = False

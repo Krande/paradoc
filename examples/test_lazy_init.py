@@ -1,9 +1,12 @@
 """Quick test to verify lazy initialization."""
-import os
-from pathlib import Path
+
 import shutil
+from pathlib import Path
+
+import pandas as pd
 
 from paradoc import OneDoc
+from paradoc.db import dataframe_to_table_data
 
 # Clean up any existing test directory
 test_dir = Path("temp/lazy_init_test")
@@ -21,7 +24,7 @@ print()
 # Step 1: Create OneDoc instance
 print("Step 1: Creating OneDoc instance...")
 one = OneDoc(test_dir, work_dir="temp/lazy_work")
-print(f"✓ OneDoc created")
+print("✓ OneDoc created")
 print()
 
 # Step 2: Check if database exists
@@ -38,11 +41,9 @@ print()
 
 # Step 3: Add data to database
 print("Step 3: Adding data to database...")
-import pandas as pd
-from paradoc.db import dataframe_to_table_data
 
-df = pd.DataFrame({'name': ['Alice', 'Bob'], 'age': [25, 30]})
-table_data = dataframe_to_table_data('test', df, 'Test Table')
+df = pd.DataFrame({"name": ["Alice", "Bob"], "age": [25, 30]})
+table_data = dataframe_to_table_data("test", df, "Test Table")
 one.db_manager.add_table(table_data)
 print("✓ Data added")
 print()
@@ -60,4 +61,3 @@ print()
 print("=" * 60)
 print("✓ Lazy initialization is working correctly!")
 print("=" * 60)
-

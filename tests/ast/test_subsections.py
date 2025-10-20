@@ -1,6 +1,3 @@
-import pytest
-import json
-
 from paradoc import OneDoc
 from paradoc.io.ast.exporter import ASTExporter
 
@@ -50,7 +47,9 @@ def test_doc1_subsection_in_manifest(files_dir, tmp_path):
 
     # Find the subsection "A subtitle"
     subtitle_sections = [s for s in section_metas if "subtitle" in s.get("title", "").lower()]
-    assert len(subtitle_sections) == 1, f"Expected to find exactly one section with 'subtitle' in title, got {len(subtitle_sections)}"
+    assert (
+        len(subtitle_sections) == 1
+    ), f"Expected to find exactly one section with 'subtitle' in title, got {len(subtitle_sections)}"
 
     subtitle_section = subtitle_sections[0]
 
@@ -65,7 +64,7 @@ def test_doc1_subsection_in_manifest(files_dir, tmp_path):
     subtitle_idx = next((i for i, s in enumerate(section_metas) if "subtitle" in s.get("title", "").lower()), -1)
 
     assert title_idx >= 0, "Could not find 'A title' section"
-    assert subtitle_idx > title_idx, f"Subsection 'A subtitle' should come after 'A title' in manifest order"
+    assert subtitle_idx > title_idx, "Subsection 'A subtitle' should come after 'A title' in manifest order"
 
     # Verify section indices are sequential
     for i, sec in enumerate(section_metas):
@@ -101,7 +100,7 @@ def test_all_header_levels_exported(files_dir, tmp_path):
                 header_id = attrs[0] if isinstance(attrs, list) and attrs else ""
                 headers_in_ast.append({"level": level, "title": title, "id": header_id})
 
-    print(f"\nHeaders found in AST blocks:")
+    print("\nHeaders found in AST blocks:")
     for h in headers_in_ast:
         print(f"  H{h['level']}: '{h['title']}' (id={h['id']})")
 
@@ -109,7 +108,7 @@ def test_all_header_levels_exported(files_dir, tmp_path):
     manifest, sections = exporter.slice_sections(ast)
     section_metas = manifest["sections"]
 
-    print(f"\nSections in manifest:")
+    print("\nSections in manifest:")
     for s in section_metas:
         print(f"  level={s['level']}: '{s['title']}' (id={s['id']})")
 
@@ -117,4 +116,3 @@ def test_all_header_levels_exported(files_dir, tmp_path):
     for h in headers_in_ast:
         matching = [s for s in section_metas if s["title"] == h["title"] and s["level"] == h["level"]]
         assert len(matching) == 1, f"Header '{h['title']}' (level {h['level']}) not found in manifest sections"
-

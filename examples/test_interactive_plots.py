@@ -1,4 +1,5 @@
 """Test that interactive plots work end-to-end."""
+
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -14,20 +15,11 @@ one = OneDoc(test_dir)
 
 # Create sample plot data
 x = np.linspace(0, 2 * np.pi, 100)
-df = pd.DataFrame({
-    'x': x,
-    'sin(x)': np.sin(x),
-    'cos(x)': np.cos(x)
-})
+df = pd.DataFrame({"x": x, "sin(x)": np.sin(x), "cos(x)": np.cos(x)})
 
 # Add plot to database
 plot_data = dataframe_to_plot_data(
-    key='test_plot',
-    df=df,
-    plot_type='line',
-    caption='Test Interactive Plot',
-    width=800,
-    height=400
+    key="test_plot", df=df, plot_type="line", caption="Test Interactive Plot", width=800, height=400
 )
 one.db_manager.add_plot(plot_data)
 
@@ -67,4 +59,3 @@ if ok:
     print("3. The plot should respond to mouse interactions")
 else:
     print("\n✗ Failed to send document to frontend")
-

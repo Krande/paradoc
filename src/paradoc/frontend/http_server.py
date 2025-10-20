@@ -5,7 +5,6 @@ import http.server
 import os
 import socket
 import socketserver
-import sys
 import threading
 import time
 from pathlib import Path
@@ -18,9 +17,9 @@ class QuietHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def end_headers(self):
         # Add CORS headers to allow requests from any origin
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         super().end_headers()
 
     def do_OPTIONS(self):
@@ -34,6 +33,7 @@ def _serve(directory: str, host: str, port: int) -> None:
     os.chdir(directory)
 
     Handler = QuietHTTPRequestHandler
+
     # Use ThreadingTCPServer for concurrency
     class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
         daemon_threads = True
@@ -59,7 +59,9 @@ def _port_open(host: str, port: int, timeout: float = 0.5) -> bool:
         return False
 
 
-def ensure_http_server(host: str = "localhost", port: int = 13580, directory: str | os.PathLike[str] | None = None) -> bool:
+def ensure_http_server(
+    host: str = "localhost", port: int = 13580, directory: str | os.PathLike[str] | None = None
+) -> bool:
     """
     Ensure a lightweight HTTP static file server is running on host:port serving the given directory.
 

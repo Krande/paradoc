@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import pathlib
-import re
 import shutil
 from itertools import chain
 from typing import Callable, Dict, Iterable
@@ -19,7 +18,13 @@ from .common import (
     TableFormat,
 )
 from .config import logger
-from .db import DbManager, parse_table_reference, table_data_to_dataframe, apply_table_annotation, parse_plot_reference
+from .db import (
+    DbManager,
+    apply_table_annotation,
+    parse_plot_reference,
+    parse_table_reference,
+    table_data_to_dataframe,
+)
 from .db.plot_renderer import PlotRenderer
 from .equations import Equation
 from .exceptions import LatexNotInstalled
@@ -61,16 +66,16 @@ class OneDoc:
     FORMATS = ExportFormats
 
     def __init__(
-            self,
-            source_dir=None,
-            main_prefix="00-main",
-            app_prefix="01-app",
-            clean_build_dir=True,
-            create_dirs=False,
-            output_dir=None,
-            work_dir="temp",
-            use_default_html_style=True,
-            **kwargs,
+        self,
+        source_dir=None,
+        main_prefix="00-main",
+        app_prefix="01-app",
+        clean_build_dir=True,
+        create_dirs=False,
+        output_dir=None,
+        work_dir="temp",
+        use_default_html_style=True,
+        **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
         self.work_dir = pathlib.Path(work_dir).resolve().absolute()
@@ -156,7 +161,7 @@ class OneDoc:
                 # Check if the figure is commented out
                 # Get first newline right before regex search found start and till the end (capture entire line)
                 start = fig.string[: fig.start()].rfind("\n") + 1
-                end = fig.string[fig.start():].find("\n") + fig.start()
+                end = fig.string[fig.start() :].find("\n") + fig.start()
                 line = fig.string[start:end]
                 if line.startswith("[//]: #"):
                     continue
@@ -182,6 +187,7 @@ class OneDoc:
 
     def send_to_frontend(self, metadata_file=None, embed_images=True, use_static_html=False):
         from paradoc.io.ast.exporter import ASTExporter
+
         shutil.rmtree(self.dist_dir, ignore_errors=True)
         self._prep_compilation(metadata_file=metadata_file)
         # Set frontend export flag before variable substitution
@@ -197,12 +203,12 @@ class OneDoc:
 
         # Move/copy all non-markdown assets into build and dist so Pandoc and the HTTP server can resolve them
         src_root = pathlib.Path(self.source_dir)
-        for fp in src_root.rglob('*'):
+        for fp in src_root.rglob("*"):
             fp = pathlib.Path(fp)
             if not fp.is_file():
                 continue
             # Skip markdown/metadata and anything already under dist_dir
-            if fp.suffix.lower() in ('.md', '.yaml'):
+            if fp.suffix.lower() in (".md", ".yaml"):
                 continue
             try:
                 if self.dist_dir in fp.parents:
@@ -230,8 +236,15 @@ class OneDoc:
             if css_style.exists() is False:
                 shutil.copy(MY_DEFAULT_HTML_CSS, css_style)
 
-    def compile(self, output_name, auto_open=False, metadata_file=None,
-                export_format: ExportFormats = ExportFormats.DOCX, send_to_frontend=False, **kwargs):
+    def compile(
+        self,
+        output_name,
+        auto_open=False,
+        metadata_file=None,
+        export_format: ExportFormats = ExportFormats.DOCX,
+        send_to_frontend=False,
+        **kwargs,
+    ):
         if isinstance(export_format, str):
             export_format = ExportFormats(export_format)
 
@@ -332,7 +345,7 @@ class OneDoc:
         # Apply annotation transformations (sorting, filtering)
         show_index = table_data.show_index_default
         if annotation:
-            print(f"DEBUG: Applying annotation transformations...")
+            print("DEBUG: Applying annotation transformations...")
             df, show_index = apply_table_annotation(df, annotation, table_data.show_index_default)
             print(f"DEBUG: After transformation shape: {df.shape}")
             print(f"DEBUG: First row after transform: {df.iloc[0].to_dict() if len(df) > 0 else 'empty'}")
@@ -378,7 +391,6 @@ class OneDoc:
         Returns:
             Markdown image string or None if not found in database
         """
-        from .db import parse_plot_reference
 
         # Check if plot exists in database
         plot_data = self.db_manager.get_plot(key_clean)
@@ -390,7 +402,9 @@ class OneDoc:
         try:
             _, annotation = parse_plot_reference(full_reference)
             if annotation:
-                logger.info(f"Parsed plot annotation for {key_clean}: width={annotation.width}, height={annotation.height}")
+                logger.info(
+                    f"Parsed plot annotation for {key_clean}: width={annotation.width}, height={annotation.height}"
+                )
         except (ValueError, AttributeError) as e:
             logger.warning(f"Failed to parse plot annotation: {e}")
 
@@ -426,8 +440,8 @@ class OneDoc:
                 plot_data=plot_data,
                 annotation=annotation,
                 output_path=plot_path,
-                format='png',
-                include_interactive_marker=self._is_frontend_export
+                format="png",
+                include_interactive_marker=self._is_frontend_export,
             )
 
             # Copy to dist directory
@@ -474,14 +488,14 @@ class OneDoc:
                     remaining_str = md_str_original[match_end:]
 
                     # Check if there's a {tbl:...} or {plt:...} annotation following
-                    if remaining_str.startswith('{tbl:') or remaining_str.startswith('{plt:'):
+                    if remaining_str.startswith("{tbl:") or remaining_str.startswith("{plt:"):
                         # Find the matching closing brace by counting brace depth
                         brace_depth = 0
                         annotation_end = 0
                         for i, char in enumerate(remaining_str):
-                            if char == '{':
+                            if char == "{":
                                 brace_depth += 1
-                            elif char == '}':
+                            elif char == "}":
                                 brace_depth -= 1
                                 if brace_depth == 0:
                                     annotation_end = i + 1
@@ -491,7 +505,9 @@ class OneDoc:
                             full_reference += remaining_str[:annotation_end]
 
                     # Try table substitution first
-                    db_table_markdown = self._get_table_markdown_from_db(full_reference, key_clean, use_table_var_substitution)
+                    db_table_markdown = self._get_table_markdown_from_db(
+                        full_reference, key_clean, use_table_var_substitution
+                    )
                     if db_table_markdown is not None:
                         logger.info(f'Substituting table "{key_clean}" from database')
                         new_str = db_table_markdown

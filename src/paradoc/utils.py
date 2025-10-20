@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import pathlib
 import re
 import shutil
-import hashlib
 from typing import TYPE_CHECKING
 
 import pypandoc
 
 from paradoc.config import create_logger
+
 from .common import MarkDownFile, Table
 from .equations import Equation
 

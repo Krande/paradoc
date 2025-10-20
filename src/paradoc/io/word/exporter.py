@@ -157,7 +157,7 @@ class WordExporter:
                 "+RTS",
                 "-K64m",
                 "-RTS",
-                f"--metadata-file={one.metadata_file}"
+                f"--metadata-file={one.metadata_file}",
                 # f"--reference-doc={MY_DOCX_TMPL}",
             ],
             filters=["pandoc-crossref"],

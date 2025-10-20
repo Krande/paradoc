@@ -1,4 +1,5 @@
 """Test database integration with OneDoc."""
+
 import pandas as pd
 import pytest
 
@@ -23,18 +24,11 @@ def test_onedoc_db_integration_basic(files_dir, tmp_path):
     one = OneDoc(test_dir, work_dir=tmp_path / "work")
 
     # Add table to database
-    df = pd.DataFrame({
-        'Name': ['Alice', 'Bob', 'Charlie'],
-        'Age': [25, 30, 35],
-        'City': ['New York', 'Boston', 'Chicago']
-    })
-
-    table_data = dataframe_to_table_data(
-        key='test_table',
-        df=df,
-        caption='Test Table',
-        show_index=False
+    df = pd.DataFrame(
+        {"Name": ["Alice", "Bob", "Charlie"], "Age": [25, 30, 35], "City": ["New York", "Boston", "Chicago"]}
     )
+
+    table_data = dataframe_to_table_data(key="test_table", df=df, caption="Test Table", show_index=False)
     one.db_manager.add_table(table_data)
 
     # Perform compilation (HTML to avoid DOCX dependencies)
@@ -68,17 +62,12 @@ def test_onedoc_db_with_annotations(files_dir, tmp_path):
     one = OneDoc(test_dir, work_dir=tmp_path / "work")
 
     # Add table to database
-    df = pd.DataFrame({
-        'Name': ['Alice', 'Bob', 'Charlie'],
-        'Age': [25, 30, 35],
-        'City': ['New York', 'Boston', 'Chicago']
-    })
+    df = pd.DataFrame(
+        {"Name": ["Alice", "Bob", "Charlie"], "Age": [25, 30, 35], "City": ["New York", "Boston", "Chicago"]}
+    )
 
     table_data = dataframe_to_table_data(
-        key='annotated_table',
-        df=df,
-        caption='Annotated Table',
-        show_index=True  # Default shows index
+        key="annotated_table", df=df, caption="Annotated Table", show_index=True  # Default shows index
     )
     one.db_manager.add_table(table_data)
 
@@ -119,25 +108,14 @@ def test_onedoc_db_prefers_database_over_memory(files_dir, tmp_path):
     one = OneDoc(test_dir, work_dir=tmp_path / "work")
 
     # Add table to database
-    df_db = pd.DataFrame({
-        'Source': ['Database'],
-        'Value': [100]
-    })
+    df_db = pd.DataFrame({"Source": ["Database"], "Value": [100]})
 
-    table_data = dataframe_to_table_data(
-        key='priority_table',
-        df=df_db,
-        caption='From Database',
-        show_index=False
-    )
+    table_data = dataframe_to_table_data(key="priority_table", df=df_db, caption="From Database", show_index=False)
     one.db_manager.add_table(table_data)
 
     # Also add to in-memory (this should be ignored)
-    df_memory = pd.DataFrame({
-        'Source': ['Memory'],
-        'Value': [200]
-    })
-    one.add_table('priority_table', df_memory, 'From Memory')
+    df_memory = pd.DataFrame({"Source": ["Memory"], "Value": [200]})
+    one.add_table("priority_table", df_memory, "From Memory")
 
     # Perform compilation
     one.compile("TestDoc", export_format="html")
@@ -164,11 +142,11 @@ def test_onedoc_db_location(files_dir, tmp_path):
 
     # Check that database does NOT exist yet (lazy initialization)
     db_path = test_dir / "data.db"
-    assert not db_path.exists(), f"Database should NOT be created until data is written"
+    assert not db_path.exists(), "Database should NOT be created until data is written"
 
     # Now add data to the database
-    df = pd.DataFrame({'col': [1, 2, 3]})
-    table_data = dataframe_to_table_data('test_table', df, 'Test')
+    df = pd.DataFrame({"col": [1, 2, 3]})
+    table_data = dataframe_to_table_data("test_table", df, "Test")
     one.db_manager.add_table(table_data)
 
     # NOW the database should exist
@@ -176,8 +154,8 @@ def test_onedoc_db_location(files_dir, tmp_path):
 
     # Verify it's a valid database by querying it
     tables = one.db_manager.list_tables()
-    assert 'test_table' in tables
+    assert "test_table" in tables
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

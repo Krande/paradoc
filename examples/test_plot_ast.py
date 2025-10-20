@@ -1,5 +1,5 @@
 """Test script to verify data-plot-key attributes are added to AST."""
-import json
+
 from pathlib import Path
 from paradoc import OneDoc
 from paradoc.io.ast.exporter import ASTExporter
@@ -25,6 +25,7 @@ one._perform_variable_substitution(False)
 exporter = ASTExporter(one)
 ast = exporter.build_ast()
 
+
 # Search for Figure blocks with data-plot-key
 def find_figures(blocks, depth=0):
     """Recursively find Figure blocks."""
@@ -47,7 +48,9 @@ def find_figures(blocks, depth=0):
                     # Check for data-plot-key
                     has_plot_key = any(a[0] == "data-plot-key" for a in attrs if isinstance(a, list) and len(a) >= 2)
                     if has_plot_key:
-                        plot_key = next(a[1] for a in attrs if isinstance(a, list) and len(a) >= 2 and a[0] == "data-plot-key")
+                        plot_key = next(
+                            a[1] for a in attrs if isinstance(a, list) and len(a) >= 2 and a[0] == "data-plot-key"
+                        )
                         print(f"{'  ' * depth}  ✓ Has data-plot-key: {plot_key}")
                     else:
                         print(f"{'  ' * depth}  ✗ Missing data-plot-key")
@@ -61,6 +64,7 @@ def find_figures(blocks, depth=0):
                     figures.extend(find_figures(nested_blocks, depth + 1))
 
     return figures
+
 
 print("=" * 60)
 print("Searching for Figure blocks in AST...")
@@ -76,4 +80,3 @@ print("=" * 60)
 # Check plot keys in database
 plot_keys = one.db_manager.list_plots()
 print(f"\nPlots in database: {plot_keys}")
-

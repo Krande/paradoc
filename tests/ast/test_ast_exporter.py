@@ -37,13 +37,15 @@ def test_build_ast_and_slice_sections(files_dir, tmp_path):
 
     # Manifest sections include ALL headers (H1-H6), while section bundles are split by H1 only
     # So manifest sections should be >= section bundles (bundles are H1 only)
-    assert len(manifest["sections"]) >= len(sections), \
-        f"Manifest should include all headers ({len(manifest['sections'])}), bundles are H1-split ({len(sections)})"
+    assert len(manifest["sections"]) >= len(
+        sections
+    ), f"Manifest should include all headers ({len(manifest['sections'])}), bundles are H1-split ({len(sections)})"
 
     # All H1 headers should appear in both manifest and section bundles
     h1_sections = [s for s in manifest["sections"] if s.get("level") == 1]
-    assert len(h1_sections) == len(sections), \
-        f"Number of H1 headers in manifest ({len(h1_sections)}) should match section bundles ({len(sections)})"
+    assert len(h1_sections) == len(
+        sections
+    ), f"Number of H1 headers in manifest ({len(h1_sections)}) should match section bundles ({len(sections)})"
 
 
 @pytest.mark.parametrize("host,port", [("localhost", 13579)])

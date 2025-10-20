@@ -39,19 +39,19 @@ class Equation:
                 except Exception:
                     # Fallback: include the line as verbatim code to avoid crashing on pytexit quirks
                     # Escape special LaTeX characters
-                    safe = line.strip().replace('\n', '')
+                    safe = line.strip().replace("\n", "")
                     if safe:
                         # Escape LaTeX special characters: \ must be first, then others
-                        safe = safe.replace('\\', '\\textbackslash{}')
-                        safe = safe.replace('_', '\\_')
-                        safe = safe.replace('{', '\\{')
-                        safe = safe.replace('}', '\\}')
-                        safe = safe.replace('#', '\\#')
-                        safe = safe.replace('$', '\\$')
-                        safe = safe.replace('%', '\\%')
-                        safe = safe.replace('&', '\\&')
-                        safe = safe.replace('^', '\\textasciicircum{}')
-                        safe = safe.replace('~', '\\textasciitilde{}')
+                        safe = safe.replace("\\", "\\textbackslash{}")
+                        safe = safe.replace("_", "\\_")
+                        safe = safe.replace("{", "\\{")
+                        safe = safe.replace("}", "\\}")
+                        safe = safe.replace("#", "\\#")
+                        safe = safe.replace("$", "\\$")
+                        safe = safe.replace("%", "\\%")
+                        safe = safe.replace("&", "\\&")
+                        safe = safe.replace("^", "\\textasciicircum{}")
+                        safe = safe.replace("~", "\\textasciitilde{}")
                         eq_latex += f"\\texttt{{{safe}}}\n"
         eq_str = eq_latex
 

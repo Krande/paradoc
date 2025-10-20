@@ -1,4 +1,5 @@
 """Example script demonstrating table database usage."""
+
 import pandas as pd
 
 from paradoc.db import DbManager, dataframe_to_table_data, parse_table_reference
@@ -15,35 +16,29 @@ def main():
     print("Example 1: Adding tables to database")
     print("=" * 60)
 
-    df1 = pd.DataFrame({
-        'Name': ['Alice', 'Bob', 'Charlie', 'Diana'],
-        'Age': [25, 30, 35, 28],
-        'City': ['New York', 'Boston', 'Chicago', 'Seattle']
-    })
-
-    table_data1 = dataframe_to_table_data(
-        key='my_table',
-        df=df1,
-        caption='Employee Information',
-        show_index=False
+    df1 = pd.DataFrame(
+        {
+            "Name": ["Alice", "Bob", "Charlie", "Diana"],
+            "Age": [25, 30, 35, 28],
+            "City": ["New York", "Boston", "Chicago", "Seattle"],
+        }
     )
+
+    table_data1 = dataframe_to_table_data(key="my_table", df=df1, caption="Employee Information", show_index=False)
 
     db.add_table(table_data1)
     print(f"✓ Added table: {table_data1.key}")
 
     # Example 2: Create another table with numeric data
-    df2 = pd.DataFrame({
-        'Product': ['Widget A', 'Widget B', 'Widget C'],
-        'Sales': [1200, 850, 2100],
-        'Profit': [450.50, 320.25, 890.75]
-    })
-
-    table_data2 = dataframe_to_table_data(
-        key='my_table_3',
-        df=df2,
-        caption='Sales Data',
-        show_index=True
+    df2 = pd.DataFrame(
+        {
+            "Product": ["Widget A", "Widget B", "Widget C"],
+            "Sales": [1200, 850, 2100],
+            "Profit": [450.50, 320.25, 890.75],
+        }
     )
+
+    table_data2 = dataframe_to_table_data(key="my_table_3", df=df2, caption="Sales Data", show_index=True)
 
     db.add_table(table_data2)
     print(f"✓ Added table: {table_data2.key}")
@@ -61,7 +56,7 @@ def main():
     print("Example 3: Retrieving table from database")
     print("=" * 60)
 
-    retrieved = db.get_table('my_table')
+    retrieved = db.get_table("my_table")
     if retrieved:
         print(f"Table Key: {retrieved.key}")
         print(f"Caption: {retrieved.caption}")
@@ -75,11 +70,11 @@ def main():
     print("=" * 60)
 
     examples = [
-        '{{__my_table__}}',
-        '{{__my_table__}}{tbl:index:no}',
-        '{{__my_table__}}{tbl:sortby:Age}',
-        '{{__my_table__}}{tbl:sortby:Age:desc}',
-        '{{__my_table__}}{tbl:index:no;sortby:Name;filter:.*York.*}',
+        "{{__my_table__}}",
+        "{{__my_table__}}{tbl:index:no}",
+        "{{__my_table__}}{tbl:sortby:Age}",
+        "{{__my_table__}}{tbl:sortby:Age:desc}",
+        "{{__my_table__}}{tbl:index:no;sortby:Name;filter:.*York.*}",
     ]
 
     for example in examples:
@@ -101,7 +96,7 @@ def main():
     from paradoc.db import apply_table_annotation, table_data_to_dataframe
 
     # Get the original dataframe
-    table_from_db = db.get_table('my_table')
+    table_from_db = db.get_table("my_table")
     df_original = table_data_to_dataframe(table_from_db)
 
     print("\nOriginal table:")
@@ -109,7 +104,8 @@ def main():
 
     # Apply sorting annotation
     from paradoc.db.models import TableAnnotation
-    annotation = TableAnnotation(sort_by='Age', sort_ascending=False, show_index=False)
+
+    annotation = TableAnnotation(sort_by="Age", sort_ascending=False, show_index=False)
     df_sorted, show_idx = apply_table_annotation(df_original, annotation)
 
     print("\nAfter applying {tbl:sortby:Age:desc;index:no}:")
@@ -117,7 +113,7 @@ def main():
     print(f"Show index: {show_idx}")
 
     # Apply filtering annotation
-    annotation2 = TableAnnotation(filter_pattern='.*e.*', show_index=False)
+    annotation2 = TableAnnotation(filter_pattern=".*e.*", show_index=False)
     df_filtered, show_idx2 = apply_table_annotation(df_original, annotation2)
 
     print("\nAfter applying {tbl:filter:.*e.*;index:no} (names containing 'e'):")
@@ -130,6 +126,5 @@ def main():
     db.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-

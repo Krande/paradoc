@@ -18,7 +18,7 @@ def resolve_references(document):
 
     # Fix references
     for block in iter_block_items(document):
-        if type(block) == Paragraph:
+        if type(block) is Paragraph:
             if block.style.name in ("Image Caption", "Table Caption"):
                 continue
             if "Figure" in block.text or "Table" in block.text:

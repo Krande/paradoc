@@ -15,6 +15,7 @@ def ensure_pandoc_path():
     :return:
     """
     import pypandoc
+
     pandoc_path = None
 
     try:

@@ -1,23 +1,22 @@
 """Plot rendering utilities for converting PlotData to image markdown."""
+
 from __future__ import annotations
 
 import base64
-import io
 from pathlib import Path
-from typing import Optional, Callable, Dict, Any
-
-from plotly.io import get_chrome
+from typing import Any, Callable, Dict, Optional
 
 try:
-    import plotly.graph_objects as go
     import plotly.express as px
+    import plotly.graph_objects as go
+
     PLOTLY_AVAILABLE = True
 except ImportError:
     PLOTLY_AVAILABLE = False
 
 import pandas as pd
 
-from .models import PlotData, PlotAnnotation
+from .models import PlotAnnotation, PlotData
 
 
 class PlotRenderer:
@@ -43,7 +42,7 @@ class PlotRenderer:
         annotation: Optional[PlotAnnotation] = None,
         output_path: Optional[Path] = None,
         format: str = "png",
-        include_interactive_marker: bool = False
+        include_interactive_marker: bool = False,
     ) -> str:
         """
         Render plot to an image and return markdown image reference.
@@ -65,27 +64,24 @@ class PlotRenderer:
         fig = self._create_figure(plot_data)
 
         # Apply size overrides from annotation or plot_data
-        width = (annotation.width if annotation and annotation.width
-                else plot_data.width or 800)
-        height = (annotation.height if annotation and annotation.height
-                 else plot_data.height or 600)
+        width = annotation.width if annotation and annotation.width else plot_data.width or 800
+        height = annotation.height if annotation and annotation.height else plot_data.height or 600
 
         fig.update_layout(width=width, height=height)
 
         # Determine format
-        img_format = (annotation.format if annotation and annotation.format
-                     else format)
+        img_format = annotation.format if annotation and annotation.format else format
 
         # Export to image
         if output_path:
             # Save to file
-            #get_chrome()
-            if img_format == 'svg':
-                fig.write_image(str(output_path), format='svg')
-            elif img_format == 'jpeg':
-                fig.write_image(str(output_path), format='jpeg')
+            # get_chrome()
+            if img_format == "svg":
+                fig.write_image(str(output_path), format="svg")
+            elif img_format == "jpeg":
+                fig.write_image(str(output_path), format="jpeg")
             else:
-                fig.write_image(str(output_path), format='png')
+                fig.write_image(str(output_path), format="png")
 
             # Return markdown reference with proper pandoc-crossref syntax
             # The correct syntax is: ![caption](path){#fig:key}
@@ -127,7 +123,7 @@ class PlotRenderer:
         Returns:
             Plotly figure object
         """
-        if plot_data.plot_type == 'custom':
+        if plot_data.plot_type == "custom":
             # Use custom function
             if not plot_data.custom_function_name:
                 raise ValueError("Custom plot type requires custom_function_name")
@@ -141,7 +137,7 @@ class PlotRenderer:
 
             return func(plot_data.data)
 
-        elif plot_data.plot_type == 'plotly':
+        elif plot_data.plot_type == "plotly":
             # Reconstruct plotly figure from dict
             return go.Figure(plot_data.data)
 
@@ -160,46 +156,45 @@ class PlotRenderer:
             Plotly figure object
         """
         # Convert data back to DataFrame
-        df = pd.DataFrame(plot_data.data['data'])
+        df = pd.DataFrame(plot_data.data["data"])
 
         # Create plot based on type
-        if plot_data.plot_type == 'line':
+        if plot_data.plot_type == "line":
             # Assume first column is x, rest are y series
             if len(df.columns) >= 2:
                 fig = px.line(df, x=df.columns[0], y=df.columns[1:])
             else:
                 fig = px.line(df)
 
-        elif plot_data.plot_type == 'bar':
+        elif plot_data.plot_type == "bar":
             if len(df.columns) >= 2:
                 fig = px.bar(df, x=df.columns[0], y=df.columns[1:])
             else:
                 fig = px.bar(df)
 
-        elif plot_data.plot_type == 'scatter':
+        elif plot_data.plot_type == "scatter":
             if len(df.columns) >= 2:
                 fig = px.scatter(df, x=df.columns[0], y=df.columns[1])
             else:
                 fig = px.scatter(df)
 
-        elif plot_data.plot_type == 'histogram':
+        elif plot_data.plot_type == "histogram":
             if len(df.columns) >= 1:
                 fig = px.histogram(df, x=df.columns[0])
             else:
                 fig = px.histogram(df)
 
-        elif plot_data.plot_type == 'box':
+        elif plot_data.plot_type == "box":
             if len(df.columns) >= 1:
                 fig = px.box(df, y=df.columns[0])
             else:
                 fig = px.box(df)
 
-        elif plot_data.plot_type == 'heatmap':
+        elif plot_data.plot_type == "heatmap":
             # For heatmap, assume data is already in matrix form
-            fig = px.imshow(df.values,
-                          labels=dict(x="Column", y="Row", color="Value"),
-                          x=df.columns.tolist(),
-                          y=df.index.tolist())
+            fig = px.imshow(
+                df.values, labels=dict(x="Column", y="Row", color="Value"), x=df.columns.tolist(), y=df.index.tolist()
+            )
 
         else:
             raise ValueError(f"Unsupported plot type: {plot_data.plot_type}")

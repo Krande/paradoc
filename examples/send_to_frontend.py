@@ -7,8 +7,14 @@ import paradoc as pa
 def main():
     parser = argparse.ArgumentParser(description="Send a Paradoc document to the Reader app.")
     parser.add_argument("--doc", default="doc_lorum", help="Path to Paradoc document dir to send.")
-    parser.add_argument("--embed-images", action="store_true", help="Embed images in IndexedDB instead of using HTTP server.")
-    parser.add_argument("--use-static-html", action="store_true", help="Extract frontend.zip and open in browser instead of expecting separate Reader app.")
+    parser.add_argument(
+        "--embed-images", action="store_true", help="Embed images in IndexedDB instead of using HTTP server."
+    )
+    parser.add_argument(
+        "--use-static-html",
+        action="store_true",
+        help="Extract frontend.zip and open in browser instead of expecting separate Reader app.",
+    )
     args = parser.parse_args()
     doc_dir = args.doc
     files_dir = pathlib.Path(__file__).resolve().absolute().parent / ".." / "files"
@@ -18,7 +24,8 @@ def main():
         od = pa.OneDoc(files_dir / doc_dir)
     else:
         od = pa.OneDoc(doc_dir)
-    ok = od.send_to_frontend(embed_images=args.embed_images, use_static_html=args.use_static_html)
+
+    od.send_to_frontend(embed_images=args.embed_images, use_static_html=args.use_static_html)
 
     if args.use_static_html:
         # In static HTML mode, the browser is opened automatically
@@ -46,5 +53,5 @@ def main():
             print("\nStopping example.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

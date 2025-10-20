@@ -1,7 +1,9 @@
 """
 Test script to verify doc_lorum can be compiled successfully
 """
+
 from pathlib import Path
+
 from paradoc import OneDoc
 
 # Set up paths
@@ -29,12 +31,11 @@ try:
 except Exception as e:
     print(f"✗ DOCX export failed: {e}")
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("Document structure verified successfully!")
-print("="*60)
+print("=" * 60)
 print("\nSummary:")
 print("- Main section: 00-main/main.md with 7 figures")
 print("- Appendix section: 01-appendix/appendix.md with 8 figures")
 print("- Total: 15 tables, 15 figures, extensive lorem ipsum content")
 print("- Features: TOC, cross-references, footnotes, equations")
-

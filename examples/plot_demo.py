@@ -1,4 +1,5 @@
 """Demo of plot functionality in Paradoc."""
+
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -7,25 +8,17 @@ from paradoc import OneDoc
 from paradoc.common import ExportFormats
 from paradoc.db import dataframe_to_plot_data, custom_function_to_plot_data, plotly_figure_to_plot_data
 
+
 # Example 1: Create a simple line plot from DataFrame
 def demo_simple_line_plot():
     """Create a simple line plot from a DataFrame."""
     # Create sample data
     x = np.linspace(0, 10, 100)
-    df = pd.DataFrame({
-        'x': x,
-        'sin(x)': np.sin(x),
-        'cos(x)': np.cos(x)
-    })
+    df = pd.DataFrame({"x": x, "sin(x)": np.sin(x), "cos(x)": np.cos(x)})
 
     # Create plot data
     plot_data = dataframe_to_plot_data(
-        key='trig_plot',
-        df=df,
-        plot_type='line',
-        caption='Trigonometric Functions',
-        width=800,
-        height=400
+        key="trig_plot", df=df, plot_type="line", caption="Trigonometric Functions", width=800, height=400
     )
 
     return plot_data
@@ -34,18 +27,10 @@ def demo_simple_line_plot():
 # Example 2: Create a bar chart
 def demo_bar_chart():
     """Create a bar chart from a DataFrame."""
-    df = pd.DataFrame({
-        'Category': ['A', 'B', 'C', 'D', 'E'],
-        'Values': [23, 45, 56, 78, 32]
-    })
+    df = pd.DataFrame({"Category": ["A", "B", "C", "D", "E"], "Values": [23, 45, 56, 78, 32]})
 
     plot_data = dataframe_to_plot_data(
-        key='bar_chart',
-        df=df,
-        plot_type='bar',
-        caption='Sample Bar Chart',
-        width=600,
-        height=400
+        key="bar_chart", df=df, plot_type="bar", caption="Sample Bar Chart", width=600, height=400
     )
 
     return plot_data
@@ -59,34 +44,28 @@ def demo_custom_plot_function():
     def create_custom_scatter_plot(data):
         """Custom function that creates a scatter plot with annotations."""
         # Extract data from the dict
-        x = data.get('x', [1, 2, 3, 4, 5])
-        y = data.get('y', [2, 4, 3, 5, 6])
+        x = data.get("x", [1, 2, 3, 4, 5])
+        y = data.get("y", [2, 4, 3, 5, 6])
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=x,
-            y=y,
-            mode='markers+lines',
-            marker=dict(size=10, color='blue'),
-            line=dict(color='red', width=2)
-        ))
-
-        fig.update_layout(
-            title='Custom Scatter Plot',
-            xaxis_title='X Axis',
-            yaxis_title='Y Axis'
+        fig.add_trace(
+            go.Scatter(
+                x=x, y=y, mode="markers+lines", marker=dict(size=10, color="blue"), line=dict(color="red", width=2)
+            )
         )
+
+        fig.update_layout(title="Custom Scatter Plot", xaxis_title="X Axis", yaxis_title="Y Axis")
 
         return fig
 
     # Create plot data for custom function
     plot_data = custom_function_to_plot_data(
-        key='custom_scatter',
-        function_name='create_custom_scatter',
-        caption='Custom Scatter Plot',
-        data={'x': [1, 2, 3, 4, 5], 'y': [2, 4, 3, 5, 6]},
+        key="custom_scatter",
+        function_name="create_custom_scatter",
+        caption="Custom Scatter Plot",
+        data={"x": [1, 2, 3, 4, 5], "y": [2, 4, 3, 5, 6]},
         width=700,
-        height=500
+        height=500,
     )
 
     return plot_data, create_custom_scatter_plot
@@ -99,21 +78,14 @@ def demo_plotly_figure():
         import plotly.express as px
 
         # Create sample data
-        df = pd.DataFrame({
-            'x': np.random.randn(100),
-            'y': np.random.randn(100)
-        })
+        df = pd.DataFrame({"x": np.random.randn(100), "y": np.random.randn(100)})
 
         # Create plotly figure
-        fig = px.scatter(df, x='x', y='y', title='Random Scatter Plot')
+        fig = px.scatter(df, x="x", y="y", title="Random Scatter Plot")
 
         # Convert to PlotData
         plot_data = plotly_figure_to_plot_data(
-            key='random_scatter',
-            fig=fig,
-            caption='Random Data Scatter Plot',
-            width=600,
-            height=600
+            key="random_scatter", fig=fig, caption="Random Data Scatter Plot", width=600, height=600
         )
 
         return plot_data
@@ -136,11 +108,7 @@ def main():
     main_dir.mkdir(exist_ok=True)
 
     # Initialize OneDoc
-    one = OneDoc(
-        source_dir=test_dir,
-        work_dir=test_dir.parent / "plot_demo_work",
-        create_dirs=True
-    )
+    one = OneDoc(source_dir=test_dir, work_dir=test_dir.parent / "plot_demo_work", create_dirs=True)
 
     # Add plots to database
     print("\n1. Creating simple line plot...")
@@ -157,9 +125,9 @@ def main():
     plot3, custom_func = demo_custom_plot_function()
     one.db_manager.add_plot(plot3)
     # Register the custom function
-    one.plot_renderer.register_custom_function('create_custom_scatter', custom_func)
+    one.plot_renderer.register_custom_function("create_custom_scatter", custom_func)
     print(f"   Added plot: {plot3.key}")
-    print(f"   Registered custom function: create_custom_scatter")
+    print("   Registered custom function: create_custom_scatter")
 
     print("\n4. Creating plotly figure...")
     plot4 = demo_plotly_figure()
@@ -220,6 +188,7 @@ This is a random scatter plot from plotly express.
     except Exception as e:
         print(f"\n✗ Failed to send to frontend: {e}")
         import traceback
+
         traceback.print_exc()
 
     one.compile("plot_demo_2", export_format=ExportFormats.DOCX)

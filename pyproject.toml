@@ -41,10 +41,17 @@ line-length = 120
 
 [tool.ruff]
 line-length = 120
+exclude = ["examples/", ".pixi/", "temp/"]
+# Tell Ruff where your source root is so it can classify first-party imports
+src = ["src"]
+
+[tool.ruff.lint]
 ignore = ["E741"]
 
 [tool.isort]
 profile = "black"
+skip = [".pixi", "node_modules", "temp", "examples"]
+skip_glob = ["**/node_modules/**", "**/temp/**", "**/_build/**"]
 
 [tool.flake8]
 max-line-length = 120

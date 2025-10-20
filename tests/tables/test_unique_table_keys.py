@@ -1,9 +1,6 @@
 """Test that table keys are unique when tables are reused with different filters/sorts."""
-import tempfile
-from pathlib import Path
 
 import pandas as pd
-import pytest
 
 from paradoc import OneDoc
 from paradoc.db import dataframe_to_table_data
@@ -41,17 +38,9 @@ def test_unique_table_keys_on_reuse(tmp_path):
     one = OneDoc(source_dir=test_dir, work_dir=tmp_path / "work")
 
     # Add test table to database
-    df = pd.DataFrame({
-        'Name': ['Item A', 'Item B', 'Item C'],
-        'Value': [100, 200, 150]
-    })
+    df = pd.DataFrame({"Name": ["Item A", "Item B", "Item C"], "Value": [100, 200, 150]})
 
-    table_data = dataframe_to_table_data(
-        key='test_table',
-        df=df,
-        caption='Test Table',
-        show_index=True
-    )
+    table_data = dataframe_to_table_data(key="test_table", df=df, caption="Test Table", show_index=True)
 
     one.db_manager.add_table(table_data)
 
@@ -70,7 +59,8 @@ def test_unique_table_keys_on_reuse(tmp_path):
 
     # Verify all occurrences are unique
     import re
-    table_keys = re.findall(r'\{#tbl:test_table[^}]*\}', generated_md)
+
+    table_keys = re.findall(r"\{#tbl:test_table[^}]*\}", generated_md)
     assert len(table_keys) == 4, "Should have exactly 4 table references"
     assert len(set(table_keys)) == 4, "All table keys should be unique"
 
@@ -101,8 +91,8 @@ def test_different_tables_no_suffix(tmp_path):
     one = OneDoc(source_dir=test_dir, work_dir=tmp_path / "work")
 
     # Add two different tables
-    for key, caption in [('table_a', 'Table A'), ('table_b', 'Table B')]:
-        df = pd.DataFrame({'Col': [1, 2, 3]})
+    for key, caption in [("table_a", "Table A"), ("table_b", "Table B")]:
+        df = pd.DataFrame({"Col": [1, 2, 3]})
         table_data = dataframe_to_table_data(key=key, df=df, caption=caption)
         one.db_manager.add_table(table_data)
 
@@ -118,4 +108,3 @@ def test_different_tables_no_suffix(tmp_path):
     assert "{#tbl:table_b}" in generated_md
     assert "{#tbl:table_a_1}" not in generated_md
     assert "{#tbl:table_b_1}" not in generated_md
-
