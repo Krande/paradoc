@@ -12,7 +12,7 @@ export function TableRenderer({ tableKey, docId }: TableRendererProps) {
   const [tableData, setTableData] = useState<any>(null)
   const [sortColumn, setSortColumn] = useState<string | null>(null)
   const [sortAscending, setSortAscending] = useState(true)
-  const [filterText, setFilterText] = useState('')
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!docId) return
@@ -75,22 +75,20 @@ export function TableRenderer({ tableKey, docId }: TableRendererProps) {
     .map(idx => ({ index: parseInt(idx), ...rowsMap[parseInt(idx)] }))
     .sort((a, b) => a.index - b.index)
 
-  // Apply filtering
-  if (filterText) {
-    const lowerFilter = filterText.toLowerCase()
-    rows = rows.filter(row => {
-      return tableData.columns.some((col: any) => {
-        const value = String(row[col.name] || '')
-        return value.toLowerCase().includes(lowerFilter)
-      })
+  // Apply per-column filtering
+  rows = rows.filter(row => {
+    return Object.entries(columnFilters).every(([columnName, filterValue]) => {
+      if (!filterValue) return true
+      const cellValue = String((row as any)[columnName] || '')
+      return cellValue.toLowerCase().includes(filterValue.toLowerCase())
     })
-  }
+  })
 
   // Apply sorting
   if (sortColumn) {
     rows.sort((a, b) => {
-      const aVal = a[sortColumn]
-      const bVal = b[sortColumn]
+      const aVal = (a as any)[sortColumn]
+      const bVal = (b as any)[sortColumn]
 
       // Try numeric comparison first
       const aNum = parseFloat(aVal)
@@ -116,22 +114,18 @@ export function TableRenderer({ tableKey, docId }: TableRendererProps) {
     }
   }
 
+  const handleColumnFilter = (columnName: string, value: string) => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [columnName]: value
+    }))
+  }
+
   return (
     <div className="my-4">
       {tableData.caption && (
         <p className="text-sm font-semibold mb-2">{tableData.caption}</p>
       )}
-
-      {/* Filter input */}
-      <div className="mb-3">
-        <input
-          type="text"
-          placeholder="Filter table..."
-          value={filterText}
-          onChange={(e) => setFilterText(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded w-full max-w-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
 
       <div className="overflow-x-auto border border-gray-300 rounded">
         <table className="min-w-full border-collapse bg-white">
@@ -145,16 +139,28 @@ export function TableRenderer({ tableKey, docId }: TableRendererProps) {
               {tableData.columns.map((col: any) => (
                 <th
                   key={col.name}
-                  className="px-3 py-2 text-left border-b border-gray-300 font-semibold text-sm cursor-pointer hover:bg-gray-200 select-none"
-                  onClick={() => handleSort(col.name)}
+                  className="px-3 py-2 text-left border-b border-gray-300 font-semibold text-sm"
                 >
-                  <div className="flex items-center">
-                    <span>{col.name}</span>
-                    {sortColumn === col.name && (
-                      <span className="ml-1">
-                        {sortAscending ? '↑' : '↓'}
-                      </span>
-                    )}
+                  <div className="flex flex-col gap-1">
+                    <div
+                      className="flex items-center cursor-pointer hover:bg-gray-200 -mx-3 -my-2 px-3 py-2 rounded select-none"
+                      onClick={() => handleSort(col.name)}
+                    >
+                      <span>{col.name}</span>
+                      {sortColumn === col.name && (
+                        <span className="ml-1">
+                          {sortAscending ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder={`Filter ${col.name}...`}
+                      value={columnFilters[col.name] || ''}
+                      onChange={(e) => handleColumnFilter(col.name, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-2 py-1 text-xs border border-gray-300 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
                   </div>
                 </th>
               ))}
@@ -176,7 +182,7 @@ export function TableRenderer({ tableKey, docId }: TableRendererProps) {
                     key={col.name}
                     className="px-3 py-2 border-b border-gray-200 text-sm"
                   >
-                    {row[col.name] !== undefined ? String(row[col.name]) : ''}
+                    {(row as any)[col.name] !== undefined ? String((row as any)[col.name]) : ''}
                   </td>
                 ))}
               </tr>

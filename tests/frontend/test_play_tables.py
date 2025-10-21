@@ -305,9 +305,9 @@ def test_table_interactive_mode_renders_table(doc_with_table, page, wait_for_fro
     headers = page.locator('th')
     assert headers.count() >= 4, "Table should have at least 4 column headers"
 
-    # Verify filter input exists
-    filter_input = page.locator('input[placeholder*="Filter"]').first
-    assert filter_input.is_visible(), "Filter input should be visible in interactive mode"
+    # Verify per-column filter inputs exist (one for each column)
+    filter_inputs = page.locator('input[placeholder*="Filter"]')
+    assert filter_inputs.count() >= 4, f"Should have filter inputs for each column, found {filter_inputs.count()}"
 
 
 def test_table_interactive_filtering(doc_with_table, page, wait_for_frontend, frontend_resources_dir):
@@ -354,9 +354,9 @@ def test_table_interactive_filtering(doc_with_table, page, wait_for_frontend, fr
     initial_rows = page.locator('tbody tr').count()
     assert initial_rows == 5, f"Should have 5 data rows initially, found {initial_rows}"
 
-    # Type in filter input to filter for "Alice"
-    filter_input = page.locator('input[placeholder*="Filter"]').first
-    filter_input.fill("Alice")
+    # Type in the Name column filter input to filter for "Alice"
+    name_filter_input = page.locator('input[placeholder*="Filter Name"]').first
+    name_filter_input.fill("Alice")
     page.wait_for_timeout(500)
 
     # Count rows after filtering (should be 1 row)
@@ -364,7 +364,7 @@ def test_table_interactive_filtering(doc_with_table, page, wait_for_frontend, fr
     assert filtered_rows == 1, f"Should have 1 row after filtering for 'Alice', found {filtered_rows}"
 
     # Clear filter and check all rows are back
-    filter_input.fill("")
+    name_filter_input.fill("")
     page.wait_for_timeout(500)
     rows_after_clear = page.locator('tbody tr').count()
     assert rows_after_clear == 5, f"Should have 5 rows after clearing filter, found {rows_after_clear}"
@@ -410,28 +410,37 @@ def test_table_interactive_sorting(doc_with_table, page, wait_for_frontend, fron
     interactive_button.click()
     page.wait_for_timeout(2000)
 
-    # Get the first row's first cell value before sorting
-    first_cell_before = page.locator('tbody tr:first-child td').first.inner_text()
+    # Get all Name column values before sorting
+    # Find the Name column index by looking at headers
+    all_headers = page.locator('thead th')
+    name_col_index = None
+    for i in range(all_headers.count()):
+        header_text = all_headers.nth(i).inner_text()
+        if 'Name' in header_text:
+            name_col_index = i + 1  # CSS nth-child is 1-based
+            break
 
-    # Click on the "Name" column header to sort
-    name_header = page.locator('th:has-text("Name")').first
+    assert name_col_index is not None, "Could not find Name column header"
+
+    # Get Name column cells using the correct index
+    name_column_cells = page.locator(f'tbody tr td:nth-child({name_col_index})')
+
+    # Click on the "Name" column header to sort (click the sortable div within the header)
+    name_header = page.locator('th:has-text("Name") div.cursor-pointer').first
     name_header.click()
     page.wait_for_timeout(500)
 
-    # Get the first row's first cell value after sorting
-    first_cell_after = page.locator('tbody tr:first-child td').first.inner_text()
+    # Get the first row's Name value after sorting (should be Alice in ascending order)
+    first_name_after = name_column_cells.first.inner_text()
+    assert first_name_after == "Alice", f"After ascending sort, expected 'Alice' but got '{first_name_after}'"
 
-    # The order should have changed (or we can verify it's alphabetically sorted)
-    # With our test data (Alice, Bob, Charlie, Diana, Eve), Alice should be first after sorting
-    # Since Alice is already first, let's click again to reverse sort
+    # Click again to reverse sort
     name_header.click()
     page.wait_for_timeout(500)
 
-    first_cell_reversed = page.locator('tbody tr:first-child td').first.inner_text()
-    # Now Eve should be first (reverse alphabetical)
-    # We just verify that sorting changed the order
-    assert first_cell_before != first_cell_reversed or first_cell_before == "Alice", \
-        "Sorting should change the order or maintain correct alphabetical order"
+    # After reverse sort (descending), Eve should be first
+    first_name_reversed = name_column_cells.first.inner_text()
+    assert first_name_reversed == "Eve", f"After descending sort, expected 'Eve' but got '{first_name_reversed}'"
 
 
 def test_table_static_mode_shows_html_table(doc_with_table, page, wait_for_frontend, frontend_resources_dir):
