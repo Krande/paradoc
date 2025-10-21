@@ -5,7 +5,7 @@ import { Navbar, TocItem } from './components/Navbar'
 // Inline the worker so it's embedded in the bundle
 import InlineWorker from './ws/worker.ts?worker&inline'
 
-import { useSectionStore, fetchManifest, fetchSection, storeEmbeddedImage, storePlotData, storeTableData } from './sections/store'
+import { useSectionStore, storeEmbeddedImage, storePlotData, storeTableData } from './sections/store'
 import type { DocManifest, SectionBundle } from './ast/types'
 import { VirtualReader } from './components/VirtualReader'
 import { calculateHeadingNumbers } from './ast/headingNumbers'
@@ -160,17 +160,18 @@ export default function App() {
   }, [])
 
   // Fetch manifest on first load if not received via WS
-  useEffect(() => {
-    if (!docId) return
-    if (state.manifest) return
-    fetchManifest(docId).then((m) => {
-      setManifest(m)
-      // Align our docId with the manifest to avoid mixing ids in URLs
-      try { if ((m as any).docId) setDocId((m as any).docId) } catch {}
-      // Eagerly load first section
-      if (m.sections.length > 0) void fetchSection((m as any).docId || docId, m.sections[0].id, m.sections[0].index).then(upsertSection).catch(() => {})
-    }).catch(() => {})
-  }, [docId, state.manifest])
+  // DISABLED: Only using WebSocket communication, not HTTP/file fetching
+  // useEffect(() => {
+  //   if (!docId) return
+  //   if (state.manifest) return
+  //   fetchManifest(docId).then((m) => {
+  //     setManifest(m)
+  //     // Align our docId with the manifest to avoid mixing ids in URLs
+  //     try { if ((m as any).docId) setDocId((m as any).docId) } catch {}
+  //     // Eagerly load first section
+  //     if (m.sections.length > 0) void fetchSection((m as any).docId || docId, m.sections[0].id, m.sections[0].index).then(upsertSection).catch(() => {})
+  //   }).catch(() => {})
+  // }, [docId, state.manifest])
 
   const handleRequestProcessInfo = () => {
     const worker = workerRef.current

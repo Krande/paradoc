@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useState } from 'react'
 import type { DocManifest, SectionBundle } from '../ast/types'
 
 // Very small IndexedDB helper
@@ -130,12 +130,9 @@ export async function fetchSection(docId: string, sectionId: string, index?: num
   }
 }
 
-export function predictivePrefetch(docId: string, manifest: DocManifest, visibleIndex: number) {
-  const next = manifest.sections[visibleIndex + 1]
-  const prev = visibleIndex > 0 ? manifest.sections[visibleIndex - 1] : undefined
-  // Silently attempt to prefetch - errors are expected when using WebSocket mode
-  if (next) void fetchSection(docId, next.id, next.index).catch(() => {})
-  if (prev) void fetchSection(docId, prev.id, prev.index).catch(() => {})
+export function predictivePrefetch(_docId: string, _manifest: DocManifest, _visibleIndex: number) {
+  // DISABLED: Only using WebSocket communication, not HTTP/file fetching
+  // Sections are delivered via WebSocket, no need for predictive prefetch
 }
 
 // Image storage helpers for embedded images
