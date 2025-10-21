@@ -1,5 +1,6 @@
 import React from 'react'
 import { TableRenderer } from './TableRenderer'
+import { getTableData } from '../sections/store'
 
 interface InteractiveTableProps {
   tableId?: string
@@ -24,8 +25,6 @@ export function InteractiveTable({ tableId, className, tableKey, docId, staticCo
 
     // Try to find table data - first try the exact key, then try without suffix
     const checkTableExists = async () => {
-      const { getTableData } = await import('../sections/store')
-
       // Try exact match first
       let data = await getTableData(docId, tableKey)
       if (data) {

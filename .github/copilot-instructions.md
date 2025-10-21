@@ -48,8 +48,10 @@ Or to run a python script
 
 ```pixi run -e prod python scripts/run_script.py```
 
+To compile a standalone frontend.zip file
 
-[quetz/tests](quetz/tests)
+```pixi run wbuild```
+
 
 ## Project Structure
 

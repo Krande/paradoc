@@ -8,6 +8,16 @@ export default defineConfig({
   build: {
     // Ensure inlined assets
     assetsInlineLimit: 100000000,
+    // Disable module preload polyfill which doesn't work with file:// protocol
+    modulePreload: {
+      polyfill: false
+    },
+    rollupOptions: {
+      output: {
+        // Force everything into a single chunk
+        manualChunks: undefined,
+      }
+    }
   },
   server: {
     port: 5173,

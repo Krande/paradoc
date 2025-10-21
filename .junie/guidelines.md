@@ -23,8 +23,6 @@ stream converted html documents to a frontend document reader app.
 
 #### Functional requirements
 The frontend is a single page document reader app. 
-The frontend shall have a websocket client running in a background thread listening for new html documents. 
-The websocket server receives html content which are documents from pandoc converted html from markdown. 
 
 #### Style guide
 
@@ -34,7 +32,7 @@ The websocket server receives html content which are documents from pandoc conve
 ## Development Environment Setup
 
 All dependencies and tasks are handled by `pixi` in a pyproject.toml file. 
-There's a prod and test environment.
+There's a `prod` and `test` environment (see environment definitions in pyproject.toml)..
 
 There is a `pixi run test` command that runs the pytest test suite.
 
@@ -45,6 +43,11 @@ To run arbitrary python commands you should do
 Or to run a python script
 
 ```pixi run -e prod python scripts/run_script.py```
+
+To compile a standalone frontend.zip file
+
+```pixi run wbuild```
+
 
 ## Project Structure
 
@@ -57,3 +60,8 @@ frontend/
 tests/
 pyproject.toml
 ```
+## Copilot shell instructions
+The default shell for agentic commands is powershell and the cwd is always the project root.
+
+So under no circumstances should you use `cd` or `pwd` to change the cwd.
+Or use characters such as && when trying to run commands in the shell

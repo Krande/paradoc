@@ -9,7 +9,7 @@ import hashlib
 # Paths
 project_root = pathlib.Path(__file__).parent.parent
 frontend_dist = project_root / "frontend" / "dist"
-resources_dir = project_root / "src" / "paradoc" / "io" / "ast" / "resources"
+resources_dir = project_root / "src" / "paradoc" / "frontend" / "resources"
 zip_path = resources_dir / "frontend.zip"
 hash_path = resources_dir / "frontend.hash"
 

@@ -1,21 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { getPlotData } from '../sections/store'
-
-// Dynamically import Plotly to avoid bundling it if not needed
-let Plotly: any = null
-
-async function loadPlotly() {
-  if (Plotly) return Plotly
-  try {
-    // Use dynamic import to load plotly.js-dist-min
-    const module = await import('plotly.js-dist-min')
-    Plotly = module.default || module
-    return Plotly
-  } catch (error) {
-    console.error('Failed to load Plotly:', error)
-    return null
-  }
-}
+import Plotly from 'plotly.js-dist-min'
 
 interface PlotRendererProps {
   plotKey: string
@@ -52,47 +37,43 @@ export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
   useEffect(() => {
     if (!plotRef.current || !plotData || !plotData.figure) return
 
-    // Load Plotly and render the plot
-    loadPlotly()
-      .then(plotly => {
-        if (!plotly || !plotRef.current) return
+    // Render the plot using statically imported Plotly
+    try {
+      const figure = plotData.figure
+      const width = plotData.width || 800
+      const height = plotData.height || 600
 
-        const figure = plotData.figure
-        const width = plotData.width || 800
-        const height = plotData.height || 600
+      // Ensure the figure has a layout object
+      const layout = { ...(figure.layout || {}) }
+      layout.width = width
+      layout.height = height
+      layout.autosize = false
 
-        // Ensure the figure has a layout object
-        const layout = { ...(figure.layout || {}) }
-        layout.width = width
-        layout.height = height
-        layout.autosize = false
+      // Add some default styling
+      if (!layout.margin) {
+        layout.margin = { l: 50, r: 50, t: 50, b: 50 }
+      }
 
-        // Add some default styling
-        if (!layout.margin) {
-          layout.margin = { l: 50, r: 50, t: 50, b: 50 }
-        }
+      const config = {
+        responsive: true,
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['sendDataToCloud'],
+      }
 
-        const config = {
-          responsive: true,
-          displayModeBar: true,
-          displaylogo: false,
-          modeBarButtonsToRemove: ['sendDataToCloud'],
-        }
-
-        // Create the plot
-        plotly.newPlot(plotRef.current, figure.data, layout, config)
-          .then(() => {
-            console.log('Plot rendered successfully:', plotData.key)
-          })
-          .catch((err: any) => {
-            console.error('Plotly rendering error:', err)
-            setError('Failed to render plot')
-          })
-      })
-      .catch(err => {
-        console.error('Failed to load Plotly library:', err)
-        setError('Failed to load Plotly library')
-      })
+      // Create the plot
+      Plotly.newPlot(plotRef.current, figure.data, layout, config)
+        .then(() => {
+          console.log('Plot rendered successfully:', plotData.key)
+        })
+        .catch((err: any) => {
+          console.error('Plotly rendering error:', err)
+          setError('Failed to render plot')
+        })
+    } catch (err) {
+      console.error('Failed to render plot:', err)
+      setError('Failed to render plot')
+    }
 
     // Cleanup
     return () => {

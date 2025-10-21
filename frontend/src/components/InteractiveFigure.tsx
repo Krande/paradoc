@@ -2,6 +2,7 @@ import React from 'react'
 import { PlotRenderer } from './PlotRenderer'
 import type { PandocBlock } from '../ast/types'
 import { renderBlock } from '../ast/render'
+import { getPlotData } from '../sections/store'
 
 interface InteractiveFigureProps {
   figureId?: string
@@ -26,8 +27,6 @@ export function InteractiveFigure({ figureId, className, plotKey, docId, content
 
     // Try to find plot data - first try the exact key, then try without suffix
     const checkPlotExists = async () => {
-      const { getPlotData } = await import('../sections/store')
-
       // Try exact match first
       let data = await getPlotData(docId, plotKey)
       if (data) {
