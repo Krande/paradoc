@@ -6,6 +6,7 @@ import { renderInlines } from './inlineRenderers'
 import { PlotRenderer } from '../components/PlotRenderer'
 import { TableRenderer } from '../components/TableRenderer'
 import { useDocId } from './context'
+import { SourceBadge } from "../components/SourceBadge"
 
 /**
  * Component to detect and render plot/table references in paragraph content
@@ -21,25 +22,25 @@ function InteractiveParagraph({ inlines }: { inlines: PandocInline[] }) {
   const plotMatch = text.match(/\{\{__([^_][^}]*)__}}(?:\{plt:[^}]*})?/)
   if (plotMatch) {
     const plotKey = plotMatch[1]
-    return <PlotRenderer plotKey={plotKey} docId={docId} />
+      return <SourceBadge><PlotRenderer plotKey={plotKey} docId={docId} /></SourceBadge>
   }
 
   // Match table references: {{__table_key__}} with optional {tbl:...} annotation
   const tableMatch = text.match(/\{\{__([^_][^}]*)__}}(?:\{tbl:[^}]*})?/)
   if (tableMatch) {
     const tableKey = tableMatch[1]
-    return <TableRenderer tableKey={tableKey} docId={docId} />
+      return <SourceBadge><TableRenderer tableKey={tableKey} docId={docId} /></SourceBadge>
   }
 
   // Regular paragraph - no interactive content
-  return <p className="my-3">{renderInlines(inlines)}</p>
+    return <SourceBadge><p className="my-3">{renderInlines(inlines)}</p></SourceBadge>
 }
 
 /**
  * Render a Plain block (paragraph without margins)
  */
 export function renderPlain(b: Plain, key?: React.Key): React.ReactElement {
-  return <p key={key} className="my-3">{renderInlines(b.c)}</p>
+    return <SourceBadge><p key={key} className="my-3">{renderInlines(b.c)}</p></SourceBadge>
 }
 
 /**
@@ -52,7 +53,7 @@ export function renderPara(b: Para, key?: React.Key): React.ReactElement | null 
     return null
   }
   // Check for plot/table references - wrap in a div with the key
-  return <div key={key}><InteractiveParagraph inlines={inlines} /></div>
+    return <SourceBadge><div key={key}><InteractiveParagraph inlines={inlines} /></div></SourceBadge>
 }
 
 /**
@@ -75,7 +76,7 @@ export function renderHeader(b: Header, key?: React.Key, headingNumber?: Heading
   if (level === 3) return <h3 key={key} {...common} className={common.className + ' text-xl'}>{numberedContent}</h3>
   if (level === 4) return <h4 key={key} {...common} className={common.className + ' text-lg'}>{numberedContent}</h4>
   if (level === 5) return <h5 key={key} {...common} className={common.className + ' text-base'}>{numberedContent}</h5>
-  return <h6 key={key} {...common} className={common.className + ' text-sm'}>{numberedContent}</h6>
+    return <SourceBadge><h6 key={key} {...common} className={common.className + ' text-sm'}>{numberedContent}</h6></SourceBadge>
 }
 
 /**
@@ -83,7 +84,7 @@ export function renderHeader(b: Header, key?: React.Key, headingNumber?: Heading
  */
 export function renderBulletList(b: BulletList, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key): React.ReactElement {
   const items = b.c
-  return <ul key={key} className="list-disc ml-6 my-2">{items.map((blocks, i) => <li key={i}>{blocks.map((bb, j) => renderBlock(bb, j))}</li>)}</ul>
+    return <SourceBadge><ul key={key} className="list-disc ml-6 my-2">{items.map((blocks, i) => <li key={i}>{blocks.map((bb, j) => renderBlock(bb, j))}</li>)}</ul></SourceBadge>
 }
 
 /**
@@ -91,7 +92,7 @@ export function renderBulletList(b: BulletList, renderBlock: (b: any, k?: React.
  */
 export function renderOrderedList(b: OrderedList, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key): React.ReactElement {
   const [, items] = b.c
-  return <ol key={key} className="list-decimal ml-6 my-2">{items.map((blocks, i) => <li key={i}>{blocks.map((bb, j) => renderBlock(bb, j))}</li>)}</ol>
+    return <SourceBadge><ol key={key} className="list-decimal ml-6 my-2">{items.map((blocks, i) => <li key={i}>{blocks.map((bb, j) => renderBlock(bb, j))}</li>)}</ol></SourceBadge>
 }
 
 /**
@@ -101,9 +102,9 @@ export function renderCodeBlock(b: CodeBlock, key?: React.Key): React.ReactEleme
   const [a, code] = b.c
   const codeAttrs = attrs(a)
   return (
-    <pre key={key} {...codeAttrs} className={'my-3 p-3 rounded bg-gray-100 overflow-auto text-sm ' + (codeAttrs.className || '')}>
+    <SourceBadge><pre key={key} {...codeAttrs} className={'my-3 p-3 rounded bg-gray-100 overflow-auto text-sm ' + (codeAttrs.className || '')}>
       <code>{code}</code>
-    </pre>
+    </pre></SourceBadge>
   )
 }
 
@@ -111,14 +112,14 @@ export function renderCodeBlock(b: CodeBlock, key?: React.Key): React.ReactEleme
  * Render a BlockQuote
  */
 export function renderBlockQuote(b: BlockQuote, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key): React.ReactElement {
-  return <blockquote key={key} className="border-l-4 pl-4 my-3 text-gray-700">{b.c.map((bb, j) => renderBlock(bb, j))}</blockquote>
+    return <SourceBadge><blockquote key={key} className="border-l-4 pl-4 my-3 text-gray-700">{b.c.map((bb, j) => renderBlock(bb, j))}</blockquote></SourceBadge>
 }
 
 /**
  * Render a HorizontalRule
  */
 export function renderHorizontalRule(key?: React.Key): React.ReactElement {
-  return <hr key={key} className="my-6" />
+    return <SourceBadge><hr key={key} className="my-6" /></SourceBadge>
 }
 
 /**
@@ -131,5 +132,5 @@ export function renderRawBlock(b: RawBlock, key?: React.Key): React.ReactElement
   if (html.includes('\\appendix')) {
     return null
   }
-  return <div key={key} dangerouslySetInnerHTML={{ __html: html }} />
+    return <SourceBadge><div key={key} dangerouslySetInnerHTML={{ __html: html }} /></SourceBadge>
 }

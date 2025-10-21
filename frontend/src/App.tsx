@@ -10,8 +10,9 @@ import { useSectionStore, storeEmbeddedImage, storePlotData, storeTableData } fr
 import type { DocManifest, SectionBundle } from './ast/types'
 import { VirtualReader } from './components/VirtualReader'
 import { calculateHeadingNumbers } from './ast/headingNumbers'
+import { SourceDisplayProvider } from './store/sourceDisplayStore'
 
-export default function App() {
+function AppContent() {
   const [connected, setConnected] = useState<boolean>(false)
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
   const [searchBarOpen, setSearchBarOpen] = useState<boolean>(false)
@@ -297,3 +298,11 @@ export default function App() {
     </div>
   )
 }
+export default function App() {
+  return (
+    <SourceDisplayProvider>
+      <AppContent />
+    </SourceDisplayProvider>
+  )
+}
+
