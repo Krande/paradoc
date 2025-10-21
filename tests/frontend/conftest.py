@@ -7,6 +7,22 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
 
 
+def pytest_addoption(parser):
+    """Add custom command line options for Playwright tests."""
+    parser.addoption(
+        "--pw-watch",
+        action="store_true",
+        default=False,
+        help="Run Playwright tests with visual feedback (non-headless mode)"
+    )
+    parser.addoption(
+        "--pw-duration",
+        action="store",
+        default="2",
+        help="Duration in seconds to keep browser visible after each test (default: 2)"
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def ensure_playwright_installed():
     """Ensure Playwright browsers are installed before running tests."""
@@ -40,10 +56,14 @@ def ensure_playwright_installed():
 
 
 @pytest.fixture(scope="session")
-def browser():
+def browser(request):
     """Launch browser for the test session."""
+    pw_watch = request.config.getoption("--pw-watch")
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=not pw_watch,
+            slow_mo=500 if pw_watch else 0  # Slow down actions by 500ms when watching
+        )
         yield browser
         browser.close()
 
@@ -57,10 +77,18 @@ def context(browser: Browser):
 
 
 @pytest.fixture
-def page(context: BrowserContext):
+def page(context: BrowserContext, request):
     """Create a new page for each test."""
     page = context.new_page()
     yield page
+
+    # If in watch mode, pause before closing the page so user can see results
+    pw_watch = request.config.getoption("--pw-watch")
+    if pw_watch:
+        duration = float(request.config.getoption("--pw-duration"))
+        print(f"\n[Playwright Watch Mode] Keeping browser open for {duration} seconds...")
+        time.sleep(duration)
+
     page.close()
 
 
