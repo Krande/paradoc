@@ -55,7 +55,7 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
 
   return (
     <RenderWithDocId docId={docId}>
-      <div ref={containerRef} className="flex-1 overflow-auto p-6">
+      <div ref={containerRef} className="flex-1 overflow-auto p-6" data-search-root>
         <div className="max-w-none w-full">
           {h1Sections.map((s, i) => {
             const bundle = sections[s.id]

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Topbar } from './components/Topbar'
 import { Navbar, TocItem } from './components/Navbar'
+import { SearchBar } from './components/SearchBar'
 
 // Inline the worker so it's embedded in the bundle
 import InlineWorker from './ws/worker.ts?worker&inline'
@@ -13,6 +14,7 @@ import { calculateHeadingNumbers } from './ast/headingNumbers'
 export default function App() {
   const [connected, setConnected] = useState<boolean>(false)
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
+  const [searchBarOpen, setSearchBarOpen] = useState<boolean>(false)
   const [processInfo, setProcessInfo] = useState<{ pid: number; thread_id: number } | null>(null)
   const [frontendId, setFrontendId] = useState<string>('')
   const [connectedFrontends, setConnectedFrontends] = useState<string[]>([])
@@ -173,6 +175,20 @@ export default function App() {
   //   }).catch(() => {})
   // }, [docId, state.manifest])
 
+  // Handle global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+F or Cmd+F to open search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault()
+        setSearchBarOpen(true)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   const handleRequestProcessInfo = () => {
     const worker = workerRef.current
     if (worker && connected) {
@@ -277,6 +293,7 @@ export default function App() {
           </div>
         )}
       </div>
+      <SearchBar isOpen={searchBarOpen} onClose={() => setSearchBarOpen(false)} />
     </div>
   )
 }
