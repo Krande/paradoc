@@ -95,6 +95,20 @@ def test_table_static_interactive_buttons_exist(doc_with_table, page, wait_for_f
     # Wait for the document to be loaded and rendered
     page.wait_for_timeout(3000)
 
+    # Debug: Print the page HTML to see what's being rendered
+    html_content = page.content()
+    print("\n=== PAGE HTML ===")
+    print(html_content[:5000])  # First 5000 chars
+    print("\n=== END HTML ===\n")
+
+    # Debug: Check if any tables exist at all
+    all_tables = page.locator('table')
+    print(f"Found {all_tables.count()} table elements")
+
+    # Debug: Check for any divs with 'relative' class
+    relative_divs = page.locator('div.relative')
+    print(f"Found {relative_divs.count()} div.relative elements")
+
     # Look for the table element with the interactive wrapper
     # The InteractiveTable component renders a div with class "relative group"
     table_container = page.locator('div.relative.group').first
