@@ -13,6 +13,47 @@ import type { HeadingNumbering } from './headingNumbers'
 export function renderDiv(b: any, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key): React.ReactElement {
   const [a, blocks] = b.c as [Attr, PandocBlock[]]
   const divAttrs = attrs(a)
+  const docId = useDocId()
+
+  // Check if this Div wraps a table with a tbl: ID (pandoc-crossref pattern)
+  if (divAttrs.id && divAttrs.id.startsWith('tbl:') && blocks.length > 0) {
+    // Check if the first block is a Table
+    const firstBlock = blocks[0]
+    if (firstBlock && typeof firstBlock === 'object' && firstBlock.t === 'Table') {
+      // Extract table key from the div ID
+      const tableKey = divAttrs.id.substring(4) // Remove 'tbl:' prefix
+
+      console.log('[renderDiv] Detected table wrapper with ID:', divAttrs.id, 'tableKey:', tableKey)
+
+      // Render the table content (without wrapping div)
+      // The InteractiveTable component will provide its own wrapper
+      const tableBlock = firstBlock as Table
+
+      // Render the static table content
+      const staticTableContent = renderTableContent(tableBlock, renderBlock, key)
+
+      // Extract caption from remaining blocks or from table caption
+      const captionBlocks = blocks.slice(1)
+      let captionContent: React.ReactNode = null
+      if (captionBlocks.length > 0) {
+        captionContent = captionBlocks.map((bb, j) => renderBlock(bb, `caption-${j}`))
+      }
+
+      // Wrap with InteractiveTable component
+      return (
+        <InteractiveTable
+          key={key}
+          tableId={divAttrs.id}
+          className="my-4"
+          tableKey={tableKey}
+          docId={docId}
+          staticContent={staticTableContent}
+          caption={captionContent}
+        />
+      )
+    }
+  }
+
   if (divAttrs.className?.includes('figure')) {
     // Basic figure styling; render children and allow captions to flow
     const className = ['my-4', divAttrs.className].filter(Boolean).join(' ')
@@ -107,22 +148,13 @@ export function renderFigure(b: any, renderBlock: (b: any, k?: React.Key, hn?: H
 /**
  * Render a Table block
  */
-export function renderTable(b: Table, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key): React.ReactElement {
+/**
+ * Helper function to render table content without wrapper
+ */
+function renderTableContent(b: Table, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key): React.ReactElement {
   // Table: [Attr, Caption, [ColSpec], TableHead, [TableBody], TableFoot]
-  const [a, caption, , tableHead, tableBodies, tableFoot] = b.c
-
-  // Extract caption text if present
-  let captionInlines: any[] = []
-  if (caption && Array.isArray(caption)) {
-    // Caption structure: [ShortCaption|null, [Blocks]]
-    const captionBlocks = (Array.isArray(caption[1])) ? caption[1] : []
-    if (captionBlocks.length > 0) {
-      const firstBlock = captionBlocks[0]
-      if (firstBlock && typeof firstBlock === 'object' && 't' in firstBlock && Array.isArray(firstBlock.c)) {
-        captionInlines = firstBlock.c
-      }
-    }
-  }
+  const [a, , , tableHead, tableBodies, tableFoot] = b.c
+  const tableAttrs = attrs(a)
 
   // Helper to render table cells
   const renderCell = (cell: any, cellKey: number, isHeader = false) => {
@@ -162,26 +194,8 @@ export function renderTable(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
     )
   }
 
-  const tableAttrs = attrs(a)
-  const docId = useDocId()
-
-  // Check if this table has a tbl: ID for interactive rendering
-  let tableKey: string | undefined
-  if (tableAttrs.id && tableAttrs.id.startsWith('tbl:')) {
-    // Remove 'tbl:' prefix to get the table key (possibly with suffix like _1, _2)
-    tableKey = tableAttrs.id.substring(4)
-
-    console.log('[renderTable] Table with ID:', {
-      tableId: tableAttrs.id,
-      extractedTableKey: tableKey,
-      docId: docId,
-      hasDocId: !!docId
-    })
-  }
-
-  // Build the static table content (used in both interactive and non-interactive modes)
-  const staticTableContent = (
-    <div className="overflow-x-auto">
+  return (
+    <div key={key} className="overflow-x-auto">
       <table
         {...tableAttrs}
         className={'min-w-full border-collapse border border-gray-300 ' + (tableAttrs.className || '')}
@@ -214,6 +228,47 @@ export function renderTable(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
       </table>
     </div>
   )
+}
+
+export function renderTable(b: Table, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key): React.ReactElement {
+  // Table: [Attr, Caption, [ColSpec], TableHead, [TableBody], TableFoot]
+  const [a, caption] = b.c
+
+  // Extract caption text if present
+  let captionInlines: any[] = []
+  if (caption && Array.isArray(caption)) {
+    // Caption structure: [ShortCaption|null, [Blocks]]
+    const captionBlocks = (Array.isArray(caption[1])) ? caption[1] : []
+    if (captionBlocks.length > 0) {
+      const firstBlock = captionBlocks[0]
+      if (firstBlock && typeof firstBlock === 'object' && 't' in firstBlock && Array.isArray(firstBlock.c)) {
+        captionInlines = firstBlock.c
+      }
+    }
+  }
+
+  const tableAttrs = attrs(a)
+  const docId = useDocId()
+
+  // Check if this table has a tbl: ID for interactive rendering
+  // NOTE: With pandoc-crossref, tables are typically wrapped in Div elements with tbl: IDs
+  // This code path handles tables that have the ID directly (rare case)
+  let tableKey: string | undefined
+  if (tableAttrs.id && tableAttrs.id.startsWith('tbl:')) {
+    // Remove 'tbl:' prefix to get the table key (possibly with suffix like _1, _2)
+    tableKey = tableAttrs.id.substring(4)
+
+    console.log('[renderTable] Table with ID:', {
+      tableId: tableAttrs.id,
+      extractedTableKey: tableKey,
+      docId: docId,
+      hasDocId: !!docId
+    })
+  }
+
+  // Build the static table content (used in both interactive and non-interactive modes)
+  const staticTableContent = renderTableContent(b, renderBlock, key)
+
 
   const captionContent = captionInlines && captionInlines.length > 0 ? (
     <div className="text-sm text-gray-600 italic mt-2 text-center">

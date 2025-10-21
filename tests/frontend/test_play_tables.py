@@ -65,6 +65,10 @@ def test_table_static_interactive_buttons_exist(doc_with_table, page, wait_for_f
     from paradoc.frontend.frontend_handler import FrontendHandler
     from paradoc.frontend.ws_server import ensure_ws_server
 
+    # Capture console logs
+    console_logs = []
+    page.on("console", lambda msg: console_logs.append(f"[{msg.type}] {msg.text}"))
+
     # Ensure WebSocket server is running
     assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
@@ -95,19 +99,61 @@ def test_table_static_interactive_buttons_exist(doc_with_table, page, wait_for_f
     # Wait for the document to be loaded and rendered
     page.wait_for_timeout(3000)
 
-    # Debug: Print the page HTML to see what's being rendered
-    html_content = page.content()
-    print("\n=== PAGE HTML ===")
-    print(html_content[:5000])  # First 5000 chars
-    print("\n=== END HTML ===\n")
+    # Debug: Print console logs
+    print("\n=== CONSOLE LOGS ===")
+    for log in console_logs:
+        print(log)
+    print("=== END CONSOLE LOGS ===\n")
+
+    # Debug: Check docId via JavaScript
+    doc_id = page.evaluate("() => { const ctx = window; return ctx.__REACT_CONTEXT__ ? ctx.__REACT_CONTEXT__.docId : 'unknown'; }")
+    print(f"DocId from page context: {doc_id}")
+
+    # Debug: Check if table data exists in IndexedDB
+    table_exists = page.evaluate("""
+        async () => {
+            const dbName = 'paradoc-cache';
+            const storeName = 'tables';
+            
+            return new Promise((resolve) => {
+                const req = indexedDB.open(dbName, 3);
+                req.onsuccess = () => {
+                    const db = req.result;
+                    const tx = db.transaction(storeName, 'readonly');
+                    const store = tx.objectStore(storeName);
+                    const getAllReq = store.getAllKeys();
+                    getAllReq.onsuccess = () => {
+                        const keys = getAllReq.result;
+                        db.close();
+                        resolve({ exists: true, keys: keys });
+                    };
+                    getAllReq.onerror = () => {
+                        db.close();
+                        resolve({ exists: false, error: 'Failed to get keys' });
+                    };
+                };
+                req.onerror = () => resolve({ exists: false, error: 'Failed to open DB' });
+            });
+        }
+    """)
+    print(f"Table data in IndexedDB: {table_exists}")
 
     # Debug: Check if any tables exist at all
     all_tables = page.locator('table')
     print(f"Found {all_tables.count()} table elements")
 
+    # Debug: Get table ID
+    if all_tables.count() > 0:
+        table_id = all_tables.first.get_attribute('id')
+        print(f"Table ID: {table_id}")
+
     # Debug: Check for any divs with 'relative' class
     relative_divs = page.locator('div.relative')
     print(f"Found {relative_divs.count()} div.relative elements")
+
+    # Debug: Check for div.relative.group
+    interactive_divs = page.locator('div.relative.group')
+    print(f"Found {interactive_divs.count()} div.relative.group elements")
 
     # Look for the table element with the interactive wrapper
     # The InteractiveTable component renders a div with class "relative group"

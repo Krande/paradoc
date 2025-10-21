@@ -188,6 +188,8 @@ export interface TableData {
 export async function storeTableData(docId: string, tableKey: string, tableData: TableData): Promise<void> {
   const key = `${docId}:${tableKey}`
   await dbPut('tables', key, tableData)
+  // Notify listeners that table data has been stored
+  window.dispatchEvent(new CustomEvent('paradoc:table-data-stored', { detail: { docId, tableKey } }))
 }
 
 export async function getTableData(docId: string, tableKey: string): Promise<TableData | undefined> {

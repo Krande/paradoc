@@ -54,6 +54,35 @@ export function InteractiveTable({ tableId, className, tableKey, docId, staticCo
     }
 
     checkTableExists()
+
+    // Listen for table data being stored (handles race condition where data arrives after component mounts)
+    const handleTableDataStored = (event: CustomEvent) => {
+      const { docId: eventDocId, tableKey: eventTableKey } = event.detail
+      if (eventDocId === docId) {
+        // Check if the stored table matches our key (exact or base key)
+        if (eventTableKey === tableKey) {
+          checkTableExists()
+        } else {
+          // Check if it's a base key match
+          const underscoreIndex = tableKey.lastIndexOf('_')
+          if (underscoreIndex > 0) {
+            const suffix = tableKey.substring(underscoreIndex + 1)
+            if (/^\d+$/.test(suffix)) {
+              const baseKey = tableKey.substring(0, underscoreIndex)
+              if (eventTableKey === baseKey) {
+                checkTableExists()
+              }
+            }
+          }
+        }
+      }
+    }
+
+    window.addEventListener('paradoc:table-data-stored', handleTableDataStored as EventListener)
+
+    return () => {
+      window.removeEventListener('paradoc:table-data-stored', handleTableDataStored as EventListener)
+    }
   }, [docId, tableKey])
 
   // If no table data exists, just render as static table
