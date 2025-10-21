@@ -1,8 +1,42 @@
 """Pytest configuration for frontend tests."""
 import pytest
 import time
+import subprocess
+import sys
 from pathlib import Path
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
+
+
+@pytest.fixture(scope="session", autouse=True)
+def ensure_playwright_installed():
+    """Ensure Playwright browsers are installed before running tests."""
+    try:
+        # Try to launch Chromium to check if it's installed
+        with sync_playwright() as p:
+            try:
+                browser = p.chromium.launch(headless=True)
+                browser.close()
+            except Exception as e:
+                # Chromium not installed, install it now
+                print("\nChromium not found. Installing Playwright browsers...")
+                subprocess.run(
+                    [sys.executable, "-m", "playwright", "install", "chromium"],
+                    check=True,
+                    capture_output=False
+                )
+                print("Playwright Chromium installed successfully.")
+    except Exception as e:
+        print(f"Warning: Could not verify Playwright installation: {e}")
+        # Try to install anyway
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "playwright", "install", "chromium"],
+                check=True,
+                capture_output=False
+            )
+        except Exception as install_error:
+            print(f"Failed to install Playwright: {install_error}")
+            raise
 
 
 @pytest.fixture(scope="session")

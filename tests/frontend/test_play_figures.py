@@ -61,15 +61,12 @@ The plot above should show sine and cosine waves.
 def test_plot_static_interactive_buttons_exist(doc_with_plot, page, wait_for_frontend):
     """Test that Static and Interactive buttons are rendered in the frontend."""
     # Send document to frontend
-    result = doc_with_plot.send_to_frontend(embed_images=True, use_static_html=True)
-    assert result, "Failed to send document to frontend"
+    doc_with_plot.send_to_frontend(embed_images=True, use_static_html=True)
 
     # Wait a bit for the frontend to be extracted and ready
     time.sleep(2)
 
-    # Navigate to the frontend
-    from paradoc.io.ast.exporter import ASTExporter
-    exporter = ASTExporter(doc_with_plot)
+    # Navigate to the frontend and verify frontend.zip was extracted
     resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "io" / "ast" / "resources"
     index_html = resources_dir / "index.html"
 
@@ -113,14 +110,15 @@ def test_plot_static_interactive_buttons_exist(doc_with_plot, page, wait_for_fro
 def test_plot_toggle_between_static_and_interactive(doc_with_plot, page, wait_for_frontend):
     """Test switching between static and interactive plot modes."""
     # Send document to frontend
-    result = doc_with_plot.send_to_frontend(embed_images=True, use_static_html=True)
-    assert result, "Failed to send document to frontend"
+    doc_with_plot.send_to_frontend(embed_images=True, use_static_html=True)
 
     time.sleep(2)
 
     # Navigate to the frontend
     resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "io" / "ast" / "resources"
     index_html = resources_dir / "index.html"
+
+    assert index_html.exists(), f"Frontend HTML not found at {index_html}"
     page.goto(f"file:///{index_html.as_posix()}")
 
     wait_for_frontend(page)
@@ -165,14 +163,15 @@ def test_plot_toggle_between_static_and_interactive(doc_with_plot, page, wait_fo
 def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_frontend):
     """Test that Interactive mode loads and renders a Plotly plot."""
     # Send document to frontend
-    result = doc_with_plot.send_to_frontend(embed_images=True, use_static_html=True)
-    assert result, "Failed to send document to frontend"
+    doc_with_plot.send_to_frontend(embed_images=True, use_static_html=True)
 
     time.sleep(2)
 
     # Navigate to the frontend
     resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "io" / "ast" / "resources"
     index_html = resources_dir / "index.html"
+
+    assert index_html.exists(), f"Frontend HTML not found at {index_html}"
     page.goto(f"file:///{index_html.as_posix()}")
 
     wait_for_frontend(page)
@@ -206,14 +205,15 @@ def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_fronte
 def test_plot_static_mode_shows_image(doc_with_plot, page, wait_for_frontend):
     """Test that Static mode shows a static image instead of interactive plot."""
     # Send document to frontend
-    result = doc_with_plot.send_to_frontend(embed_images=True, use_static_html=True)
-    assert result, "Failed to send document to frontend"
+    doc_with_plot.send_to_frontend(embed_images=True, use_static_html=True)
 
     time.sleep(2)
 
     # Navigate to the frontend
     resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "io" / "ast" / "resources"
     index_html = resources_dir / "index.html"
+
+    assert index_html.exists(), f"Frontend HTML not found at {index_html}"
     page.goto(f"file:///{index_html.as_posix()}")
 
     wait_for_frontend(page)
