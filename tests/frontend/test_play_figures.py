@@ -67,7 +67,7 @@ def test_plot_static_interactive_buttons_exist(doc_with_plot, page, wait_for_fro
     time.sleep(2)
 
     # Navigate to the frontend and verify frontend.zip was extracted
-    resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "io" / "ast" / "resources"
+    resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
     index_html = resources_dir / "index.html"
 
     assert index_html.exists(), f"Frontend HTML not found at {index_html}"
@@ -115,7 +115,7 @@ def test_plot_toggle_between_static_and_interactive(doc_with_plot, page, wait_fo
     time.sleep(2)
 
     # Navigate to the frontend
-    resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "io" / "ast" / "resources"
+    resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
     index_html = resources_dir / "index.html"
 
     assert index_html.exists(), f"Frontend HTML not found at {index_html}"
@@ -168,7 +168,7 @@ def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_fronte
     time.sleep(2)
 
     # Navigate to the frontend
-    resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "io" / "ast" / "resources"
+    resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
     index_html = resources_dir / "index.html"
 
     assert index_html.exists(), f"Frontend HTML not found at {index_html}"
@@ -210,7 +210,7 @@ def test_plot_static_mode_shows_image(doc_with_plot, page, wait_for_frontend):
     time.sleep(2)
 
     # Navigate to the frontend
-    resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "io" / "ast" / "resources"
+    resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
     index_html = resources_dir / "index.html"
 
     assert index_html.exists(), f"Frontend HTML not found at {index_html}"

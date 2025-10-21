@@ -36,9 +36,7 @@ class FrontendHandler:
 
     def _get_resources_dir(self) -> pathlib.Path:
         """Get the resources directory path."""
-        import paradoc.io.ast.exporter as exporter_module
-
-        return pathlib.Path(exporter_module.__file__).parent / "resources"
+        return pathlib.Path(__file__).parent / "resources"
 
     def has_active_frontends(self) -> bool:
         """

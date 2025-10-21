@@ -8,7 +8,7 @@ const root = path.resolve(process.cwd())
 const distDir = path.join(root, 'dist')
 const distIndex = path.join(distDir, 'index.html')
 const outZipFrontend = path.join(distDir, 'frontend.zip')
-const resourcesZip = path.resolve(root, '..', 'src', 'paradoc', 'resources', 'frontend.zip')
+const resourcesZip = path.resolve(root, '..', 'src', 'paradoc', 'frontend','resources', 'frontend.zip')
 
 function ensureDir(p) {
   const dir = path.dirname(p)
