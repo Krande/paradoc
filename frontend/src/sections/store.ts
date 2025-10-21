@@ -164,6 +164,8 @@ export interface PlotData {
 export async function storePlotData(docId: string, plotKey: string, plotData: PlotData): Promise<void> {
   const key = `${docId}:${plotKey}`
   await dbPut('plots', key, plotData)
+  // Notify listeners that plot data has been stored
+  window.dispatchEvent(new CustomEvent('paradoc:plot-data-stored', { detail: { docId, plotKey } }))
 }
 
 export async function getPlotData(docId: string, plotKey: string): Promise<PlotData | undefined> {

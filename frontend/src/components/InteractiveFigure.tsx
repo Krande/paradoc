@@ -56,6 +56,36 @@ export function InteractiveFigure({ figureId, className, plotKey, docId, content
     }
 
     checkPlotExists()
+
+    // Listen for plot data being stored and re-check
+    const handlePlotDataStored = (event: Event) => {
+      const customEvent = event as CustomEvent<{ docId: string; plotKey: string }>
+      // Check if this event is relevant to our component
+      if (customEvent.detail.docId === docId) {
+        // Check if the stored plot key matches ours (with or without suffix)
+        if (customEvent.detail.plotKey === plotKey) {
+          checkPlotExists()
+        } else {
+          // Check if our plotKey has a suffix and the base matches
+          const underscoreIndex = plotKey.lastIndexOf('_')
+          if (underscoreIndex > 0) {
+            const suffix = plotKey.substring(underscoreIndex + 1)
+            if (/^\d+$/.test(suffix)) {
+              const baseKey = plotKey.substring(0, underscoreIndex)
+              if (customEvent.detail.plotKey === baseKey) {
+                checkPlotExists()
+              }
+            }
+          }
+        }
+      }
+    }
+
+    window.addEventListener('paradoc:plot-data-stored', handlePlotDataStored)
+
+    return () => {
+      window.removeEventListener('paradoc:plot-data-stored', handlePlotDataStored)
+    }
   }, [docId, plotKey])
 
   // If no plot data exists, just render as static figure
