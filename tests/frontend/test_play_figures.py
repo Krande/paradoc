@@ -1,9 +1,9 @@
 """Test frontend rendering of interactive plots using Playwright."""
 import pytest
-import time
 from pathlib import Path
 import numpy as np
 import pandas as pd
+from unittest.mock import patch
 
 from paradoc import OneDoc
 from paradoc.db import dataframe_to_plot_data
@@ -58,27 +58,45 @@ The plot above should show sine and cosine waves.
     return one
 
 
-def test_plot_static_interactive_buttons_exist(doc_with_plot, page, wait_for_frontend):
+@pytest.fixture
+def frontend_resources_dir():
+    """Get the frontend resources directory path."""
+    return Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
+
+
+def test_plot_static_interactive_buttons_exist(doc_with_plot, page, wait_for_frontend, frontend_resources_dir):
     """Test that Static and Interactive buttons are rendered in the frontend."""
-    # Send document to frontend
-    doc_with_plot.send_to_frontend(embed_images=True, use_static_html=True)
+    from paradoc.frontend.frontend_handler import FrontendHandler
+    from paradoc.frontend.ws_server import ensure_ws_server
 
-    # Wait a bit for the frontend to be extracted and ready
-    time.sleep(2)
+    # Ensure WebSocket server is running
+    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
-    # Navigate to the frontend and verify frontend.zip was extracted
-    resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
-    index_html = resources_dir / "index.html"
+    # Use FrontendHandler to extract frontend without opening browser
+    frontend_handler = FrontendHandler(doc_with_plot, host="localhost", port=13579)
 
+    # Mock the open_frontend method to prevent opening browser windows
+    with patch.object(frontend_handler, 'open_frontend', return_value=True):
+        assert frontend_handler.ensure_frontend_extracted(), "Failed to extract frontend"
+
+    # Navigate to the frontend with Playwright (headless)
+    index_html = frontend_resources_dir / "index.html"
     assert index_html.exists(), f"Frontend HTML not found at {index_html}"
 
-    page.goto(f"file:///{index_html.as_posix()}")
+    # Send document via WebSocket (without auto-opening browser)
+    from paradoc.io.ast.exporter import ASTExporter
+    doc_with_plot._prep_compilation(metadata_file=None)
+    doc_with_plot._perform_variable_substitution(False)
+    exporter = ASTExporter(doc_with_plot)
 
-    # Wait for frontend to load
+    # Navigate to the page first
+    page.goto(f"file:///{index_html.as_posix()}")
     wait_for_frontend(page)
 
+    # Now send the document (frontend is already loaded in Playwright)
+    exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
+
     # Wait for the document to be loaded and rendered
-    # The frontend should load the document from IndexedDB
     page.wait_for_timeout(3000)
 
     # Look for the figure element with the plot
@@ -107,21 +125,37 @@ def test_plot_static_interactive_buttons_exist(doc_with_plot, page, wait_for_fro
     assert 'cursor-pointer' in interactive_btn_classes, "Interactive button should have cursor-pointer class"
 
 
-def test_plot_toggle_between_static_and_interactive(doc_with_plot, page, wait_for_frontend):
+def test_plot_toggle_between_static_and_interactive(doc_with_plot, page, wait_for_frontend, frontend_resources_dir):
     """Test switching between static and interactive plot modes."""
-    # Send document to frontend
-    doc_with_plot.send_to_frontend(embed_images=True, use_static_html=True)
+    from paradoc.frontend.frontend_handler import FrontendHandler
+    from paradoc.frontend.ws_server import ensure_ws_server
+    from paradoc.io.ast.exporter import ASTExporter
 
-    time.sleep(2)
+    # Ensure WebSocket server is running
+    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
-    # Navigate to the frontend
-    resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
-    index_html = resources_dir / "index.html"
+    # Use FrontendHandler to extract frontend without opening browser
+    frontend_handler = FrontendHandler(doc_with_plot, host="localhost", port=13579)
 
+    # Mock the open_frontend method to prevent opening browser windows
+    with patch.object(frontend_handler, 'open_frontend', return_value=True):
+        assert frontend_handler.ensure_frontend_extracted(), "Failed to extract frontend"
+
+    # Navigate to the frontend with Playwright (headless)
+    index_html = frontend_resources_dir / "index.html"
     assert index_html.exists(), f"Frontend HTML not found at {index_html}"
-    page.goto(f"file:///{index_html.as_posix()}")
 
+    # Navigate to the page first
+    page.goto(f"file:///{index_html.as_posix()}")
     wait_for_frontend(page)
+
+    # Send document via WebSocket (without auto-opening browser)
+    doc_with_plot._prep_compilation(metadata_file=None)
+    doc_with_plot._perform_variable_substitution(False)
+    exporter = ASTExporter(doc_with_plot)
+    exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
+
+    # Wait for document to render
     page.wait_for_timeout(3000)
 
     # Hover to reveal buttons
@@ -160,21 +194,37 @@ def test_plot_toggle_between_static_and_interactive(doc_with_plot, page, wait_fo
     assert 'bg-blue-600' in static_classes, "Static button should be active after clicking back"
 
 
-def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_frontend):
+def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_frontend, frontend_resources_dir):
     """Test that Interactive mode loads and renders a Plotly plot."""
-    # Send document to frontend
-    doc_with_plot.send_to_frontend(embed_images=True, use_static_html=True)
+    from paradoc.frontend.frontend_handler import FrontendHandler
+    from paradoc.frontend.ws_server import ensure_ws_server
+    from paradoc.io.ast.exporter import ASTExporter
 
-    time.sleep(2)
+    # Ensure WebSocket server is running
+    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
-    # Navigate to the frontend
-    resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
-    index_html = resources_dir / "index.html"
+    # Use FrontendHandler to extract frontend without opening browser
+    frontend_handler = FrontendHandler(doc_with_plot, host="localhost", port=13579)
 
+    # Mock the open_frontend method to prevent opening browser windows
+    with patch.object(frontend_handler, 'open_frontend', return_value=True):
+        assert frontend_handler.ensure_frontend_extracted(), "Failed to extract frontend"
+
+    # Navigate to the frontend with Playwright (headless)
+    index_html = frontend_resources_dir / "index.html"
     assert index_html.exists(), f"Frontend HTML not found at {index_html}"
-    page.goto(f"file:///{index_html.as_posix()}")
 
+    # Navigate to the page first
+    page.goto(f"file:///{index_html.as_posix()}")
     wait_for_frontend(page)
+
+    # Send document via WebSocket (without auto-opening browser)
+    doc_with_plot._prep_compilation(metadata_file=None)
+    doc_with_plot._perform_variable_substitution(False)
+    exporter = ASTExporter(doc_with_plot)
+    exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
+
+    # Wait for document to render
     page.wait_for_timeout(3000)
 
     # Hover to reveal buttons
@@ -202,21 +252,37 @@ def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_fronte
     # We can at least verify the plot container exists
 
 
-def test_plot_static_mode_shows_image(doc_with_plot, page, wait_for_frontend):
+def test_plot_static_mode_shows_image(doc_with_plot, page, wait_for_frontend, frontend_resources_dir):
     """Test that Static mode shows a static image instead of interactive plot."""
-    # Send document to frontend
-    doc_with_plot.send_to_frontend(embed_images=True, use_static_html=True)
+    from paradoc.frontend.frontend_handler import FrontendHandler
+    from paradoc.frontend.ws_server import ensure_ws_server
+    from paradoc.io.ast.exporter import ASTExporter
 
-    time.sleep(2)
+    # Ensure WebSocket server is running
+    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
-    # Navigate to the frontend
-    resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
-    index_html = resources_dir / "index.html"
+    # Use FrontendHandler to extract frontend without opening browser
+    frontend_handler = FrontendHandler(doc_with_plot, host="localhost", port=13579)
 
+    # Mock the open_frontend method to prevent opening browser windows
+    with patch.object(frontend_handler, 'open_frontend', return_value=True):
+        assert frontend_handler.ensure_frontend_extracted(), "Failed to extract frontend"
+
+    # Navigate to the frontend with Playwright (headless)
+    index_html = frontend_resources_dir / "index.html"
     assert index_html.exists(), f"Frontend HTML not found at {index_html}"
-    page.goto(f"file:///{index_html.as_posix()}")
 
+    # Navigate to the page first
+    page.goto(f"file:///{index_html.as_posix()}")
     wait_for_frontend(page)
+
+    # Send document via WebSocket (without auto-opening browser)
+    doc_with_plot._prep_compilation(metadata_file=None)
+    doc_with_plot._perform_variable_substitution(False)
+    exporter = ASTExporter(doc_with_plot)
+    exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
+
+    # Wait for document to render
     page.wait_for_timeout(3000)
 
     # In static mode (default), we should see a figure with an img element
