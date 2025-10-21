@@ -136,8 +136,8 @@ mkdocs-glightbox = "*"
 
 [tool.pixi.feature.test.tasks]
 pre-install = { cmd = "python -c \"from plotly.io._kaleido import plotly_get_chrome; plotly_get_chrome()\"", outputs = ["$PIXI_HOME/envs/test/Lib/site-packages/choreographer/cli/browser_exe/chrome-win64/chrome.exe"] }
-test = { cmd = "pytest tests", depends-on = ["pre-install"] }
-test-doc = { cmd = "python send_to_frontend.py", cwd = "examples", depends-on = ["pre-install"]}
+test = { cmd = "pytest tests" }
+test-doc = { cmd = "python send_to_frontend.py", cwd = "examples" }
 
 [tool.pixi.feature.profile.tasks]
 test-doc-profile = { cmd = ["pyinstrument", "-r", "html", "-o", "profile_doc.html", "$PIXI_PROJECT_ROOT/examples/send_to_frontend.py"], cwd= "examples" }
