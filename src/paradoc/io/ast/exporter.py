@@ -539,7 +539,7 @@ class ASTExporter:
         embed_images: bool = True,
         use_static_html: bool = False,
         frontend_id: str | None = None,
-        check_frontend_active: bool = True
+        auto_open_frontend: bool = True,
     ) -> bool:
         """
         Build AST, slice it into sections, and stream manifest + sections over the
@@ -551,220 +551,50 @@ class ASTExporter:
             embed_images: If True, embed images as base64 in WebSocket messages instead of serving via HTTP
             use_static_html: If True, extract frontend.zip to resources folder and open in browser
             frontend_id: Optional frontend ID to send to specific frontend. If None, sends to all connected frontends.
-            check_frontend_active: If True, check if any frontends are connected before sending. Default True.
+            auto_open_frontend: If True, automatically open a local frontend if none connected. Default True.
 
         Returns:
             True if successful, False otherwise
         """
-        # If use_static_html is True, extract the frontend and open it in a browser
+        # If use_static_html is True, use the FrontendHandler for static HTML mode
         if use_static_html:
-            return self._open_static_html(host=host, port=port, embed_images=embed_images)
+            return self._send_to_static_frontend(host=host, port=port, embed_images=embed_images)
 
-        # Ensure WS background server is running
-        try:
-            from paradoc.frontend.ws_server import ensure_ws_server, has_active_frontends, get_connected_frontends  # lazy import
+        # For WebSocket mode, ensure server is running and frontend is ready
+        from paradoc.frontend.frontend_handler import FrontendHandler
+        from paradoc.frontend.ws_client import WSClient
+        from paradoc.frontend.ws_server import ensure_ws_server
 
-            server_ok = ensure_ws_server(host=host, port=port)
-            if not server_ok:
-                logger.error("WebSocket server could not be started or reached")
+        # Ensure WebSocket server is running
+        if not ensure_ws_server(host=host, port=port):
+            logger.error("WebSocket server could not be started or reached")
+            return False
+
+        # Use FrontendHandler to ensure a frontend is ready
+        frontend_handler = FrontendHandler(self.one_doc, host=host, port=port)
+
+        # Check if specific frontend_id is requested
+        if frontend_id:
+            connected = frontend_handler.get_connected_frontends()
+            if frontend_id not in connected:
+                logger.warning(f"Frontend ID '{frontend_id}' not found. Connected frontends: {connected}")
+                print(f"Warning: Frontend ID '{frontend_id}' not found. Connected: {connected}")
+                return False
+            print(f"Sending document to frontend: {frontend_id}")
+        else:
+            # Ensure at least one frontend is ready
+            if not frontend_handler.ensure_frontend_ready(
+                auto_open=auto_open_frontend,
+                wait_for_connection=auto_open_frontend
+            ):
+                logger.warning("No active frontends and could not open new frontend")
+                print("Warning: No active frontends connected. Please open a Paradoc Reader frontend first.")
                 return False
 
-            # Check if any frontends are connected
-            if check_frontend_active:
-                if not has_active_frontends(host=host, port=port):
-                    logger.warning("No active frontends connected to WebSocket server. Document will not be displayed.")
-                    print("Warning: No active frontends connected. Please open a Paradoc Reader frontend first.")
-                    return False
+            connected = frontend_handler.get_connected_frontends()
+            print(f"Sending document to {len(connected)} connected frontend(s): {connected}")
 
-                # If a specific frontend_id is requested, verify it exists
-                if frontend_id:
-                    connected = get_connected_frontends(host=host, port=port)
-                    if frontend_id not in connected:
-                        logger.warning(f"Frontend ID '{frontend_id}' not found. Connected frontends: {connected}")
-                        print(f"Warning: Frontend ID '{frontend_id}' not found. Connected: {connected}")
-                        return False
-                    print(f"Sending document to frontend: {frontend_id}")
-                else:
-                    connected = get_connected_frontends(host=host, port=port)
-                    print(f"Sending document to {len(connected)} connected frontend(s): {connected}")
-        except Exception as e:
-            logger.error(f"Could not ensure WebSocket server is running: {e}")
-            # Continue; we might still connect to an external server
-
-        try:
-            import websocket  # type: ignore
-        except Exception:
-            print(
-                "websocket-client is not installed. Please add it to your environment to use ASTExporter.send_to_frontend()."
-            )
-            return False
-
-        # Build and slice
-        ast = self.build_ast()
-        manifest, sections = self.slice_sections(ast)
-
-        # Get doc_id early so it's available in all scopes
-        doc_id = manifest.get("docId") or self._infer_doc_id()
-
-        # Send plot and table data if available
-        plot_data_dict = self._extract_plot_data_from_db()
-        table_data_dict = self._extract_table_data_from_db()
-
-        # Only start HTTP server if not embedding images
-        # When embed_images=True, images are sent via WebSocket and stored in IndexedDB
-        if not embed_images:
-            # Ensure a static HTTP server is serving assets from dist_dir so relative image paths load in the SPA
-            try:
-                from paradoc.frontend.http_server import (
-                    ensure_http_server,  # lazy import
-                )
-
-                http_port = int(port) + 1
-                # Make sure dist_dir exists
-                try:
-                    self.one_doc.dist_dir.mkdir(exist_ok=True, parents=True)
-                except Exception:
-                    pass
-
-                # Write JSON artifacts expected by the frontend fetch() paths
-                try:
-
-                    base_dir = self.one_doc.dist_dir / "doc" / doc_id
-                    section_dir = base_dir / "section"
-                    section_dir.mkdir(parents=True, exist_ok=True)
-
-                    # manifest.json
-                    (base_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
-
-                    # sections: by index and by id
-                    for bundle in sections:
-                        sec = bundle["section"]
-                        idx = sec.get("index")
-                        sid = sec.get("id")
-                        data = json.dumps(bundle, ensure_ascii=False)
-                        if idx is not None:
-                            (section_dir / f"{idx}.json").write_text(data, encoding="utf-8")
-                        if sid:
-                            # sanitize filename a bit
-                            safe_sid = "".join(ch if ch.isalnum() or ch in ("-", "_", ".") else "-" for ch in str(sid))
-                            (section_dir / f"{safe_sid}.json").write_text(data, encoding="utf-8")
-                except Exception:
-                    logger.error("Failed to write HTTP JSON artifacts for frontend", exc_info=True)
-
-                _ = ensure_http_server(host=host, port=http_port, directory=str(self.one_doc.dist_dir))
-                # Advertise asset base to the frontend manifest so it can resolve relative URLs
-                try:
-                    manifest["assetBase"] = f"http://{host}:{http_port}/"
-                    manifest["httpDocBase"] = f"http://{host}:{http_port}/doc/{doc_id}/"
-                except Exception:
-                    logger.error("Could not advertise asset base to frontend manifest", exc_info=True)
-                    pass
-            except Exception:
-                # Non-fatal if HTTP server cannot be started; images may fail to load
-                logger.error("Could not ensure HTTP server is running", exc_info=True)
-                pass
-
-        ws_url = f"ws://{host}:{port}"
-        try:
-            ws = websocket.create_connection(ws_url, timeout=3)
-        except Exception as e:
-            print(f"Could not connect to frontend WebSocket at {ws_url}: {e}")
-            return False
-
-        try:
-            # Send plot and table data if available
-            plot_data_dict = self._extract_plot_data_from_db()
-            table_data_dict = self._extract_table_data_from_db()
-
-            # Send manifest first
-            ws.send(json.dumps({"kind": "manifest", "manifest": manifest}))
-            # Then each section
-            for bundle in sections:
-                msg = {"kind": "ast_section", "section": bundle["section"], "doc": bundle["doc"]}
-                ws.send(json.dumps(msg))
-
-            # Embed images if requested
-            if embed_images:
-                for bundle in sections:
-                    embedded_images = self._embed_images_in_bundle(bundle)
-                    if embedded_images:
-                        img_msg = {"kind": "embedded_images", "images": embedded_images}
-                        ws.send(json.dumps(img_msg))
-
-            # Send plot data if available
-            if plot_data_dict:
-                plot_msg = {"kind": "plot_data", "data": plot_data_dict}
-                ws.send(json.dumps(plot_msg))
-
-            # Send table data if available
-            if table_data_dict:
-                table_msg = {"kind": "table_data", "data": table_data_dict}
-                ws.send(json.dumps(table_msg))
-
-            return True
-        except Exception as e:
-            print(f"Failed to send AST to frontend over WebSocket: {e}")
-            return False
-        finally:
-            try:
-                ws.close()
-            except Exception:
-                pass
-
-    def _open_static_html(self, host: str, port: int, embed_images: bool) -> bool:
-        """
-        Extract frontend.zip to resources folder if needed (checking hash) and open in browser.
-        Similar strategy to adapy's renderer_react.py.
-
-        Args:
-            host: WebSocket server host
-            port: WebSocket server port
-            embed_images: If True, embed images as base64 in WebSocket messages instead of serving via HTTP
-        """
-        import pathlib
-        import webbrowser
-
-        from paradoc.utils import get_md5_hash_for_file
-
-        # Locate the frontend.zip in the resources folder
-        this_dir = pathlib.Path(__file__).parent.absolute()
-        zip_frontend = this_dir / "resources" / "frontend.zip"
-        hash_file = zip_frontend.with_suffix(".hash")
-        local_html_path = this_dir / "resources" / "index.html"
-
-        if not zip_frontend.exists():
-            logger.error(f"frontend.zip not found at {zip_frontend}")
-            return False
-
-        # Check if we need to extract the frontend
-        hash_content = get_md5_hash_for_file(zip_frontend).hexdigest()
-        if local_html_path.exists() and hash_file.exists():
-            with open(hash_file, "r") as f:
-                hash_stored = f.read()
-            if hash_content == hash_stored:
-                logger.info("Frontend already extracted and up to date")
-            else:
-                logger.info("Frontend hash changed, re-extracting...")
-                self._extract_frontend(zip_frontend, this_dir / "resources", hash_file, hash_content)
-        else:
-            logger.info("Extracting frontend for the first time...")
-            self._extract_frontend(zip_frontend, this_dir / "resources", hash_file, hash_content)
-
-        # Start WebSocket server and optionally HTTP server
-        try:
-            from paradoc.frontend.ws_server import ensure_ws_server
-
-            _ = ensure_ws_server(host=host, port=port)
-        except Exception as e:
-            logger.error(f"Could not ensure WebSocket server is running: {e}")
-
-        # Build and send the document via WebSocket
-        try:
-            import websocket
-        except Exception:
-            print("websocket-client is not installed. Please add it to your environment.")
-            return False
-
+        # Build AST and prepare data
         ast = self.build_ast()
         manifest, sections = self.slice_sections(ast)
         doc_id = manifest.get("docId") or self._infer_doc_id()
@@ -773,102 +603,188 @@ class ASTExporter:
         plot_data_dict = self._extract_plot_data_from_db()
         table_data_dict = self._extract_table_data_from_db()
 
-        http_port = int(port) + 1  # Initialize http_port early
-
-        # Start HTTP server if not embedding images
+        # Setup HTTP server if not embedding images
         if not embed_images:
-            try:
-                from paradoc.frontend.http_server import ensure_http_server
+            self._setup_http_server(host, port, doc_id, manifest, sections)
 
-                self.one_doc.dist_dir.mkdir(exist_ok=True, parents=True)
+        # Send document via WebSocket
+        return self._send_via_websocket(
+            host=host,
+            port=port,
+            manifest=manifest,
+            sections=sections,
+            embed_images=embed_images,
+            plot_data_dict=plot_data_dict,
+            table_data_dict=table_data_dict,
+        )
 
-                # Write JSON artifacts
-                base_dir = self.one_doc.dist_dir / "doc" / doc_id
-                section_dir = base_dir / "section"
-                section_dir.mkdir(parents=True, exist_ok=True)
+    def _send_to_static_frontend(self, host: str, port: int, embed_images: bool) -> bool:
+        """
+        Send document to a static HTML frontend (opens in browser).
 
-                (base_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+        Args:
+            host: WebSocket server host
+            port: WebSocket server port
+            embed_images: If True, embed images as base64
 
-                for bundle in sections:
-                    sec = bundle["section"]
-                    idx = sec.get("index")
-                    sid = sec.get("id")
-                    data = json.dumps(bundle, ensure_ascii=False)
-                    if idx is not None:
-                        (section_dir / f"{idx}.json").write_text(data, encoding="utf-8")
-                    if sid:
-                        safe_sid = "".join(ch if ch.isalnum() or ch in ("-", "_", ".") else "-" for ch in str(sid))
-                        (section_dir / f"{safe_sid}.json").write_text(data, encoding="utf-8")
+        Returns:
+            True if successful, False otherwise
+        """
+        from paradoc.frontend.frontend_handler import FrontendHandler
+        from paradoc.frontend.ws_server import ensure_ws_server
 
-                _ = ensure_http_server(host=host, port=http_port, directory=str(self.one_doc.dist_dir))
-                manifest["assetBase"] = f"http://{host}:{http_port}/"
-                manifest["httpDocBase"] = f"http://{host}:{http_port}/doc/{doc_id}/"
-            except Exception as e:
-                logger.error(f"Could not ensure HTTP server is running: {e}")
-
-        # Send data via WebSocket
-        ws_url = f"ws://{host}:{port}"
-        try:
-            ws = websocket.create_connection(ws_url, timeout=3)
-            ws.send(json.dumps({"kind": "manifest", "manifest": manifest}))
-            for bundle in sections:
-                msg = {"kind": "ast_section", "section": bundle["section"], "doc": bundle["doc"]}
-                ws.send(json.dumps(msg))
-
-            if embed_images:
-                for bundle in sections:
-                    embedded_images = self._embed_images_in_bundle(bundle)
-                    if embedded_images:
-                        img_msg = {"kind": "embedded_images", "images": embedded_images}
-                        ws.send(json.dumps(img_msg))
-
-            # Send plot data if available
-            if plot_data_dict:
-                plot_msg = {"kind": "plot_data", "data": plot_data_dict}
-                ws.send(json.dumps(plot_msg))
-                logger.info(f"Sent {len(plot_data_dict)} plots to frontend")
-
-            # Send table data if available
-            if table_data_dict:
-                table_msg = {"kind": "table_data", "data": table_data_dict}
-                ws.send(json.dumps(table_msg))
-                logger.info(f"Sent {len(table_data_dict)} tables to frontend")
-
-            ws.close()
-        except Exception as e:
-            logger.error(f"Failed to send AST to frontend over WebSocket: {e}")
+        # Ensure WebSocket server is running
+        if not ensure_ws_server(host=host, port=port):
+            logger.error("WebSocket server could not be started")
             return False
 
-        # Open the HTML file in the browser
-        url = local_html_path.resolve().as_uri()
-        webbrowser.open(url)
-        logger.info(f"✓ Opened frontend in browser: {url}")
+        # Use FrontendHandler to manage frontend
+        frontend_handler = FrontendHandler(self.one_doc, host=host, port=port)
 
-        if embed_images:
-            print("✓ Sent document to Reader with embedded images.")
-            print("✓ Images stored in browser IndexedDB - no HTTP server needed!")
-            print("✓ You can close this script now - the document is fully cached in the browser.")
-        else:
-            print("✓ Sent document to Reader.")
-            print(f"Serving JSON and assets via HTTP server at http://{host}:{http_port}/")
-            print("The browser is open. Press Ctrl+C here to stop the servers.")
+        # Extract and open frontend
+        if not frontend_handler.ensure_frontend_extracted():
+            return False
 
-        return True
+        if not frontend_handler.open_frontend():
+            return False
 
-    def _extract_frontend(
-        self, zip_path: pathlib.Path, dest_dir: pathlib.Path, hash_file: pathlib.Path, hash_content: str
+        # Wait for frontend to connect
+        if not frontend_handler.wait_for_frontend_connection(timeout=10):
+            logger.warning("Frontend opened but did not connect - sending anyway")
+
+        # Build and send document
+        ast = self.build_ast()
+        manifest, sections = self.slice_sections(ast)
+        doc_id = manifest.get("docId") or self._infer_doc_id()
+
+        # Extract plot and table data
+        plot_data_dict = self._extract_plot_data_from_db()
+        table_data_dict = self._extract_table_data_from_db()
+
+        # Setup HTTP server if not embedding images
+        if not embed_images:
+            self._setup_http_server(host, port, doc_id, manifest, sections)
+
+        # Send via WebSocket
+        success = self._send_via_websocket(
+            host=host,
+            port=port,
+            manifest=manifest,
+            sections=sections,
+            embed_images=embed_images,
+            plot_data_dict=plot_data_dict,
+            table_data_dict=table_data_dict,
+        )
+
+        if success:
+            frontend_handler.print_frontend_status(embed_images=embed_images)
+
+        return success
+
+    def _setup_http_server(
+        self, host: str, port: int, doc_id: str, manifest: Dict[str, Any], sections: List[Dict[str, Any]]
     ):
-        """Extract frontend.zip to destination directory and update hash file."""
-        import zipfile  # Local import to avoid unused import warning
+        """
+        Setup HTTP server for serving assets and JSON artifacts.
 
-        logger.info(f"Extracting frontend from {zip_path} to {dest_dir}")
-        archive = zipfile.ZipFile(zip_path)
-        archive.extractall(dest_dir)
+        Args:
+            host: HTTP server host
+            port: WebSocket port (HTTP port will be port+1)
+            doc_id: Document ID
+            manifest: Document manifest
+            sections: List of section bundles
+        """
+        try:
+            from paradoc.frontend.http_server import ensure_http_server
 
-        # Update hash file
-        with open(hash_file, "w") as f:
-            f.write(hash_content)
-        logger.info("Frontend extraction complete")
+            http_port = int(port) + 1
+
+            # Ensure dist_dir exists
+            self.one_doc.dist_dir.mkdir(exist_ok=True, parents=True)
+
+            # Write JSON artifacts
+            base_dir = self.one_doc.dist_dir / "doc" / doc_id
+            section_dir = base_dir / "section"
+            section_dir.mkdir(parents=True, exist_ok=True)
+
+            # Write manifest
+            (base_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+
+            # Write sections
+            for bundle in sections:
+                sec = bundle["section"]
+                idx = sec.get("index")
+                sid = sec.get("id")
+                data = json.dumps(bundle, ensure_ascii=False)
+
+                if idx is not None:
+                    (section_dir / f"{idx}.json").write_text(data, encoding="utf-8")
+                if sid:
+                    safe_sid = "".join(ch if ch.isalnum() or ch in ("-", "_", ".") else "-" for ch in str(sid))
+                    (section_dir / f"{safe_sid}.json").write_text(data, encoding="utf-8")
+
+            # Start HTTP server
+            ensure_http_server(host=host, port=http_port, directory=str(self.one_doc.dist_dir))
+
+            # Update manifest with asset URLs
+            manifest["assetBase"] = f"http://{host}:{http_port}/"
+            manifest["httpDocBase"] = f"http://{host}:{http_port}/doc/{doc_id}/"
+
+            logger.info(f"HTTP server serving assets at http://{host}:{http_port}/")
+        except Exception as e:
+            logger.error(f"Failed to setup HTTP server: {e}", exc_info=True)
+
+    def _send_via_websocket(
+        self,
+        host: str,
+        port: int,
+        manifest: Dict[str, Any],
+        sections: List[Dict[str, Any]],
+        embed_images: bool,
+        plot_data_dict: Dict[str, Any],
+        table_data_dict: Dict[str, Any],
+    ) -> bool:
+        """
+        Send document data via WebSocket using WSClient.
+
+        Args:
+            host: WebSocket host
+            port: WebSocket port
+            manifest: Document manifest
+            sections: List of section bundles
+            embed_images: If True, embed images in messages
+            plot_data_dict: Plot data dictionary
+            table_data_dict: Table data dictionary
+
+        Returns:
+            True if successful, False otherwise
+        """
+        from paradoc.frontend.ws_client import WSClient
+
+        # Prepare embedded images if requested
+        embedded_images_list = []
+        if embed_images:
+            for bundle in sections:
+                embedded_images = self._embed_images_in_bundle(bundle)
+                embedded_images_list.append(embedded_images)
+
+        # Send using WSClient
+        try:
+            with WSClient(host=host, port=port) as ws_client:
+                if not ws_client._ws:  # Connection failed
+                    return False
+
+                return ws_client.send_complete_document(
+                    manifest=manifest,
+                    sections=sections,
+                    embedded_images=embedded_images_list if embed_images else None,
+                    plot_data=plot_data_dict,
+                    table_data=table_data_dict,
+                )
+        except Exception as e:
+            logger.error(f"Failed to send document via WebSocket: {e}")
+            return False
+
 
     def _extract_plot_data_from_db(self) -> Dict[str, Any]:
         """

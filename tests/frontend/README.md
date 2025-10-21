@@ -13,10 +13,11 @@ This directory contains Playwright-based end-to-end tests for the Paradoc fronte
 - Added playwright dependencies to `pyproject.toml` (test feature)
 - Installed Playwright chromium browser
 
-### ⚠️ In Progress
-The tests are currently **failing** at the `send_to_frontend()` call because:
-- The method returns `None` instead of a boolean when `use_static_html=True`
-- Need to remove or adjust the assertion: `assert result, "Failed to send document to frontend"`
+### ✅ Recently Fixed
+- Removed the failing `assert result` statements since `send_to_frontend()` returns `None` with `use_static_html=True`
+- Added `assert index_html.exists()` before navigation to verify frontend extraction
+- Added autouse fixture in `conftest.py` that automatically installs Chromium if not found
+- Cleaned up duplicate code and imports in test functions
 
 ## Test File: `test_play_figures.py`
 
@@ -44,7 +45,15 @@ Tests that interactive plots render correctly in the frontend with proper Static
 4. **`test_plot_static_mode_shows_image`**
    - Verifies default Static mode shows an `<img>` element
    - Checks that image has a valid `src` attribute (base64 or URL)
+### Fixtures
 
+#### `ensure_playwright_installed` (autouse)
+- Automatically checks if Chromium is installed before running tests
+- If Chromium is not found, installs it automatically using `playwright install chromium`
+- Runs once per test session, so no manual installation needed
+- This fixture ensures tests can run immediately without manual setup
+
+#### `doc_with_plot`
 ### Fixture: `doc_with_plot`
 Creates a test document with:
 - A markdown file in `00-main/test.md`
