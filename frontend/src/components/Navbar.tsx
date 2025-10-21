@@ -69,7 +69,7 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
       <div
         id="paradoc-mobile-drawer-root"
         className={`fixed inset-0 z-40 md:hidden ${open ? 'pointer-events-auto' : 'pointer-events-none'}`}
-        {...(!open ? ({ inert: '' } as any) : {})}
+        {...(!open ? ({ inert: true } as any) : {})}
       >
         {/* Backdrop */}
         <div

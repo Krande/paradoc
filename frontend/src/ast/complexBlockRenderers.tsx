@@ -10,7 +10,7 @@ import type { HeadingNumbering } from './headingNumbers'
 /**
  * Render a Div block (generic container)
  */
-export function renderDiv(b: any, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key): React.ReactElement {
+export function renderDiv(b: any, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key, sourceInfo?: { source_file?: string; source_dir?: string }): React.ReactElement {
   const [a, blocks] = b.c as [Attr, PandocBlock[]]
   const divAttrs = attrs(a)
   const docId = useDocId()
@@ -69,7 +69,7 @@ export function renderDiv(b: any, renderBlock: (b: any, k?: React.Key, hn?: Head
 /**
  * Render a Figure block (Pandoc v3+ with proper caption support)
  */
-export function renderFigure(b: any, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key): React.ReactElement {
+export function renderFigure(b: any, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key, sourceInfo?: { source_file?: string; source_dir?: string }): React.ReactElement {
   // Pandoc v3+ Figure block: c = [Attr, [ShortCaption|null, [Blocks caption]], [Blocks content]]
   const [a, cap, content] = b.c as [Attr, any, PandocBlock[]]
   const captionBlocks: any[] = (cap && Array.isArray(cap) && Array.isArray(cap[1])) ? cap[1] : []
@@ -230,7 +230,7 @@ function renderTableContent(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
   )
 }
 
-export function renderTable(b: Table, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key): React.ReactElement {
+export function renderTable(b: Table, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key, sourceInfo?: { source_file?: string; source_dir?: string }): React.ReactElement {
   // Table: [Attr, Caption, [ColSpec], TableHead, [TableBody], TableFoot]
   const [a, caption] = b.c
 

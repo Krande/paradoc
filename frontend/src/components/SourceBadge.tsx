@@ -10,6 +10,7 @@ interface SourceBadgeProps {
   children: ReactNode
   sourceInfo?: SourceInfo
   blockType?: string
+  key?: React.Key
 }
 
 /**
@@ -20,6 +21,7 @@ export function SourceBadge({ children, sourceInfo, blockType = 'block' }: Sourc
   const { enabled } = useSourceDisplayStore()
 
   if (!enabled || !sourceInfo?.source_file) {
+    // Return children directly - React will handle the key prop on the SourceBadge component itself
     return <>{children}</>
   }
 
