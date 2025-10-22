@@ -112,6 +112,81 @@ def add_bookmark(paragraph: Paragraph, bookmark_text, bookmark_name):
     tag.append(end)
 
 
+def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str):
+    """Add a bookmark around the caption number SEQ field.
+
+    This is the proper way to create Word cross-references - the bookmark
+    wraps around the SEQ field that generates the caption number, not the
+    entire caption paragraph.
+
+    Args:
+        paragraph: The caption paragraph containing SEQ fields
+        bookmark_name: The name of the bookmark (will be normalized to Word format)
+    """
+    # Normalize bookmark name to Word-compatible format
+    normalized_name = _normalize_bookmark_name(bookmark_name)
+
+    # Generate a unique ID for the bookmark
+    import random
+    bookmark_id = str(random.randint(1, 999999))
+
+    # Find the SEQ field runs in the caption
+    # Caption structure: [prefix run] [STYLEREF field] [separator run] [SEQ field] [caption text run]
+    # We want to wrap the bookmark around the SEQ field
+
+    p_element = paragraph._p
+    runs = list(p_element.findall(qn('w:r')))
+
+    if len(runs) < 4:
+        # Not enough runs to identify SEQ field, fall back to paragraph bookmark
+        add_bookmark_to_caption(paragraph, bookmark_name)
+        return
+
+    # Find the SEQ field (usually the 4th run, index 3)
+    # Look for the run containing fldChar with fldCharType="end" for the SEQ field
+    seq_field_end_idx = None
+    for idx, run in enumerate(runs):
+        # Check if this run contains a field end
+        fld_chars = run.findall(qn('w:fldChar'))
+        for fld_char in fld_chars:
+            fld_type = fld_char.get(qn('w:fldCharType'))
+            if fld_type == 'end':
+                # This might be the SEQ field end - check previous runs for SEQ instruction
+                if idx >= 2:
+                    # Check if previous runs contain SEQ instruction
+                    for check_idx in range(max(0, idx - 3), idx):
+                        instr_texts = runs[check_idx].findall(qn('w:instrText'))
+                        for instr in instr_texts:
+                            if instr.text and 'SEQ' in instr.text and 'STYLEREF' not in instr.text:
+                                seq_field_end_idx = idx
+                                break
+                if seq_field_end_idx:
+                    break
+
+    if seq_field_end_idx is None:
+        # Couldn't find SEQ field, fall back to paragraph bookmark
+        add_bookmark_to_caption(paragraph, bookmark_name)
+        return
+
+    # Place bookmark start before the SEQ field begin (a few runs before the end)
+    bookmark_start_idx = max(0, seq_field_end_idx - 3)
+
+    # Add bookmark start before the SEQ field
+    start = OxmlElement("w:bookmarkStart")
+    start.set(qn("w:id"), bookmark_id)
+    start.set(qn("w:name"), normalized_name)
+
+    # Insert bookmark start before the identified run
+    runs[bookmark_start_idx].addprevious(start)
+
+    # Add bookmark end after the SEQ field end
+    end = OxmlElement("w:bookmarkEnd")
+    end.set(qn("w:id"), bookmark_id)
+
+    # Insert bookmark end after the SEQ field end run
+    runs[seq_field_end_idx].addnext(end)
+
+
 def add_bookmark_to_caption(paragraph: Paragraph, bookmark_name):
     """Add a bookmark to a caption paragraph for cross-referencing.
 
@@ -369,7 +444,9 @@ def _add_ref_field_runs(p_element, bookmark_name):
     r2 = OxmlElement("w:r")
     instrText = OxmlElement("w:instrText")
     instrText.set(qn("xml:space"), "preserve")
-    instrText.text = f" REF {bookmark_name} \\h "
+    # Use Word's cross-reference format: REF bookmark \h \* MERGEFORMAT
+    # \h creates a hyperlink, \* MERGEFORMAT preserves formatting
+    instrText.text = f" REF {bookmark_name} \\h \\* MERGEFORMAT "
     r2.append(instrText)
     p_element.append(r2)
 
@@ -414,7 +491,7 @@ def add_ref_field_to_paragraph(paragraph: Paragraph, bookmark_name: str):
     r2 = run2._r
     instrText = OxmlElement("w:instrText")
     instrText.set(qn("xml:space"), "preserve")
-    instrText.text = f" REF {bookmark_name} \\h "
+    instrText.text = f" REF {bookmark_name} \\h \\* MERGEFORMAT "
     r2.append(instrText)
 
     # Create field separator

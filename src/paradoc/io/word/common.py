@@ -108,23 +108,21 @@ class DocXFigureRef:
     document_index: int = None
 
     def format_figure(self, is_appendix, restart_caption_numbering):
-        # Import here to avoid circular dependency
-        from .references import add_bookmark_to_caption
-
         figure_format = self.figure_ref.format
         self.docx_caption.paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
+        # Rebuild caption without bookmark
         rebuild_caption(self.docx_caption, "Figure", self.figure_ref.caption, is_appendix, restart_caption_numbering)
 
-        # Add bookmark to caption using the figure reference ID
-        # This allows Word cross-references to work properly
+        # Add bookmark around the caption number (SEQ field) for Word cross-references
         if self.figure_ref.reference:
+            from .references import add_bookmark_around_seq_field
+
             bookmark_name = f"fig:{self.figure_ref.reference}"
-            add_bookmark_to_caption(self.docx_caption, bookmark_name)
+            add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
 
         for run in self.docx_caption.runs:
             run.font.name = figure_format.font_style
-            # run.font.size = figure_format.font_size
 
 
 def rebuild_caption(caption: Paragraph, caption_prefix, caption_str, is_appendix, should_restart=False):
@@ -149,6 +147,7 @@ def rebuild_caption(caption: Paragraph, caption_prefix, caption_str, is_appendix
     else:
         # \s switch continues numbering from heading level
         seq_instruction += ' \\s 1'
+
 
     seq1 = caption._element._new_r()
     seq1.text = caption_prefix + " "
