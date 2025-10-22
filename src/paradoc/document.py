@@ -246,7 +246,7 @@ class OneDoc:
         output_name,
         auto_open=False,
         metadata_file=None,
-        export_format: ExportFormats = ExportFormats.DOCX,
+        export_format: ExportFormats | str = ExportFormats.DOCX,
         send_to_frontend=False,
         **kwargs,
     ):
