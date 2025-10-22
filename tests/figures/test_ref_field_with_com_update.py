@@ -53,9 +53,9 @@ Another reference: see [@fig:test_figure] for details.
     # Compile with COM automation enabled
     work_dir = tmp_path / "work"
     one = OneDoc(source_dir, work_dir=work_dir)
-    one.compile("test_output", auto_open=False, export_format="docx", enable_word_com_automation=True)
+    one.compile("test_output_wcom", auto_open=False, export_format="docx", enable_word_com_automation=True)
 
-    output_file = work_dir / "_dist" / "test_output.docx"
+    output_file = work_dir / "_dist" / "test_output_wcom.docx"
 
     # Now run the COM update manually to update fields
     from paradoc.io.word.utils import docx_update

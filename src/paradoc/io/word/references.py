@@ -446,7 +446,7 @@ def _add_ref_field_runs(p_element, bookmark_name):
     instrText.set(qn("xml:space"), "preserve")
     # Use Word's cross-reference format: REF bookmark \h \* MERGEFORMAT
     # \h creates a hyperlink, \* MERGEFORMAT preserves formatting
-    instrText.text = f" REF {bookmark_name} \\h \\* MERGEFORMAT "
+    instrText.text = f" REF {bookmark_name} \\h "
     r2.append(instrText)
     p_element.append(r2)
 
@@ -491,7 +491,7 @@ def add_ref_field_to_paragraph(paragraph: Paragraph, bookmark_name: str):
     r2 = run2._r
     instrText = OxmlElement("w:instrText")
     instrText.set(qn("xml:space"), "preserve")
-    instrText.text = f" REF {bookmark_name} \\h \\* MERGEFORMAT "
+    instrText.text = f" REF {bookmark_name} \\h "
     r2.append(instrText)
 
     # Create field separator
