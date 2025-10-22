@@ -108,10 +108,19 @@ class DocXFigureRef:
     document_index: int = None
 
     def format_figure(self, is_appendix, restart_caption_numbering):
+        # Import here to avoid circular dependency
+        from .references import add_bookmark_to_caption
+
         figure_format = self.figure_ref.format
         self.docx_caption.paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
         rebuild_caption(self.docx_caption, "Figure", self.figure_ref.caption, is_appendix, restart_caption_numbering)
+
+        # Add bookmark to caption using the figure reference ID
+        # This allows Word cross-references to work properly
+        if self.figure_ref.reference:
+            bookmark_name = f"fig:{self.figure_ref.reference}"
+            add_bookmark_to_caption(self.docx_caption, bookmark_name)
 
         for run in self.docx_caption.runs:
             run.font.name = figure_format.font_style
@@ -126,11 +135,20 @@ def rebuild_caption(caption: Paragraph, caption_prefix, caption_str, is_appendix
 
     heading_ref = '"Appendix"' if is_appendix is True else '"Heading 1"'
 
-    sub_heading_ref = "\\s" if should_restart is False else "\\r"
-    if is_appendix and should_restart:
-        sub_heading_ref += '"Appendix X.1"'
+    # Build the SEQ field instruction
+    # Format: SEQ Figure \* ARABIC \s 1
+    # where Figure/Table is the identifier, \* ARABIC is the format, \s 1 restarts numbering
+    seq_instruction = f"SEQ {caption_prefix} \\* ARABIC"
+
+    if should_restart:
+        # \r switch restarts numbering at heading level
+        if is_appendix:
+            seq_instruction += ' \\r "Appendix X.1"'
+        else:
+            seq_instruction += ' \\r "Heading 1"'
     else:
-        sub_heading_ref += '"Heading 1"'
+        # \s switch continues numbering from heading level
+        seq_instruction += ' \\s 1'
 
     seq1 = caption._element._new_r()
     seq1.text = caption_prefix + " "
@@ -142,9 +160,11 @@ def rebuild_caption(caption: Paragraph, caption_prefix, caption_str, is_appendix
     new_run = Run(stroke, run._parent)
     new_run.text = "-"
     run._element.addprevious(stroke)
+
     seq2 = caption._element._new_r()
-    add_seq_reference(seq2, f"SEQ {sub_heading_ref} ARABIC", run._parent)
+    add_seq_reference(seq2, seq_instruction, run._parent)
     run._element.addprevious(seq2)
+
     fin = caption._element._new_r()
     fin_run = Run(fin, run._parent)
     fin_run.text = ": " + caption_str

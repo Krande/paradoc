@@ -1,0 +1,70 @@
+"""Debug test to check if REF fields are being created."""
+
+import os
+import re
+
+from docx import Document
+
+from paradoc import OneDoc
+
+
+def test_debug_ref_conversion(tmp_path, capsys):
+    """Debug test with explicit output."""
+    # Create test document
+    source_dir = tmp_path / "test_doc"
+    main_dir = source_dir / "00-main"
+    main_dir.mkdir(parents=True)
+
+    # Create test image
+    import base64
+    png_data = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+    )
+
+    images_dir = main_dir / "images"
+    images_dir.mkdir(parents=True)
+    img_path = images_dir / "test.png"
+    img_path.write_bytes(png_data)
+
+    # Create markdown
+    md_content = """# Test Document
+
+![Test Figure Caption](images/test.png){#fig:test_figure}
+
+Reference to figure: [@fig:test_figure]
+"""
+
+    md_file = main_dir / "test.md"
+    md_file.write_text(md_content, encoding="utf-8")
+
+    # Compile
+    work_dir = tmp_path / "work"
+    one = OneDoc(source_dir, work_dir=work_dir)
+    one.compile("test_output", auto_open=False, export_format="docx")
+
+    output_file = work_dir / "_dist" / "test_output.docx"
+    doc = Document(str(output_file))
+
+    # Check results
+    has_bookmark = False
+    has_ref_field = False
+
+    for para in doc.paragraphs:
+        xml_str = para._element.xml.decode('utf-8') if isinstance(para._element.xml, bytes) else para._element.xml
+
+        if "Test Figure Caption" in para.text:
+            has_bookmark = "bookmarkStart" in xml_str and "fig:test_figure" in xml_str
+            print(f"Caption bookmark: {has_bookmark}")
+
+        if "Reference to figure" in para.text:
+            has_ref_field = "REF" in xml_str and "fig:test_figure" in xml_str
+            print(f"Reference has REF field: {has_ref_field}")
+            print(f"Reference text: {para.text}")
+            if not has_ref_field and "REF" in xml_str:
+                # Extract REF instructions
+                ref_matches = re.findall(r'<w:instrText[^>]*>([^<]*)</w:instrText>', xml_str)
+                print(f"REF instructions found: {ref_matches}")
+
+    assert has_bookmark, "Caption should have bookmark"
+    assert has_ref_field, "Reference should have REF field pointing to bookmark"
+

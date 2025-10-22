@@ -33,6 +33,9 @@ class WordExporter:
             self._compile_docx_from_str(dest_file)
 
     def _compile_individual_md_files_to_docx(self, output_name, dest_file, check_open_docs=False):
+
+        from .references import convert_figure_references_to_ref_fields
+
         one = self.one_doc
 
         for mdf in one.md_files_main + one.md_files_app:
@@ -54,14 +57,19 @@ class WordExporter:
         self.format_tables(composer_main.doc, False)
         self.format_tables(composer_app.doc, True)
 
-        self.format_figures(composer_main.doc, False)
-        self.format_figures(composer_app.doc, True)
+        # Format figures and collect them for reference conversion
+        main_figures = self.format_figures(composer_main.doc, False)
+        app_figures = self.format_figures(composer_app.doc, True)
 
         format_paragraphs_and_headings(composer_app.doc, one.appendix_heading_map)
 
         # Merge docs
         composer_main.doc.add_page_break()
         composer_main.append(composer_app.doc)
+
+        # Convert figure references to REF fields after merging
+        all_figures = main_figures + app_figures
+        convert_figure_references_to_ref_fields(composer_main.doc, all_figures)
 
         # Format all paragraphs
         format_paragraphs_and_headings(composer_main.doc, one.paragraph_style_map)
@@ -101,12 +109,14 @@ class WordExporter:
             docx_tbl.format_table(is_appendix, restart_caption_numbering=restart_caption_num)
 
     def format_figures(self, composer_doc: Document, is_appendix):
-        for i, docx_fig in enumerate(self.get_all_figures(composer_doc)):
+        figures = self.get_all_figures(composer_doc)
+        for i, docx_fig in enumerate(figures):
             if is_appendix and i == 0:
                 restart_caption_num = True
             else:
                 restart_caption_num = False
             docx_fig.format_figure(is_appendix, restart_caption_num)
+        return figures
 
     def get_all_tables(self, doc: Document):
         tables = []

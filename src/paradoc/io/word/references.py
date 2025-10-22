@@ -90,6 +90,32 @@ def add_bookmark(paragraph: Paragraph, bookmark_text, bookmark_name):
     tag.append(end)
 
 
+def add_bookmark_to_caption(paragraph: Paragraph, bookmark_name):
+    """Add a bookmark to a caption paragraph for cross-referencing.
+
+    The bookmark wraps around the entire caption paragraph so that
+    Word's cross-reference feature can reference it properly.
+
+    Args:
+        paragraph: The caption paragraph to add the bookmark to
+        bookmark_name: The name of the bookmark (e.g., "fig:test_figure")
+    """
+    # Generate a unique ID for the bookmark
+    import random
+    bookmark_id = str(random.randint(1, 999999))
+
+    # Add bookmark start at the beginning of the paragraph
+    start = OxmlElement("w:bookmarkStart")
+    start.set(qn("w:id"), bookmark_id)
+    start.set(qn("w:name"), bookmark_name)
+    paragraph._p.insert(0, start)
+
+    # Add bookmark end at the end of the paragraph
+    end = OxmlElement("w:bookmarkEnd")
+    end.set(qn("w:id"), bookmark_id)
+    paragraph._p.append(end)
+
+
 def insert_caption(pg: Paragraph, prefix, run, text, is_appendix: bool):
     heading_ref = "Appendix" if is_appendix is True else '"Heading 1"'
 
@@ -158,3 +184,121 @@ def add_table_reference(paragraph, seq=" SEQ Table \\* ARABIC \\s 1"):
     r.append(fldChar)
 
     return run
+
+
+def convert_figure_references_to_ref_fields(document, figures):
+    """Convert plain text figure references to Word REF fields.
+
+    This function finds paragraphs that contain figure references (like "Figure 1" or "fig. 1")
+    and converts them to proper Word REF fields that point to the bookmarked captions.
+
+    Args:
+        document: The Word document
+        figures: List of DocXFigureRef objects containing figure information
+    """
+    # Build a list of bookmark names in order
+    bookmarks_in_order = []
+
+    for fig in figures:
+        if hasattr(fig, 'figure_ref') and fig.figure_ref.reference:
+            ref_id = fig.figure_ref.reference
+            bookmark_name = f"fig:{ref_id}"
+            bookmarks_in_order.append(bookmark_name)
+
+    if not bookmarks_in_order:
+        return  # No figures to process
+
+    # Pattern to match figure references from pandoc-crossref
+    # Match: "Figure X", "fig. X", "Figure X-Y" etc.
+    # Note: SEQ fields show as "-" before evaluation, so we match any number pattern
+    fig_ref_pattern = re.compile(r'\b((?:Figure|fig\.)\s+([\d\-]+))\b', re.IGNORECASE)
+
+    # Track which bookmark to use next (in order of appearance)
+    bookmark_index = 0
+
+    # Iterate through all paragraphs
+    for block in iter_block_items(document):
+        if not isinstance(block, Paragraph):
+            continue
+
+        # Skip caption paragraphs
+        if block.style.name in ("Image Caption", "Table Caption", "Captioned Figure"):
+            continue
+
+        # Check if paragraph contains figure references
+        if not re.search(fig_ref_pattern, block.text):
+            continue
+
+        # Process the paragraph to replace text with REF fields
+        original_text = block.text
+
+        # Find all matches in the paragraph text
+        matches = list(fig_ref_pattern.finditer(original_text))
+        if not matches:
+            continue
+
+        # Clear all runs in the paragraph
+        for run in block.runs:
+            run._element.getparent().remove(run._element)
+
+        # Rebuild the paragraph with text and REF fields
+        last_pos = 0
+        for match in matches:
+            # Use the next bookmark in sequence
+            if bookmark_index >= len(bookmarks_in_order):
+                # No more bookmarks available, just add the text as-is
+                if last_pos < len(original_text):
+                    block.add_run(original_text[last_pos:])
+                break
+
+            bookmark_name = bookmarks_in_order[bookmark_index]
+            bookmark_index += 1
+
+            # Add text before the reference
+            if match.start() > last_pos:
+                before_text = original_text[last_pos:match.start()]
+                block.add_run(before_text)
+
+            # Add REF field
+            add_ref_field_to_paragraph(block, bookmark_name)
+
+            last_pos = match.end()
+
+        # Add remaining text after the last reference
+        if last_pos < len(original_text):
+            after_text = original_text[last_pos:]
+            block.add_run(after_text)
+
+
+
+def add_ref_field_to_paragraph(paragraph: Paragraph, bookmark_name: str):
+    """Add a REF field to a paragraph.
+
+    Args:
+        paragraph: The paragraph to add the REF field to
+        bookmark_name: The name of the bookmark to reference
+    """
+    # Create field begin
+    run1 = paragraph.add_run()
+    r1 = run1._r
+    fldChar1 = OxmlElement("w:fldChar")
+    fldChar1.set(qn("w:fldCharType"), "begin")
+    r1.append(fldChar1)
+
+    # Create field instruction
+    run2 = paragraph.add_run()
+    r2 = run2._r
+    instrText = OxmlElement("w:instrText")
+    instrText.set(qn("xml:space"), "preserve")
+    # Use \h for hyperlink and \* MERGEFORMAT to preserve formatting
+    instrText.text = f" REF {bookmark_name} \\h "
+    r2.append(instrText)
+
+    # Create field end
+    run3 = paragraph.add_run()
+    r3 = run3._r
+    fldChar2 = OxmlElement("w:fldChar")
+    fldChar2.set(qn("w:fldCharType"), "end")
+    r3.append(fldChar2)
+
+
