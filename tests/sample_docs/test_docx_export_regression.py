@@ -91,6 +91,9 @@ def test_doc_with_nested_images_docx_export(files_dir, tmp_path):
 
     This verifies that the DOCX export process completes without errors.
     Note: doc_lorum uses database-generated plots, not static image files.
+
+    This is a regression test for the bug where images weren't being exported to DOCX
+    because the resource path was pointing to the source directory instead of the build directory.
     """
     source = files_dir / "doc_lorum"
     work_dir = tmp_path / f"{source.name}_nested"
@@ -115,8 +118,15 @@ def test_doc_with_nested_images_docx_export(files_dir, tmp_path):
         if "image" in rel.target_ref:
             image_count += 1
 
-    # Should have at least some images (logo, etc.)
-    assert image_count > 0, f"Expected at least one image in the document, but found {image_count}"
+    # doc_lorum has 7 main plots + 7 appendix plots = 14 total expected figures
+    # The exact count is: historical_trends, data_framework, statistical_workflow,
+    # primary_results, comparative_analysis, error_analysis, theory_comparison (7 main)
+    # + system_architecture, performance_benchmarks, time_series, computational_results,
+    # correlation_matrix, distributions, surface_plot, box_plots (8 appendix) = 15 total
+    # But we should verify at least 14 plots are present (allowing for variations)
+    expected_min_figures = 14
+    assert image_count >= expected_min_figures, \
+        f"Expected at least {expected_min_figures} images in the document (from database plots), but found {image_count}"
 
     # Verify tables exist
     table_count = len(doc.tables)

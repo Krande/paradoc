@@ -36,7 +36,8 @@ class WordExporter:
         one = self.one_doc
 
         for mdf in one.md_files_main + one.md_files_app:
-            resource_paths = f"--resource-path={mdf.path.parent.absolute()}"
+            # Use build_file parent as resource path since images are stored relative to build location
+            resource_paths = f"--resource-path={mdf.build_file.parent.absolute()}"
             pypandoc.convert_file(
                 str(mdf.build_file),
                 ExportFormats.DOCX,

@@ -501,6 +501,19 @@ class OneDoc:
         else:
             img_markdown = f"![](images/{plot_filename}){{#{fig_id}}}"
 
+        # Add plot-based figure to figures dictionary for DOCX export
+        # This ensures format_figures() can find database-generated plots
+        if caption:
+            from paradoc.common import Figure
+            file_path_str = f"images/{plot_filename}"
+            self.figures[caption] = Figure(
+                name=unique_key,
+                caption=caption,
+                reference=fig_id,
+                file_path=file_path_str,
+                md_instance=mdf
+            )
+
         return img_markdown
 
 
