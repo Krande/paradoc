@@ -8,6 +8,28 @@ from docx.text.run import Run
 from .utils import iter_block_items
 
 
+def _normalize_bookmark_name(name: str) -> str:
+    """Convert a bookmark name to Word-compatible format.
+
+    Word doesn't like colons in bookmark names for REF fields.
+    Convert 'fig:test_figure' to '_Reffig_test_figure'.
+
+    Args:
+        name: The bookmark name (e.g., "fig:test_figure")
+
+    Returns:
+        Word-compatible bookmark name (e.g., "_Reffig_test_figure")
+    """
+    # Replace colons with underscores
+    normalized = name.replace(':', '_')
+
+    # Add _Ref prefix if not already present (Word's convention)
+    if not normalized.startswith('_Ref'):
+        normalized = '_Ref' + normalized
+
+    return normalized
+
+
 def resolve_references(document):
     refs = dict()
     fig_re = re.compile(
@@ -100,6 +122,10 @@ def add_bookmark_to_caption(paragraph: Paragraph, bookmark_name):
         paragraph: The caption paragraph to add the bookmark to
         bookmark_name: The name of the bookmark (e.g., "fig:test_figure")
     """
+    # Normalize bookmark name to Word-compatible format
+    # Convert "fig:test_figure" to "_Reffig_test_figure"
+    normalized_name = _normalize_bookmark_name(bookmark_name)
+
     # Generate a unique ID for the bookmark
     import random
     bookmark_id = str(random.randint(1, 999999))
@@ -107,7 +133,7 @@ def add_bookmark_to_caption(paragraph: Paragraph, bookmark_name):
     # Add bookmark start at the beginning of the paragraph
     start = OxmlElement("w:bookmarkStart")
     start.set(qn("w:id"), bookmark_id)
-    start.set(qn("w:name"), bookmark_name)
+    start.set(qn("w:name"), normalized_name)
     paragraph._p.insert(0, start)
 
     # Add bookmark end at the end of the paragraph
@@ -203,7 +229,9 @@ def convert_figure_references_to_ref_fields(document, figures):
         if hasattr(fig, 'figure_ref') and fig.figure_ref.reference:
             ref_id = fig.figure_ref.reference
             bookmark_name = f"fig:{ref_id}"
-            bookmarks_in_order.append(bookmark_name)
+            # Normalize to Word-compatible format
+            normalized_name = _normalize_bookmark_name(bookmark_name)
+            bookmarks_in_order.append(normalized_name)
 
     if not bookmarks_in_order:
         return  # No figures to process
@@ -213,8 +241,12 @@ def convert_figure_references_to_ref_fields(document, figures):
     # Note: SEQ fields show as "-" before evaluation, so we match any number pattern
     fig_ref_pattern = re.compile(r'\b((?:Figure|fig\.)\s+([\d\-]+))\b', re.IGNORECASE)
 
-    # Track which bookmark to use next (in order of appearance)
-    bookmark_index = 0
+    # Track figure numbers to bookmark mapping
+    # Extract figure numbers from bookmarks for mapping
+    figure_num_to_bookmark = {}
+    for idx, bookmark in enumerate(bookmarks_in_order):
+        # Map figure index (1-based) to bookmark
+        figure_num_to_bookmark[idx + 1] = bookmark
 
     # Iterate through all paragraphs
     for block in iter_block_items(document):
@@ -253,15 +285,35 @@ def convert_figure_references_to_ref_fields(document, figures):
         # We manually create and append run elements to ensure correct order
         last_pos = 0
         for match in matches:
-            # Use the next bookmark in sequence
-            if bookmark_index >= len(bookmarks_in_order):
-                # No more bookmarks available, just add the text as-is
+            # Extract the figure number from the match
+            figure_num_str = match.group(2)  # The number part (e.g., "1" from "Figure 1")
+
+            # Try to parse the figure number
+            # If it's "-" (unevaluated SEQ field), assume it's the first figure
+            try:
+                if figure_num_str == "-":
+                    figure_num = 1  # Default to first figure
+                else:
+                    figure_num = int(figure_num_str)
+            except ValueError:
+                figure_num = 1  # Fallback to first figure
+
+            # Map figure number to bookmark (1-based indexing)
+            # Figure 1 -> bookmarks_in_order[0], Figure 2 -> bookmarks_in_order[1], etc.
+            bookmark_idx = figure_num - 1
+
+            if 0 <= bookmark_idx < len(bookmarks_in_order):
+                bookmark_name = bookmarks_in_order[bookmark_idx]
+            else:
+                # If figure number is out of range, use the last bookmark
+                bookmark_name = bookmarks_in_order[-1] if bookmarks_in_order else None
+
+            if bookmark_name is None:
+                # No bookmark available, just add remaining text and break
                 if last_pos < len(original_text):
                     _add_text_run(p_element, original_text[last_pos:])
                 break
 
-            bookmark_name = bookmarks_in_order[bookmark_index]
-            bookmark_index += 1
 
             # Add text before the reference
             if match.start() > last_pos:
