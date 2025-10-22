@@ -112,82 +112,140 @@ def add_bookmark(paragraph: Paragraph, bookmark_text, bookmark_name):
     tag.append(end)
 
 
-def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str):
+def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> str:
     """Add a bookmark around the caption number SEQ field.
 
-    This is the proper way to create Word cross-references - the bookmark
-    wraps around the SEQ field that generates the caption number, not the
-    entire caption paragraph.
+    This matches Word's native cross-reference implementation - the bookmark
+    wraps tightly around the SEQ field only, not the entire caption paragraph.
+
+    Based on reverse engineering Word's cross-reference system, Word:
+    1. Uses random numeric bookmark IDs: _Ref + random number (e.g., _Ref212059733)
+    2. Places bookmarks around SEQ fields (can be fldSimple or complex fields)
+    3. Uses bookmark ID "0" for the w:id attribute
 
     Args:
         paragraph: The caption paragraph containing SEQ fields
-        bookmark_name: The name of the bookmark (will be normalized to Word format)
-    """
-    # Normalize bookmark name to Word-compatible format
-    normalized_name = _normalize_bookmark_name(bookmark_name)
+        bookmark_name: The name of the bookmark (e.g., "fig:test_figure")
 
-    # Generate a unique ID for the bookmark
+    Returns:
+        The actual bookmark name that was created (e.g., "_Ref306075071")
+    """
+    # Generate Word-style random bookmark name
+    # Word uses _Ref + 9-digit random number
     import random
+    random_id = random.randint(100000000, 999999999)
+    word_style_name = f"_Ref{random_id}"
+
+    # Generate a unique bookmark ID
+    # Important: Both bookmarkStart and bookmarkEnd must use the SAME ID
+    # We use a random number to avoid conflicts with other bookmarks
     bookmark_id = str(random.randint(1, 999999))
 
-    # Find the SEQ field runs in the caption
-    # Caption structure: [prefix run] [STYLEREF field] [separator run] [SEQ field] [caption text run]
-    # We want to wrap the bookmark around the SEQ field
-
     p_element = paragraph._p
+
+    # First, try to find fldSimple elements (Word's preferred format for SEQ fields)
+    fld_simple_elements = p_element.findall(qn('w:fldSimple'))
+
+    for fld_simple in fld_simple_elements:
+        instr = fld_simple.get(qn('w:instr'))
+        if instr and 'SEQ' in instr and 'STYLEREF' not in instr:
+            # Found the SEQ field - wrap bookmark around it
+            # Insert bookmark start before the fldSimple element
+            start = OxmlElement("w:bookmarkStart")
+            start.set(qn("w:id"), bookmark_id)
+            start.set(qn("w:name"), word_style_name)
+            fld_simple.addprevious(start)
+
+            # Insert bookmark end after the fldSimple element
+            end = OxmlElement("w:bookmarkEnd")
+            end.set(qn("w:id"), bookmark_id)
+            fld_simple.addnext(end)
+
+            return word_style_name  # Return the actual bookmark name created
+
+    # If no fldSimple found, look for complex field structure (begin/instrText/end)
     runs = list(p_element.findall(qn('w:r')))
 
-    if len(runs) < 4:
-        # Not enough runs to identify SEQ field, fall back to paragraph bookmark
-        add_bookmark_to_caption(paragraph, bookmark_name)
-        return
-
-    # Find the SEQ field (usually the 4th run, index 3)
-    # Look for the run containing fldChar with fldCharType="end" for the SEQ field
-    seq_field_end_idx = None
+    # First, check if the SEQ field is entirely within a single run
+    # (this is how add_seq_reference creates them)
     for idx, run in enumerate(runs):
-        # Check if this run contains a field end
+        # Check if this run contains both begin and end field chars
+        fld_chars = run.findall(qn('w:fldChar'))
+        has_begin = False
+        has_end = False
+
+        for fld_char in fld_chars:
+            fld_type = fld_char.get(qn('w:fldCharType'))
+            if fld_type == 'begin':
+                has_begin = True
+            elif fld_type == 'end':
+                has_end = True
+
+        # If this run has both begin and end, check for SEQ instruction
+        if has_begin and has_end:
+            instr_texts = run.findall(qn('w:instrText'))
+            for instr in instr_texts:
+                if instr.text and 'SEQ' in instr.text and 'STYLEREF' not in instr.text:
+                    # Found a complete SEQ field within a single run!
+                    start = OxmlElement("w:bookmarkStart")
+                    start.set(qn("w:id"), bookmark_id)
+                    start.set(qn("w:name"), word_style_name)
+                    run.addprevious(start)
+
+                    end = OxmlElement("w:bookmarkEnd")
+                    end.set(qn("w:id"), bookmark_id)
+                    run.addnext(end)
+
+                    return word_style_name  # Return the actual bookmark name created
+
+    # If not found in a single run, look for SEQ field spread across multiple runs
+    seq_field_begin_idx = None
+    seq_field_end_idx = None
+
+    for idx, run in enumerate(runs):
+        # Look for field characters
         fld_chars = run.findall(qn('w:fldChar'))
         for fld_char in fld_chars:
             fld_type = fld_char.get(qn('w:fldCharType'))
-            if fld_type == 'end':
-                # This might be the SEQ field end - check previous runs for SEQ instruction
-                if idx >= 2:
-                    # Check if previous runs contain SEQ instruction
-                    for check_idx in range(max(0, idx - 3), idx):
-                        instr_texts = runs[check_idx].findall(qn('w:instrText'))
-                        for instr in instr_texts:
-                            if instr.text and 'SEQ' in instr.text and 'STYLEREF' not in instr.text:
-                                seq_field_end_idx = idx
-                                break
-                if seq_field_end_idx:
-                    break
 
-    if seq_field_end_idx is None:
-        # Couldn't find SEQ field, fall back to paragraph bookmark
-        add_bookmark_to_caption(paragraph, bookmark_name)
-        return
+            if fld_type == 'begin':
+                # Check if the next run(s) contain SEQ instruction
+                for check_idx in range(idx, min(idx + 3, len(runs))):
+                    instr_texts = runs[check_idx].findall(qn('w:instrText'))
+                    for instr in instr_texts:
+                        if instr.text and 'SEQ' in instr.text and 'STYLEREF' not in instr.text:
+                            seq_field_begin_idx = idx
+                            break
+                    if seq_field_begin_idx is not None:
+                        break
 
-    # Place bookmark start before the SEQ field begin (a few runs before the end)
-    bookmark_start_idx = max(0, seq_field_end_idx - 3)
+            elif fld_type == 'end' and seq_field_begin_idx is not None:
+                # Found the end of the SEQ field we identified
+                seq_field_end_idx = idx
+                break
 
-    # Add bookmark start before the SEQ field
-    start = OxmlElement("w:bookmarkStart")
-    start.set(qn("w:id"), bookmark_id)
-    start.set(qn("w:name"), normalized_name)
+        if seq_field_end_idx is not None:
+            break
 
-    # Insert bookmark start before the identified run
-    runs[bookmark_start_idx].addprevious(start)
+    if seq_field_begin_idx is not None and seq_field_end_idx is not None:
+        # Found complex SEQ field spread across runs - wrap bookmark around it
+        start = OxmlElement("w:bookmarkStart")
+        start.set(qn("w:id"), bookmark_id)
+        start.set(qn("w:name"), word_style_name)
+        runs[seq_field_begin_idx].addprevious(start)
 
-    # Add bookmark end after the SEQ field end
-    end = OxmlElement("w:bookmarkEnd")
-    end.set(qn("w:id"), bookmark_id)
+        end = OxmlElement("w:bookmarkEnd")
+        end.set(qn("w:id"), bookmark_id)
+        runs[seq_field_end_idx].addnext(end)
 
-    # Insert bookmark end after the SEQ field end run
-    runs[seq_field_end_idx].addnext(end)
+        return word_style_name  # Return the actual bookmark name created
+
+    # If we couldn't find any SEQ field, fall back to paragraph bookmark
+    # This shouldn't happen in normal caption paragraphs, but provides a safety net
+    return add_bookmark_to_caption(paragraph, bookmark_name)
 
 
-def add_bookmark_to_caption(paragraph: Paragraph, bookmark_name):
+def add_bookmark_to_caption(paragraph: Paragraph, bookmark_name: str) -> str:
     """Add a bookmark to a caption paragraph for cross-referencing.
 
     The bookmark wraps around the entire caption paragraph so that
@@ -196,25 +254,31 @@ def add_bookmark_to_caption(paragraph: Paragraph, bookmark_name):
     Args:
         paragraph: The caption paragraph to add the bookmark to
         bookmark_name: The name of the bookmark (e.g., "fig:test_figure")
-    """
-    # Normalize bookmark name to Word-compatible format
-    # Convert "fig:test_figure" to "_Reffig_test_figure"
-    normalized_name = _normalize_bookmark_name(bookmark_name)
 
-    # Generate a unique ID for the bookmark
+    Returns:
+        The actual bookmark name that was created
+    """
+    # Generate Word-style random bookmark name
     import random
+    random_id = random.randint(100000000, 999999999)
+    word_style_name = f"_Ref{random_id}"
+
+    # Generate a unique bookmark ID
+    # Important: Both bookmarkStart and bookmarkEnd must use the SAME ID
     bookmark_id = str(random.randint(1, 999999))
 
     # Add bookmark start at the beginning of the paragraph
     start = OxmlElement("w:bookmarkStart")
     start.set(qn("w:id"), bookmark_id)
-    start.set(qn("w:name"), normalized_name)
+    start.set(qn("w:name"), word_style_name)
     paragraph._p.insert(0, start)
 
     # Add bookmark end at the end of the paragraph
     end = OxmlElement("w:bookmarkEnd")
     end.set(qn("w:id"), bookmark_id)
     paragraph._p.append(end)
+
+    return word_style_name
 
 
 def insert_caption(pg: Paragraph, prefix, run, text, is_appendix: bool):
@@ -297,16 +361,26 @@ def convert_figure_references_to_ref_fields(document, figures):
         document: The Word document
         figures: List of DocXFigureRef objects containing figure information
     """
-    # Build a list of bookmark names in order
+    # Build a mapping from semantic reference IDs to actual bookmark names
+    # and a list of bookmark names in order
+    ref_id_to_bookmark = {}
     bookmarks_in_order = []
 
     for fig in figures:
         if hasattr(fig, 'figure_ref') and fig.figure_ref.reference:
             ref_id = fig.figure_ref.reference
-            bookmark_name = f"fig:{ref_id}"
-            # Normalize to Word-compatible format
-            normalized_name = _normalize_bookmark_name(bookmark_name)
-            bookmarks_in_order.append(normalized_name)
+            # Use the actual bookmark name that was created (e.g., "_Ref306075071")
+            # instead of trying to normalize the semantic name
+            if hasattr(fig, 'actual_bookmark_name') and fig.actual_bookmark_name:
+                actual_bookmark = fig.actual_bookmark_name
+                ref_id_to_bookmark[ref_id] = actual_bookmark
+                bookmarks_in_order.append(actual_bookmark)
+            else:
+                # Fallback to old behavior if actual_bookmark_name not set
+                bookmark_name = f"fig:{ref_id}"
+                normalized_name = _normalize_bookmark_name(bookmark_name)
+                ref_id_to_bookmark[ref_id] = normalized_name
+                bookmarks_in_order.append(normalized_name)
 
     if not bookmarks_in_order:
         return  # No figures to process

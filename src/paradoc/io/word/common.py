@@ -106,6 +106,7 @@ class DocXFigureRef:
     docx_following_pg: Paragraph = None
     is_appendix = False
     document_index: int = None
+    actual_bookmark_name: str = None  # Store the actual Word-style bookmark name
 
     def format_figure(self, is_appendix, restart_caption_numbering):
         figure_format = self.figure_ref.format
@@ -119,7 +120,8 @@ class DocXFigureRef:
             from .references import add_bookmark_around_seq_field
 
             bookmark_name = f"fig:{self.figure_ref.reference}"
-            add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
+            # Capture the actual bookmark name that was created
+            self.actual_bookmark_name = add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
 
         for run in self.docx_caption.runs:
             run.font.name = figure_format.font_style

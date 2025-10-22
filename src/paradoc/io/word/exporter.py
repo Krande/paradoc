@@ -13,6 +13,7 @@ from .utils import (
     add_to_composer,
     close_word_docs_by_name,
     docx_update,
+    fix_bookmark_ids,
     get_from_doc_by_index,
     iter_block_items,
 )
@@ -76,6 +77,10 @@ class WordExporter:
 
         # Apply last minute fixes
         fix_headers_after_compose(composer_main.doc)
+
+        # Fix bookmark ID mismatches caused by docxcompose
+        # This is critical for cross-references to work correctly
+        fix_bookmark_ids(composer_main.doc)
 
         print("Close Existing Word documents")
         if check_open_docs and self.enable_word_com_automation:
