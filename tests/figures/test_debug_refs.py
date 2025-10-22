@@ -48,6 +48,7 @@ Reference to figure: [@fig:test_figure]
     # Check results
     has_bookmark = False
     has_ref_field = False
+    correct_order = False
 
     for para in doc.paragraphs:
         xml_str = para._element.xml.decode('utf-8') if isinstance(para._element.xml, bytes) else para._element.xml
@@ -56,10 +57,22 @@ Reference to figure: [@fig:test_figure]
             has_bookmark = "bookmarkStart" in xml_str and "fig:test_figure" in xml_str
             print(f"Caption bookmark: {has_bookmark}")
 
-        if "Reference to figure" in para.text:
+        if "Reference to figure" in para.text or "Figure 1" in para.text:
             has_ref_field = "REF" in xml_str and "fig:test_figure" in xml_str
             print(f"Reference has REF field: {has_ref_field}")
-            print(f"Reference text: {para.text}")
+            print(f"Reference text: '{para.text}'")
+
+            # Check if the text order is correct
+            # Should be "Reference to figure: Figure 1" not "Figure 1Reference to figure:"
+            if "Reference to figure:" in para.text:
+                figure_pos = para.text.find("Figure 1")
+                reference_pos = para.text.find("Reference to figure:")
+                if figure_pos > reference_pos:
+                    correct_order = True
+                    print(f"Text order: CORRECT (reference at {reference_pos}, figure at {figure_pos})")
+                else:
+                    print(f"Text order: WRONG (reference at {reference_pos}, figure at {figure_pos})")
+
             if not has_ref_field and "REF" in xml_str:
                 # Extract REF instructions
                 ref_matches = re.findall(r'<w:instrText[^>]*>([^<]*)</w:instrText>', xml_str)
@@ -67,4 +80,5 @@ Reference to figure: [@fig:test_figure]
 
     assert has_bookmark, "Caption should have bookmark"
     assert has_ref_field, "Reference should have REF field pointing to bookmark"
+    assert correct_order, "Figure reference should appear AFTER 'Reference to figure:', not before"
 

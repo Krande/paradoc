@@ -237,18 +237,27 @@ def convert_figure_references_to_ref_fields(document, figures):
         if not matches:
             continue
 
-        # Clear all runs in the paragraph
-        for run in block.runs:
-            run._element.getparent().remove(run._element)
+        # Store paragraph element before clearing
+        p_element = block._p
+
+        # Clear all runs in the paragraph by removing them from the XML
+        for run in list(block.runs):  # Use list() to avoid modification during iteration
+            p_element.remove(run._element)
+
+        # Also remove hyperlink elements (pandoc-crossref creates these)
+        for child in list(p_element):
+            if child.tag == qn('w:hyperlink'):
+                p_element.remove(child)
 
         # Rebuild the paragraph with text and REF fields
+        # We manually create and append run elements to ensure correct order
         last_pos = 0
         for match in matches:
             # Use the next bookmark in sequence
             if bookmark_index >= len(bookmarks_in_order):
                 # No more bookmarks available, just add the text as-is
                 if last_pos < len(original_text):
-                    block.add_run(original_text[last_pos:])
+                    _add_text_run(p_element, original_text[last_pos:])
                 break
 
             bookmark_name = bookmarks_in_order[bookmark_index]
@@ -257,18 +266,81 @@ def convert_figure_references_to_ref_fields(document, figures):
             # Add text before the reference
             if match.start() > last_pos:
                 before_text = original_text[last_pos:match.start()]
-                block.add_run(before_text)
+                _add_text_run(p_element, before_text)
 
             # Add REF field
-            add_ref_field_to_paragraph(block, bookmark_name)
+            _add_ref_field_runs(p_element, bookmark_name)
 
             last_pos = match.end()
 
         # Add remaining text after the last reference
         if last_pos < len(original_text):
             after_text = original_text[last_pos:]
-            block.add_run(after_text)
+            _add_text_run(p_element, after_text)
 
+
+
+
+def _add_text_run(p_element, text):
+    """Add a text run to a paragraph element by appending to XML.
+
+    Args:
+        p_element: The paragraph XML element (w:p)
+        text: The text content for the run
+    """
+    r = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.text = text
+    r.append(t)
+
+    # Simply append to the paragraph - runs should come after pPr
+    p_element.append(r)
+
+
+def _add_ref_field_runs(p_element, bookmark_name):
+    """Add REF field runs to a paragraph element by appending to XML.
+
+    This creates the complete REF field structure with begin, instruction, separator, result, and end.
+
+    Args:
+        p_element: The paragraph XML element (w:p)
+        bookmark_name: The name of the bookmark to reference
+    """
+    # Run 1: Field begin
+    r1 = OxmlElement("w:r")
+    fldChar1 = OxmlElement("w:fldChar")
+    fldChar1.set(qn("w:fldCharType"), "begin")
+    r1.append(fldChar1)
+    p_element.append(r1)
+
+    # Run 2: Field instruction
+    r2 = OxmlElement("w:r")
+    instrText = OxmlElement("w:instrText")
+    instrText.set(qn("xml:space"), "preserve")
+    instrText.text = f" REF {bookmark_name} \\h "
+    r2.append(instrText)
+    p_element.append(r2)
+
+    # Run 3: Field separator
+    r3 = OxmlElement("w:r")
+    fldChar3 = OxmlElement("w:fldChar")
+    fldChar3.set(qn("w:fldCharType"), "separate")
+    r3.append(fldChar3)
+    p_element.append(r3)
+
+    # Run 4: Field result (placeholder text that will be replaced when field is updated)
+    r4 = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.text = "Figure 1"  # Placeholder - will be updated by Word
+    r4.append(t)
+    p_element.append(r4)
+
+    # Run 5: Field end
+    r5 = OxmlElement("w:r")
+    fldChar5 = OxmlElement("w:fldChar")
+    fldChar5.set(qn("w:fldCharType"), "end")
+    r5.append(fldChar5)
+    p_element.append(r5)
 
 
 def add_ref_field_to_paragraph(paragraph: Paragraph, bookmark_name: str):
@@ -290,15 +362,24 @@ def add_ref_field_to_paragraph(paragraph: Paragraph, bookmark_name: str):
     r2 = run2._r
     instrText = OxmlElement("w:instrText")
     instrText.set(qn("xml:space"), "preserve")
-    # Use \h for hyperlink and \* MERGEFORMAT to preserve formatting
     instrText.text = f" REF {bookmark_name} \\h "
     r2.append(instrText)
 
-    # Create field end
+    # Create field separator
     run3 = paragraph.add_run()
     r3 = run3._r
-    fldChar2 = OxmlElement("w:fldChar")
-    fldChar2.set(qn("w:fldCharType"), "end")
-    r3.append(fldChar2)
+    fldChar3 = OxmlElement("w:fldChar")
+    fldChar3.set(qn("w:fldCharType"), "separate")
+    r3.append(fldChar3)
+
+    # Create field result (placeholder)
+    run4 = paragraph.add_run("Figure 1")
+
+    # Create field end
+    run5 = paragraph.add_run()
+    r5 = run5._r
+    fldChar5 = OxmlElement("w:fldChar")
+    fldChar5.set(qn("w:fldCharType"), "end")
+    r5.append(fldChar5)
 
 
