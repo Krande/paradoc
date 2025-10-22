@@ -89,7 +89,7 @@ class WordExporter:
             tbl_name = cell0.text
             tbl = self.one_doc.tables.get(tbl_name, None)
             if tbl is None:
-                raise ValueError("Unable to retrieve originally parsed table")
+                raise ValueError(f"Unable to retrieve originally parsed table '{tbl_name}'")
 
             docx_tbl.table_ref = tbl
             docx_tbl.substitute_back_temp_var()

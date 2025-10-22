@@ -344,18 +344,6 @@ class OneDoc:
         if annotation:
             df, show_index = apply_table_annotation(df, annotation, table_data.show_index_default)
 
-        # Handle table name in first cell for DOCX compatibility
-        if use_table_var_substitution:
-            col_name = df.columns[0]
-            col_index = df.columns.get_loc(col_name)
-            df = df.copy()
-            df[col_name] = df[col_name].astype(object)
-            df.iloc[0, int(col_index)] = key_clean
-
-        # Convert to markdown
-        props = dict(index=show_index, tablefmt="grid")
-        tbl_str = df.to_markdown(**props)
-
         # Generate unique key for this table instance
         # Track usage count and append numeric suffix for reused tables
         if key_clean not in self._table_key_usage_count:
@@ -365,11 +353,41 @@ class OneDoc:
             self._table_key_usage_count[key_clean] += 1
             unique_key = f"{key_clean}_{self._table_key_usage_count[key_clean]}"
 
+        # Handle table name in first cell for DOCX compatibility
+        # IMPORTANT: The name in the cell must match the key in self.tables dictionary
+        # For DOCX export, we use unique_key in the cell so each instance can be looked up
+        if use_table_var_substitution:
+            df = df.copy()
+            if show_index:
+                # When index is shown, put the table name as the first index value
+                # Create a new index with the table name as the first element
+                new_index = [unique_key] + list(df.index[1:])
+                df.index = new_index
+            else:
+                # When index is hidden, put the table name in the first data cell
+                col_name = df.columns[0]
+                df[col_name] = df[col_name].astype(object)
+                df.iat[0, 0] = unique_key
+
+        # Convert to markdown
+        props = dict(index=show_index, tablefmt="grid")
+        tbl_str = df.to_markdown(**props)
+
         # Add caption unless nocaption flag is set
         # NOTE: Do NOT include the annotation in the caption - it's only for transformation
         if not (annotation and annotation.no_caption):
             tbl_str += f"\n\nTable: {table_data.caption}"
             tbl_str += f" {{#tbl:{unique_key}}}"
+
+        # Create and store Table object for DOCX export compatibility
+        # Store with unique_key (including usage count suffix) to handle multiple instances
+        table_obj = Table(
+            name=unique_key,
+            df=df,
+            caption=table_data.caption,
+            link_name_override=unique_key
+        )
+        self.tables[unique_key] = table_obj
 
         return tbl_str
 
