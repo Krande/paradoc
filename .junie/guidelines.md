@@ -19,8 +19,6 @@ stream the document (streamed as AST JSON chunks and figures separately) to a fr
 The export to docx functionality is currently structured by converting md files 1 by 1 using `pandoc`,
 then the python library `python-docx` and `docxcompose`.
 
-
-
 ### Frontend
 * TailwindCSS 4
 * Typescript
@@ -68,6 +66,15 @@ frontend/
 tests/
 pyproject.toml
 ```
+
+## OneDoc Default Document Structure
+
+The document is structured in a Main and Appendix part. All heading in Main should be 1, 1.1, 1.2, ..., 2, 2.1, .. etc., while
+Appendix should be Appendix A, A.1, A.2, ..., Appendix B, B1., ..., etc.
+Figure, Table and Equation numbering should use the level 1 heading number then hyphen and the incremented
+number per figure.
+
+Cross-reference should always include label and number.
 
 ## Copilot shell instructions
 The default shell for agentic commands is powershell and the cwd is always the project root.

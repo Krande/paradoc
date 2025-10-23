@@ -268,7 +268,7 @@ class WordDocument:
         height: Optional[float] = None,
         layout: Union[FigureLayout, str] = FigureLayout.INLINE,
         create_bookmark: bool = True,
-        use_chapter_numbers: bool = False
+        use_chapter_numbers: bool = True
     ) -> Optional[str]:
         """Add a figure with a caption.
         
@@ -319,10 +319,15 @@ class WordDocument:
             # Create placeholder shape
             width = width or 100
             height = height or 100
+            
+            # Always create as floating shape first
             shape = self._doc.Shapes.AddShape(WD_MSO_SHAPE_RECTANGLE, 100, 100, width, height)
             
-            # Apply text wrapping for non-inline layouts
-            if layout != FigureLayout.INLINE:
+            if layout == FigureLayout.INLINE:
+                # For inline layout, set wrapping to inline (wdWrapInline = 7)
+                shape.WrapFormat.Type = WD_WRAP_INLINE
+            else:
+                # For other layouts, apply the specific text wrapping
                 self._apply_text_wrapping(shape, layout)
         
         # Move to end and add caption
@@ -331,18 +336,39 @@ class WordDocument:
         self._app.Selection.Style = "Caption"
         
         # Create caption with SEQ field
-        # Use \\s 1 switch for chapter-based numbering (e.g., 1.1, 1.2, 2.1)
-        seq_field_text = "SEQ Figure \\* ARABIC"
-        if use_chapter_numbers:
-            seq_field_text += " \\s 1"
-        
         self._app.Selection.TypeText("Figure ")
-        self._app.Selection.Fields.Add(
-            Range=self._app.Selection.Range,
-            Type=WD_FIELD_EMPTY,
-            Text=seq_field_text,
-            PreserveFormatting=True
-        )
+        
+        if use_chapter_numbers:
+            # Use chapter-based numbering with hyphen separator (e.g., 1-1, 1-2, 2-1)
+            # Format: { STYLEREF 1 \s }-{ SEQ Figure \* ARABIC \s 1 }
+            # STYLEREF gets the heading 1 number, SEQ counts within that chapter
+            # \s 1 switch makes SEQ track Heading 1 and reset when it changes
+            
+            # Add STYLEREF field for chapter number
+            self._app.Selection.Fields.Add(
+                Range=self._app.Selection.Range,
+                Type=WD_FIELD_EMPTY,
+                Text="STYLEREF 1 \\s",
+                PreserveFormatting=True
+            )
+            # Add hyphen separator
+            self._app.Selection.TypeText("-")
+            # Add SEQ field that resets per chapter and increments within chapter
+            self._app.Selection.Fields.Add(
+                Range=self._app.Selection.Range,
+                Type=WD_FIELD_EMPTY,
+                Text="SEQ Figure \\* ARABIC \\s 1",
+                PreserveFormatting=True
+            )
+        else:
+            # Simple sequential numbering (1, 2, 3, ...)
+            self._app.Selection.Fields.Add(
+                Range=self._app.Selection.Range,
+                Type=WD_FIELD_EMPTY,
+                Text="SEQ Figure \\* ARABIC",
+                PreserveFormatting=True
+            )
+        
         self._app.Selection.TypeText(f": {caption_text}")
         
         # Create bookmark if requested
@@ -364,7 +390,7 @@ class WordDocument:
         cols: int = 2,
         data: Optional[list[list]] = None,
         create_bookmark: bool = True,
-        use_chapter_numbers: bool = False
+        use_chapter_numbers: bool = True
     ) -> Optional[str]:
         """Add a table with a caption.
         
@@ -408,18 +434,39 @@ class WordDocument:
         self._app.Selection.Style = "Caption"
         
         # Create caption with SEQ field
-        # Use \\s 1 switch for chapter-based numbering (e.g., 1.1, 1.2, 2.1)
-        seq_field_text = "SEQ Table \\* ARABIC"
-        if use_chapter_numbers:
-            seq_field_text += " \\s 1"
-        
         self._app.Selection.TypeText("Table ")
-        self._app.Selection.Fields.Add(
-            Range=self._app.Selection.Range,
-            Type=WD_FIELD_EMPTY,
-            Text=seq_field_text,
-            PreserveFormatting=True
-        )
+        
+        if use_chapter_numbers:
+            # Use chapter-based numbering with hyphen separator (e.g., 1-1, 1-2, 2-1)
+            # Format: { STYLEREF 1 \s }-{ SEQ Table \* ARABIC \s 1 }
+            # STYLEREF gets the heading 1 number, SEQ counts within that chapter
+            # \s 1 switch makes SEQ track Heading 1 and reset when it changes
+            
+            # Add STYLEREF field for chapter number
+            self._app.Selection.Fields.Add(
+                Range=self._app.Selection.Range,
+                Type=WD_FIELD_EMPTY,
+                Text="STYLEREF 1 \\s",
+                PreserveFormatting=True
+            )
+            # Add hyphen separator
+            self._app.Selection.TypeText("-")
+            # Add SEQ field that resets per chapter and increments within chapter
+            self._app.Selection.Fields.Add(
+                Range=self._app.Selection.Range,
+                Type=WD_FIELD_EMPTY,
+                Text="SEQ Table \\* ARABIC \\s 1",
+                PreserveFormatting=True
+            )
+        else:
+            # Simple sequential numbering (1, 2, 3, ...)
+            self._app.Selection.Fields.Add(
+                Range=self._app.Selection.Range,
+                Type=WD_FIELD_EMPTY,
+                Text="SEQ Table \\* ARABIC",
+                PreserveFormatting=True
+            )
+        
         self._app.Selection.TypeText(f": {caption_text}")
         
         # Create bookmark if requested
