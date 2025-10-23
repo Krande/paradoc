@@ -456,7 +456,13 @@ def convert_figure_references_to_ref_fields(document, figures):
         # We manually create and append run elements to ensure correct order
         last_pos = 0
         for match in matches:
-            figure_num_str = match.group(1)  # The number part (e.g., "1" from "Figure 1")
+            # Extract the figure number from the matched text
+            matched_text = match.group(1)  # e.g., "Figure 1-1"
+            # Extract just the number part
+            number_match = re.search(r'([\d\-]+)$', matched_text)
+            if not number_match:
+                continue
+            figure_num_str = number_match.group(1)  # e.g., "1-1"
 
             # Try to parse the figure number
             # If it's "-" (unevaluated SEQ field), assume it's the first figure
@@ -529,19 +535,11 @@ def _add_ref_field_runs(p_element, bookmark_name, label="Figure"):
         bookmark_name: The name of the bookmark to reference
         label: The label prefix to include (e.g., "Figure", "Table", "Eq")
     """
-    # Add space before the label to ensure proper spacing
-    r_space_before = OxmlElement("w:r")
-    t_space_before = OxmlElement("w:t")
-    t_space_before.set(qn("xml:space"), "preserve")
-    t_space_before.text = " "
-    r_space_before.append(t_space_before)
-    p_element.append(r_space_before)
-
-    # Add the label prefix as regular text before the field
+    # Add space before the field
     r_label = OxmlElement("w:r")
     t_label = OxmlElement("w:t")
     t_label.set(qn("xml:space"), "preserve")
-    t_label.text = f"{label} "
+    t_label.text = " "
     r_label.append(t_label)
     p_element.append(r_label)
 
@@ -582,14 +580,6 @@ def _add_ref_field_runs(p_element, bookmark_name, label="Figure"):
     fldChar5.set(qn("w:fldCharType"), "end")
     r5.append(fldChar5)
     p_element.append(r5)
-
-    # Add a space after the REF field
-    r_space = OxmlElement("w:r")
-    t_space = OxmlElement("w:t")
-    t_space.set(qn("xml:space"), "preserve")
-    t_space.text = " "
-    r_space.append(t_space)
-    p_element.append(r_space)
 
 
 def add_ref_field_to_paragraph(paragraph: Paragraph, bookmark_name: str):
@@ -658,7 +648,9 @@ def convert_table_references_to_ref_fields(document, tables):
         return  # No tables to process
 
     # Pattern to match table references from pandoc-crossref
-    tbl_ref_pattern = re.compile(r'\b(?:Table|tbl\.)\s+([\d\-]+)\b', re.IGNORECASE)
+    # Note: pandoc-crossref outputs "Table1" (no space) for tables, unlike "Figure 1" for figures
+    # So we use \s* (zero or more spaces) instead of \s+ (one or more spaces)
+    tbl_ref_pattern = re.compile(r'\b((?:Table|tbl\.)\s*[\d\-]+)\b', re.IGNORECASE)
 
     # Iterate through all paragraphs
     for block in iter_block_items(document):
@@ -692,7 +684,13 @@ def convert_table_references_to_ref_fields(document, tables):
         # Rebuild the paragraph with text and REF fields
         last_pos = 0
         for match in matches:
-            table_num_str = match.group(1)
+            # Extract the table number from the matched text
+            matched_text = match.group(1)  # e.g., "Table 1-1"
+            # Extract just the number part
+            number_match = re.search(r'([\d\-]+)$', matched_text)
+            if not number_match:
+                continue
+            table_num_str = number_match.group(1)  # e.g., "1-1"
             try:
                 if table_num_str == "-":
                     table_num = 1
