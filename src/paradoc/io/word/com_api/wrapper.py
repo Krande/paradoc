@@ -103,6 +103,8 @@ class WordApplication:
         if template is not None:
             template_path = str(Path(template).absolute())
             com_doc = self._app.Documents.Add(Template=template_path)
+            # Move cursor to end of document so new content appears after template content
+            self._app.Selection.EndKey(Unit=WD_STORY)
         else:
             com_doc = self._app.Documents.Add()
         doc = WordDocument(self._app, com_doc)

@@ -144,9 +144,11 @@ def test_word_with_template(tmp_path):
     
     with WordApplication(visible=False) as word_app:
         doc = word_app.create_document(template=template_file)
-        
+
+        doc.add_page_break()
         # Add content to the template-based document
         doc.add_heading("New Document", level=1)
+
         doc.add_paragraph("This document uses styles from the template.")
         
         doc.add_figure_with_caption("Figure in templated doc")
