@@ -220,39 +220,3 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
         create_text_run(p_element, after_text)
 
 
-def resolve_references(document):
-    """Legacy function - kept for backward compatibility.
-
-    Original function that parsed references but didn't convert them.
-    """
-    refs = dict()
-    fig_re = re.compile(
-        r"(?:Figure\s(?P<number>[0-9]{0,5})\s*)",
-        re.MULTILINE | re.DOTALL | re.IGNORECASE,
-    )
-    tbl_re = re.compile(r"(?:Table\s(?P<number>[0-9]{0,5})\s*)", re.MULTILINE | re.DOTALL | re.IGNORECASE)
-
-    # Fix references
-    for block in iter_block_items(document):
-        if type(block) is Paragraph:
-            if block.style.name in ("Image Caption", "Table Caption"):
-                continue
-            if "Figure" in block.text or "Table" in block.text:
-                for m in fig_re.finditer(block.text):
-                    d = m.groupdict()
-                    n = d["number"]
-                    figref = f"Figure {n}"
-                    if figref in refs.keys():
-                        fref = refs[figref]
-                        pg_ref = fref[1]
-
-                for m in tbl_re.finditer(block.text):
-                    d = m.groupdict()
-                    n = d["number"]
-                    tblref = f"Table {n}"
-                    if tblref in refs.keys():
-                        tref = refs[tblref]
-                        pg_ref = tref[1]
-                        parent = pg_ref._p
-                        print(parent)
-

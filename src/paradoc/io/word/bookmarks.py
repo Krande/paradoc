@@ -234,34 +234,3 @@ def _add_bookmark_around_runs(runs, start_idx: int, end_idx: int, bookmark_name:
     runs[end_idx].addnext(end)
 
     return bookmark_name
-
-
-# Legacy functions for backward compatibility
-def add_bookmarkStart(paragraph: Paragraph, _id):
-    """Legacy function - kept for backward compatibility."""
-    name = "_Ref_id_num_" + _id
-    start = OxmlElement("w:bookmarkStart")
-    start.set(qn("w:name"), name)
-    start.set(qn("w:id"), str(_id))
-    paragraph._p.append(start)
-    return name
-
-
-def add_bookmark(paragraph: Paragraph, bookmark_text, bookmark_name):
-    """Legacy function - kept for backward compatibility."""
-    run = paragraph.add_run()
-    tag = run._r
-    start = OxmlElement("w:bookmarkStart")
-    start.set(qn("w:id"), "0")
-    start.set(qn("w:name"), bookmark_name)
-    tag.append(start)
-
-    text = OxmlElement("w:r")
-    text.text = bookmark_text
-    tag.append(text)
-
-    end = OxmlElement("w:bookmarkEnd")
-    end.set(qn("w:id"), "0")
-    end.set(qn("w:name"), bookmark_name)
-    tag.append(end)
-

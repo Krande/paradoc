@@ -3,7 +3,6 @@ from docx.text.paragraph import Paragraph
 
 from paradoc.config import create_logger
 
-from .captions import insert_caption_into_runs
 from .utils import iter_block_items
 
 logger = create_logger()
@@ -119,10 +118,3 @@ def fix_headers_after_compose(doc: Document):
 
     for pg in pg_rem:
         delete_paragraph(pg)
-
-
-def format_image_captions(doc: Document, is_appendix):
-    for block in iter_block_items(doc):
-        if type(block) is Paragraph:
-            if block.style.name in ("Image Caption",):
-                insert_caption_into_runs(block, "Figure", is_appendix)

@@ -167,32 +167,3 @@ def create_text_run(p_element, text: str):
     t.text = text
     r.append(t)
     p_element.append(r)
-
-
-def append_ref_to_paragraph(paragraph: Paragraph, ref_name: str, text: str = ""):
-    """Legacy function - Add a REF field to a paragraph with optional prefix text.
-
-    Args:
-        paragraph: The paragraph to add the REF field to
-        ref_name: The bookmark name to reference
-        text: Optional text to add before the field
-    """
-    # run 1
-    run = paragraph.add_run(text)
-    r = run._r
-    fldChar = OxmlElement("w:fldChar")
-    fldChar.set(qn("w:fldCharType"), "begin")
-    r.append(fldChar)
-    # run 2
-    run = paragraph.add_run()
-    r = run._r
-    instrText = OxmlElement("w:instrText")
-    instrText.text = "REF " + ref_name + " \\h"
-    r.append(instrText)
-    # run 3
-    run = paragraph.add_run()
-    r = run._r
-    fldChar = OxmlElement("w:fldChar")
-    fldChar.set(qn("w:fldCharType"), "end")
-    r.append(fldChar)
-

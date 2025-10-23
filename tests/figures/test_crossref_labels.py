@@ -8,14 +8,11 @@ This test ensures that cross-references:
 
 import os
 import re
-from pathlib import Path
 
 from docx import Document
-from docx.oxml.ns import qn
 
 from paradoc import OneDoc
 from paradoc.io.word.utils import docx_update
-
 
 auto_open = os.getenv("AUTO_OPEN", False)
 

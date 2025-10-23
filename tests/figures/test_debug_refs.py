@@ -1,13 +1,17 @@
 """Debug test to check if REF fields are being created."""
 
 import os
+import platform
 import re
 
+import pytest
 from docx import Document
 
 from paradoc import OneDoc
+from paradoc.io.word.utils import docx_update
 
 
+@pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
 def test_debug_ref_conversion(tmp_path, capsys):
     """Debug test with explicit output."""
     # Create test document
@@ -43,6 +47,8 @@ Reference to figure: [@fig:test_figure]
     one.compile("test_output", auto_open=False, export_format="docx")
 
     output_file = work_dir / "_dist" / "test_output.docx"
+    docx_update(output_file)
+
     doc = Document(str(output_file))
 
     # Check results
