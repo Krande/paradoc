@@ -116,14 +116,25 @@ def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> s
     """Add a bookmark around the caption numbering sequence.
 
     For proper cross-referencing, the bookmark needs to wrap around the entire
-    numbering sequence (STYLEREF + hyphen + SEQ) so that REF fields show "1-1"
+    numbering sequence (STYLEREF + hyphen + SEQ) so that REF fields show "2-1"
     instead of just "1".
 
-    Caption structure:
-    - STYLEREF field (chapter number: "1")
-    - Hyphen text run: "-"
-    - SEQ field (figure/table number: "1")
-    - Caption text: ": caption"
+    Caption structure (as created by rebuild_caption):
+    - Run 0: "Figure " or "Table " text
+    - Runs 1-5: STYLEREF field (chapter number: "2")
+      - Run 1: field begin
+      - Run 2: instrText with STYLEREF
+      - Run 3: field separate
+      - Run 4: result text "2"
+      - Run 5: field end
+    - Run 6: hyphen text "-"
+    - Runs 7-11: SEQ field (figure/table number: "1")
+      - Run 7: field begin
+      - Run 8: instrText with SEQ
+      - Run 9: field separate
+      - Run 10: result text "1"
+      - Run 11: field end
+    - Run 12+: ": caption text"
 
     Args:
         paragraph: The caption paragraph containing the numbering fields
@@ -143,93 +154,113 @@ def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> s
     p_element = paragraph._p
     runs = list(p_element.findall(qn('w:r')))
 
-    # Find the STYLEREF field (chapter number) - this is the start of the numbering
+    # Strategy: Find STYLEREF field begin and SEQ field end, then wrap bookmark around both
+    # We need to track field begin/end pairs to correctly identify which end belongs to which field
     styleref_begin_idx = None
+    styleref_field_type = None
     seq_end_idx = None
 
-    for idx, run in enumerate(runs):
-        # Look for field characters
+    # Track all field begins and their types
+    field_begins = []  # List of (run_idx, field_type)
+
+    # First pass: identify all field begin positions and their types
+    for i, run in enumerate(runs):
+        instr_texts = run.findall(qn('w:instrText'))
+        for instr in instr_texts:
+            if instr.text:
+                # Look back to find the corresponding field begin
+                for j in range(max(0, i - 3), i + 1):
+                    fld_chars = runs[j].findall(qn('w:fldChar'))
+                    for fld_char in fld_chars:
+                        if fld_char.get(qn('w:fldCharType')) == 'begin':
+                            if 'STYLEREF' in instr.text:
+                                field_begins.append((j, 'STYLEREF'))
+                                if styleref_begin_idx is None:
+                                    styleref_begin_idx = j
+                            elif 'SEQ' in instr.text and 'STYLEREF' not in instr.text:
+                                field_begins.append((j, 'SEQ'))
+                            break
+
+    # Second pass: find field ends and match them to their begins
+    field_ends = []  # List of (run_idx, field_type)
+    begin_stack = []  # Stack to track which field begins we've seen
+
+    for i, run in enumerate(runs):
         fld_chars = run.findall(qn('w:fldChar'))
         for fld_char in fld_chars:
             fld_type = fld_char.get(qn('w:fldCharType'))
 
-            if fld_type == 'begin' and styleref_begin_idx is None:
-                # Check if this is the STYLEREF field
-                for check_idx in range(idx, min(idx + 3, len(runs))):
-                    instr_texts = runs[check_idx].findall(qn('w:instrText'))
-                    for instr in instr_texts:
-                        if instr.text and 'STYLEREF' in instr.text:
-                            styleref_begin_idx = idx
-                            break
-                    if styleref_begin_idx is not None:
+            if fld_type == 'begin':
+                # Check if this is one of our tracked field begins
+                for begin_idx, begin_field_type in field_begins:
+                    if begin_idx == i:
+                        begin_stack.append((i, begin_field_type))
                         break
 
-            elif fld_type == 'end' and styleref_begin_idx is not None:
-                # Check if there's a SEQ field after this
-                # Look ahead for SEQ field
-                for check_idx in range(idx + 1, min(idx + 10, len(runs))):
-                    check_run_fld_chars = runs[check_idx].findall(qn('w:fldChar'))
-                    for check_fld_char in check_run_fld_chars:
-                        check_fld_type = check_fld_char.get(qn('w:fldCharType'))
-                        if check_fld_type == 'end':
-                            # Check if this is a SEQ field end
-                            for seq_check_idx in range(max(0, check_idx - 3), check_idx):
-                                seq_instr_texts = runs[seq_check_idx].findall(qn('w:instrText'))
-                                for seq_instr in seq_instr_texts:
-                                    if seq_instr.text and 'SEQ' in seq_instr.text and 'STYLEREF' not in seq_instr.text:
-                                        seq_end_idx = check_idx
-                                        break
-                                if seq_end_idx is not None:
-                                    break
-                            if seq_end_idx is not None:
-                                break
-                    if seq_end_idx is not None:
-                        break
-                break
+            elif fld_type == 'end':
+                # This end corresponds to the most recent unmatched begin
+                if begin_stack:
+                    begin_idx, begin_field_type = begin_stack.pop()
+                    field_ends.append((i, begin_field_type))
 
-        if seq_end_idx is not None:
-            break
+                    # Record the SEQ field end (but only after we've found STYLEREF)
+                    if begin_field_type == 'SEQ' and styleref_begin_idx is not None and seq_end_idx is None:
+                        seq_end_idx = i
 
+    # If we found both STYLEREF begin and SEQ end, wrap bookmark around the entire range
     if styleref_begin_idx is not None and seq_end_idx is not None:
-        # Found the full numbering sequence - wrap bookmark around STYLEREF + hyphen + SEQ
+        # Insert bookmark start BEFORE the STYLEREF field begin run
         start = OxmlElement("w:bookmarkStart")
         start.set(qn("w:id"), bookmark_id)
         start.set(qn("w:name"), word_style_name)
         runs[styleref_begin_idx].addprevious(start)
 
+        # Insert bookmark end AFTER the SEQ field end run
         end = OxmlElement("w:bookmarkEnd")
         end.set(qn("w:id"), bookmark_id)
         runs[seq_end_idx].addnext(end)
 
         return word_style_name
 
-    # Fallback: try to find just the SEQ field if STYLEREF approach didn't work
-    for idx, run in enumerate(runs):
-        fld_chars = run.findall(qn('w:fldChar'))
-        has_begin = False
-        has_end = False
+    # Fallback: if we can't find STYLEREF, just wrap the SEQ field
+    # This handles cases where caption structure might be different
+    seq_begin_idx = None
+    seq_end_idx = None
 
+    for i, run in enumerate(runs):
+        fld_chars = run.findall(qn('w:fldChar'))
         for fld_char in fld_chars:
             fld_type = fld_char.get(qn('w:fldCharType'))
+
             if fld_type == 'begin':
-                has_begin = True
-            elif fld_type == 'end':
-                has_end = True
+                # Check if this is SEQ field
+                for j in range(i, min(i + 5, len(runs))):
+                    check_instr = runs[j].findall(qn('w:instrText'))
+                    for instr in check_instr:
+                        if instr.text and 'SEQ' in instr.text and 'STYLEREF' not in instr.text:
+                            seq_begin_idx = i
+                            break
+                    if seq_begin_idx == i:
+                        break
 
-        if has_begin and has_end:
-            instr_texts = run.findall(qn('w:instrText'))
-            for instr in instr_texts:
-                if instr.text and 'SEQ' in instr.text and 'STYLEREF' not in instr.text:
-                    start = OxmlElement("w:bookmarkStart")
-                    start.set(qn("w:id"), bookmark_id)
-                    start.set(qn("w:name"), word_style_name)
-                    run.addprevious(start)
+            elif fld_type == 'end' and seq_begin_idx is not None and seq_end_idx is None:
+                seq_end_idx = i
+                break
 
-                    end = OxmlElement("w:bookmarkEnd")
-                    end.set(qn("w:id"), bookmark_id)
-                    run.addnext(end)
+        if seq_begin_idx is not None and seq_end_idx is not None:
+            break
 
-                    return word_style_name
+    if seq_begin_idx is not None and seq_end_idx is not None:
+        start = OxmlElement("w:bookmarkStart")
+        start.set(qn("w:id"), bookmark_id)
+        start.set(qn("w:name"), word_style_name)
+        runs[seq_begin_idx].addprevious(start)
+
+        end = OxmlElement("w:bookmarkEnd")
+        end.set(qn("w:id"), bookmark_id)
+        runs[seq_end_idx].addnext(end)
+
+        return word_style_name
 
     # Final fallback to paragraph bookmark
     return add_bookmark_to_caption(paragraph, bookmark_name)
@@ -378,7 +409,8 @@ def convert_figure_references_to_ref_fields(document, figures):
     # Pattern to match figure references from pandoc-crossref
     # Match: "Figure X", "fig. X", "Figure X-Y" etc.
     # Note: SEQ fields show as "-" before evaluation, so we match any number pattern
-    fig_ref_pattern = re.compile(r'\b((?:Figure|fig\.)\s+([\d\-]+))\b', re.IGNORECASE)
+    # We capture the label separately so we can replace it consistently
+    fig_ref_pattern = re.compile(r'\b(?:Figure|fig\.)\s+([\d\-]+)\b', re.IGNORECASE)
 
     # Track figure numbers to bookmark mapping
     # Extract figure numbers from bookmarks for mapping
@@ -424,8 +456,7 @@ def convert_figure_references_to_ref_fields(document, figures):
         # We manually create and append run elements to ensure correct order
         last_pos = 0
         for match in matches:
-            # Extract the figure number from the match
-            figure_num_str = match.group(2)  # The number part (e.g., "1" from "Figure 1")
+            figure_num_str = match.group(1)  # The number part (e.g., "1" from "Figure 1")
 
             # Try to parse the figure number
             # If it's "-" (unevaluated SEQ field), assume it's the first figure
@@ -627,7 +658,7 @@ def convert_table_references_to_ref_fields(document, tables):
         return  # No tables to process
 
     # Pattern to match table references from pandoc-crossref
-    tbl_ref_pattern = re.compile(r'\b((?:Table|tbl\.)\s+([\d\-]+))\b', re.IGNORECASE)
+    tbl_ref_pattern = re.compile(r'\b(?:Table|tbl\.)\s+([\d\-]+)\b', re.IGNORECASE)
 
     # Iterate through all paragraphs
     for block in iter_block_items(document):
@@ -661,7 +692,7 @@ def convert_table_references_to_ref_fields(document, tables):
         # Rebuild the paragraph with text and REF fields
         last_pos = 0
         for match in matches:
-            table_num_str = match.group(2)
+            table_num_str = match.group(1)
             try:
                 if table_num_str == "-":
                     table_num = 1
