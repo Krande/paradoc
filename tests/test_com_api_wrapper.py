@@ -339,6 +339,118 @@ def test_figure_layouts(tmp_path):
         os.startfile(output_file)
 
 
+@pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
+def test_chapter_numbering(tmp_path):
+    """Test chapter-based numbering for figures and tables."""
+    from paradoc.io.word.com_api import WordApplication
+    
+    output_file = Path(tmp_path) / "test_chapter_numbering.docx"
+    
+    with WordApplication(visible=False) as word_app:
+        doc = word_app.create_document(template=MY_DOCX_TMPL)
+        
+        # Chapter 1
+        doc.add_heading("Chapter 1: Introduction", level=1)
+        doc.add_paragraph("This is the first chapter.")
+        doc.add_paragraph()
+        
+        # Add figures with chapter numbering in Chapter 1
+        doc.add_figure_with_caption(
+            caption_text="First figure in chapter 1",
+            use_chapter_numbers=True
+        )
+        doc.add_paragraph()
+        
+        doc.add_figure_with_caption(
+            caption_text="Second figure in chapter 1",
+            use_chapter_numbers=True
+        )
+        doc.add_paragraph()
+        
+        # Add table with chapter numbering in Chapter 1
+        doc.add_table_with_caption(
+            caption_text="First table in chapter 1",
+            rows=2,
+            cols=2,
+            use_chapter_numbers=True
+        )
+        doc.add_paragraph()
+        
+        # Chapter 2
+        doc.add_heading("Chapter 2: Methods", level=1)
+        doc.add_paragraph("This is the second chapter.")
+        doc.add_paragraph()
+        
+        # Add figures with chapter numbering in Chapter 2
+        doc.add_figure_with_caption(
+            caption_text="First figure in chapter 2",
+            use_chapter_numbers=True
+        )
+        doc.add_paragraph()
+        
+        doc.add_figure_with_caption(
+            caption_text="Second figure in chapter 2",
+            use_chapter_numbers=True
+        )
+        doc.add_paragraph()
+        
+        # Add table with chapter numbering in Chapter 2
+        doc.add_table_with_caption(
+            caption_text="First table in chapter 2",
+            rows=2,
+            cols=2,
+            use_chapter_numbers=True
+        )
+        doc.add_paragraph()
+        
+        # Chapter 3
+        doc.add_heading("Chapter 3: Results", level=1)
+        doc.add_paragraph("This is the third chapter.")
+        doc.add_paragraph()
+        
+        # Add mixed numbering - with and without chapter numbers
+        doc.add_figure_with_caption(
+            caption_text="Figure with chapter numbering",
+            use_chapter_numbers=True
+        )
+        doc.add_paragraph()
+        
+        doc.add_table_with_caption(
+            caption_text="Table with simple numbering",
+            rows=2,
+            cols=2,
+            use_chapter_numbers=False  # This should continue simple numbering
+        )
+        doc.add_paragraph()
+        
+        # Add cross-references
+        doc.add_heading("References Section", level=2)
+        doc.add_paragraph("Cross-references to the figures and tables:")
+        doc.add_paragraph()
+        
+        doc.add_cross_reference("figure_0", reference_type="figure", prefix_text="See ")
+        doc.add_paragraph(" for the first figure.")
+        doc.add_paragraph()
+        
+        doc.add_cross_reference("table_0", reference_type="table", prefix_text="Refer to ")
+        doc.add_paragraph(" for the first table.")
+        
+        doc.update_fields()
+        doc.save(output_file)
+    
+    assert output_file.exists(), "Document should be created"
+    assert output_file.stat().st_size > 0, "Document should not be empty"
+    
+    print(f"\nChapter numbering test document created: {output_file}")
+    print("Expected numbering:")
+    print("  Chapter 1: Figure 1.1, Figure 1.2, Table 1.1")
+    print("  Chapter 2: Figure 2.1, Figure 2.2, Table 2.1")
+    print("  Chapter 3: Figure 3.1, Table 1 (simple)")
+    
+    if os.getenv("AUTO_OPEN"):
+        os.startfile(output_file)
+
+
 if __name__ == "__main__":
     # Run tests directly
     test_word_com_api_wrapper()
@@ -348,4 +460,5 @@ if __name__ == "__main__":
     test_table_with_data()
     test_table_data_validation()
     test_figure_layouts()
+    test_chapter_numbering()
     print("\nAll tests passed!")

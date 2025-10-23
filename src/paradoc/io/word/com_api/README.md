@@ -164,7 +164,7 @@ doc.add_section_break("next_page")
 
 #### Figure Methods
 
-##### add_figure_with_caption(caption_text, image_path=None, width=None, height=None, layout=FigureLayout.INLINE, create_bookmark=True)
+##### add_figure_with_caption(caption_text, image_path=None, width=None, height=None, layout=FigureLayout.INLINE, create_bookmark=True, use_chapter_numbers=False)
 
 Add a figure with a caption using Word's SEQ field for automatic numbering.
 
@@ -181,6 +181,7 @@ Add a figure with a caption using Word's SEQ field for automatic numbering.
   - `FigureLayout.BEHIND_TEXT` or `"behind_text"`: Figure behind text
   - `FigureLayout.IN_FRONT_OF_TEXT` or `"in_front_of_text"`: Figure in front of text
 - `create_bookmark` (bool): Whether to create a bookmark for cross-referencing
+- `use_chapter_numbers` (bool): Whether to use chapter-based numbering (e.g., 1.1, 1.2, 2.1). Requires Heading 1 styles in the document. Default is False (simple numbering: 1, 2, 3, etc.)
 
 Returns: The bookmark name if `create_bookmark=True`, otherwise `None`
 
@@ -218,11 +219,29 @@ fig_bookmark = doc.add_figure_with_caption(
     image_path="logo.png",
     layout=FigureLayout.BEHIND_TEXT
 )
+
+# Chapter-based numbering (e.g., 1.1, 1.2, 2.1, 2.2)
+# Requires Heading 1 styles in the document
+doc.add_heading("Chapter 1: Introduction", level=1)
+doc.add_figure_with_caption(
+    caption_text="First figure in chapter 1",
+    use_chapter_numbers=True  # Will be numbered as Figure 1.1
+)
+doc.add_figure_with_caption(
+    caption_text="Second figure in chapter 1",
+    use_chapter_numbers=True  # Will be numbered as Figure 1.2
+)
+
+doc.add_heading("Chapter 2: Methods", level=1)
+doc.add_figure_with_caption(
+    caption_text="First figure in chapter 2",
+    use_chapter_numbers=True  # Will be numbered as Figure 2.1
+)
 ```
 
 #### Table Methods
 
-##### add_table_with_caption(caption_text, rows=2, cols=2, data=None, create_bookmark=True)
+##### add_table_with_caption(caption_text, rows=2, cols=2, data=None, create_bookmark=True, use_chapter_numbers=False)
 
 Add a table with a caption using Word's SEQ field for automatic numbering.
 
@@ -231,6 +250,7 @@ Add a table with a caption using Word's SEQ field for automatic numbering.
 - `cols` (int): Number of columns in the table
 - `data` (list[list], optional): Data to populate the table. Should be a list of lists where each inner list represents a row. If provided, dimensions must match the table size (rows x cols). Values will be converted to strings.
 - `create_bookmark` (bool): Whether to create a bookmark for cross-referencing
+- `use_chapter_numbers` (bool): Whether to use chapter-based numbering (e.g., 1.1, 1.2, 2.1). Requires Heading 1 styles in the document. Default is False (simple numbering: 1, 2, 3, etc.)
 
 Returns: The bookmark name if `create_bookmark=True`, otherwise `None`
 
@@ -266,6 +286,30 @@ doc.add_table_with_caption(
     rows=3,
     cols=3,
     data=numeric_data
+)
+
+# Chapter-based numbering (e.g., 1.1, 1.2, 2.1, 2.2)
+# Requires Heading 1 styles in the document
+doc.add_heading("Chapter 1: Introduction", level=1)
+doc.add_table_with_caption(
+    caption_text="First table in chapter 1",
+    rows=2,
+    cols=2,
+    use_chapter_numbers=True  # Will be numbered as Table 1.1
+)
+doc.add_table_with_caption(
+    caption_text="Second table in chapter 1",
+    rows=2,
+    cols=2,
+    use_chapter_numbers=True  # Will be numbered as Table 1.2
+)
+
+doc.add_heading("Chapter 2: Methods", level=1)
+doc.add_table_with_caption(
+    caption_text="First table in chapter 2",
+    rows=2,
+    cols=2,
+    use_chapter_numbers=True  # Will be numbered as Table 2.1
 )
 ```
 

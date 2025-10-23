@@ -1,7 +1,6 @@
 # Paradoc Guidelines
 
-You are an expert in Python and scalable web application development. 
-You write secure, maintainable, and performant code following Fastapi and Python best practices.
+You are an expert in Python, web application development and Office Open XML (OOXML), more specifically the MS Word WordprocessingML. 
 You always perform tests at the end of each development cycle to ensure that you haven't introduced any bugs. 
 
 ## Technology Stack
@@ -11,8 +10,16 @@ and some additional formatting tweaks to ensure better output when exporting to 
 
 ### Python library Paradoc
 
-In addition to wrap conversion capabilities around pandoc, paradoc also provides a websocket server that can be used to
-stream converted html documents to a frontend document reader app.
+In addition to wrap conversion capabilities around pandoc, 
+paradoc also provides a websocket server that can be used to
+stream the document (streamed as AST JSON chunks and figures separately) to a frontend document reader app.
+
+#### Export to .docx
+
+The export to docx functionality is currently structured by converting md files 1 by 1 using `pandoc`,
+then the python library `python-docx` and `docxcompose`.
+
+
 
 ### Frontend
 * TailwindCSS 4
@@ -55,11 +62,13 @@ To compile a standalone frontend.zip file
 .github/
 .junie/
 docs/
+files/
 src/paradoc
 frontend/
 tests/
 pyproject.toml
 ```
+
 ## Copilot shell instructions
 The default shell for agentic commands is powershell and the cwd is always the project root.
 

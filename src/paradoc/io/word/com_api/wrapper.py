@@ -267,7 +267,8 @@ class WordDocument:
         width: Optional[float] = None,
         height: Optional[float] = None,
         layout: Union[FigureLayout, str] = FigureLayout.INLINE,
-        create_bookmark: bool = True
+        create_bookmark: bool = True,
+        use_chapter_numbers: bool = False
     ) -> Optional[str]:
         """Add a figure with a caption.
         
@@ -281,6 +282,8 @@ class WordDocument:
             height: Optional height for image/shape in points
             layout: Layout/text wrapping style for the figure (default: inline with text)
             create_bookmark: Whether to create a bookmark for cross-referencing
+            use_chapter_numbers: Whether to use chapter-based numbering (e.g., 1.1, 1.2, 2.1).
+                                Requires Heading 1 styles in the document. Default is False (simple numbering).
             
         Returns:
             The bookmark name if create_bookmark=True, otherwise None
@@ -328,11 +331,16 @@ class WordDocument:
         self._app.Selection.Style = "Caption"
         
         # Create caption with SEQ field
+        # Use \\s 1 switch for chapter-based numbering (e.g., 1.1, 1.2, 2.1)
+        seq_field_text = "SEQ Figure \\* ARABIC"
+        if use_chapter_numbers:
+            seq_field_text += " \\s 1"
+        
         self._app.Selection.TypeText("Figure ")
         self._app.Selection.Fields.Add(
             Range=self._app.Selection.Range,
             Type=WD_FIELD_EMPTY,
-            Text="SEQ Figure \\* ARABIC",
+            Text=seq_field_text,
             PreserveFormatting=True
         )
         self._app.Selection.TypeText(f": {caption_text}")
@@ -355,7 +363,8 @@ class WordDocument:
         rows: int = 2,
         cols: int = 2,
         data: Optional[list[list]] = None,
-        create_bookmark: bool = True
+        create_bookmark: bool = True,
+        use_chapter_numbers: bool = False
     ) -> Optional[str]:
         """Add a table with a caption.
         
@@ -369,6 +378,8 @@ class WordDocument:
                   each inner list represents a row. If provided, the dimensions should
                   match the table size (rows x cols). Values will be converted to strings.
             create_bookmark: Whether to create a bookmark for cross-referencing
+            use_chapter_numbers: Whether to use chapter-based numbering (e.g., 1.1, 1.2, 2.1).
+                                Requires Heading 1 styles in the document. Default is False (simple numbering).
             
         Returns:
             The bookmark name if create_bookmark=True, otherwise None
@@ -397,11 +408,16 @@ class WordDocument:
         self._app.Selection.Style = "Caption"
         
         # Create caption with SEQ field
+        # Use \\s 1 switch for chapter-based numbering (e.g., 1.1, 1.2, 2.1)
+        seq_field_text = "SEQ Table \\* ARABIC"
+        if use_chapter_numbers:
+            seq_field_text += " \\s 1"
+        
         self._app.Selection.TypeText("Table ")
         self._app.Selection.Fields.Add(
             Range=self._app.Selection.Range,
             Type=WD_FIELD_EMPTY,
-            Text="SEQ Table \\* ARABIC",
+            Text=seq_field_text,
             PreserveFormatting=True
         )
         self._app.Selection.TypeText(f": {caption_text}")
