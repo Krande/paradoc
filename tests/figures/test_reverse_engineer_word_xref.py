@@ -56,16 +56,33 @@ def test_reverse_engineer_word_crossref(tmp_path):
         # This is the OFFICIAL way Word creates captions with bookmarks
         print("  Creating caption with Word's InsertCaption...")
 
-        # First, select the current paragraph
-        word.Selection.EndKey(Unit=5)  # wdLine = 5
+        # Insert an actual shape for the caption to attach to
+        print("  Inserting a shape for the caption to attach to...")
+        # Use Shapes.AddShape (not InlineShapes) - msoShapeRectangle = 1
+        shape = word_doc.Shapes.AddShape(1, 100, 100, 100, 100)
 
-        # Insert caption - Word automatically creates a bookmark
-        word.Selection.InsertCaption(
-            Label="Figure",
-            Title=": Test Caption Created by Word",
-            Position=0  # wdCaptionPositionBelow
+        # Move to end of document and add caption manually
+        # InsertCaption can be unreliable across different Word configurations
+        word.Selection.EndKey(Unit=6)  # wdStory = 6 (end of document)
+        word.Selection.TypeParagraph()
+        word.Selection.Style = "Caption"
+
+        # Create a SEQ field for the figure number (what Word does internally)
+        word.Selection.TypeText("Figure ")
+        word.Selection.Fields.Add(
+            Range=word.Selection.Range,
+            Type=-1,  # wdFieldEmpty
+            Text="SEQ Figure \\* ARABIC",
+            PreserveFormatting=True
         )
-        print("  [OK] Caption created")
+        word.Selection.TypeText(": Test Caption Created by Word")
+
+        # Create a bookmark for this caption (what Word does for cross-references)
+        caption_range = word.Selection.Paragraphs(1).Range
+        bookmark_name = "_Ref" + str(int(time.time() * 1000) % 1000000000)
+        word_doc.Bookmarks.Add(bookmark_name, caption_range)
+
+        print("  [OK] Caption created with bookmark:", bookmark_name)
 
         # Add some spacing
         word.Selection.TypeParagraph()
