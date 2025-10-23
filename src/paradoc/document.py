@@ -234,9 +234,16 @@ class OneDoc:
 
         if self.metadata_file.exists() is False:
             with open(self.metadata_file, "w") as f:
-                f.write('linkReferences: true\nnameInLink: true\nfigPrefix: "Figure"\ntblPrefix: "Table"')
+                # Use correct pandoc-crossref metadata format
+                # figureTitle and tableTitle are the proper settings for pandoc-crossref
+                f.write('linkReferences: true\n')
+                f.write('nameInLink: true\n')
+                f.write('figureTitle: "Figure"\n')
+                f.write('tableTitle: "Table"\n')
+                f.write('figPrefix: "Figure"\n')  # Keep for backwards compatibility
+                f.write('tblPrefix: "Table"\n')   # Keep for backwards compatibility
                 if self.use_default_html_style is True:
-                    f.write("\nstylesheet: style.css")
+                    f.write("stylesheet: style.css\n")
             css_style = self.source_dir / "style.css"
             if css_style.exists() is False:
                 shutil.copy(MY_DEFAULT_HTML_CSS, css_style)
