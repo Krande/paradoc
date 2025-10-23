@@ -113,63 +113,98 @@ def add_bookmark(paragraph: Paragraph, bookmark_text, bookmark_name):
 
 
 def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> str:
-    """Add a bookmark around the caption number SEQ field.
+    """Add a bookmark around the caption numbering sequence.
 
-    This matches Word's native cross-reference implementation - the bookmark
-    wraps tightly around the SEQ field only, not the entire caption paragraph.
+    For proper cross-referencing, the bookmark needs to wrap around the entire
+    numbering sequence (STYLEREF + hyphen + SEQ) so that REF fields show "1-1"
+    instead of just "1".
 
-    Based on reverse engineering Word's cross-reference system, Word:
-    1. Uses random numeric bookmark IDs: _Ref + random number (e.g., _Ref212059733)
-    2. Places bookmarks around SEQ fields (can be fldSimple or complex fields)
-    3. Uses bookmark ID "0" for the w:id attribute
+    Caption structure:
+    - STYLEREF field (chapter number: "1")
+    - Hyphen text run: "-"
+    - SEQ field (figure/table number: "1")
+    - Caption text: ": caption"
 
     Args:
-        paragraph: The caption paragraph containing SEQ fields
+        paragraph: The caption paragraph containing the numbering fields
         bookmark_name: The name of the bookmark (e.g., "fig:test_figure")
 
     Returns:
         The actual bookmark name that was created (e.g., "_Ref306075071")
     """
     # Generate Word-style random bookmark name
-    # Word uses _Ref + 9-digit random number
     import random
     random_id = random.randint(100000000, 999999999)
     word_style_name = f"_Ref{random_id}"
 
     # Generate a unique bookmark ID
-    # Important: Both bookmarkStart and bookmarkEnd must use the SAME ID
-    # We use a random number to avoid conflicts with other bookmarks
     bookmark_id = str(random.randint(1, 999999))
 
     p_element = paragraph._p
-
-    # First, try to find fldSimple elements (Word's preferred format for SEQ fields)
-    fld_simple_elements = p_element.findall(qn('w:fldSimple'))
-
-    for fld_simple in fld_simple_elements:
-        instr = fld_simple.get(qn('w:instr'))
-        if instr and 'SEQ' in instr and 'STYLEREF' not in instr:
-            # Found the SEQ field - wrap bookmark around it
-            # Insert bookmark start before the fldSimple element
-            start = OxmlElement("w:bookmarkStart")
-            start.set(qn("w:id"), bookmark_id)
-            start.set(qn("w:name"), word_style_name)
-            fld_simple.addprevious(start)
-
-            # Insert bookmark end after the fldSimple element
-            end = OxmlElement("w:bookmarkEnd")
-            end.set(qn("w:id"), bookmark_id)
-            fld_simple.addnext(end)
-
-            return word_style_name  # Return the actual bookmark name created
-
-    # If no fldSimple found, look for complex field structure (begin/instrText/end)
     runs = list(p_element.findall(qn('w:r')))
 
-    # First, check if the SEQ field is entirely within a single run
-    # (this is how add_seq_reference creates them)
+    # Find the STYLEREF field (chapter number) - this is the start of the numbering
+    styleref_begin_idx = None
+    seq_end_idx = None
+
     for idx, run in enumerate(runs):
-        # Check if this run contains both begin and end field chars
+        # Look for field characters
+        fld_chars = run.findall(qn('w:fldChar'))
+        for fld_char in fld_chars:
+            fld_type = fld_char.get(qn('w:fldCharType'))
+
+            if fld_type == 'begin' and styleref_begin_idx is None:
+                # Check if this is the STYLEREF field
+                for check_idx in range(idx, min(idx + 3, len(runs))):
+                    instr_texts = runs[check_idx].findall(qn('w:instrText'))
+                    for instr in instr_texts:
+                        if instr.text and 'STYLEREF' in instr.text:
+                            styleref_begin_idx = idx
+                            break
+                    if styleref_begin_idx is not None:
+                        break
+
+            elif fld_type == 'end' and styleref_begin_idx is not None:
+                # Check if there's a SEQ field after this
+                # Look ahead for SEQ field
+                for check_idx in range(idx + 1, min(idx + 10, len(runs))):
+                    check_run_fld_chars = runs[check_idx].findall(qn('w:fldChar'))
+                    for check_fld_char in check_run_fld_chars:
+                        check_fld_type = check_fld_char.get(qn('w:fldCharType'))
+                        if check_fld_type == 'end':
+                            # Check if this is a SEQ field end
+                            for seq_check_idx in range(max(0, check_idx - 3), check_idx):
+                                seq_instr_texts = runs[seq_check_idx].findall(qn('w:instrText'))
+                                for seq_instr in seq_instr_texts:
+                                    if seq_instr.text and 'SEQ' in seq_instr.text and 'STYLEREF' not in seq_instr.text:
+                                        seq_end_idx = check_idx
+                                        break
+                                if seq_end_idx is not None:
+                                    break
+                            if seq_end_idx is not None:
+                                break
+                    if seq_end_idx is not None:
+                        break
+                break
+
+        if seq_end_idx is not None:
+            break
+
+    if styleref_begin_idx is not None and seq_end_idx is not None:
+        # Found the full numbering sequence - wrap bookmark around STYLEREF + hyphen + SEQ
+        start = OxmlElement("w:bookmarkStart")
+        start.set(qn("w:id"), bookmark_id)
+        start.set(qn("w:name"), word_style_name)
+        runs[styleref_begin_idx].addprevious(start)
+
+        end = OxmlElement("w:bookmarkEnd")
+        end.set(qn("w:id"), bookmark_id)
+        runs[seq_end_idx].addnext(end)
+
+        return word_style_name
+
+    # Fallback: try to find just the SEQ field if STYLEREF approach didn't work
+    for idx, run in enumerate(runs):
         fld_chars = run.findall(qn('w:fldChar'))
         has_begin = False
         has_end = False
@@ -181,12 +216,10 @@ def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> s
             elif fld_type == 'end':
                 has_end = True
 
-        # If this run has both begin and end, check for SEQ instruction
         if has_begin and has_end:
             instr_texts = run.findall(qn('w:instrText'))
             for instr in instr_texts:
                 if instr.text and 'SEQ' in instr.text and 'STYLEREF' not in instr.text:
-                    # Found a complete SEQ field within a single run!
                     start = OxmlElement("w:bookmarkStart")
                     start.set(qn("w:id"), bookmark_id)
                     start.set(qn("w:name"), word_style_name)
@@ -196,52 +229,9 @@ def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> s
                     end.set(qn("w:id"), bookmark_id)
                     run.addnext(end)
 
-                    return word_style_name  # Return the actual bookmark name created
+                    return word_style_name
 
-    # If not found in a single run, look for SEQ field spread across multiple runs
-    seq_field_begin_idx = None
-    seq_field_end_idx = None
-
-    for idx, run in enumerate(runs):
-        # Look for field characters
-        fld_chars = run.findall(qn('w:fldChar'))
-        for fld_char in fld_chars:
-            fld_type = fld_char.get(qn('w:fldCharType'))
-
-            if fld_type == 'begin':
-                # Check if the next run(s) contain SEQ instruction
-                for check_idx in range(idx, min(idx + 3, len(runs))):
-                    instr_texts = runs[check_idx].findall(qn('w:instrText'))
-                    for instr in instr_texts:
-                        if instr.text and 'SEQ' in instr.text and 'STYLEREF' not in instr.text:
-                            seq_field_begin_idx = idx
-                            break
-                    if seq_field_begin_idx is not None:
-                        break
-
-            elif fld_type == 'end' and seq_field_begin_idx is not None:
-                # Found the end of the SEQ field we identified
-                seq_field_end_idx = idx
-                break
-
-        if seq_field_end_idx is not None:
-            break
-
-    if seq_field_begin_idx is not None and seq_field_end_idx is not None:
-        # Found complex SEQ field spread across runs - wrap bookmark around it
-        start = OxmlElement("w:bookmarkStart")
-        start.set(qn("w:id"), bookmark_id)
-        start.set(qn("w:name"), word_style_name)
-        runs[seq_field_begin_idx].addprevious(start)
-
-        end = OxmlElement("w:bookmarkEnd")
-        end.set(qn("w:id"), bookmark_id)
-        runs[seq_field_end_idx].addnext(end)
-
-        return word_style_name  # Return the actual bookmark name created
-
-    # If we couldn't find any SEQ field, fall back to paragraph bookmark
-    # This shouldn't happen in normal caption paragraphs, but provides a safety net
+    # Final fallback to paragraph bookmark
     return add_bookmark_to_caption(paragraph, bookmark_name)
 
 
@@ -469,8 +459,8 @@ def convert_figure_references_to_ref_fields(document, figures):
                 before_text = original_text[last_pos:match.start()]
                 _add_text_run(p_element, before_text)
 
-            # Add REF field
-            _add_ref_field_runs(p_element, bookmark_name)
+            # Add REF field with "Figure" label
+            _add_ref_field_runs(p_element, bookmark_name, label="Figure")
 
             last_pos = match.end()
 
@@ -498,7 +488,7 @@ def _add_text_run(p_element, text):
     p_element.append(r)
 
 
-def _add_ref_field_runs(p_element, bookmark_name):
+def _add_ref_field_runs(p_element, bookmark_name, label="Figure"):
     """Add REF field runs to a paragraph element by appending to XML.
 
     This creates the complete REF field structure with begin, instruction, separator, result, and end.
@@ -506,7 +496,24 @@ def _add_ref_field_runs(p_element, bookmark_name):
     Args:
         p_element: The paragraph XML element (w:p)
         bookmark_name: The name of the bookmark to reference
+        label: The label prefix to include (e.g., "Figure", "Table", "Eq")
     """
+    # Add space before the label to ensure proper spacing
+    r_space_before = OxmlElement("w:r")
+    t_space_before = OxmlElement("w:t")
+    t_space_before.set(qn("xml:space"), "preserve")
+    t_space_before.text = " "
+    r_space_before.append(t_space_before)
+    p_element.append(r_space_before)
+
+    # Add the label prefix as regular text before the field
+    r_label = OxmlElement("w:r")
+    t_label = OxmlElement("w:t")
+    t_label.set(qn("xml:space"), "preserve")
+    t_label.text = f"{label} "
+    r_label.append(t_label)
+    p_element.append(r_label)
+
     # Run 1: Field begin
     r1 = OxmlElement("w:r")
     fldChar1 = OxmlElement("w:fldChar")
@@ -534,7 +541,7 @@ def _add_ref_field_runs(p_element, bookmark_name):
     # Run 4: Field result (placeholder text that will be replaced when field is updated)
     r4 = OxmlElement("w:r")
     t = OxmlElement("w:t")
-    t.text = "Figure 1"  # Placeholder - will be updated by Word
+    t.text = "1-1"  # Placeholder - will be updated by Word to show full numbering
     r4.append(t)
     p_element.append(r4)
 
@@ -544,6 +551,14 @@ def _add_ref_field_runs(p_element, bookmark_name):
     fldChar5.set(qn("w:fldCharType"), "end")
     r5.append(fldChar5)
     p_element.append(r5)
+
+    # Add a space after the REF field
+    r_space = OxmlElement("w:r")
+    t_space = OxmlElement("w:t")
+    t_space.set(qn("xml:space"), "preserve")
+    t_space.text = " "
+    r_space.append(t_space)
+    p_element.append(r_space)
 
 
 def add_ref_field_to_paragraph(paragraph: Paragraph, bookmark_name: str):
@@ -586,3 +601,196 @@ def add_ref_field_to_paragraph(paragraph: Paragraph, bookmark_name: str):
     r5.append(fldChar5)
 
 
+def convert_table_references_to_ref_fields(document, tables):
+    """Convert plain text table references to Word REF fields.
+
+    This function finds paragraphs that contain table references (like "Table 1" or "tbl. 1")
+    and converts them to proper Word REF fields that point to the bookmarked captions.
+
+    Args:
+        document: The Word document
+        tables: List of DocXTableRef objects containing table information
+    """
+    # Build a mapping from semantic reference IDs to actual bookmark names
+    ref_id_to_bookmark = {}
+    bookmarks_in_order = []
+
+    for tbl in tables:
+        if hasattr(tbl, 'table_ref') and hasattr(tbl.table_ref, 'link_name_override'):
+            ref_id = tbl.table_ref.link_name_override or tbl.table_ref.name
+            if hasattr(tbl, 'actual_bookmark_name') and tbl.actual_bookmark_name:
+                actual_bookmark = tbl.actual_bookmark_name
+                ref_id_to_bookmark[ref_id] = actual_bookmark
+                bookmarks_in_order.append(actual_bookmark)
+
+    if not bookmarks_in_order:
+        return  # No tables to process
+
+    # Pattern to match table references from pandoc-crossref
+    tbl_ref_pattern = re.compile(r'\b((?:Table|tbl\.)\s+([\d\-]+))\b', re.IGNORECASE)
+
+    # Iterate through all paragraphs
+    for block in iter_block_items(document):
+        if not isinstance(block, Paragraph):
+            continue
+
+        # Skip caption paragraphs
+        if block.style.name in ("Image Caption", "Table Caption", "Captioned Figure"):
+            continue
+
+        # Check if paragraph contains table references
+        if not re.search(tbl_ref_pattern, block.text):
+            continue
+
+        # Process the paragraph to replace text with REF fields
+        original_text = block.text
+        matches = list(tbl_ref_pattern.finditer(original_text))
+        if not matches:
+            continue
+
+        # Store paragraph element before clearing
+        p_element = block._p
+
+        # Clear all runs and hyperlinks
+        for run in list(block.runs):
+            p_element.remove(run._element)
+        for child in list(p_element):
+            if child.tag == qn('w:hyperlink'):
+                p_element.remove(child)
+
+        # Rebuild the paragraph with text and REF fields
+        last_pos = 0
+        for match in matches:
+            table_num_str = match.group(2)
+            try:
+                if table_num_str == "-":
+                    table_num = 1
+                else:
+                    table_num = int(table_num_str)
+            except ValueError:
+                table_num = 1
+
+            bookmark_idx = table_num - 1
+            if 0 <= bookmark_idx < len(bookmarks_in_order):
+                bookmark_name = bookmarks_in_order[bookmark_idx]
+            else:
+                bookmark_name = bookmarks_in_order[-1] if bookmarks_in_order else None
+
+            if bookmark_name is None:
+                if last_pos < len(original_text):
+                    _add_text_run(p_element, original_text[last_pos:])
+                break
+
+            # Add text before the reference
+            if match.start() > last_pos:
+                before_text = original_text[last_pos:match.start()]
+                _add_text_run(p_element, before_text)
+
+            # Add REF field with "Table" label
+            _add_ref_field_runs(p_element, bookmark_name, label="Table")
+
+            last_pos = match.end()
+
+        # Add remaining text after the last reference
+        if last_pos < len(original_text):
+            after_text = original_text[last_pos:]
+            _add_text_run(p_element, after_text)
+
+
+def convert_equation_references_to_ref_fields(document, equations):
+    """Convert plain text equation references to Word REF fields.
+
+    This function finds paragraphs that contain equation references (like "Eq 1" or "eq. 1")
+    and converts them to proper Word REF fields that point to the bookmarked captions.
+
+    Args:
+        document: The Word document
+        equations: List of equation objects containing equation information
+    """
+    # Build a mapping from semantic reference IDs to actual bookmark names
+    ref_id_to_bookmark = {}
+    bookmarks_in_order = []
+
+    # Note: This assumes equations will have similar structure to figures/tables
+    # You may need to adjust based on how equations are actually stored
+    for eq in equations:
+        if hasattr(eq, 'reference') and eq.reference:
+            ref_id = eq.reference
+            if hasattr(eq, 'actual_bookmark_name') and eq.actual_bookmark_name:
+                actual_bookmark = eq.actual_bookmark_name
+                ref_id_to_bookmark[ref_id] = actual_bookmark
+                bookmarks_in_order.append(actual_bookmark)
+
+    if not bookmarks_in_order:
+        return  # No equations to process
+
+    # Pattern to match equation references from pandoc-crossref
+    # Match: "Eq X", "eq. X", "Equation X", etc.
+    eq_ref_pattern = re.compile(r'\b((?:Eq(?:uation)?|eq\.)\s+([\d\-]+))\b', re.IGNORECASE)
+
+    # Iterate through all paragraphs
+    for block in iter_block_items(document):
+        if not isinstance(block, Paragraph):
+            continue
+
+        # Skip caption paragraphs
+        if block.style.name in ("Image Caption", "Table Caption", "Captioned Figure"):
+            continue
+
+        # Check if paragraph contains equation references
+        if not re.search(eq_ref_pattern, block.text):
+            continue
+
+        # Process the paragraph to replace text with REF fields
+        original_text = block.text
+        matches = list(eq_ref_pattern.finditer(original_text))
+        if not matches:
+            continue
+
+        # Store paragraph element before clearing
+        p_element = block._p
+
+        # Clear all runs and hyperlinks
+        for run in list(block.runs):
+            p_element.remove(run._element)
+        for child in list(p_element):
+            if child.tag == qn('w:hyperlink'):
+                p_element.remove(child)
+
+        # Rebuild the paragraph with text and REF fields
+        last_pos = 0
+        for match in matches:
+            eq_num_str = match.group(2)
+            try:
+                if eq_num_str == "-":
+                    eq_num = 1
+                else:
+                    eq_num = int(eq_num_str)
+            except ValueError:
+                eq_num = 1
+
+            bookmark_idx = eq_num - 1
+            if 0 <= bookmark_idx < len(bookmarks_in_order):
+                bookmark_name = bookmarks_in_order[bookmark_idx]
+            else:
+                bookmark_name = bookmarks_in_order[-1] if bookmarks_in_order else None
+
+            if bookmark_name is None:
+                if last_pos < len(original_text):
+                    _add_text_run(p_element, original_text[last_pos:])
+                break
+
+            # Add text before the reference
+            if match.start() > last_pos:
+                before_text = original_text[last_pos:match.start()]
+                _add_text_run(p_element, before_text)
+
+            # Add REF field with "Eq" label
+            _add_ref_field_runs(p_element, bookmark_name, label="Eq")
+
+            last_pos = match.end()
+
+        # Add remaining text after the last reference
+        if last_pos < len(original_text):
+            after_text = original_text[last_pos:]
+            _add_text_run(p_element, after_text)

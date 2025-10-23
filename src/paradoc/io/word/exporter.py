@@ -35,7 +35,7 @@ class WordExporter:
 
     def _compile_individual_md_files_to_docx(self, output_name, dest_file, check_open_docs=False):
 
-        from .references import convert_figure_references_to_ref_fields
+        from .references import convert_figure_references_to_ref_fields, convert_table_references_to_ref_fields
 
         one = self.one_doc
 
@@ -55,8 +55,8 @@ class WordExporter:
         composer_main = add_to_composer(self.main_tmpl, one.md_files_main)
         composer_app = add_to_composer(self.app_tmpl, one.md_files_app)
 
-        self.format_tables(composer_main.doc, False)
-        self.format_tables(composer_app.doc, True)
+        main_tables = self.format_tables(composer_main.doc, False)
+        app_tables = self.format_tables(composer_app.doc, True)
 
         # Format figures and collect them for reference conversion
         main_figures = self.format_figures(composer_main.doc, False)
@@ -71,6 +71,10 @@ class WordExporter:
         # Convert figure references to REF fields after merging
         all_figures = main_figures + app_figures
         convert_figure_references_to_ref_fields(composer_main.doc, all_figures)
+
+        # Convert table references to REF fields after merging
+        all_tables = main_tables + app_tables
+        convert_table_references_to_ref_fields(composer_main.doc, all_tables)
 
         # Format all paragraphs
         format_paragraphs_and_headings(composer_main.doc, one.paragraph_style_map)
@@ -95,6 +99,7 @@ class WordExporter:
             docx_update(str(dest_file))
 
     def format_tables(self, composer_doc: Document, is_appendix):
+        tables = []
         for i, docx_tbl in enumerate(self.get_all_tables(composer_doc)):
             try:
                 cell0 = docx_tbl.get_content_cell0_pg()
@@ -112,6 +117,8 @@ class WordExporter:
             else:
                 restart_caption_num = False
             docx_tbl.format_table(is_appendix, restart_caption_numbering=restart_caption_num)
+            tables.append(docx_tbl)
+        return tables
 
     def format_figures(self, composer_doc: Document, is_appendix):
         figures = self.get_all_figures(composer_doc)

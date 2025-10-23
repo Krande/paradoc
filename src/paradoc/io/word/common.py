@@ -23,6 +23,7 @@ class DocXTableRef:
     docx_following_pg: Paragraph = None
     is_appendix = False
     document_index: int = None
+    actual_bookmark_name: str = None  # Store the actual Word-style bookmark name
 
     def is_complete(self):
         docx_attr = [self.docx_caption, self.docx_table, self.docx_following_pg]
@@ -63,6 +64,15 @@ class DocXTableRef:
         self.docx_caption.paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
         rebuild_caption(self.docx_caption, "Table", self.table_ref.caption, is_appendix, restart_caption_numbering)
+
+        # Add bookmark around the caption number for Word cross-references
+        if self.table_ref.link_name_override or self.table_ref.name:
+            from .references import add_bookmark_around_seq_field
+
+            table_id = self.table_ref.link_name_override or self.table_ref.name
+            bookmark_name = f"tbl:{table_id}"
+            # Capture the actual bookmark name that was created
+            self.actual_bookmark_name = add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
 
         for run in self.docx_caption.runs:
             run.font.name = tbl_format.font_style
