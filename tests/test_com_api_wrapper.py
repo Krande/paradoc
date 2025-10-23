@@ -493,6 +493,354 @@ def test_chapter_numbering(tmp_path):
         os.startfile(output_file)
 
 
+@pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
+def test_cross_references_with_chapter_numbering(tmp_path):
+    """Test cross-references with chapter-based numbering for figures and tables."""
+    from paradoc.io.word.com_api import WordApplication
+    from docx import Document
+    
+    output_file = Path(tmp_path) / "test_crossref_chapter_numbering.docx"
+    
+    with WordApplication(visible=False) as word_app:
+        doc = word_app.create_document(template=MY_DOCX_TMPL)
+        
+        # Chapter 1
+        doc.add_heading("Chapter 1: Introduction", level=1)
+        doc.add_paragraph("This is the first chapter with figures and tables.")
+        doc.add_paragraph()
+        
+        # Add figures with chapter numbering and bookmarks
+        fig1_bookmark = doc.add_figure_with_caption(
+            caption_text="First figure in chapter 1",
+            use_chapter_numbers=True,
+            create_bookmark=True
+        )
+        doc.add_paragraph()
+        
+        fig2_bookmark = doc.add_figure_with_caption(
+            caption_text="Second figure in chapter 1",
+            use_chapter_numbers=True,
+            create_bookmark=True
+        )
+        doc.add_paragraph()
+        
+        # Add table with chapter numbering and bookmark
+        tbl1_bookmark = doc.add_table_with_caption(
+            caption_text="First table in chapter 1",
+            rows=2,
+            cols=2,
+            use_chapter_numbers=True,
+            create_bookmark=True
+        )
+        doc.add_paragraph()
+        
+        # Chapter 2
+        doc.add_heading("Chapter 2: Methods", level=1)
+        doc.add_paragraph("This chapter references content from Chapter 1.")
+        doc.add_paragraph()
+        
+        # Add cross-references to Chapter 1 figures and tables
+        doc.add_paragraph("As shown in ")
+        doc.add_cross_reference(
+            bookmark_name=0,  # First figure
+            reference_type="figure",
+            include_hyperlink=True
+        )
+        doc.add_paragraph(", the data clearly demonstrates the trend.")
+        doc.add_paragraph()
+        
+        doc.add_paragraph("Additionally, ")
+        doc.add_cross_reference(
+            bookmark_name=1,  # Second figure
+            reference_type="figure",
+            include_hyperlink=True,
+            prefix_text=""
+        )
+        doc.add_paragraph(" provides further evidence.")
+        doc.add_paragraph()
+        
+        doc.add_paragraph("The results are summarized in ")
+        doc.add_cross_reference(
+            bookmark_name=0,  # First table
+            reference_type="table",
+            include_hyperlink=True
+        )
+        doc.add_paragraph(".")
+        doc.add_paragraph()
+        
+        # Add figures in Chapter 2
+        fig3_bookmark = doc.add_figure_with_caption(
+            caption_text="First figure in chapter 2",
+            use_chapter_numbers=True,
+            create_bookmark=True
+        )
+        doc.add_paragraph()
+        
+        tbl2_bookmark = doc.add_table_with_caption(
+            caption_text="First table in chapter 2",
+            rows=2,
+            cols=2,
+            use_chapter_numbers=True,
+            create_bookmark=True
+        )
+        doc.add_paragraph()
+        
+        # Chapter 3
+        doc.add_heading("Chapter 3: Discussion", level=1)
+        doc.add_paragraph("This chapter references figures and tables from previous chapters.")
+        doc.add_paragraph()
+        
+        # Reference figures from both chapters
+        doc.add_paragraph("Comparing ")
+        doc.add_cross_reference(
+            bookmark_name=0,  # Figure 1-1
+            reference_type="figure",
+            include_hyperlink=True
+        )
+        doc.add_paragraph(" and ")
+        doc.add_cross_reference(
+            bookmark_name=2,  # Figure 2-1
+            reference_type="figure",
+            include_hyperlink=True
+        )
+        doc.add_paragraph(" reveals important differences.")
+        doc.add_paragraph()
+        
+        # Reference tables
+        doc.add_paragraph("See ")
+        doc.add_cross_reference(
+            bookmark_name=0,  # Table 1-1
+            reference_type="table",
+            include_hyperlink=True
+        )
+        doc.add_paragraph(" and ")
+        doc.add_cross_reference(
+            bookmark_name=1,  # Table 2-1
+            reference_type="table",
+            include_hyperlink=True
+        )
+        doc.add_paragraph(" for detailed data.")
+        doc.add_paragraph()
+        
+        # Update all fields to resolve cross-references
+        doc.update_fields()
+        doc.save(output_file)
+    
+    assert output_file.exists(), "Document should be created"
+    assert output_file.stat().st_size > 0, "Document should not be empty"
+    
+    # Read the document using python-docx and verify captions and cross-references
+    docx_doc = Document(str(output_file))
+    
+    # Find all caption paragraphs
+    figure_captions = []
+    table_captions = []
+    crossref_paragraphs = []
+    
+    for para in docx_doc.paragraphs:
+        text = para.text.strip()
+        if para.style.name == 'Caption':
+            if text.startswith('Figure'):
+                figure_captions.append(text)
+            elif text.startswith('Table'):
+                table_captions.append(text)
+        # Find paragraphs that contain cross-references (contain "Figure" or "Table" but not Caption style)
+        elif para.style.name != 'Caption' and ('Figure' in text or 'Table' in text):
+            crossref_paragraphs.append(text)
+    
+    # Assert figure captions
+    print(f"\nFound {len(figure_captions)} figure captions:")
+    for caption in figure_captions:
+        print(f"  {caption}")
+    
+    assert len(figure_captions) >= 3, f"Expected at least 3 figures, found {len(figure_captions)}"
+    assert "Figure 1-1:" in figure_captions[0], f"Expected 'Figure 1-1:' in first caption, got: {figure_captions[0]}"
+    assert "Figure 1-2:" in figure_captions[1], f"Expected 'Figure 1-2:' in second caption, got: {figure_captions[1]}"
+    assert "Figure 2-1:" in figure_captions[2], f"Expected 'Figure 2-1:' in third caption, got: {figure_captions[2]}"
+    
+    # Assert table captions
+    print(f"\nFound {len(table_captions)} table captions:")
+    for caption in table_captions:
+        print(f"  {caption}")
+    
+    assert len(table_captions) >= 2, f"Expected at least 2 tables, found {len(table_captions)}"
+    assert "Table 1-1:" in table_captions[0], f"Expected 'Table 1-1:' in first caption, got: {table_captions[0]}"
+    assert "Table 2-1:" in table_captions[1], f"Expected 'Table 2-1:' in second caption, got: {table_captions[1]}"
+    
+    # Assert cross-references are present and contain expected text
+    print(f"\nFound {len(crossref_paragraphs)} paragraphs with cross-references:")
+    for para in crossref_paragraphs[:10]:  # Show first 10
+        print(f"  {para}")
+    
+    # Check that cross-references contain figure/table numbers
+    crossref_text = ' '.join(crossref_paragraphs)
+    
+    # Should contain references to Figure 1-1, Figure 1-2, Figure 2-1
+    assert "Figure 1-1" in crossref_text or "Figure 1 1" in crossref_text, \
+        f"Expected cross-reference to 'Figure 1-1' in text"
+    assert "Figure 1-2" in crossref_text or "Figure 1 2" in crossref_text, \
+        f"Expected cross-reference to 'Figure 1-2' in text"
+    assert "Figure 2-1" in crossref_text or "Figure 2 1" in crossref_text, \
+        f"Expected cross-reference to 'Figure 2-1' in text"
+    
+    # Should contain references to Table 1-1, Table 2-1
+    assert "Table 1-1" in crossref_text or "Table 1 1" in crossref_text, \
+        f"Expected cross-reference to 'Table 1-1' in text"
+    assert "Table 2-1" in crossref_text or "Table 2 1" in crossref_text, \
+        f"Expected cross-reference to 'Table 2-1' in text"
+    
+    print(f"\n[PASS] All cross-reference assertions passed!")
+    print(f"  Captions: Figure 1-1, Figure 1-2, Figure 2-1, Table 1-1, Table 2-1")
+    print(f"  Cross-references verified in document text")
+    
+    if os.getenv("AUTO_OPEN"):
+        os.startfile(output_file)
+
+
+@pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
+def test_caption_reference_wrapper(tmp_path):
+    """Test the new CaptionReference wrapper for simplified cross-referencing."""
+    from paradoc.io.word.com_api import WordApplication
+    from docx import Document
+    
+    output_file = Path(tmp_path) / "test_caption_reference.docx"
+    
+    with WordApplication(visible=False) as word_app:
+        doc = word_app.create_document(template=MY_DOCX_TMPL)
+        
+        # Add content with chapter numbering
+        doc.add_heading("Chapter 1: Introduction", level=1)
+        doc.add_paragraph("This chapter introduces the concepts.")
+        doc.add_paragraph()
+        
+        # Add figures and capture CaptionReference objects
+        fig1 = doc.add_figure_with_caption(
+            caption_text="System architecture diagram",
+            use_chapter_numbers=True,
+            create_bookmark=True
+        )
+        doc.add_paragraph()
+        
+        fig2 = doc.add_figure_with_caption(
+            caption_text="Data flow diagram",
+            use_chapter_numbers=True,
+            create_bookmark=True
+        )
+        doc.add_paragraph()
+        
+        # Add table and capture CaptionReference object
+        tbl1 = doc.add_table_with_caption(
+            caption_text="System requirements",
+            rows=3,
+            cols=2,
+            data=[["Item", "Value"], ["CPU", "Intel i7"], ["RAM", "16 GB"]],
+            use_chapter_numbers=True,
+            create_bookmark=True
+        )
+        doc.add_paragraph()
+        
+        # Chapter 2
+        doc.add_heading("Chapter 2: Implementation", level=1)
+        doc.add_paragraph("This chapter describes the implementation details.")
+        doc.add_paragraph()
+        
+        # Add more content
+        fig3 = doc.add_figure_with_caption(
+            caption_text="Implementation flowchart",
+            use_chapter_numbers=True,
+            create_bookmark=True
+        )
+        doc.add_paragraph()
+        
+        # Chapter 3 - Cross-references using CaptionReference objects
+        doc.add_heading("Chapter 3: Analysis", level=1)
+        doc.add_paragraph("This chapter analyzes the results.")
+        doc.add_paragraph()
+        
+        # NEW SIMPLIFIED API: Pass CaptionReference directly
+        doc.add_paragraph("As shown in ")
+        doc.add_cross_reference(fig1, include_hyperlink=True)  # No need for reference_type!
+        doc.add_paragraph(", the architecture is modular.")
+        doc.add_paragraph()
+        
+        doc.add_paragraph("The data flow depicted in ")
+        doc.add_cross_reference(fig2, include_hyperlink=True)
+        doc.add_paragraph(" demonstrates the process.")
+        doc.add_paragraph()
+        
+        doc.add_paragraph("According to ")
+        doc.add_cross_reference(tbl1, include_hyperlink=True)  # Works for tables too!
+        doc.add_paragraph(", the system meets all requirements.")
+        doc.add_paragraph()
+        
+        doc.add_paragraph("Comparing ")
+        doc.add_cross_reference(fig1, include_hyperlink=True)
+        doc.add_paragraph(" with ")
+        doc.add_cross_reference(fig3, include_hyperlink=True)
+        doc.add_paragraph(" reveals the evolution of the design.")
+        doc.add_paragraph()
+        
+        # Update fields and save
+        doc.update_fields()
+        doc.save(output_file)
+    
+    assert output_file.exists(), "Document should be created"
+    assert output_file.stat().st_size > 0, "Document should not be empty"
+    
+    # Verify the document using python-docx
+    docx_doc = Document(str(output_file))
+    
+    # Find captions and cross-references
+    figure_captions = []
+    table_captions = []
+    crossref_paragraphs = []
+    
+    for para in docx_doc.paragraphs:
+        text = para.text.strip()
+        if para.style.name == 'Caption':
+            if text.startswith('Figure'):
+                figure_captions.append(text)
+            elif text.startswith('Table'):
+                table_captions.append(text)
+        elif para.style.name != 'Caption' and ('Figure' in text or 'Table' in text):
+            crossref_paragraphs.append(text)
+    
+    print(f"\nFound {len(figure_captions)} figure captions:")
+    for caption in figure_captions:
+        print(f"  {caption}")
+    
+    print(f"\nFound {len(table_captions)} table captions:")
+    for caption in table_captions:
+        print(f"  {caption}")
+    
+    print(f"\nFound {len(crossref_paragraphs)} paragraphs with cross-references:")
+    for para in crossref_paragraphs:
+        print(f"  {para}")
+    
+    # Verify expected captions
+    assert len(figure_captions) >= 3, f"Expected at least 3 figures, found {len(figure_captions)}"
+    assert "Figure 1-1:" in figure_captions[0]
+    assert "Figure 1-2:" in figure_captions[1]
+    assert "Figure 2-1:" in figure_captions[2]
+    
+    assert len(table_captions) >= 1, f"Expected at least 1 table, found {len(table_captions)}"
+    assert "Table 1-1:" in table_captions[0]
+    
+    # Verify cross-references are present
+    crossref_text = ' '.join(crossref_paragraphs)
+    assert "Figure 1-1" in crossref_text or "Figure 1 1" in crossref_text
+    assert "Figure 1-2" in crossref_text or "Figure 1 2" in crossref_text
+    assert "Figure 2-1" in crossref_text or "Figure 2 1" in crossref_text
+    assert "Table 1-1" in crossref_text or "Table 1 1" in crossref_text
+    
+    print(f"\n[PASS] CaptionReference wrapper test passed!")
+    print(f"  Successfully used CaptionReference objects for cross-referencing")
+    print(f"  No need to specify reference_type manually!")
+    
+    if os.getenv("AUTO_OPEN"):
+        os.startfile(output_file)
+
+
 if __name__ == "__main__":
     # Run tests directly
     test_word_com_api_wrapper()

@@ -5,6 +5,7 @@ This module provides high-level wrapper classes around win32com for Word automat
 
 import platform
 import time
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Optional, Literal, Union
@@ -39,6 +40,24 @@ class FigureLayout(str, Enum):
     TOP_BOTTOM = "top_bottom"  # Text above and below only
     BEHIND_TEXT = "behind_text"  # Figure behind text
     IN_FRONT_OF_TEXT = "in_front_of_text"  # Figure in front of text
+
+
+@dataclass
+class CaptionReference:
+    """Reference to a figure or table caption for cross-referencing.
+    
+    This class encapsulates all information needed to create a cross-reference
+    to a figure or table caption. It is returned by add_figure_with_caption and
+    add_table_with_caption methods and can be passed directly to add_cross_reference.
+    
+    Attributes:
+        bookmark_name: The Word bookmark name for the caption
+        id: The sequential ID (0-based index) of the caption
+        reference_type: The type of caption ("figure" or "table")
+    """
+    bookmark_name: str
+    id: int
+    reference_type: Literal["figure", "table"]
 
 
 class WordApplication:
@@ -269,7 +288,7 @@ class WordDocument:
         layout: Union[FigureLayout, str] = FigureLayout.INLINE,
         create_bookmark: bool = True,
         use_chapter_numbers: bool = True
-    ) -> Optional[str]:
+    ) -> Optional[CaptionReference]:
         """Add a figure with a caption.
         
         If image_path is provided, inserts the image. Otherwise, creates a placeholder shape.
@@ -286,7 +305,7 @@ class WordDocument:
                                 Requires Heading 1 styles in the document. Default is False (simple numbering).
             
         Returns:
-            The bookmark name if create_bookmark=True, otherwise None
+            CaptionReference object if create_bookmark=True, otherwise None
         """
         # Convert string to enum if needed
         if isinstance(layout, str):
@@ -372,16 +391,21 @@ class WordDocument:
         self._app.Selection.TypeText(f": {caption_text}")
         
         # Create bookmark if requested
-        bookmark_name = None
+        caption_ref = None
         if create_bookmark:
             caption_range = self._app.Selection.Paragraphs(1).Range
             bookmark_name = f"_Ref{int(time.time() * 1000) % 1000000000}"
             self._doc.Bookmarks.Add(bookmark_name, caption_range)
             self._bookmarks[f"figure_{self._figure_count}"] = bookmark_name
+            caption_ref = CaptionReference(
+                bookmark_name=bookmark_name,
+                id=self._figure_count,
+                reference_type="figure"
+            )
             self._figure_count += 1
             
         self._app.Selection.TypeParagraph()
-        return bookmark_name
+        return caption_ref
         
     def add_table_with_caption(
         self,
@@ -391,7 +415,7 @@ class WordDocument:
         data: Optional[list[list]] = None,
         create_bookmark: bool = True,
         use_chapter_numbers: bool = True
-    ) -> Optional[str]:
+    ) -> Optional[CaptionReference]:
         """Add a table with a caption.
         
         The caption uses a SEQ field for automatic numbering.
@@ -408,7 +432,7 @@ class WordDocument:
                                 Requires Heading 1 styles in the document. Default is False (simple numbering).
             
         Returns:
-            The bookmark name if create_bookmark=True, otherwise None
+            CaptionReference object if create_bookmark=True, otherwise None
         """
         # Validate data dimensions if provided
         if data is not None:
@@ -470,32 +494,51 @@ class WordDocument:
         self._app.Selection.TypeText(f": {caption_text}")
         
         # Create bookmark if requested
-        bookmark_name = None
+        caption_ref = None
         if create_bookmark:
             caption_range = self._app.Selection.Paragraphs(1).Range
             bookmark_name = f"_Ref{int(time.time() * 1000) % 1000000000}"
             self._doc.Bookmarks.Add(bookmark_name, caption_range)
             self._bookmarks[f"table_{self._table_count}"] = bookmark_name
+            caption_ref = CaptionReference(
+                bookmark_name=bookmark_name,
+                id=self._table_count,
+                reference_type="table"
+            )
             self._table_count += 1
             
         self._app.Selection.TypeParagraph()
-        return bookmark_name
+        return caption_ref
         
     def add_cross_reference(
         self,
-        bookmark_name: str,
-        reference_type: Literal["figure", "table"] = "figure",
+        bookmark_name: Union[CaptionReference, str, int],
+        reference_type: Optional[Literal["figure", "table"]] = None,
         include_hyperlink: bool = True,
         prefix_text: str = ""
     ):
         """Add a cross-reference to a figure or table.
         
         Args:
-            bookmark_name: The bookmark name to reference (or index if using item number)
-            reference_type: Type of reference ("figure" or "table")
+            bookmark_name: Either a CaptionReference object (returned from add_figure_with_caption
+                          or add_table_with_caption), a bookmark name string, or an integer index.
+                          When passing a CaptionReference, reference_type is automatically extracted.
+            reference_type: Type of reference ("figure" or "table"). Required only when bookmark_name
+                           is a string or int. Ignored when bookmark_name is a CaptionReference.
             include_hyperlink: Whether to make the reference a clickable hyperlink
             prefix_text: Optional text to insert before the reference (e.g., "See ")
         """
+        # Handle CaptionReference object
+        if isinstance(bookmark_name, CaptionReference):
+            actual_bookmark_name = bookmark_name.id  # Use the id for item index
+            actual_reference_type = bookmark_name.reference_type
+        else:
+            # Legacy behavior: bookmark_name is str or int
+            actual_bookmark_name = bookmark_name
+            if reference_type is None:
+                raise ValueError("reference_type must be provided when bookmark_name is not a CaptionReference")
+            actual_reference_type = reference_type
+        
         if prefix_text:
             self._app.Selection.TypeText(prefix_text)
             
@@ -505,16 +548,16 @@ class WordDocument:
             "table": WD_REF_TYPE_TABLE
         }
         
-        if reference_type not in ref_type_map:
-            raise ValueError(f"Invalid reference_type: {reference_type}")
+        if actual_reference_type not in ref_type_map:
+            raise ValueError(f"Invalid reference_type: {actual_reference_type}")
             
-        # If bookmark_name is an integer or a key like "figure_0", resolve it
-        if isinstance(bookmark_name, int):
-            item_index = bookmark_name + 1  # Word uses 1-based indexing
-        elif bookmark_name in self._bookmarks:
+        # If actual_bookmark_name is an integer or a key like "figure_0", resolve it
+        if isinstance(actual_bookmark_name, int):
+            item_index = actual_bookmark_name + 1  # Word uses 1-based indexing
+        elif actual_bookmark_name in self._bookmarks:
             # This is a symbolic reference - need to find the item index
             # For now, just use the numeric suffix + 1
-            item_index = int(bookmark_name.split('_')[-1]) + 1
+            item_index = int(actual_bookmark_name.split('_')[-1]) + 1
         else:
             # Assume it's already a bookmark name - find its position
             # For simplicity, we'll try to insert by item number based on count
@@ -522,7 +565,7 @@ class WordDocument:
             
         try:
             self._app.Selection.InsertCrossReference(
-                ReferenceType=ref_type_map[reference_type],
+                ReferenceType=ref_type_map[actual_reference_type],
                 ReferenceKind=WD_ONLY_LABEL_AND_NUMBER,
                 ReferenceItem=item_index,
                 InsertAsHyperlink=include_hyperlink,

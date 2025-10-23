@@ -39,14 +39,16 @@ with WordApplication(visible=False) as word_app:
     doc.add_heading("My Document", level=1)
     doc.add_paragraph("This is a paragraph.")
     
-    # Add a figure with caption
-    doc.add_figure_with_caption("Example figure description")
+    # Add a figure with caption (returns CaptionReference)
+    fig = doc.add_figure_with_caption("Example figure description")
     
-    # Add a table with caption
-    doc.add_table_with_caption("Example table", rows=3, cols=3)
+    # Add a table with caption (returns CaptionReference)
+    tbl = doc.add_table_with_caption("Example table", rows=3, cols=3)
     
-    # Add a cross-reference to the first figure
-    doc.add_cross_reference("figure_0", reference_type="figure", prefix_text="See ")
+    # Add a cross-reference - simply pass the CaptionReference!
+    doc.add_paragraph("As shown in ")
+    doc.add_cross_reference(fig)  # No need to specify reference_type!
+    doc.add_paragraph(", the data is clear.")
     
     # Update fields and save
     doc.update_fields()
@@ -183,7 +185,7 @@ Add a figure with a caption using Word's SEQ field for automatic numbering.
 - `create_bookmark` (bool): Whether to create a bookmark for cross-referencing
 - `use_chapter_numbers` (bool): Whether to use chapter-based numbering (e.g., 1-1, 1-2, 2-1). Requires Heading 1 styles in the document. Default is False (simple numbering: 1, 2, 3, etc.)
 
-Returns: The bookmark name if `create_bookmark=True`, otherwise `None`
+Returns: `CaptionReference` object if `create_bookmark=True`, otherwise `None`. The returned object can be passed directly to `add_cross_reference()`.
 
 ```python
 from paradoc.io.word.com_api import WordApplication, FigureLayout
@@ -252,7 +254,7 @@ Add a table with a caption using Word's SEQ field for automatic numbering.
 - `create_bookmark` (bool): Whether to create a bookmark for cross-referencing
 - `use_chapter_numbers` (bool): Whether to use chapter-based numbering (e.g., 1-1, 1-2, 2-1). Requires Heading 1 styles in the document. Default is False (simple numbering: 1, 2, 3, etc.)
 
-Returns: The bookmark name if `create_bookmark=True`, otherwise `None`
+Returns: `CaptionReference` object if `create_bookmark=True`, otherwise `None`. The returned object can be passed directly to `add_cross_reference()`.
 
 ```python
 # Empty table
@@ -315,17 +317,34 @@ doc.add_table_with_caption(
 
 #### Cross-Reference Methods
 
-##### add_cross_reference(bookmark_name, reference_type="figure", include_hyperlink=True, prefix_text="")
+##### add_cross_reference(bookmark_name, reference_type=None, include_hyperlink=True, prefix_text="")
 
 Add a cross-reference to a figure or table.
 
-- `bookmark_name` (str | int): The bookmark name or index (e.g., "figure_0" or 0)
-- `reference_type` (str): Type of reference ("figure" or "table")
+- `bookmark_name` (CaptionReference | str | int): Either a `CaptionReference` object (returned from `add_figure_with_caption` or `add_table_with_caption`), a bookmark name string, or an integer index. When passing a `CaptionReference`, the `reference_type` is automatically extracted.
+- `reference_type` (str, optional): Type of reference ("figure" or "table"). Required only when `bookmark_name` is a string or int. Ignored when `bookmark_name` is a `CaptionReference`.
 - `include_hyperlink` (bool): Whether to make the reference a clickable hyperlink
 - `prefix_text` (str): Optional text to insert before the reference (e.g., "See ")
 
+**New Simplified API (Recommended):**
+
 ```python
-# Reference the first figure
+# Capture the CaptionReference when creating captions
+fig = doc.add_figure_with_caption("My Figure")
+tbl = doc.add_table_with_caption("My Table", rows=3, cols=3)
+
+# Simply pass the CaptionReference - no need to specify reference_type!
+doc.add_paragraph("As shown in ")
+doc.add_cross_reference(fig)  # Automatically knows it's a figure
+doc.add_paragraph(" and ")
+doc.add_cross_reference(tbl)  # Automatically knows it's a table
+doc.add_paragraph(".")
+```
+
+**Legacy API (Still Supported):**
+
+```python
+# Reference by symbolic name
 doc.add_cross_reference("figure_0", reference_type="figure", prefix_text="See ")
 
 # Reference by index

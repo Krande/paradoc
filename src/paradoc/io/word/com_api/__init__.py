@@ -11,6 +11,6 @@ for creating and manipulating Word documents with support for:
 The wrapper is only available on Windows platforms.
 """
 
-from .wrapper import WordApplication, WordDocument, FigureLayout
+from .wrapper import WordApplication, WordDocument, FigureLayout, CaptionReference
 
-__all__ = ['WordApplication', 'WordDocument', 'FigureLayout']
+__all__ = ['WordApplication', 'WordDocument', 'FigureLayout', 'CaptionReference']
