@@ -139,38 +139,52 @@ def wait_for_frontend():
 @pytest.fixture(scope="session")
 def ws_server():
     """
-    Ensure WebSocket server is running for the test session.
-    Uses session scope to start the server once and reuse it across all tests.
+    Start WebSocket server in a background thread for the test session.
+    This approach is more reliable in CI environments than subprocess spawning.
     """
-    from paradoc.frontend.ws_server import ensure_ws_server, ping_ws_server
+    import threading
     import logging
+    from paradoc.frontend.ws_server import run_server, ping_ws_server
 
     logger = logging.getLogger("paradoc.ws_server")
     host = "localhost"
     port = 13579
 
-    # Try to ensure server is running
-    logger.info(f"Test fixture: Ensuring WebSocket server is running on {host}:{port}")
+    # First check if a server is already running
+    if ping_ws_server(host=host, port=port, timeout=1.0):
+        logger.info(f"Test fixture: WebSocket server already running on {host}:{port}")
+        yield {"host": host, "port": port}
+        return
 
-    # Give it more time in CI environments
-    wait_time = 10.0  # Increased from default 3.0 seconds
+    # Start the server in a background daemon thread
+    logger.info(f"Test fixture: Starting WebSocket server in background thread on {host}:{port}")
 
-    if not ensure_ws_server(host=host, port=port, wait_seconds=wait_time):
-        # If it still failed, try one more time with even more patience
-        logger.warning("First attempt failed, retrying WebSocket server startup...")
-        time.sleep(2)
-        if not ensure_ws_server(host=host, port=port, wait_seconds=wait_time):
-            pytest.fail(f"Failed to start WebSocket server on {host}:{port} after multiple attempts")
+    server_thread = threading.Thread(
+        target=run_server,
+        args=(host, port),
+        daemon=True,  # Daemon thread will be killed when main thread exits
+        name="WebSocketServerThread"
+    )
+    server_thread.start()
 
-    logger.info(f"Test fixture: WebSocket server is running on {host}:{port}")
+    # Wait for the server to become responsive
+    max_wait = 10.0  # seconds
+    start_time = time.time()
+    server_ready = False
 
-    # Verify it's actually responding
-    if not ping_ws_server(host=host, port=port, timeout=5.0):
-        pytest.fail(f"WebSocket server started but not responding on {host}:{port}")
+    while time.time() - start_time < max_wait:
+        if ping_ws_server(host=host, port=port, timeout=1.0):
+            server_ready = True
+            logger.info(f"Test fixture: WebSocket server is ready on {host}:{port}")
+            break
+        time.sleep(0.2)
+
+    if not server_ready:
+        pytest.fail(f"Failed to start WebSocket server on {host}:{port} after {max_wait}s")
 
     yield {"host": host, "port": port}
 
-    # Note: We don't shut down the server here as it may be shared across tests
-    # and we want it to persist for the entire test session
+    # Note: We don't explicitly shut down the server as it's a daemon thread
+    # and will be cleaned up when the test process exits
     logger.info("Test fixture: WebSocket server session completed")
 
