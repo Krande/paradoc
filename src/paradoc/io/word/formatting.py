@@ -3,7 +3,7 @@ from docx.text.paragraph import Paragraph
 
 from paradoc.config import create_logger
 
-from .references import insert_caption_into_runs
+from .captions import insert_caption_into_runs
 from .utils import iter_block_items
 
 logger = create_logger()

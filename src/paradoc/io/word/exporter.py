@@ -7,8 +7,9 @@ from docx.table import Table as DocxTable
 from paradoc.common import MY_DOCX_TMPL, MY_DOCX_TMPL_BLANK, ExportFormats
 from paradoc.document import OneDoc
 
-from .common import DocXFigureRef, DocXTableRef
+from .crossref import convert_figure_references_to_ref_fields, convert_table_references_to_ref_fields
 from .formatting import fix_headers_after_compose, format_paragraphs_and_headings
+from .models import DocXFigureRef, DocXTableRef
 from .utils import (
     add_to_composer,
     close_word_docs_by_name,
@@ -34,9 +35,6 @@ class WordExporter:
             self._compile_docx_from_str(dest_file)
 
     def _compile_individual_md_files_to_docx(self, output_name, dest_file, check_open_docs=False):
-
-        from .references import convert_figure_references_to_ref_fields, convert_table_references_to_ref_fields
-
         one = self.one_doc
 
         for mdf in one.md_files_main + one.md_files_app:
