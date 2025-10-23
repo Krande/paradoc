@@ -148,6 +148,7 @@ def test_word_with_template(tmp_path):
         doc.add_page_break()
         # Add content to the template-based document
         doc.add_heading("New Document", level=1)
+        doc.add_heading("A Subsection", level=2)
 
         doc.add_paragraph("This document uses styles from the template.")
         
@@ -169,10 +170,100 @@ def test_word_with_template(tmp_path):
         os.startfile(output_file)
 
 
+@pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
+def test_table_with_data(tmp_path):
+    """Test creating a table with data."""
+    from paradoc.io.word.com_api import WordApplication
+    
+    output_file = Path(tmp_path) / "test_table_data.docx"
+    
+    # Create test data
+    table_data = [
+        ["Header 1", "Header 2", "Header 3"],
+        ["Row 1, Col 1", "Row 1, Col 2", "Row 1, Col 3"],
+        ["Row 2, Col 1", "Row 2, Col 2", "Row 2, Col 3"],
+    ]
+    
+    with WordApplication(visible=False) as word_app:
+        doc = word_app.create_document()
+        
+        doc.add_heading("Table with Data Test", level=1)
+        doc.add_paragraph("Testing table data population feature.")
+        doc.add_paragraph()
+        
+        # Add table with data
+        table_bookmark = doc.add_table_with_caption(
+            caption_text="Test Data Table",
+            rows=3,
+            cols=3,
+            data=table_data,
+            create_bookmark=True
+        )
+        
+        doc.add_paragraph()
+        
+        # Test with numeric data
+        numeric_data = [
+            ["Item", "Quantity", "Price"],
+            ["Apple", 10, 1.50],
+            ["Banana", 20, 0.75],
+            ["Orange", 15, 2.00],
+        ]
+        
+        doc.add_table_with_caption(
+            caption_text="Numeric Data Table",
+            rows=4,
+            cols=3,
+            data=numeric_data
+        )
+        
+        doc.update_fields()
+        doc.save(output_file)
+    
+    assert output_file.exists(), "Document should be created"
+    assert output_file.stat().st_size > 0, "Document should not be empty"
+    
+    print(f"\nTable with data test document created: {output_file}")
+    
+    if os.getenv("AUTO_OPEN"):
+        os.startfile(output_file)
+
+
+@pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
+def test_table_data_validation(tmp_path):
+    """Test that table data validation works correctly."""
+    from paradoc.io.word.com_api import WordApplication
+    
+    with WordApplication(visible=False) as word_app:
+        doc = word_app.create_document()
+        
+        # Test: Wrong number of rows
+        with pytest.raises(ValueError, match="Data has 2 rows but table has 3 rows"):
+            doc.add_table_with_caption(
+                caption_text="Invalid Table",
+                rows=3,
+                cols=2,
+                data=[["A", "B"], ["C", "D"]]  # Only 2 rows instead of 3
+            )
+        
+        # Test: Wrong number of columns
+        with pytest.raises(ValueError, match="Data row 0 has 3 columns but table has 2 columns"):
+            doc.add_table_with_caption(
+                caption_text="Invalid Table",
+                rows=2,
+                cols=2,
+                data=[["A", "B", "C"], ["D", "E", "F"]]  # 3 columns instead of 2
+            )
+    
+    print("\nTable data validation tests passed")
+
+
 if __name__ == "__main__":
     # Run tests directly
     test_word_com_api_wrapper()
     test_word_sections_and_breaks()
     test_word_heading_levels()
     test_word_with_template()
+    test_table_with_data()
+    test_table_data_validation()
     print("\nAll tests passed!")

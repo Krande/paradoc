@@ -191,22 +191,50 @@ fig_bookmark = doc.add_figure_with_caption("Placeholder Figure")
 
 #### Table Methods
 
-##### add_table_with_caption(caption_text, rows=2, cols=2, create_bookmark=True)
+##### add_table_with_caption(caption_text, rows=2, cols=2, data=None, create_bookmark=True)
 
 Add a table with a caption using Word's SEQ field for automatic numbering.
 
 - `caption_text` (str): The caption text (without "Table X:" prefix)
 - `rows` (int): Number of rows in the table
 - `cols` (int): Number of columns in the table
+- `data` (list[list], optional): Data to populate the table. Should be a list of lists where each inner list represents a row. If provided, dimensions must match the table size (rows x cols). Values will be converted to strings.
 - `create_bookmark` (bool): Whether to create a bookmark for cross-referencing
 
 Returns: The bookmark name if `create_bookmark=True`, otherwise `None`
 
 ```python
+# Empty table
 table_bookmark = doc.add_table_with_caption(
     caption_text="Results Summary",
     rows=5,
     cols=4
+)
+
+# Table with data
+data = [
+    ["Name", "Age", "City"],
+    ["Alice", "30", "New York"],
+    ["Bob", "25", "London"],
+]
+table_bookmark = doc.add_table_with_caption(
+    caption_text="User Data",
+    rows=3,
+    cols=3,
+    data=data
+)
+
+# Table with mixed data types (automatically converted to strings)
+numeric_data = [
+    ["Item", "Quantity", "Price"],
+    ["Apple", 10, 1.50],
+    ["Banana", 20, 0.75],
+]
+doc.add_table_with_caption(
+    caption_text="Inventory",
+    rows=3,
+    cols=3,
+    data=numeric_data
 )
 ```
 

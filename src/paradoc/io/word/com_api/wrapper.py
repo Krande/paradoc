@@ -292,6 +292,7 @@ class WordDocument:
         caption_text: str,
         rows: int = 2,
         cols: int = 2,
+        data: Optional[list[list]] = None,
         create_bookmark: bool = True
     ) -> Optional[str]:
         """Add a table with a caption.
@@ -302,14 +303,31 @@ class WordDocument:
             caption_text: The caption text (without "Table X:" prefix)
             rows: Number of rows in the table
             cols: Number of columns in the table
+            data: Optional data to populate the table. Should be a list of lists where
+                  each inner list represents a row. If provided, the dimensions should
+                  match the table size (rows x cols). Values will be converted to strings.
             create_bookmark: Whether to create a bookmark for cross-referencing
             
         Returns:
             The bookmark name if create_bookmark=True, otherwise None
         """
+        # Validate data dimensions if provided
+        if data is not None:
+            if len(data) != rows:
+                raise ValueError(f"Data has {len(data)} rows but table has {rows} rows")
+            for i, row in enumerate(data):
+                if len(row) != cols:
+                    raise ValueError(f"Data row {i} has {len(row)} columns but table has {cols} columns")
+        
         # Insert table
         table_range = self._app.Selection.Range
         table = self._doc.Tables.Add(table_range, rows, cols)
+        
+        # Populate table with data if provided
+        if data is not None:
+            for row_idx, row_data in enumerate(data, start=1):  # Word uses 1-based indexing
+                for col_idx, cell_value in enumerate(row_data, start=1):
+                    table.Cell(row_idx, col_idx).Range.Text = str(cell_value)
         
         # Move past the table
         self._app.Selection.EndKey(Unit=WD_STORY)
