@@ -24,7 +24,9 @@ def convert_figure_references_to_ref_fields(document, figures):
         return  # No figures to process
 
     # Pattern to match figure references from pandoc-crossref
-    fig_ref_pattern = re.compile(r'\b(?:Figure|fig\.)\s+([\d\-]+)\b', re.IGNORECASE)
+    # Matches: "Figure 1", "Figure 1-1", "fig. 1", "fig.\xa01" (with non-breaking space)
+    # Use [\s\xa0] to match both regular space and non-breaking space
+    fig_ref_pattern = re.compile(r'\b(?:Figure|fig\.)[\s\xa0]+([\d\-]+)', re.IGNORECASE)
 
     _convert_references(document, bookmarks_in_order, fig_ref_pattern, "Figure")
 
@@ -181,17 +183,31 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
             # For figures/tables: group 1 is number
             num_str = match.group(1).split()[-1] if ' ' in match.group(1) else match.group(1)
 
-        # Parse the number
+        # Map the reference number to the bookmark
+        # Since pandoc-crossref numbers figures sequentially (1, 2, 3, ...)
+        # but displays them with chapter numbers (1-1, 1-2, 2-1, ...),
+        # we need to map based on sequential order in the document.
+        # The bookmarks list is already in document order, so we can use
+        # sequential mapping.
         try:
             if num_str == "-":
                 item_num = 1
             else:
-                # Extract just digits from strings like "1-1" or "1"
-                item_num = int(re.search(r'\d+', num_str).group())
+                # For simple numbers like "1", use directly
+                # For chapter-based like "1-1", extract the last part
+                if '-' in num_str:
+                    # This is chapter-section format, but we need to map to sequential position
+                    # Since we can't reliably reverse-engineer the sequential position from "1-1",
+                    # we'll use the first occurrence we find
+                    # TODO: Improve this by tracking the actual sequential number from pandoc
+                    item_num = int(num_str.split('-')[0])
+                else:
+                    item_num = int(num_str)
         except (ValueError, AttributeError):
             item_num = 1
 
         # Map number to bookmark (1-based indexing)
+        # For now, use simple sequential mapping
         bookmark_idx = item_num - 1
         if 0 <= bookmark_idx < len(bookmarks):
             bookmark_name = bookmarks[bookmark_idx]

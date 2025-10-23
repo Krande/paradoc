@@ -103,19 +103,16 @@ def create_ref_field_runs(p_element, bookmark_name: str, label: str = "Figure"):
     This creates the complete REF field structure with begin, instruction,
     separator, result, and end by directly manipulating XML.
 
+    IMPORTANT: The label (e.g., "Figure") should NOT be added as a separate text run
+    because the REF field will be updated by Word to show the complete bookmark text
+    which already includes the label. Adding it separately causes duplication like
+    "Figure Figure 1-1".
+
     Args:
         p_element: The paragraph XML element (w:p)
         bookmark_name: The name of the bookmark to reference
-        label: The label prefix to include (e.g., "Figure", "Table", "Eq")
+        label: The label prefix for the placeholder (e.g., "Figure", "Table", "Eq")
     """
-    # Add space before the field
-    r_label = OxmlElement("w:r")
-    t_label = OxmlElement("w:t")
-    t_label.set(qn("xml:space"), "preserve")
-    t_label.text = " "
-    r_label.append(t_label)
-    p_element.append(r_label)
-
     # Run 1: Field begin
     r1 = OxmlElement("w:r")
     fldChar1 = OxmlElement("w:fldChar")
@@ -127,8 +124,8 @@ def create_ref_field_runs(p_element, bookmark_name: str, label: str = "Figure"):
     r2 = OxmlElement("w:r")
     instrText = OxmlElement("w:instrText")
     instrText.set(qn("xml:space"), "preserve")
-    # Use Word's cross-reference format: REF bookmark \h \* MERGEFORMAT
-    # \h creates a hyperlink, \* MERGEFORMAT preserves formatting
+    # Use Word's cross-reference format: REF bookmark \h
+    # \h creates a hyperlink to the bookmark
     instrText.text = f" REF {bookmark_name} \\h "
     r2.append(instrText)
     p_element.append(r2)
@@ -141,9 +138,11 @@ def create_ref_field_runs(p_element, bookmark_name: str, label: str = "Figure"):
     p_element.append(r3)
 
     # Run 4: Field result (placeholder text that will be replaced when field is updated)
+    # The bookmark contains the full caption text including label, so we use that as placeholder
     r4 = OxmlElement("w:r")
     t = OxmlElement("w:t")
-    t.text = "1-1"  # Placeholder - will be updated by Word to show full numbering
+    t.set(qn("xml:space"), "preserve")
+    t.text = f"{label} 1-1"  # Placeholder - will be updated by Word to show actual bookmark content
     r4.append(t)
     p_element.append(r4)
 
@@ -164,6 +163,7 @@ def create_text_run(p_element, text: str):
     """
     r = OxmlElement("w:r")
     t = OxmlElement("w:t")
+    t.set(qn("xml:space"), "preserve")
     t.text = text
     r.append(t)
     p_element.append(r)
