@@ -134,5 +134,43 @@ def wait_for_frontend():
         page.wait_for_timeout(1000)
 
     return _wait
-"""Frontend tests using Playwright."""
+
+
+@pytest.fixture(scope="session")
+def ws_server():
+    """
+    Ensure WebSocket server is running for the test session.
+    Uses session scope to start the server once and reuse it across all tests.
+    """
+    from paradoc.frontend.ws_server import ensure_ws_server, ping_ws_server
+    import logging
+
+    logger = logging.getLogger("paradoc.ws_server")
+    host = "localhost"
+    port = 13579
+
+    # Try to ensure server is running
+    logger.info(f"Test fixture: Ensuring WebSocket server is running on {host}:{port}")
+
+    # Give it more time in CI environments
+    wait_time = 10.0  # Increased from default 3.0 seconds
+
+    if not ensure_ws_server(host=host, port=port, wait_seconds=wait_time):
+        # If it still failed, try one more time with even more patience
+        logger.warning("First attempt failed, retrying WebSocket server startup...")
+        time.sleep(2)
+        if not ensure_ws_server(host=host, port=port, wait_seconds=wait_time):
+            pytest.fail(f"Failed to start WebSocket server on {host}:{port} after multiple attempts")
+
+    logger.info(f"Test fixture: WebSocket server is running on {host}:{port}")
+
+    # Verify it's actually responding
+    if not ping_ws_server(host=host, port=port, timeout=5.0):
+        pytest.fail(f"WebSocket server started but not responding on {host}:{port}")
+
+    yield {"host": host, "port": port}
+
+    # Note: We don't shut down the server here as it may be shared across tests
+    # and we want it to persist for the entire test session
+    logger.info("Test fixture: WebSocket server session completed")
 

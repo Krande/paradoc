@@ -64,13 +64,9 @@ def frontend_resources_dir():
     return Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
 
 
-def test_plot_static_interactive_buttons_exist(doc_with_plot, page, wait_for_frontend, frontend_resources_dir):
+def test_plot_static_interactive_buttons_exist(doc_with_plot, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that Static and Interactive buttons are rendered in the frontend."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.frontend.ws_server import ensure_ws_server
-
-    # Ensure WebSocket server is running
-    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_plot, host="localhost", port=13579)
@@ -125,14 +121,11 @@ def test_plot_static_interactive_buttons_exist(doc_with_plot, page, wait_for_fro
     assert 'cursor-pointer' in interactive_btn_classes, "Interactive button should have cursor-pointer class"
 
 
-def test_plot_toggle_between_static_and_interactive(doc_with_plot, page, wait_for_frontend, frontend_resources_dir):
+def test_plot_toggle_between_static_and_interactive(doc_with_plot, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test switching between static and interactive plot modes."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.frontend.ws_server import ensure_ws_server
     from paradoc.io.ast.exporter import ASTExporter
 
-    # Ensure WebSocket server is running
-    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_plot, host="localhost", port=13579)
@@ -194,14 +187,11 @@ def test_plot_toggle_between_static_and_interactive(doc_with_plot, page, wait_fo
     assert 'bg-blue-600' in static_classes, "Static button should be active after clicking back"
 
 
-def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_frontend, frontend_resources_dir):
+def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that Interactive mode loads and renders a Plotly plot."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.frontend.ws_server import ensure_ws_server
     from paradoc.io.ast.exporter import ASTExporter
 
-    # Ensure WebSocket server is running
-    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_plot, host="localhost", port=13579)
@@ -252,14 +242,11 @@ def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_fronte
     # We can at least verify the plot container exists
 
 
-def test_plot_static_mode_shows_image(doc_with_plot, page, wait_for_frontend, frontend_resources_dir):
+def test_plot_static_mode_shows_image(doc_with_plot, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that Static mode shows a static image instead of interactive plot."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.frontend.ws_server import ensure_ws_server
     from paradoc.io.ast.exporter import ASTExporter
 
-    # Ensure WebSocket server is running
-    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_plot, host="localhost", port=13579)

@@ -60,17 +60,14 @@ def frontend_resources_dir():
     return Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
 
 
-def test_table_static_interactive_buttons_exist(doc_with_table, page, wait_for_frontend, frontend_resources_dir):
+def test_table_static_interactive_buttons_exist(doc_with_table, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that Static and Interactive buttons are rendered for tables in the frontend."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.frontend.ws_server import ensure_ws_server
 
     # Capture console logs
     console_logs = []
     page.on("console", lambda msg: console_logs.append(f"[{msg.type}] {msg.text}"))
 
-    # Ensure WebSocket server is running
-    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)
@@ -181,14 +178,11 @@ def test_table_static_interactive_buttons_exist(doc_with_table, page, wait_for_f
     assert 'cursor-pointer' in interactive_btn_classes, "Interactive button should have cursor-pointer class"
 
 
-def test_table_toggle_between_static_and_interactive(doc_with_table, page, wait_for_frontend, frontend_resources_dir):
+def test_table_toggle_between_static_and_interactive(doc_with_table, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test switching between static and interactive table modes."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.frontend.ws_server import ensure_ws_server
     from paradoc.io.ast.exporter import ASTExporter
 
-    # Ensure WebSocket server is running
-    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)
@@ -250,14 +244,11 @@ def test_table_toggle_between_static_and_interactive(doc_with_table, page, wait_
     assert 'bg-blue-600' in static_classes, "Static button should be active after clicking back"
 
 
-def test_table_interactive_mode_renders_table(doc_with_table, page, wait_for_frontend, frontend_resources_dir):
+def test_table_interactive_mode_renders_table(doc_with_table, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that Interactive mode loads and renders an interactive table with sorting/filtering."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.frontend.ws_server import ensure_ws_server
     from paradoc.io.ast.exporter import ASTExporter
 
-    # Ensure WebSocket server is running
-    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)
@@ -310,14 +301,11 @@ def test_table_interactive_mode_renders_table(doc_with_table, page, wait_for_fro
     assert filter_inputs.count() >= 4, f"Should have filter inputs for each column, found {filter_inputs.count()}"
 
 
-def test_table_interactive_filtering(doc_with_table, page, wait_for_frontend, frontend_resources_dir):
+def test_table_interactive_filtering(doc_with_table, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that the filter functionality works in interactive table mode."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.frontend.ws_server import ensure_ws_server
     from paradoc.io.ast.exporter import ASTExporter
 
-    # Ensure WebSocket server is running
-    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)
@@ -370,14 +358,11 @@ def test_table_interactive_filtering(doc_with_table, page, wait_for_frontend, fr
     assert rows_after_clear == 5, f"Should have 5 rows after clearing filter, found {rows_after_clear}"
 
 
-def test_table_interactive_sorting(doc_with_table, page, wait_for_frontend, frontend_resources_dir):
+def test_table_interactive_sorting(doc_with_table, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that column sorting works in interactive table mode."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.frontend.ws_server import ensure_ws_server
     from paradoc.io.ast.exporter import ASTExporter
 
-    # Ensure WebSocket server is running
-    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)
@@ -443,14 +428,11 @@ def test_table_interactive_sorting(doc_with_table, page, wait_for_frontend, fron
     assert first_name_reversed == "Eve", f"After descending sort, expected 'Eve' but got '{first_name_reversed}'"
 
 
-def test_table_static_mode_shows_html_table(doc_with_table, page, wait_for_frontend, frontend_resources_dir):
+def test_table_static_mode_shows_html_table(doc_with_table, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that Static mode shows a static HTML table."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.frontend.ws_server import ensure_ws_server
     from paradoc.io.ast.exporter import ASTExporter
 
-    # Ensure WebSocket server is running
-    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)
@@ -488,14 +470,11 @@ def test_table_static_mode_shows_html_table(doc_with_table, page, wait_for_front
     assert filter_input.count() == 0, "Filter input should not exist in static mode"
 
 
-def test_table_caption_displayed(doc_with_table, page, wait_for_frontend, frontend_resources_dir):
+def test_table_caption_displayed(doc_with_table, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that table caption is displayed in both static and interactive modes."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.frontend.ws_server import ensure_ws_server
     from paradoc.io.ast.exporter import ASTExporter
 
-    # Ensure WebSocket server is running
-    assert ensure_ws_server(host="localhost", port=13579), "Failed to start WebSocket server"
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)
