@@ -5,6 +5,7 @@ This module provides high-level wrapper classes around win32com for Word automat
 
 import platform
 import time
+from enum import Enum
 from pathlib import Path
 from typing import Optional, Literal, Union
 
@@ -15,6 +16,29 @@ WD_REF_TYPE_FIGURE = "Figure"
 WD_REF_TYPE_TABLE = "Table"
 WD_ONLY_LABEL_AND_NUMBER = 2
 WD_MSO_SHAPE_RECTANGLE = 1
+
+# Text wrapping constants for Word shapes
+WD_WRAP_INLINE = 7  # wdWrapInline
+WD_WRAP_SQUARE = 0  # wdWrapSquare
+WD_WRAP_TIGHT = 1  # wdWrapTight
+WD_WRAP_THROUGH = 2  # wdWrapThrough
+WD_WRAP_TOP_BOTTOM = 3  # wdWrapTopAndBottom
+WD_WRAP_BEHIND = 3  # wdWrapBehind (uses different enum)
+WD_WRAP_FRONT = 4  # wdWrapInFrontOf (uses different enum)
+
+
+class FigureLayout(str, Enum):
+    """Layout options for figures in Word documents.
+    
+    Determines how text wraps around the figure.
+    """
+    INLINE = "inline"  # Inline with text (default)
+    SQUARE = "square"  # Square wrapping around the figure
+    TIGHT = "tight"  # Tight wrapping following figure outline
+    THROUGH = "through"  # Text wraps through transparent areas
+    TOP_BOTTOM = "top_bottom"  # Text above and below only
+    BEHIND_TEXT = "behind_text"  # Figure behind text
+    IN_FRONT_OF_TEXT = "in_front_of_text"  # Figure in front of text
 
 
 class WordApplication:
@@ -187,6 +211,29 @@ class WordDocument:
             self._app.Selection.TypeText(text)
         self._app.Selection.TypeParagraph()
         
+    def _apply_text_wrapping(self, shape, layout: FigureLayout):
+        """Apply text wrapping to a shape based on layout type.
+        
+        Args:
+            shape: Word Shape COM object
+            layout: FigureLayout enum value
+        """
+        # Map layout enum to Word wrapping constants
+        if layout == FigureLayout.SQUARE:
+            shape.WrapFormat.Type = WD_WRAP_SQUARE
+        elif layout == FigureLayout.TIGHT:
+            shape.WrapFormat.Type = WD_WRAP_TIGHT
+        elif layout == FigureLayout.THROUGH:
+            shape.WrapFormat.Type = WD_WRAP_THROUGH
+        elif layout == FigureLayout.TOP_BOTTOM:
+            shape.WrapFormat.Type = WD_WRAP_TOP_BOTTOM
+        elif layout == FigureLayout.BEHIND_TEXT:
+            shape.WrapFormat.Type = WD_WRAP_SQUARE  # Use square as base
+            shape.ZOrder(0)  # Send to back (behind text)
+        elif layout == FigureLayout.IN_FRONT_OF_TEXT:
+            shape.WrapFormat.Type = WD_WRAP_SQUARE  # Use square as base
+            shape.ZOrder(1)  # Bring to front (in front of text)
+    
     def add_page_break(self):
         """Insert a page break."""
         self._app.Selection.InsertBreak(7)  # wdPageBreak = 7
@@ -219,6 +266,7 @@ class WordDocument:
         image_path: Optional[Union[str, Path]] = None,
         width: Optional[float] = None,
         height: Optional[float] = None,
+        layout: Union[FigureLayout, str] = FigureLayout.INLINE,
         create_bookmark: bool = True
     ) -> Optional[str]:
         """Add a figure with a caption.
@@ -231,18 +279,23 @@ class WordDocument:
             image_path: Optional path to image file to insert
             width: Optional width for image/shape in points
             height: Optional height for image/shape in points
+            layout: Layout/text wrapping style for the figure (default: inline with text)
             create_bookmark: Whether to create a bookmark for cross-referencing
             
         Returns:
             The bookmark name if create_bookmark=True, otherwise None
         """
+        # Convert string to enum if needed
+        if isinstance(layout, str):
+            layout = FigureLayout(layout)
+        
         # Insert figure (image or placeholder)
         if image_path is not None:
             image_path = Path(image_path).absolute()
             if not image_path.exists():
                 raise FileNotFoundError(f"Image file not found: {image_path}")
                 
-            # Insert image
+            # Insert image as inline shape first
             inline_shape = self._app.Selection.InlineShapes.AddPicture(
                 FileName=str(image_path),
                 LinkToFile=False,
@@ -254,11 +307,20 @@ class WordDocument:
                 inline_shape.Width = width
             if height is not None:
                 inline_shape.Height = height
+            
+            # Convert to floating shape if non-inline layout requested
+            if layout != FigureLayout.INLINE:
+                shape = inline_shape.ConvertToShape()
+                self._apply_text_wrapping(shape, layout)
         else:
             # Create placeholder shape
             width = width or 100
             height = height or 100
             shape = self._doc.Shapes.AddShape(WD_MSO_SHAPE_RECTANGLE, 100, 100, width, height)
+            
+            # Apply text wrapping for non-inline layouts
+            if layout != FigureLayout.INLINE:
+                self._apply_text_wrapping(shape, layout)
         
         # Move to end and add caption
         self._app.Selection.EndKey(Unit=WD_STORY)

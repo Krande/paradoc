@@ -164,7 +164,7 @@ doc.add_section_break("next_page")
 
 #### Figure Methods
 
-##### add_figure_with_caption(caption_text, image_path=None, width=None, height=None, create_bookmark=True)
+##### add_figure_with_caption(caption_text, image_path=None, width=None, height=None, layout=FigureLayout.INLINE, create_bookmark=True)
 
 Add a figure with a caption using Word's SEQ field for automatic numbering.
 
@@ -172,12 +172,22 @@ Add a figure with a caption using Word's SEQ field for automatic numbering.
 - `image_path` (str | Path): Optional path to image file to insert
 - `width` (float): Optional width for image/shape in points
 - `height` (float): Optional height for image/shape in points
+- `layout` (FigureLayout | str): Layout/text wrapping style for the figure. Options:
+  - `FigureLayout.INLINE` or `"inline"`: Inline with text (default)
+  - `FigureLayout.SQUARE` or `"square"`: Square wrapping around the figure
+  - `FigureLayout.TIGHT` or `"tight"`: Tight wrapping following figure outline
+  - `FigureLayout.THROUGH` or `"through"`: Text wraps through transparent areas
+  - `FigureLayout.TOP_BOTTOM` or `"top_bottom"`: Text above and below only
+  - `FigureLayout.BEHIND_TEXT` or `"behind_text"`: Figure behind text
+  - `FigureLayout.IN_FRONT_OF_TEXT` or `"in_front_of_text"`: Figure in front of text
 - `create_bookmark` (bool): Whether to create a bookmark for cross-referencing
 
 Returns: The bookmark name if `create_bookmark=True`, otherwise `None`
 
 ```python
-# Add a figure with an image
+from paradoc.io.word.com_api import WordApplication, FigureLayout
+
+# Add a figure with an image (default inline layout)
 fig_bookmark = doc.add_figure_with_caption(
     caption_text="System Architecture",
     image_path="diagram.png",
@@ -187,6 +197,27 @@ fig_bookmark = doc.add_figure_with_caption(
 
 # Add a figure placeholder (no image)
 fig_bookmark = doc.add_figure_with_caption("Placeholder Figure")
+
+# Add a figure with square text wrapping
+fig_bookmark = doc.add_figure_with_caption(
+    caption_text="Wrapped Figure",
+    image_path="chart.png",
+    layout=FigureLayout.SQUARE
+)
+
+# Add a figure with tight text wrapping (using string)
+fig_bookmark = doc.add_figure_with_caption(
+    caption_text="Tight Wrapped Figure",
+    image_path="photo.png",
+    layout="tight"
+)
+
+# Add a figure behind text (watermark-style)
+fig_bookmark = doc.add_figure_with_caption(
+    caption_text="Background Figure",
+    image_path="logo.png",
+    layout=FigureLayout.BEHIND_TEXT
+)
 ```
 
 #### Table Methods

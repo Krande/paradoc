@@ -258,6 +258,87 @@ def test_table_data_validation(tmp_path):
     print("\nTable data validation tests passed")
 
 
+@pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
+def test_figure_layouts(tmp_path):
+    """Test different figure layout options."""
+    from paradoc.io.word.com_api import WordApplication, FigureLayout
+    
+    output_file = Path(tmp_path) / "test_figure_layouts.docx"
+    
+    with WordApplication(visible=False) as word_app:
+        doc = word_app.create_document()
+        
+        doc.add_heading("Figure Layout Tests", level=1)
+        doc.add_paragraph("Testing different figure layout options.")
+        doc.add_paragraph()
+        
+        # Test inline (default)
+        doc.add_paragraph("Figure with inline layout (default):")
+        doc.add_figure_with_caption(
+            caption_text="Inline Figure",
+            layout=FigureLayout.INLINE
+        )
+        doc.add_paragraph()
+        
+        # Test square wrapping
+        doc.add_paragraph("Figure with square wrapping:")
+        doc.add_figure_with_caption(
+            caption_text="Square Wrapped Figure",
+            layout=FigureLayout.SQUARE
+        )
+        doc.add_paragraph()
+        
+        # Test tight wrapping
+        doc.add_paragraph("Figure with tight wrapping:")
+        doc.add_figure_with_caption(
+            caption_text="Tight Wrapped Figure",
+            layout=FigureLayout.TIGHT
+        )
+        doc.add_paragraph()
+        
+        # Test top/bottom wrapping
+        doc.add_paragraph("Figure with top/bottom wrapping:")
+        doc.add_figure_with_caption(
+            caption_text="Top/Bottom Wrapped Figure",
+            layout=FigureLayout.TOP_BOTTOM
+        )
+        doc.add_paragraph()
+        
+        # Test behind text
+        doc.add_paragraph("Figure behind text:")
+        doc.add_figure_with_caption(
+            caption_text="Behind Text Figure",
+            layout=FigureLayout.BEHIND_TEXT
+        )
+        doc.add_paragraph()
+        
+        # Test in front of text
+        doc.add_paragraph("Figure in front of text:")
+        doc.add_figure_with_caption(
+            caption_text="In Front of Text Figure",
+            layout=FigureLayout.IN_FRONT_OF_TEXT
+        )
+        doc.add_paragraph()
+        
+        # Test with string parameter
+        doc.add_paragraph("Figure using string parameter:")
+        doc.add_figure_with_caption(
+            caption_text="String Parameter Figure",
+            layout="square"  # Pass as string instead of enum
+        )
+        
+        doc.update_fields()
+        doc.save(output_file)
+    
+    assert output_file.exists(), "Document should be created"
+    assert output_file.stat().st_size > 0, "Document should not be empty"
+    
+    print(f"\nFigure layouts test document created: {output_file}")
+    
+    if os.getenv("AUTO_OPEN"):
+        os.startfile(output_file)
+
+
 if __name__ == "__main__":
     # Run tests directly
     test_word_com_api_wrapper()
@@ -266,4 +347,5 @@ if __name__ == "__main__":
     test_word_with_template()
     test_table_with_data()
     test_table_data_validation()
+    test_figure_layouts()
     print("\nAll tests passed!")
