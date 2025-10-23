@@ -20,7 +20,9 @@ def convert_figure_references_to_ref_fields(document, figures):
         figures: List of DocXFigureRef objects containing figure information
     """
     bookmarks_in_order = _extract_bookmarks_from_figures(figures)
+    print(f"[DEBUG convert_figure_references] Found {len(bookmarks_in_order)} figure bookmarks: {bookmarks_in_order}")
     if not bookmarks_in_order:
+        print("[DEBUG convert_figure_references] No bookmarks found, returning early")
         return  # No figures to process
 
     # Pattern to match figure references from pandoc-crossref
@@ -42,7 +44,9 @@ def convert_table_references_to_ref_fields(document, tables):
         tables: List of DocXTableRef objects containing table information
     """
     bookmarks_in_order = _extract_bookmarks_from_tables(tables)
+    print(f"[DEBUG convert_table_references] Found {len(bookmarks_in_order)} table bookmarks: {bookmarks_in_order}")
     if not bookmarks_in_order:
+        print("[DEBUG convert_table_references] No bookmarks found, returning early")
         return  # No tables to process
 
     # Note: pandoc-crossref outputs "Table1" (no space) for tables
@@ -131,20 +135,30 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
         label: The label to use in REF fields (e.g., "Figure", "Table", "Eq")
         num_group: The regex group number containing the number (default 1)
     """
+    processed_count = 0
+    skipped_caption = 0
+    no_match = 0
+    
     for block in iter_block_items(document):
         if not isinstance(block, Paragraph):
             continue
 
         # Skip caption paragraphs
         if block.style.name in ("Image Caption", "Table Caption", "Captioned Figure"):
+            skipped_caption += 1
             continue
 
         # Check if paragraph contains references
         if not re.search(pattern, block.text):
+            no_match += 1
             continue
 
         # Process the paragraph
+        print(f"[DEBUG _convert_references] Processing paragraph with {label}: {block.text[:80]}")
         _process_paragraph_references(block, pattern, bookmarks_in_order, label, num_group)
+        processed_count += 1
+    
+    print(f"[DEBUG _convert_references] {label} summary: processed={processed_count}, skipped_caption={skipped_caption}, no_match={no_match}")
 
 
 def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, bookmarks: list[str], label: str, num_group: int):
@@ -161,6 +175,8 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
     matches = list(pattern.finditer(original_text))
     if not matches:
         return
+    
+    print(f"[DEBUG _process_paragraph_references] Found {len(matches)} matches in: {original_text[:80]}")
 
     # Store paragraph element before clearing
     p_element = paragraph._p
@@ -174,6 +190,7 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
 
     # Rebuild the paragraph with text and REF fields
     last_pos = 0
+    ref_fields_added = 0
     for match in matches:
         # Extract the number from the matched text
         if num_group == 2:
@@ -227,6 +244,8 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
 
         # Add REF field
         create_ref_field_runs(p_element, bookmark_name, label=label)
+        ref_fields_added += 1
+        print(f"[DEBUG _process_paragraph_references]   Added REF field #{ref_fields_added} -> {bookmark_name}")
 
         last_pos = match.end()
 
@@ -234,5 +253,7 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
     if last_pos < len(original_text):
         after_text = original_text[last_pos:]
         create_text_run(p_element, after_text)
+    
+    print(f"[DEBUG _process_paragraph_references] Completed: added {ref_fields_added} REF fields")
 
 
