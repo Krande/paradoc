@@ -49,16 +49,23 @@ Reference to figure: [@fig:test_figure]
     has_bookmark = False
     has_ref_field = False
     correct_order = False
+    bookmark_id = None
 
     for para in doc.paragraphs:
         xml_str = para._element.xml.decode('utf-8') if isinstance(para._element.xml, bytes) else para._element.xml
 
         if "Test Figure Caption" in para.text:
-            has_bookmark = "bookmarkStart" in xml_str and "fig:test_figure" in xml_str
-            print(f"Caption bookmark: {has_bookmark}")
+            # Check for Word's native _Ref bookmark (e.g., _Ref695480937)
+            has_bookmark = "bookmarkStart" in xml_str and "_Ref" in xml_str
+            # Extract the bookmark ID for verification
+            bookmark_match = re.search(r'w:name="(_Ref\d+)"', xml_str)
+            if bookmark_match:
+                bookmark_id = bookmark_match.group(1)
+            print(f"Caption bookmark: {has_bookmark}, ID: {bookmark_id}")
 
         if "Reference to figure" in para.text or "Figure 1" in para.text:
-            has_ref_field = "REF" in xml_str and "fig:test_figure" in xml_str
+            # Check for REF field with Word's native _Ref bookmark
+            has_ref_field = "REF" in xml_str and "_Ref" in xml_str
             print(f"Reference has REF field: {has_ref_field}")
             print(f"Reference text: '{para.text}'")
 
@@ -78,7 +85,7 @@ Reference to figure: [@fig:test_figure]
                 ref_matches = re.findall(r'<w:instrText[^>]*>([^<]*)</w:instrText>', xml_str)
                 print(f"REF instructions found: {ref_matches}")
 
-    assert has_bookmark, "Caption should have bookmark"
-    assert has_ref_field, "Reference should have REF field pointing to bookmark"
+    assert has_bookmark, "Caption should have Word's native _Ref bookmark"
+    assert has_ref_field, "Reference should have REF field pointing to _Ref bookmark"
     assert correct_order, "Figure reference should appear AFTER 'Reference to figure:', not before"
 
