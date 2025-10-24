@@ -188,9 +188,6 @@ def test_paradoc_figures_only(tmp_path):
     one.compile("paradoc_output", auto_open=False, export_format="docx")
     
     output_file = work_dir / "_dist" / "paradoc_output.docx"
-    # Update fields to show proper numbering
-    print(f"\n[Updating fields in Word...]")
-    docx_update(str(output_file))
 
 
     print(f"\n[SAVED] {output_file}")

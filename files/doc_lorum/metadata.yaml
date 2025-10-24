@@ -1,15 +1,8 @@
-title: "Comprehensive Lorem Ipsum Documentation"
-subtitle: "A Demonstration of Advanced Document Features"
 lang: en-GB
-autoSectionLabels: True
-#numberSections: true # This breaks the
-sectionsDepth: -1
-chapDelim: "-"
-chapters: true
 linkReferences: true
 nameInLink: true
+figureTitle: "Figure"
+tableTitle: "Table"
 figPrefix: "Figure"
 tblPrefix: "Table"
-header-includes:
-    - "\\newcommand{\\lorumdoc}{Lorem Ipsum Documentation}"
 

@@ -66,16 +66,16 @@ class OneDoc:
     FORMATS = ExportFormats
 
     def __init__(
-        self,
-        source_dir=None,
-        main_prefix="00-main",
-        app_prefix="01-app",
-        clean_build_dir=True,
-        create_dirs=False,
-        output_dir=None,
-        work_dir="temp",
-        use_default_html_style=True,
-        **kwargs,
+            self,
+            source_dir=None,
+            main_prefix="00-main",
+            app_prefix="01-app",
+            clean_build_dir=True,
+            create_dirs=False,
+            output_dir=None,
+            work_dir="temp",
+            use_default_html_style=True,
+            **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
         self.work_dir = pathlib.Path(work_dir).resolve().absolute()
@@ -159,7 +159,7 @@ class OneDoc:
                 # Check if the figure is commented out
                 # Get first newline right before regex search found start and till the end (capture entire line)
                 start = fig.string[: fig.start()].rfind("\n") + 1
-                end = fig.string[fig.start() :].find("\n") + fig.start()
+                end = fig.string[fig.start():].find("\n") + fig.start()
                 line = fig.string[start:end]
                 if line.startswith("[//]: #"):
                     continue
@@ -241,7 +241,7 @@ class OneDoc:
                 f.write('figureTitle: "Figure"\n')
                 f.write('tableTitle: "Table"\n')
                 f.write('figPrefix: "Figure"\n')  # Keep for backwards compatibility
-                f.write('tblPrefix: "Table"\n')   # Keep for backwards compatibility
+                f.write('tblPrefix: "Table"\n')  # Keep for backwards compatibility
                 if self.use_default_html_style is True:
                     f.write("stylesheet: style.css\n")
             css_style = self.source_dir / "style.css"
@@ -249,14 +249,43 @@ class OneDoc:
                 shutil.copy(MY_DEFAULT_HTML_CSS, css_style)
 
     def compile(
-        self,
-        output_name,
-        auto_open=False,
-        metadata_file=None,
-        export_format: ExportFormats | str = ExportFormats.DOCX,
-        send_to_frontend=False,
-        **kwargs,
+            self,
+            output_name,
+            auto_open=False,
+            metadata_file=None,
+            export_format: ExportFormats | str = ExportFormats.DOCX,
+            send_to_frontend=False,
+            update_docx_with_com=True,
+            **kwargs,
     ):
+        """
+        Compiles a report into the specified format and handles the resultant exported
+        file accordingly. Depending on the export format, different specialized exporters
+        are used, and variable substitutions are performed where necessary. The resulting
+        file can then be optionally opened, sent to a frontend, or copied to a specific
+        output directory.
+
+        :param output_name: Name of the output file without the file extension.
+        :type output_name: str
+        :param auto_open: Whether to automatically open the compiled document after export.
+        :type auto_open: bool, optional
+        :param metadata_file: Path to an optional metadata file to be used for compilation.
+        :type metadata_file: str, optional
+        :param export_format: The format in which to export the report.
+        :type export_format: ExportFormats | str
+        :param send_to_frontend: Whether to send the exported HTML document to a frontend service.
+            Applicable only when export_format is HTML.
+        :type send_to_frontend: bool, optional
+        :param update_docx_with_com: Specifies whether to perform certain DOCX updates using COM.
+            Applicable only for DOCX export.
+        :type update_docx_with_com: bool, optional
+        :param kwargs: Additional keyword arguments used specifically by certain exporters
+            or configurations such as custom DOCX compilation or navbar inclusion in HTML.
+        :type kwargs: dict, optional
+        :return: None
+        :rtype: NoneType
+        """
+
         if isinstance(export_format, str):
             export_format = ExportFormats(export_format)
 
@@ -266,6 +295,7 @@ class OneDoc:
         self._prep_compilation(metadata_file=metadata_file)
 
         if export_format == ExportFormats.DOCX:
+            import platform
             from paradoc.io.word.exporter import WordExporter
 
             use_custom_compile = kwargs.get("use_custom_docx_compile", True)
@@ -278,6 +308,11 @@ class OneDoc:
             check_open_docs = auto_open is True
             wordx = WordExporter(self, **kwargs)
             wordx.export(output_name, dest_file, check_open_docs=check_open_docs)
+
+            if update_docx_with_com and platform.system() == "Windows":
+                from paradoc.io.word.utils import docx_update
+                docx_update(dest_file)
+
         elif export_format == ExportFormats.PDF:
             from paradoc.io.pdf.exporter import PdfExporter
 
@@ -522,7 +557,6 @@ class OneDoc:
             )
 
         return img_markdown
-
 
     def _perform_variable_substitution(self, use_table_var_substitution):
         logger.info("Performing variable substitution")
