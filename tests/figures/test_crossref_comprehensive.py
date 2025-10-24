@@ -129,7 +129,7 @@ In conclusion, [@fig:trends] establishes the baseline, [@fig:analysis] confirms 
     # Compile the document
     work_dir = tmp_path / "work"
     one = OneDoc(source_dir, work_dir=work_dir)
-    one.compile("test_crossref", auto_open=False, export_format="docx")
+    one.compile("test_crossref", auto_open=False, export_format="docx", update_docx_with_com=False)
 
     output_file = work_dir / "_dist" / "test_crossref.docx"
     assert output_file.exists(), "Output file should be created"
@@ -222,85 +222,136 @@ In conclusion, [@fig:trends] establishes the baseline, [@fig:analysis] confirms 
     # Re-open document after field update
     doc_after = Document(str(output_file))
 
-    # Find all paragraphs with figure references
-    figure_refs = []
-    table_refs = []
-    
-    for para in doc_after.paragraphs:
+    # Find all paragraphs and their cross-references with context
+    paragraphs_with_refs = []
+
+    for i, para in enumerate(doc_after.paragraphs):
         text = para.text
         
         # Find figure references
         fig_matches = re.findall(r'Figure\s+(\d+)-(\d+)', text)
-        for chapter, fig_num in fig_matches:
-            figure_refs.append({
+        if fig_matches:
+            paragraphs_with_refs.append({
+                'index': i,
                 'text': text,
-                'chapter': int(chapter),
-                'number': int(fig_num),
-                'full_ref': f"Figure {chapter}-{fig_num}"
+                'type': 'figure',
+                'refs': [f"Figure {ch}-{num}" for ch, num in fig_matches]
             })
         
         # Find table references
         tbl_matches = re.findall(r'Table\s+(\d+)-(\d+)', text)
-        for chapter, tbl_num in tbl_matches:
-            table_refs.append({
+        if tbl_matches:
+            paragraphs_with_refs.append({
+                'index': i,
                 'text': text,
-                'chapter': int(chapter),
-                'number': int(tbl_num),
-                'full_ref': f"Table {chapter}-{tbl_num}"
+                'type': 'table',
+                'refs': [f"Table {ch}-{num}" for ch, num in tbl_matches]
             })
     
-    print(f"\nFigure references found: {len(figure_refs)}")
-    for ref in figure_refs[:10]:  # Show first 10
-        print(f"  • {ref['full_ref']}")
-    
-    print(f"\nTable references found: {len(table_refs)}")
-    for ref in table_refs[:10]:  # Show first 10
-        print(f"  • {ref['full_ref']}")
-    
-    # ASSERTIONS: Verify correct numbering
-    
-    # Should have many figure references (multiple refs to same figures)
-    assert len(figure_refs) >= 10, f"Expected at least 10 figure references, found {len(figure_refs)}"
-    
-    # Should have several table references
-    assert len(table_refs) >= 6, f"Expected at least 6 table references, found {len(table_refs)}"
-    
-    # Extract unique figure numbers
-    unique_figs = set(ref['full_ref'] for ref in figure_refs)
-    print(f"\nUnique figure references: {sorted(unique_figs)}")
-    
-    # Verify we have the three expected figures
-    # Figure 1 should be in Section 1 (chapter 1)
-    # Figure 2 should be in Section 2 (chapter 2)
-    # Figure 3 should be in Section 2 (chapter 2)
-    assert any('1-1' in ref['full_ref'] for ref in figure_refs), "Should have Figure 1-1"
-    assert any('2-1' in ref['full_ref'] for ref in figure_refs), "Should have Figure 2-1"
-    assert any('2-2' in ref['full_ref'] for ref in figure_refs), "Should have Figure 2-2"
-    
-    # Extract unique table numbers
-    unique_tbls = set(ref['full_ref'] for ref in table_refs)
-    print(f"Unique table references: {sorted(unique_tbls)}")
-    
-    # Verify we have the three expected tables
-    assert any('1-1' in ref['full_ref'] for ref in table_refs), "Should have Table 1-1"
-    assert any('2-1' in ref['full_ref'] for ref in table_refs), "Should have Table 2-1"
-    # Table 3 is in Section 3 (chapter 3)
-    assert any('3-1' in ref['full_ref'] for ref in table_refs), "Should have Table 3-1"
-    
-    # Verify all references have proper format
-    for ref in figure_refs:
-        assert ref['chapter'] in [1, 2, 3], f"Figure chapter should be 1, 2, or 3, got {ref['chapter']}"
-        assert ref['number'] >= 1, f"Figure number should be >= 1, got {ref['number']}"
-    
-    for ref in table_refs:
-        assert ref['chapter'] in [1, 2, 3], f"Table chapter should be 1, 2, or 3, got {ref['chapter']}"
-        assert ref['number'] >= 1, f"Table number should be >= 1, got {ref['number']}"
-    
-    print(f"\n" + "="*80)
-    print("TEST PASSED")
+    print(f"\nFound {len(paragraphs_with_refs)} paragraphs with cross-references:")
+    for p in paragraphs_with_refs:
+        print(f"  Para {p['index']}: {p['text'][:80]}...")
+        print(f"    References: {', '.join(p['refs'])}")
+
+    # SPECIFIC ASSERTIONS: Verify that specific cross-references point to correct targets
+    print("\n" + "="*80)
+    print("VERIFYING SPECIFIC CROSS-REFERENCE TARGETS")
     print("="*80)
-    print(f"✓ All {len(figure_refs)} figure references have correct format and numbering")
-    print(f"✓ All {len(table_refs)} table references have correct format and numbering")
+
+    # Test Case 1: "As shown in [@fig:trends]" should resolve to Figure 1-1
+    para_fig_trends_1 = next((p for p in paragraphs_with_refs
+                              if 'historical trends demonstrate a clear pattern' in p['text']), None)
+    assert para_fig_trends_1 is not None, "Could not find paragraph with 'historical trends demonstrate'"
+    print(f"\n✓ Found: '{para_fig_trends_1['text'][:60]}...'")
+    print(f"  References: {para_fig_trends_1['refs']}")
+    assert 'Figure 1-1' in para_fig_trends_1['refs'], \
+        f"Expected 'Figure 1-1' in paragraph about historical trends, got {para_fig_trends_1['refs']}"
+    assert len(para_fig_trends_1['refs']) == 1, \
+        f"Expected exactly 1 figure reference in this paragraph, got {len(para_fig_trends_1['refs'])}"
+
+    # Test Case 2: "As shown in [@fig:analysis], ... Compare this with [@fig:trends]"
+    # Should resolve to Figure 2-1 and Figure 1-1
+    para_fig_analysis = next((p for p in paragraphs_with_refs
+                              if 'analysis reveals important insights' in p['text']), None)
+    assert para_fig_analysis is not None, "Could not find paragraph with 'analysis reveals important'"
+    print(f"\n✓ Found: '{para_fig_analysis['text'][:60]}...'")
+    print(f"  References: {para_fig_analysis['refs']}")
+    assert 'Figure 2-1' in para_fig_analysis['refs'], \
+        f"Expected 'Figure 2-1' (analysis) in this paragraph, got {para_fig_analysis['refs']}"
+    assert 'Figure 1-1' in para_fig_analysis['refs'], \
+        f"Expected 'Figure 1-1' (trends) in this paragraph, got {para_fig_analysis['refs']}"
+    assert len(para_fig_analysis['refs']) == 2, \
+        f"Expected exactly 2 figure references, got {len(para_fig_analysis['refs'])}"
+
+    # Test Case 3: "The projection in [@fig:projection] ... Both [@fig:analysis] and [@fig:projection] are consistent with [@fig:trends]"
+    # Should resolve to Figure 2-2, Figure 2-1, Figure 2-2, Figure 1-1
+    para_fig_projection = next((p for p in paragraphs_with_refs
+                                if 'projection' in p['text'].lower() and 'future trends' in p['text']), None)
+    assert para_fig_projection is not None, "Could not find paragraph with 'projection' and 'future trends'"
+    print(f"\n✓ Found: '{para_fig_projection['text'][:60]}...'")
+    print(f"  References: {para_fig_projection['refs']}")
+    assert 'Figure 2-2' in para_fig_projection['refs'], \
+        f"Expected 'Figure 2-2' (projection) in this paragraph, got {para_fig_projection['refs']}"
+    assert 'Figure 2-1' in para_fig_projection['refs'], \
+        f"Expected 'Figure 2-1' (analysis) in this paragraph, got {para_fig_projection['refs']}"
+    assert 'Figure 1-1' in para_fig_projection['refs'], \
+        f"Expected 'Figure 1-1' (trends) in this paragraph, got {para_fig_projection['refs']}"
+    # Should have 4 total references (projection appears twice)
+    assert len(para_fig_projection['refs']) == 4, \
+        f"Expected exactly 4 figure references, got {len(para_fig_projection['refs'])}"
+
+    # Test Case 4: Table references - "The data in [@tbl:metrics]" should resolve to Table 1-1
+    para_tbl_metrics_1 = next((p for p in paragraphs_with_refs
+                               if 'supports this observation' in p['text'] and p['type'] == 'table'), None)
+    assert para_tbl_metrics_1 is not None, "Could not find paragraph with table reference 'supports this observation'"
+    print(f"\n✓ Found: '{para_tbl_metrics_1['text'][:60]}...'")
+    print(f"  References: {para_tbl_metrics_1['refs']}")
+    assert 'Table 1-1' in para_tbl_metrics_1['refs'], \
+        f"Expected 'Table 1-1' (metrics) in this paragraph, got {para_tbl_metrics_1['refs']}"
+    assert len(para_tbl_metrics_1['refs']) == 1, \
+        f"Expected exactly 1 table reference, got {len(para_tbl_metrics_1['refs'])}"
+
+    # Test Case 5: "The performance comparison in [@tbl:comparison] ... This contrasts with the baseline in [@tbl:metrics]"
+    # Should resolve to Table 2-1 and Table 1-1
+    para_tbl_comparison = next((p for p in paragraphs_with_refs
+                                if 'performance comparison' in p['text'].lower() and 'significant improvements' in p['text']), None)
+    assert para_tbl_comparison is not None, "Could not find paragraph with 'performance comparison' and 'significant improvements'"
+    print(f"\n✓ Found: '{para_tbl_comparison['text'][:60]}...'")
+    print(f"  References: {para_tbl_comparison['refs']}")
+    assert 'Table 2-1' in para_tbl_comparison['refs'], \
+        f"Expected 'Table 2-1' (comparison) in this paragraph, got {para_tbl_comparison['refs']}"
+    assert 'Table 1-1' in para_tbl_comparison['refs'], \
+        f"Expected 'Table 1-1' (metrics) in this paragraph, got {para_tbl_comparison['refs']}"
+    assert len(para_tbl_comparison['refs']) == 2, \
+        f"Expected exactly 2 table references, got {len(para_tbl_comparison['refs'])}"
+
+    # Test Case 6: Summary paragraph with all three tables
+    # "- Baseline metrics: [@tbl:metrics] - Performance comparison: [@tbl:comparison] - Final summary: [@tbl:summary]"
+    # Should resolve to Table 1-1, Table 2-1, Table 3-1
+    para_tbl_summary = next((p for p in paragraphs_with_refs
+                             if 'baseline metrics' in p['text'].lower() and 'performance comparison' in p['text'].lower()), None)
+    assert para_tbl_summary is not None, "Could not find paragraph with 'baseline metrics' and 'performance comparison'"
+    print(f"\n✓ Found: '{para_tbl_summary['text'][:60]}...'")
+    print(f"  References: {para_tbl_summary['refs']}")
+    assert 'Table 1-1' in para_tbl_summary['refs'], \
+        f"Expected 'Table 1-1' (metrics) in summary paragraph, got {para_tbl_summary['refs']}"
+    assert 'Table 2-1' in para_tbl_summary['refs'], \
+        f"Expected 'Table 2-1' (comparison) in summary paragraph, got {para_tbl_summary['refs']}"
+    assert 'Table 3-1' in para_tbl_summary['refs'], \
+        f"Expected 'Table 3-1' (summary) in summary paragraph, got {para_tbl_summary['refs']}"
+    assert len(para_tbl_summary['refs']) == 3, \
+        f"Expected exactly 3 table references, got {len(para_tbl_summary['refs'])}"
+
+    print(f"\n" + "="*80)
+    print("TEST PASSED - ALL CROSS-REFERENCES VERIFIED")
+    print("="*80)
+    print(f"✓ Figure reference to 'trends' correctly points to Figure 1-1")
+    print(f"✓ Figure reference to 'analysis' correctly points to Figure 2-1")
+    print(f"✓ Figure reference to 'projection' correctly points to Figure 2-2")
+    print(f"✓ Table reference to 'metrics' correctly points to Table 1-1")
+    print(f"✓ Table reference to 'comparison' correctly points to Table 2-1")
+    print(f"✓ Table reference to 'summary' correctly points to Table 3-1")
+    print(f"✓ All multi-reference paragraphs have correct target references")
     print(f"✓ All REF fields properly structured with \\h switch")
     print(f"✓ All bookmarks use Word-style _Ref naming")
 
