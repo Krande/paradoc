@@ -14,7 +14,7 @@ from paradoc.io.word.utils import docx_update
 
 @pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
 def test_comprehensive_crossref_with_figures_and_tables(tmp_path):
-    """Test cross-references with 3 figures and 3 tables spread across different sections.
+    r"""Test cross-references with 3 figures and 3 tables spread across different sections.
     
     This test verifies:
     1. Figures and tables in different sections get correct numbering (1-1, 2-1, 2-2, etc.)

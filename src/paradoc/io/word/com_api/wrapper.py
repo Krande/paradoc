@@ -15,7 +15,8 @@ WD_STORY = 6  # End of document
 WD_FIELD_EMPTY = -1
 WD_REF_TYPE_FIGURE = "Figure"
 WD_REF_TYPE_TABLE = "Table"
-WD_ONLY_LABEL_AND_NUMBER = 2
+WD_ONLY_LABEL_AND_NUMBER = 3
+WD_FULL_CAPTION = 1
 WD_MSO_SHAPE_RECTANGLE = 1
 
 # Text wrapping constants for Word shapes
@@ -230,6 +231,17 @@ class WordDocument:
             self._app.Selection.TypeText(text)
         self._app.Selection.TypeParagraph()
         
+    def add_text(self, text: str):
+        """Add text at the current cursor position without creating a new paragraph.
+
+        This is useful for adding text inline, such as continuing on the same line
+        after inserting a cross-reference.
+
+        Args:
+            text: The text to insert
+        """
+        self._app.Selection.TypeText(text)
+
     def _apply_text_wrapping(self, shape, layout: FigureLayout):
         """Apply text wrapping to a shape based on layout type.
         
@@ -515,7 +527,8 @@ class WordDocument:
         bookmark_name: Union[CaptionReference, str, int],
         reference_type: Optional[Literal["figure", "table"]] = None,
         include_hyperlink: bool = True,
-        prefix_text: str = ""
+        prefix_text: str = "",
+        include_caption_text: bool = False
     ):
         """Add a cross-reference to a figure or table.
         
@@ -527,6 +540,8 @@ class WordDocument:
                            is a string or int. Ignored when bookmark_name is a CaptionReference.
             include_hyperlink: Whether to make the reference a clickable hyperlink
             prefix_text: Optional text to insert before the reference (e.g., "See ")
+            include_caption_text: If True, inserts the full caption (label, number, and caption text).
+                                  If False (default), inserts only label and number.
         """
         # Handle CaptionReference object
         if isinstance(bookmark_name, CaptionReference):
@@ -566,11 +581,14 @@ class WordDocument:
         try:
             self._app.Selection.InsertCrossReference(
                 ReferenceType=ref_type_map[actual_reference_type],
-                ReferenceKind=WD_ONLY_LABEL_AND_NUMBER,
+                ReferenceKind=WD_FULL_CAPTION if include_caption_text else WD_ONLY_LABEL_AND_NUMBER,
                 ReferenceItem=item_index,
                 InsertAsHyperlink=include_hyperlink,
                 IncludePosition=False
             )
+            # Collapse selection to end to ensure cursor stays on the same line
+            # This prevents Word from inserting a paragraph break
+            self._app.Selection.Collapse(Direction=0)  # wdCollapseEnd = 0
         except Exception as e:
             raise RuntimeError(f"Failed to insert cross-reference: {e}")
             

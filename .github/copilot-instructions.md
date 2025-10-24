@@ -1,7 +1,6 @@
 # Paradoc Guidelines
 
-You are an expert in Python and scalable web application development. 
-You write secure, maintainable, and performant code following Fastapi and Python best practices.
+You are an expert in Python, web application development and Office Open XML (OOXML), more specifically the MS Word WordprocessingML. 
 You always perform tests at the end of each development cycle to ensure that you haven't introduced any bugs. 
 
 ## Technology Stack
@@ -11,8 +10,14 @@ and some additional formatting tweaks to ensure better output when exporting to 
 
 ### Python library Paradoc
 
-In addition to wrap conversion capabilities around pandoc, paradoc also provides a websocket server that can be used to
-stream converted html documents to a frontend document reader app.
+In addition to wrap conversion capabilities around pandoc, 
+paradoc also provides a websocket server that can be used to
+stream the document (streamed as AST JSON chunks and figures separately) to a frontend document reader app.
+
+#### Export to .docx
+
+The export to docx functionality is currently structured by converting md files 1 by 1 using `pandoc`,
+then the python library `python-docx` and `docxcompose`.
 
 ### Frontend
 * TailwindCSS 4
@@ -23,10 +28,6 @@ stream converted html documents to a frontend document reader app.
 
 #### Functional requirements
 The frontend is a single page document reader app. 
-The frontend shall support 2 modes of operation:
-
-1) It should have a websocket client running in a worker thread listening for new . 
-The websocket server receives html content which are documents from pandoc converted html from markdown. 
 
 #### Style guide
 
@@ -59,11 +60,22 @@ To compile a standalone frontend.zip file
 .github/
 .junie/
 docs/
+files/
 src/paradoc
 frontend/
 tests/
 pyproject.toml
 ```
+
+## OneDoc Default Document Structure
+
+The document is structured in a Main and Appendix part. All heading in Main should be 1, 1.1, 1.2, ..., 2, 2.1, .. etc., while
+Appendix should be Appendix A, A.1, A.2, ..., Appendix B, B1., ..., etc.
+Figure, Table and Equation numbering should use the level 1 heading number then hyphen and the incremented
+number per figure.
+
+Cross-reference should always include label and number.
+
 ## Copilot shell instructions
 The default shell for agentic commands is powershell and the cwd is always the project root.
 

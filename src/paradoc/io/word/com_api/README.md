@@ -317,7 +317,7 @@ doc.add_table_with_caption(
 
 #### Cross-Reference Methods
 
-##### add_cross_reference(bookmark_name, reference_type=None, include_hyperlink=True, prefix_text="")
+##### add_cross_reference(bookmark_name, reference_type=None, include_hyperlink=True, prefix_text="", include_caption_text=False)
 
 Add a cross-reference to a figure or table.
 
@@ -325,6 +325,7 @@ Add a cross-reference to a figure or table.
 - `reference_type` (str, optional): Type of reference ("figure" or "table"). Required only when `bookmark_name` is a string or int. Ignored when `bookmark_name` is a `CaptionReference`.
 - `include_hyperlink` (bool): Whether to make the reference a clickable hyperlink
 - `prefix_text` (str): Optional text to insert before the reference (e.g., "See ")
+- `include_caption_text` (bool): If True, includes the full caption (label, number, and caption text). Default False inserts only label and number.
 
 **New Simplified API (Recommended):**
 

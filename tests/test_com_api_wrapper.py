@@ -540,32 +540,32 @@ def test_cross_references_with_chapter_numbering(tmp_path):
         doc.add_paragraph()
         
         # Add cross-references to Chapter 1 figures and tables
-        doc.add_paragraph("As shown in ")
+        doc.add_text("As shown in ")
         doc.add_cross_reference(
             bookmark_name=0,  # First figure
             reference_type="figure",
             include_hyperlink=True
         )
-        doc.add_paragraph(", the data clearly demonstrates the trend.")
+        doc.add_text(", the data clearly demonstrates the trend.")
         doc.add_paragraph()
         
-        doc.add_paragraph("Additionally, ")
+        doc.add_text("Additionally, ")
         doc.add_cross_reference(
             bookmark_name=1,  # Second figure
             reference_type="figure",
             include_hyperlink=True,
             prefix_text=""
         )
-        doc.add_paragraph(" provides further evidence.")
+        doc.add_text(" provides further evidence.")
         doc.add_paragraph()
         
-        doc.add_paragraph("The results are summarized in ")
+        doc.add_text("The results are summarized in ")
         doc.add_cross_reference(
             bookmark_name=0,  # First table
             reference_type="table",
             include_hyperlink=True
         )
-        doc.add_paragraph(".")
+        doc.add_text(".")
         doc.add_paragraph()
         
         # Add figures in Chapter 2
@@ -591,35 +591,35 @@ def test_cross_references_with_chapter_numbering(tmp_path):
         doc.add_paragraph()
         
         # Reference figures from both chapters
-        doc.add_paragraph("Comparing ")
+        doc.add_text("Comparing ")
         doc.add_cross_reference(
             bookmark_name=0,  # Figure 1-1
             reference_type="figure",
             include_hyperlink=True
         )
-        doc.add_paragraph(" and ")
+        doc.add_text(" and ")
         doc.add_cross_reference(
             bookmark_name=2,  # Figure 2-1
             reference_type="figure",
             include_hyperlink=True
         )
-        doc.add_paragraph(" reveals important differences.")
+        doc.add_text(" reveals important differences.")
         doc.add_paragraph()
         
         # Reference tables
-        doc.add_paragraph("See ")
+        doc.add_text("See ")
         doc.add_cross_reference(
             bookmark_name=0,  # Table 1-1
             reference_type="table",
             include_hyperlink=True
         )
-        doc.add_paragraph(" and ")
+        doc.add_text(" and ")
         doc.add_cross_reference(
             bookmark_name=1,  # Table 2-1
             reference_type="table",
             include_hyperlink=True
         )
-        doc.add_paragraph(" for detailed data.")
+        doc.add_text(" for detailed data.")
         doc.add_paragraph()
         
         # Update all fields to resolve cross-references
@@ -688,10 +688,30 @@ def test_cross_references_with_chapter_numbering(tmp_path):
         f"Expected cross-reference to 'Table 1-1' in text"
     assert "Table 2-1" in crossref_text or "Table 2 1" in crossref_text, \
         f"Expected cross-reference to 'Table 2-1' in text"
+
+    # Ensure caption text is NOT included in cross-references (label and number only)
+    forbidden_caption_texts = [
+        "First figure in chapter 1",
+        "Second figure in chapter 1",
+        "First table in chapter 1",
+        "First figure in chapter 2",
+        "First table in chapter 2",
+    ]
+    for forbidden in forbidden_caption_texts:
+        assert forbidden not in crossref_text, (
+            f"Cross-references should not include caption text, but found '{forbidden}' in: {crossref_text}"
+        )
+
+    # Also ensure colon-suffixed patterns like 'Figure 1-1:' do not appear in cross-references
+    colon_patterns = ["Figure 1-1:", "Figure 1-2:", "Figure 2-1:", "Table 1-1:", "Table 2-1:"]
+    for pat in colon_patterns:
+        assert pat not in crossref_text, (
+            f"Cross-references should not include caption-style colon text, but found '{pat}'"
+        )
     
     print(f"\n[PASS] All cross-reference assertions passed!")
     print(f"  Captions: Figure 1-1, Figure 1-2, Figure 2-1, Table 1-1, Table 2-1")
-    print(f"  Cross-references verified in document text")
+    print(f"  Cross-references verified in document text (without caption text)")
     
     if os.getenv("AUTO_OPEN"):
         os.startfile(output_file)
