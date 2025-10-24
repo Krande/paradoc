@@ -72,11 +72,17 @@ def add_bookmark_to_paragraph(paragraph: Paragraph, bookmark_name: str = None) -
 
 
 def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> str:
-    """Add a bookmark around the caption numbering sequence.
+    """Add a bookmark around the entire caption paragraph.
 
-    For proper cross-referencing, the bookmark wraps around the entire
-    numbering sequence (STYLEREF + hyphen + SEQ) so that REF fields show "2-1"
-    instead of just "1".
+    IMPORTANT: For Word cross-references to work correctly, the bookmark MUST wrap
+    the entire caption paragraph, not just the field codes. When a REF field points
+    to a bookmark that wraps field codes (STYLEREF/SEQ), Word re-evaluates those
+    fields at the REF location, giving incorrect numbers.
+
+    By wrapping the entire paragraph, Word displays the visible text content of the
+    paragraph (after field evaluation), which gives the correct caption number.
+
+    This matches how Word's native Insert Caption feature works.
 
     Caption structure (as created by rebuild_caption):
     - Run 0: "Figure " or "Table " text
@@ -92,24 +98,8 @@ def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> s
     Returns:
         The actual Word-style bookmark name that was created (e.g., "_Ref306075071")
     """
-    word_style_name, bookmark_id = generate_word_bookmark_name()
-
-    p_element = paragraph._p
-    runs = list(p_element.findall(qn('w:r')))
-
-    # Find STYLEREF field begin and SEQ field end indices
-    styleref_begin_idx, seq_end_idx = _find_field_indices(runs)
-
-    # Try to wrap bookmark around both STYLEREF and SEQ fields
-    if styleref_begin_idx is not None and seq_end_idx is not None:
-        return _add_bookmark_around_runs(runs, styleref_begin_idx, seq_end_idx, word_style_name, bookmark_id)
-
-    # Fallback: wrap just the SEQ field
-    seq_begin_idx, seq_end_idx = _find_seq_field_only(runs)
-    if seq_begin_idx is not None and seq_end_idx is not None:
-        return _add_bookmark_around_runs(runs, seq_begin_idx, seq_end_idx, word_style_name, bookmark_id)
-
-    # Final fallback: wrap entire paragraph
+    # Always wrap the entire paragraph for correct cross-referencing
+    # This ensures REF fields display the evaluated text, not re-execute field codes
     return add_bookmark_to_paragraph(paragraph, bookmark_name)
 
 
