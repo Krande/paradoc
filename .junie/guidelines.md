@@ -72,7 +72,7 @@ pyproject.toml
 The document is structured in a Main and Appendix part. All heading in Main should be 1, 1.1, 1.2, ..., 2, 2.1, .. etc., while
 Appendix should be Appendix A, A.1, A.2, ..., Appendix B, B1., ..., etc.
 Figure, Table and Equation numbering should use the level 1 heading number then hyphen and the incremented
-number per figure.
+number per figure within that level 1 heading section. The incremented number should be reset to 1 when a new level 1 heading is encountered.
 
 Cross-reference should always include label and number.
 
