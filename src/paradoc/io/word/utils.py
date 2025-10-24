@@ -8,7 +8,7 @@ from docx.oxml.table import CT_Tbl
 from docx.oxml.text.paragraph import CT_P
 from docx.table import Table, _Cell
 from docx.text.paragraph import Paragraph
-from docxcompose.composer import Composer
+from paradoc.io.word.compose.composer import Composer
 
 from paradoc.common import MY_DOCX_TMPL, MarkDownFile
 from paradoc.config import create_logger
@@ -237,7 +237,7 @@ def convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_do
     :return:
     """
     from docx import Document
-    from docxcompose.composer import Composer
+    from paradoc.io.word.compose.composer import Composer
 
     build_dir = source / "_build"
     if style_doc is not None:
