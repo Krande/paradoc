@@ -19,15 +19,33 @@ def add_seq_reference(run_in, seq: str, parent):
     """
     new_run = Run(run_in, parent)
     r = new_run._r
+
+    # Field begin
     fldChar = OxmlElement("w:fldChar")
     fldChar.set(qn("w:fldCharType"), "begin")
     r.append(fldChar)
+
+    # Field instruction
     instrText = OxmlElement("w:instrText")
-    instrText.text = seq
+    instrText.set(qn("xml:space"), "preserve")
+    instrText.text = " " + seq + " "
     r.append(instrText)
-    fldChar = OxmlElement("w:fldChar")
-    fldChar.set(qn("w:fldCharType"), "end")
-    r.append(fldChar)
+
+    # Field separator (CRITICAL - without this, fields don't display correctly)
+    fldChar2 = OxmlElement("w:fldChar")
+    fldChar2.set(qn("w:fldCharType"), "separate")
+    r.append(fldChar2)
+
+    # Field result placeholder
+    t = OxmlElement("w:t")
+    t.text = "1"  # Placeholder that will be updated by Word
+    r.append(t)
+
+    # Field end
+    fldChar3 = OxmlElement("w:fldChar")
+    fldChar3.set(qn("w:fldCharType"), "end")
+    r.append(fldChar3)
+
     return new_run
 
 
@@ -43,15 +61,32 @@ def add_table_reference(paragraph: Paragraph, seq: str = " SEQ Table \\* ARABIC 
     """
     run = paragraph.add_run()
     r = run._r
+
+    # Field begin
     fldChar = OxmlElement("w:fldChar")
     fldChar.set(qn("w:fldCharType"), "begin")
     r.append(fldChar)
+
+    # Field instruction
     instrText = OxmlElement("w:instrText")
+    instrText.set(qn("xml:space"), "preserve")
     instrText.text = seq
     r.append(instrText)
-    fldChar = OxmlElement("w:fldChar")
-    fldChar.set(qn("w:fldCharType"), "end")
-    r.append(fldChar)
+
+    # Field separator
+    fldChar2 = OxmlElement("w:fldChar")
+    fldChar2.set(qn("w:fldCharType"), "separate")
+    r.append(fldChar2)
+
+    # Field result placeholder
+    t = OxmlElement("w:t")
+    t.text = "1"
+    r.append(t)
+
+    # Field end
+    fldChar3 = OxmlElement("w:fldChar")
+    fldChar3.set(qn("w:fldCharType"), "end")
+    r.append(fldChar3)
 
     return run
 

@@ -49,8 +49,10 @@ def convert_table_references_to_ref_fields(document, tables):
         print("[DEBUG convert_table_references] No bookmarks found, returning early")
         return  # No tables to process
 
-    # Note: pandoc-crossref outputs "Table1" (no space) for tables
-    tbl_ref_pattern = re.compile(r'\b((?:Table|tbl\.)\s*[\d\-]+)\b', re.IGNORECASE)
+    # Pattern to match table references from pandoc-crossref
+    # Matches: "Table 1", "Table 1-1", "tbl. 1", etc.
+    # Group 1 captures just the number part (like the figure pattern)
+    tbl_ref_pattern = re.compile(r'\b(?:Table|tbl\.)[\s\xa0]+([\d\-]+)', re.IGNORECASE)
 
     _convert_references(document, bookmarks_in_order, tbl_ref_pattern, "Table")
 
@@ -135,10 +137,58 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
         label: The label to use in REF fields (e.g., "Figure", "Table", "Eq")
         num_group: The regex group number containing the number (default 1)
     """
+    # First pass: Build a mapping of all reference numbers to their sequential order
+    # IMPORTANT: At this point in the document composition, SEQ fields haven't been
+    # evaluated by Word yet, so captions may all show placeholder values like "1-1".
+    # Instead of parsing numbers, we'll just count captions in document order.
+    reference_to_index = {}
+    caption_count = 0
+
+    # Pattern to identify caption paragraphs
+    caption_pattern = re.compile(rf'{label}\s+[\d\-]+:', re.IGNORECASE)
+
+    # Also track the actual numbers we see for later mapping
+    seen_numbers = []
+
+    for block in iter_block_items(document):
+        if not isinstance(block, Paragraph):
+            continue
+
+        text = block.text.strip()
+        match = caption_pattern.search(text)
+        if match:
+            # Extract the full matched pattern to get the number
+            full_match = match.group(0)
+            # Extract just the number part (e.g., "1-1" from "Figure 1-1:")
+            num_match = re.search(r'([\d\-]+):', full_match)
+            if num_match:
+                ref_num = num_match.group(1)
+                seen_numbers.append(ref_num)
+                # Map this reference number to its sequential position
+                reference_to_index[ref_num] = caption_count
+                print(f"[DEBUG _convert_references]   Caption #{caption_count}: {label} {ref_num} (text: {text[:50]})")
+                caption_count += 1
+
+    # If all captions have the same number (e.g., all show "1-1" as placeholder),
+    # we need to handle references by sequential order instead
+    unique_numbers = set(seen_numbers)
+    if len(unique_numbers) == 1 and len(seen_numbers) > 1:
+        print(f"[DEBUG _convert_references]   WARNING: All captions show same number '{list(unique_numbers)[0]}' - likely unevaluated SEQ fields")
+        print(f"[DEBUG _convert_references]   Will use sequential matching for references")
+        # In this case, we can't reliably map by number, so we'll need to match references
+        # to captions in the order they appear in the document
+
+    print(f"[DEBUG _convert_references] Built reference mapping for {label}: {reference_to_index}")
+    print(f"[DEBUG _convert_references] Total {label} captions found: {caption_count}")
+
+    # Second pass: Convert references to REF fields using the mapping
     processed_count = 0
     skipped_caption = 0
     no_match = 0
     
+    # Track reference occurrences for sequential matching when all captions have same number
+    reference_occurrence_count = {}
+
     for block in iter_block_items(document):
         if not isinstance(block, Paragraph):
             continue
@@ -155,13 +205,13 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
 
         # Process the paragraph
         print(f"[DEBUG _convert_references] Processing paragraph with {label}: {block.text[:80]}")
-        _process_paragraph_references(block, pattern, bookmarks_in_order, label, num_group)
+        _process_paragraph_references(block, pattern, bookmarks_in_order, label, num_group, reference_to_index, reference_occurrence_count)
         processed_count += 1
     
     print(f"[DEBUG _convert_references] {label} summary: processed={processed_count}, skipped_caption={skipped_caption}, no_match={no_match}")
 
 
-def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, bookmarks: list[str], label: str, num_group: int):
+def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, bookmarks: list[str], label: str, num_group: int, reference_to_index: dict = None, reference_occurrence_count: dict = None):
     """Process a single paragraph to replace text references with REF fields.
 
     Args:
@@ -170,6 +220,8 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
         bookmarks: List of bookmark names in order
         label: The label for REF fields
         num_group: The regex group containing the number
+        reference_to_index: Mapping of reference numbers (e.g., "2-1") to sequential indices
+        reference_occurrence_count: Track how many times we've seen each reference number for sequential matching
     """
     original_text = paragraph.text
     matches = list(pattern.finditer(original_text))
@@ -191,6 +243,11 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
     # Rebuild the paragraph with text and REF fields
     last_pos = 0
     ref_fields_added = 0
+
+    # Check if we have multiple captions with the same number (unevaluated SEQ fields)
+    unique_refs = set(reference_to_index.keys()) if reference_to_index else set()
+    all_same_number = len(unique_refs) == 1 and len(reference_to_index) > 1 if reference_to_index else False
+
     for match in matches:
         # Extract the number from the matched text
         if num_group == 2:
@@ -201,31 +258,32 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
             num_str = match.group(1).split()[-1] if ' ' in match.group(1) else match.group(1)
 
         # Map the reference number to the bookmark
-        # Since pandoc-crossref numbers figures sequentially (1, 2, 3, ...)
-        # but displays them with chapter numbers (1-1, 1-2, 2-1, ...),
-        # we need to map based on sequential order in the document.
-        # The bookmarks list is already in document order, so we can use
-        # sequential mapping.
-        try:
-            if num_str == "-":
-                item_num = 1
-            else:
-                # For simple numbers like "1", use directly
-                # For chapter-based like "1-1", extract the last part
-                if '-' in num_str:
-                    # This is chapter-section format, but we need to map to sequential position
-                    # Since we can't reliably reverse-engineer the sequential position from "1-1",
-                    # we'll use the first occurrence we find
-                    # TODO: Improve this by tracking the actual sequential number from pandoc
-                    item_num = int(num_str.split('-')[0])
+        if all_same_number and reference_occurrence_count is not None:
+            # All captions show the same number (e.g., "1-1") - use sequential matching
+            # Track how many times we've seen this reference number
+            if num_str not in reference_occurrence_count:
+                reference_occurrence_count[num_str] = 0
+            bookmark_idx = reference_occurrence_count[num_str]
+            reference_occurrence_count[num_str] += 1
+            print(f"[DEBUG _process_paragraph_references]   Sequential match: reference #{bookmark_idx} (number: {num_str})")
+        elif reference_to_index and num_str in reference_to_index:
+            # Use the pre-built mapping
+            bookmark_idx = reference_to_index[num_str]
+        else:
+            # Fallback to simple sequential mapping if no mapping available
+            try:
+                if num_str == "-":
+                    bookmark_idx = 0
+                elif '-' in num_str:
+                    # For chapter-based numbers, can't determine sequential position without mapping
+                    # Fall back to using the section number - 1
+                    bookmark_idx = int(num_str.split('-')[0]) - 1
                 else:
-                    item_num = int(num_str)
-        except (ValueError, AttributeError):
-            item_num = 1
+                    bookmark_idx = int(num_str) - 1
+            except (ValueError, AttributeError):
+                bookmark_idx = 0
 
-        # Map number to bookmark (1-based indexing)
-        # For now, use simple sequential mapping
-        bookmark_idx = item_num - 1
+        # Get the bookmark name
         if 0 <= bookmark_idx < len(bookmarks):
             bookmark_name = bookmarks[bookmark_idx]
         else:
@@ -245,7 +303,7 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
         # Add REF field
         create_ref_field_runs(p_element, bookmark_name, label=label)
         ref_fields_added += 1
-        print(f"[DEBUG _process_paragraph_references]   Added REF field #{ref_fields_added} -> {bookmark_name}")
+        print(f"[DEBUG _process_paragraph_references]   Added REF field #{ref_fields_added}: {num_str} -> index {bookmark_idx} -> {bookmark_name}")
 
         last_pos = match.end()
 

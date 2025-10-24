@@ -31,19 +31,18 @@ def rebuild_caption(caption: Paragraph, caption_prefix: str, caption_str: str, i
     heading_ref = '"Appendix"' if is_appendix else '"Heading 1"'
 
     # Build the SEQ field instruction
-    # Format: SEQ Figure \* ARABIC \s 1
-    # where Figure/Table is the identifier, \* ARABIC is the format, \s 1 restarts numbering
-    seq_instruction = f"SEQ {caption_prefix} \\* ARABIC"
-
+    # For chapter-based numbering (Figure 1-1, 1-2, 2-1, etc.), we need:
+    # - First figure/table: SEQ Figure \* ARABIC \r 1 \s 1
+    #   (\r 1 initializes to 1, \s 1 enables chapter tracking)
+    # - Subsequent figures/tables: SEQ Figure \* ARABIC \s 1
+    #   (\s 1 continues chapter tracking and increments within chapter)
     if should_restart:
-        # \r switch restarts numbering at heading level
-        if is_appendix:
-            seq_instruction += ' \\r "Appendix X.1"'
-        else:
-            seq_instruction += ' \\r "Heading 1"'
+        # Initialize the sequence with \r 1 and enable chapter tracking with \s 1
+        seq_instruction = f"SEQ {caption_prefix} \\* ARABIC \\r 1 \\s 1"
     else:
-        # \s switch continues numbering from heading level
-        seq_instruction += ' \\s 1'
+        # Continue the sequence within the chapter
+        seq_instruction = f"SEQ {caption_prefix} \\* ARABIC \\s 1"
+
 
     # Add caption prefix text (e.g., "Figure ")
     seq1 = caption._element._new_r()

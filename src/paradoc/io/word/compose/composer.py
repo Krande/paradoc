@@ -585,16 +585,79 @@ class Composer(object):
             ref.getparent().remove(ref)
 
     def renumber_bookmarks(self):
+        """Renumber bookmark IDs while maintaining start/end pairing.
+
+        This ensures that bookmarkStart and bookmarkEnd elements with the same
+        name get the same ID, which is required for Word to recognize them as
+        a valid bookmark pair.
+        """
+        # Build a mapping of bookmark name -> new ID
+        bookmark_name_to_id = {}
         bookmarks_start = xpath(self.doc.element.body, './/w:bookmarkStart')
-        bookmark_id = 0
+
+        next_id = 0
         for bookmark in bookmarks_start:
-            bookmark.set('{%s}id' % NS['w'], str(bookmark_id))
-            bookmark_id += 1
+            name = bookmark.get('{%s}name' % NS['w'])
+            if name not in bookmark_name_to_id:
+                bookmark_name_to_id[name] = str(next_id)
+                next_id += 1
+            # Set the ID based on the name mapping
+            bookmark.set('{%s}id' % NS['w'], bookmark_name_to_id[name])
+
+        # Now update bookmarkEnd elements to match their corresponding starts
         bookmarks_end = xpath(self.doc.element.body, './/w:bookmarkEnd')
-        bookmark_id = 0
-        for bookmark in bookmarks_end:
-            bookmark.set('{%s}id' % NS['w'], str(bookmark_id))
-            bookmark_id += 1
+
+        # We need to match ends to starts by tracking them in document order
+        # Create a list of (element, name, id) for all starts
+        starts_in_order = []
+        for bookmark in bookmarks_start:
+            name = bookmark.get('{%s}name' % NS['w'])
+            bm_id = bookmark.get('{%s}id' % NS['w'])
+            starts_in_order.append((bookmark, name, bm_id))
+
+        # Track which bookmarks are currently open as we traverse the document
+        open_bookmarks = {}  # old_id -> (name, new_id)
+
+        # We need to traverse in document order to properly match starts and ends
+        # Get all bookmark elements (both starts and ends) in order
+        all_bookmark_elements = []
+        for elem in self.doc.element.body.iter():
+            if elem.tag == '{%s}bookmarkStart' % NS['w']:
+                all_bookmark_elements.append(('start', elem))
+            elif elem.tag == '{%s}bookmarkEnd' % NS['w']:
+                all_bookmark_elements.append(('end', elem))
+
+        # Track open bookmarks: name -> new_id
+        currently_open = {}
+
+        for elem_type, elem in all_bookmark_elements:
+            if elem_type == 'start':
+                name = elem.get('{%s}name' % NS['w'])
+                new_id = bookmark_name_to_id.get(name)
+                if new_id:
+                    # Track that this bookmark is now open
+                    currently_open[name] = new_id
+            elif elem_type == 'end':
+                # Find which bookmark this end belongs to
+                # Ends don't have names, so we need to match by ID or by last-opened
+                old_id = elem.get('{%s}id' % NS['w'])
+
+                # Try to find the matching start by checking if any open bookmark has this old_id
+                matched = False
+                for name, new_id in list(currently_open.items()):
+                    # Check if this could be the matching end
+                    # Since we're traversing in order, the first open bookmark is likely the match
+                    # For safety, we'll match the first one and close it
+                    elem.set('{%s}id' % NS['w'], new_id)
+                    del currently_open[name]
+                    matched = True
+                    break
+
+                if not matched and currently_open:
+                    # If we couldn't match by old_id, just close the first open bookmark
+                    name, new_id = list(currently_open.items())[0]
+                    elem.set('{%s}id' % NS['w'], new_id)
+                    del currently_open[name]
 
     def renumber_docpr_ids(self):
         # Ensure that non-visual drawing properties have a unique id

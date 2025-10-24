@@ -110,7 +110,11 @@ class WordExporter:
 
             docx_tbl.table_ref = tbl
             docx_tbl.substitute_back_temp_var()
-            if is_appendix and i == 0:
+            # Restart numbering for:
+            # 1. The very first table in the main document (i == 0 and not is_appendix)
+            # 2. The first table in the appendix (i == 0 and is_appendix)
+            # This initializes the SEQ field with \r 1 \s 1
+            if i == 0:
                 restart_caption_num = True
             else:
                 restart_caption_num = False
@@ -121,7 +125,11 @@ class WordExporter:
     def format_figures(self, composer_doc: Document, is_appendix):
         figures = self.get_all_figures(composer_doc)
         for i, docx_fig in enumerate(figures):
-            if is_appendix and i == 0:
+            # Restart numbering for:
+            # 1. The very first figure in the main document (i == 0 and not is_appendix)
+            # 2. The first figure in the appendix (i == 0 and is_appendix)
+            # This initializes the SEQ field with \r 1 \s 1
+            if i == 0:
                 restart_caption_num = True
             else:
                 restart_caption_num = False
