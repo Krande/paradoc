@@ -2,86 +2,150 @@
 CROSS-REFERENCE ISSUE ANALYSIS
 ================================
 
-Based on the diagnostic test output, here's what we found:
+Updated: 2025-M10-24
 
-## Current Behavior (CORRECT):
-1. Figure captions are numbered correctly: 1-1, 1-2, 2-1, 2-2, 3-1, 3-2
-2. Cross-references ARE being created with the correct bookmark names
-3. Different figures have different bookmark names (_Ref687218041, _Ref896347428, etc.)
+## CRITICAL DISCOVERY: Missing SEQ Fields in Captions
 
-## Problem (INCORRECT):
-All cross-references display "Figure 1-1" instead of the actual figure numbers.
+After comparing XML structure between working COM API documents and Paradoc documents,
+I've identified the root cause of cross-reference issues.
 
-After Word updates the REF fields:
-- REF to Figure 1-1 shows: "Figure 1-1" ✓
-- REF to Figure 1-2 shows: "Figure 1-1" ✗ (should show "Figure 1-2")
-- REF to Figure 2-1 shows: "Figure 1-1" ✗ (should show "Figure 2-1")
+### The Problem (CONFIRMED):
+**Paradoc documents have NO SEQ fields in figure/table captions.**
 
-## Root Cause:
-The bookmarks are wrapping the caption NUMBER fields (STYLEREF + hyphen + SEQ),
-but when Word evaluates a REF field pointing to a bookmark, it displays THE EVALUATED
-RESULT of those fields AT THE LOCATION WHERE THE REF FIELD IS, not the stored text
-within the bookmark.
-
-Since SEQ fields are context-sensitive (they count sequentially through the document),
-when Word evaluates "SEQ Figure \\* ARABIC \\s 1" at different locations in the document,
-it returns different values based on how many figures have appeared up to that point.
-
-## The Fix:
-Instead of wrapping the bookmark around the FIELD CODES (STYLEREF + SEQ), we need to
-wrap the bookmark around the FIELD RESULTS (the actual text "1-1", "1-2", etc.).
-
-Word's cross-reference system works by:
-1. Bookmarking the DISPLAY TEXT (field results after evaluation)
-2. REF fields then copy that bookmarked text
-
-Current structure (WRONG):
+When Paradoc creates captions, they appear as static text:
 ```
-<bookmark start>
-<STYLEREF field> <- field code
--
-<SEQ field> <- field code
-<bookmark end>
-: Caption text
+Figure 1-1: Caption text
 ```
 
-When Word evaluates this, the REF field re-evaluates the STYLEREF and SEQ fields
-in the context where the REF appears, giving wrong numbers.
-
-Correct structure (NEEDED):
+But Word requires dynamic SEQ (sequence) fields to properly number captions:
 ```
-<STYLEREF field>
--
-<bookmark start>
-<field result>1-1</field result>  <- the evaluated text
-<bookmark end>
-<SEQ field>
-: Caption text
+Figure <STYLEREF 1>-<SEQ Figure \* ARABIC \s 1>: Caption text
 ```
 
-OR use the entire caption text as Word does:
+### Evidence from XML Comparison:
+
+#### COM API Caption (WORKING) ✓:
+```xml
+<w:r><w:t>Figure </w:t></w:r>
+<w:r><w:fldChar w:fldCharType="begin" /></w:r>
+<w:r><w:instrText> STYLEREF 1 \s \* MERGEFORMAT </w:instrText></w:r>
+<w:r><w:fldChar w:fldCharType="separate" /></w:r>
+<w:r><w:t>1</w:t></w:r>
+<w:r><w:fldChar w:fldCharType="end" /></w:r>
+<w:r><w:t>-</w:t></w:r>
+<w:r><w:fldChar w:fldCharType="begin" /></w:r>
+<w:r><w:instrText> SEQ Figure \* ARABIC \s 1 \* MERGEFORMAT </w:instrText></w:r>
+<w:r><w:fldChar w:fldCharType="separate" /></w:r>
+<w:r><w:t>1</w:t></w:r>
+<w:r><w:fldChar w:fldCharType="end" /></w:r>
+<w:r><w:t>: Caption text</w:t></w:r>
 ```
-Figure 
-<bookmark start>
-<STYLEREF field + result>
--
-<SEQ field + result>
-<bookmark end>
-: Caption text
+
+#### Paradoc Caption (BROKEN) ✗:
+```xml
+<w:r><w:t>Figure 1-1: Caption text</w:t></w:r>
 ```
 
-## Implementation Strategy:
-The bookmark should be placed AFTER the fields have been inserted, and should wrap
-around the entire caption label + number that will be displayed. Word will then
-properly reference this text when updating REF fields.
+### Test Results:
+Running `test_xml_comparison.py`:
+- **COM API document:** Found 2 SEQ fields ✓
+- **Paradoc document:** Found 0 SEQ fields ✗
 
-Alternatively, we could use Word's native caption numbering system instead of
-manually creating STYLEREF/SEQ fields, but that would require significant refactoring.
+### Why This Breaks Cross-References:
+1. Without SEQ fields, captions cannot auto-increment
+2. All captions show "Figure 1-1" regardless of their actual position
+3. When Word updates REF fields, they all resolve to "Figure 1-1"
+4. Even though bookmarks are correctly placed, they point to identical text
 
-## Quick Fix:
-Modify the bookmark placement to wrap the field RESULTS instead of field CODES.
-This means the bookmark should span the text BETWEEN the "separate" and "end" 
-markers of the fields, or we need to restructure how we create the captions.
+### The Real Root Cause:
+The issue is NOT with:
+- Bookmark placement ✓ (bookmarks are correctly placed)
+- REF field structure ✓ (REF fields have correct \h switch)
+- Cross-reference conversion ✓ (pandoc-crossref [@fig:xxx] → REF fields works)
+
+The issue IS with:
+- **Caption numbering mechanism** ✗ (static text instead of SEQ fields)
+
+### How Captions Are Currently Created:
+Looking at the debug output from `test_comprehensive_crossref_with_figures_and_tables`:
+```
+[DEBUG _convert_references]   Caption #0: Figure 1-1 (text: Figure 1-1: Historical trends visualization)
+[DEBUG _convert_references]   Caption #1: Figure 1-1 (text: Figure 1-1: Analysis results visualization)
+[DEBUG _convert_references]   Caption #2: Figure 1-1 (text: Figure 1-1: Future projection visualization)
+[DEBUG _convert_references]   WARNING: All captions show same number '1-1' - likely unevaluated SEQ fields
+```
+
+This confirms that captions are being inserted as static text "Figure 1-1" rather than
+dynamic SEQ fields that Word can evaluate and update.
+
+### The Fix Strategy:
+We need to modify the caption creation process to insert proper Word field codes:
+
+1. **For each figure/table caption:**
+   - Insert "Figure " (or "Table ") as static text
+   - Insert a STYLEREF field to get the chapter number
+   - Insert "-" as static text
+   - Insert a SEQ field with:
+     - Identifier: "Figure" or "Table"
+     - Format: \* ARABIC
+     - Chapter separator: \s 1
+     - Merge format: \* MERGEFORMAT
+   - Insert ": caption text" as static text
+
+2. **Place bookmarks around the entire label:**
+   ```
+   <bookmark start>
+   Figure <STYLEREF><-><SEQ>
+   <bookmark end>
+   : caption text
+   ```
+
+### Where to Fix:
+The caption creation likely happens in one of these locations:
+- `src/paradoc/io/word/crossref_converter.py` - processes cross-references
+- `src/paradoc/io/word/docx_composer.py` - composes the final document
+- `src/paradoc/figures.py` - handles figure processing
+- Pandoc template or filter that generates initial captions
+
+### Latest Investigation (2025-01-24):
+
+**Pandoc-crossref Output Format:**
+Pandoc-crossref outputs references as: `"Figure1.1"` (no space, period separator)
+NOT as: `"Figure 1-1"` (with space and hyphen)
+
+**Fixed Regex Patterns:**
+Updated crossref.py to match both formats:
+- Changed pattern from `[\s\xa0]+([\d\-]+)` to `[\s\xa0]*([\d\.\-]+)`
+- Now matches: "Figure1.1", "Figure1-1", "Figure 1", "Figure 1-1"
+
+**New Issue Discovered:**
+Debug logs show REF fields are being added correctly during processing:
+```
+[DEBUG _process_paragraph_references]   Added REF field #1: 2 -> index 1 -> _Reffig_analysis
+[DEBUG _process_paragraph_references]   Added REF field #2: 1 -> index 0 -> _Reffig_trends
+```
+
+But when document is re-opened to verify, **only 1 REF field found** (out of 13 added).
+
+**Root Cause Analysis:**
+The REF fields are being created correctly in memory but are NOT persisting when the document is saved. This suggests:
+1. The fields may not be properly attached to the paragraph element
+2. Something is clearing them after they're added
+3. The document save process might not be preserving the field structures
+
+**Next Steps:**
+1. ✓ Fixed regex patterns to match pandoc-crossref output
+2. ✓ Confirmed SEQ fields ARE being created in captions
+3. ✓ Confirmed bookmarks are correctly placed
+4. ✓ Confirmed REF fields are linked to correct bookmarks
+5. ⚠ INVESTIGATE: Why REF fields don't persist to saved document
+6. Test if the issue is with create_ref_field_runs() function
+7. Verify the paragraph element modification is working correctly
+
+### Reference Documents:
+- Working COM API document: `temp/test_compare_com_vs_paradoc_xm0/com_xml/`
+- Broken Paradoc document: `temp/test_compare_com_vs_paradoc_xm0/paradoc_xml/`
+- Comparison report: `temp/test_compare_com_vs_paradoc_xm0/crossref_comparison_report.md`
 """
 
 if __name__ == "__main__":

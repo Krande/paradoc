@@ -17,7 +17,7 @@ stream the document (streamed as AST JSON chunks and figures separately) to a fr
 #### Export to .docx
 
 The export to docx functionality is currently structured by converting md files 1 by 1 using `pandoc`,
-then the python library `python-docx` and `docxcompose`.
+then the python library `python-docx` and `docxcompose` (docxcompose source now part of paradoc copied to paradoc/io/word/compose).
 
 ### Frontend
 * TailwindCSS 4

@@ -26,9 +26,11 @@ def convert_figure_references_to_ref_fields(document, figures):
         return  # No figures to process
 
     # Pattern to match figure references from pandoc-crossref
-    # Matches: "Figure 1", "Figure 1-1", "fig. 1", "fig.\xa01" (with non-breaking space)
-    # Use [\s\xa0] to match both regular space and non-breaking space
-    fig_ref_pattern = re.compile(r'\b(?:Figure|fig\.)[\s\xa0]+([\d\-]+)', re.IGNORECASE)
+    # Matches: "Figure1.1", "Figure1-1", "Figure 1", "Figure 1-1", "fig. 1", "fig.\xa01"
+    # Pandoc-crossref may output with or without space, and uses period or hyphen as separator
+    # Use [\s\xa0]* to match optional space (zero or more)
+    # Use [\d\.\-]+ to match numbers with period or hyphen separators
+    fig_ref_pattern = re.compile(r'\b(?:Figure|fig\.)[\s\xa0]*([\d\.\-]+)', re.IGNORECASE)
 
     _convert_references(document, bookmarks_in_order, fig_ref_pattern, "Figure")
 
@@ -50,9 +52,11 @@ def convert_table_references_to_ref_fields(document, tables):
         return  # No tables to process
 
     # Pattern to match table references from pandoc-crossref
-    # Matches: "Table 1", "Table 1-1", "tbl. 1", etc.
-    # Group 1 captures just the number part (like the figure pattern)
-    tbl_ref_pattern = re.compile(r'\b(?:Table|tbl\.)[\s\xa0]+([\d\-]+)', re.IGNORECASE)
+    # Matches: "Table1.1", "Table1-1", "Table 1", "Table 1-1", "tbl. 1", etc.
+    # Pandoc-crossref may output with or without space, and uses period or hyphen as separator
+    # Use [\s\xa0]* to match optional space (zero or more)
+    # Use [\d\.\-]+ to match numbers with period or hyphen separators
+    tbl_ref_pattern = re.compile(r'\b(?:Table|tbl\.)[\s\xa0]*([\d\.\-]+)', re.IGNORECASE)
 
     _convert_references(document, bookmarks_in_order, tbl_ref_pattern, "Table")
 
@@ -144,8 +148,8 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
     reference_to_index = {}
     caption_count = 0
 
-    # Pattern to identify caption paragraphs
-    caption_pattern = re.compile(rf'{label}\s+[\d\-]+:', re.IGNORECASE)
+    # Pattern to identify caption paragraphs (matches both "Figure 1-1:" and "Figure 1.1:")
+    caption_pattern = re.compile(rf'{label}\s+[\d\.\-]+:', re.IGNORECASE)
 
     # Also track the actual numbers we see for later mapping
     seen_numbers = []
@@ -159,8 +163,8 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
         if match:
             # Extract the full matched pattern to get the number
             full_match = match.group(0)
-            # Extract just the number part (e.g., "1-1" from "Figure 1-1:")
-            num_match = re.search(r'([\d\-]+):', full_match)
+            # Extract just the number part (e.g., "1-1" or "1.1" from "Figure 1-1:" or "Figure 1.1:")
+            num_match = re.search(r'([\d\.\-]+):', full_match)
             if num_match:
                 ref_num = num_match.group(1)
                 seen_numbers.append(ref_num)
@@ -272,12 +276,13 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
         else:
             # Fallback to simple sequential mapping if no mapping available
             try:
-                if num_str == "-":
+                if num_str in ("-", "."):
                     bookmark_idx = 0
-                elif '-' in num_str:
-                    # For chapter-based numbers, can't determine sequential position without mapping
+                elif '-' in num_str or '.' in num_str:
+                    # For chapter-based numbers (e.g., "1-1" or "1.1"), can't determine sequential position without mapping
                     # Fall back to using the section number - 1
-                    bookmark_idx = int(num_str.split('-')[0]) - 1
+                    separator = '-' if '-' in num_str else '.'
+                    bookmark_idx = int(num_str.split(separator)[0]) - 1
                 else:
                     bookmark_idx = int(num_str) - 1
             except (ValueError, AttributeError):
