@@ -1,4 +1,4 @@
-from paradoc import MY_DOCX_TMPL
+from paradoc import MY_DOCX_TMPL, OneDoc
 from paradoc.io.word.com_api import WordApplication
 from paradoc.io.word.inspect import DocxInspector
 import pathlib
@@ -8,7 +8,7 @@ ROOT_DIR = pathlib.Path(__file__).parent.parent
 def functional_doc(dest_doc):
     with WordApplication(visible=False) as word_app:
         doc = word_app.create_document(template=MY_DOCX_TMPL)
-
+        doc.add_page_break()
         # Create 3 sections, each with 2 subsections
         for section_num in range(1, 4):
             print(f"\n[Section {section_num}]")
@@ -29,9 +29,8 @@ def functional_doc(dest_doc):
                 # Add figure
                 fig_ref = doc.add_figure_with_caption(
                     caption_text=f"Caption for figure in section {subsection_label}",
-                    width=150,
-                    height=100,
-                    use_chapter_numbers=True
+                    use_chapter_numbers=True,
+                    image_path="pdoc/00-main/images/31343C.png"
                 )
                 print(f"    Added Figure {section_num}-{subsection_num}")
 
@@ -78,6 +77,9 @@ def main():
     tmp_path.mkdir(parents=True, exist_ok=True)
     working_doc_path = tmp_path / "working_reference.docx"
     non_func_path = tmp_path / "non_functional_reference.docx"
+
+    od = OneDoc('pdoc')
+    ast = od.get_ast()
 
     if not working_doc_path.exists():
         functional_doc(working_doc_path.as_posix())

@@ -6,7 +6,7 @@ This is section 1 introduction.
 
 This subsection discusses 
 
-![Caption for figure in section 1.1](placeholder.png){#fig:1-1}
+![Caption for figure in section 1.1](images/31343C.png){#fig:1-1}
 
 | Header 1 | Header 2 |
 |----------|----------|
@@ -20,7 +20,7 @@ As shown in @fig:1-1 and @tbl:1-1, the data is consistent.
 
 This subsection discusses 
 
-![Caption for figure in section 1.2](placeholder.png){#fig:1-2}
+![Caption for figure in section 1.2](images/31343C.png){#fig:1-2}
 
 | Header 1 | Header 2 |
 |----------|----------|
@@ -38,7 +38,7 @@ This is section 2 introduction.
 
 This subsection discusses 
 
-![Caption for figure in section 2.1](placeholder.png){#fig:2-1}
+![Caption for figure in section 2.1](images/31343C.png){#fig:2-1}
 
 | Header 1 | Header 2 |
 |----------|----------|
@@ -52,7 +52,7 @@ As shown in @fig:2-1 and @tbl:2-1, the data is consistent.
 
 This subsection discusses 
 
-![Caption for figure in section 2.2](placeholder.png){#fig:2-2}
+![Caption for figure in section 2.2](images/31343C.png){#fig:2-2}
 
 | Header 1 | Header 2 |
 |----------|----------|
@@ -70,7 +70,7 @@ This is section 3 introduction.
 
 This subsection discusses 
 
-![Caption for figure in section 3.1](placeholder.png){#fig:3-1}
+![Caption for figure in section 3.1](images/31343C.png){#fig:3-1}
 
 | Header 1 | Header 2 |
 |----------|----------|
@@ -84,7 +84,7 @@ As shown in @fig:3-1 and @tbl:3-1, the data is consistent.
 
 This subsection discusses 
 
-![Caption for figure in section 3.2](placeholder.png){#fig:3-2}
+![Caption for figure in section 3.2](images/31343C.png){#fig:3-2}
 
 | Header 1 | Header 2 |
 |----------|----------|

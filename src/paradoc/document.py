@@ -28,6 +28,7 @@ from .db import (
 from .db.plot_renderer import PlotRenderer
 from .equations import Equation
 from .exceptions import LatexNotInstalled
+from .io.ast.exporter import ASTExporter
 from .utils import get_list_of_files
 
 
@@ -183,6 +184,10 @@ class OneDoc:
         if clean_build_dir is True:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
+    def get_ast(self) -> dict:
+        self._prep_compilation()
+        return ASTExporter(self).build_ast()
+
     def send_to_frontend(self, metadata_file=None, embed_images=True, use_static_html=False, frontend_id=None):
         """
         Send document to Paradoc frontend reader via WebSocket.
@@ -212,22 +217,29 @@ class OneDoc:
             fp = pathlib.Path(fp)
             if not fp.is_file():
                 continue
-            # Skip markdown/metadata and anything already under dist_dir
-            if fp.suffix.lower() in (".md", ".yaml"):
+
+            # Skip metadata.yaml files for both build and dist directories
+            if fp.suffix.lower() in (".yaml", ".py", ".db"):
+                continue
+
+            rel_path = fp.relative_to(self.source_dir)
+            # Preserve relative structure; if there is only one segment, keep it
+            rel_without_first = pathlib.Path(*rel_path.parts[1:]) if len(rel_path.parts) > 1 else rel_path
+            build_file = self.build_dir / rel_path
+            os.makedirs(build_file.parent, exist_ok=True)
+            shutil.copy(fp, build_file)
+
+            # Skip markdown and already under dist_dir
+            if fp.suffix.lower() in (".md", ):
                 continue
             try:
                 if self.dist_dir in fp.parents:
                     continue
             except Exception:
                 pass
-            rel_path = fp.relative_to(self.source_dir)
-            # Preserve relative structure; if there is only one segment, keep it
-            rel_without_first = pathlib.Path(*rel_path.parts[1:]) if len(rel_path.parts) > 1 else rel_path
-            build_file = self.build_dir / rel_path
+
             dist_file = self.dist_dir / rel_without_first
-            os.makedirs(build_file.parent, exist_ok=True)
             os.makedirs(dist_file.parent, exist_ok=True)
-            shutil.copy(fp, build_file)
             shutil.copy(fp, dist_file)
 
         self.metadata_file = self.source_dir / "metadata.yaml" if metadata_file is None else pathlib.Path(metadata_file)

@@ -74,24 +74,39 @@ class Table:
 
     @staticmethod
     def from_markdown_str(table_str: str) -> Table:
-        """Parse a markdown table string and return a Table instance"""
+        """Parse a markdown table string and return a Table instance.
+        Supports both Pandoc "Table:" caption syntax and colon-prefixed ": Caption" syntax.
+        """
         lines = table_str.splitlines()
         header = [x.strip() for x in lines[0].split("|")[1:-1]]
         data = []
         table_caption_str = None
+        # Start from line index 2 to skip header separator row
         for line in lines[2:]:
-            if line == "":
+            if line.strip() == "":
+                # allow a blank line between the table and the caption
                 continue
-            if line.strip().startswith("Table:"):
-                table_caption_str = line.strip()
+            stripped = line.strip()
+            if stripped.startswith("Table:") or stripped.startswith(":"):
+                table_caption_str = stripped
                 break
+            # data row
             data.append([x.strip() for x in line.split("|")[1:-1]])
 
-        caption = table_caption_str.split("Table:")[1].strip()
-        caption = caption.split("{")[0].strip()
+        # Extract caption text before optional {#tbl:...}
+        if table_caption_str is None:
+            raise ValueError("Could not find caption line for table. Expected 'Table:' or ': ' caption line.")
+        if table_caption_str.startswith("Table:"):
+            caption_text = table_caption_str.split("Table:", 1)[1].strip()
+        else:
+            # Remove any leading ':' characters and following whitespace
+            caption_text = table_caption_str.lstrip(":").strip()
+        caption = caption_text.split("{")[0].strip()
+
         # Create a pandas DataFrame using the extracted header and data rows
         df = pd.DataFrame(data, columns=header)
-        name = str(df.values[0][0])
+        # Use the first data cell as the table name (this is how WordExporter maps back)
+        name = str(df.values[0][0]) if not df.empty else ""
         tbl_ref = re.search(r"{#tbl:(.*?)}", table_str)
         link_override = None
         if tbl_ref is not None:
@@ -129,6 +144,8 @@ class MarkDownFile:
 
     def read_built_file(self):
         """Read the Markdown file after performed variable substitution"""
+        if not self.build_file.exists():
+            raise FileNotFoundError(f"Built file not found: {self.build_file}")
         with open(self.build_file, "r", encoding="utf-8") as f:
             return f.read()
 
@@ -145,7 +162,18 @@ class MarkDownFile:
         yield from regx.finditer(self.read_original_file())
 
     def get_tables(self):
-        regx = re.compile(r"(\|.*?\nTable:.*?$)", re.MULTILINE | re.DOTALL)
+        # Match a pipe table followed by a caption line either in Pandoc style "Table:" or colon-prefixed ":"
+        # Examples:
+        # | H1 | H2 |
+        # |----|----|
+        # | a  | b  |
+        #
+        # Table: Caption {#tbl:id}
+        #
+        # or
+        # : Caption {#tbl:id}
+        # Allow optional blank line(s) between the table and the caption line
+        regx = re.compile(r"(\|[\s\S]*?\n(?:\s*\n)*\s*(?:(?:Table:)|(?::+\s*)).*$)", re.MULTILINE)
         yield from regx.finditer(self.read_original_file())
 
 
