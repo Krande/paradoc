@@ -7,9 +7,9 @@ from docx.table import Table as DocxTable
 from paradoc.common import MY_DOCX_TMPL, MY_DOCX_TMPL_BLANK, ExportFormats
 from paradoc.document import OneDoc
 
-from .crossref import convert_figure_references_to_ref_fields, convert_table_references_to_ref_fields
 from .formatting import fix_headers_after_compose, format_paragraphs_and_headings
 from .models import DocXFigureRef, DocXTableRef
+from .reference_helper import ReferenceHelper
 from .utils import (
     add_to_composer,
     close_word_docs_by_name,
@@ -37,6 +37,10 @@ class WordExporter:
     def _compile_individual_md_files_to_docx(self, output_name, dest_file, check_open_docs=False):
         one = self.one_doc
 
+        # Initialize the reference helper to manage all cross-references
+        ref_helper = ReferenceHelper()
+        print("\n[WordExporter] Initialized ReferenceHelper for cross-reference management")
+
         for mdf in one.md_files_main + one.md_files_app:
             # Use build_file parent as resource path since images are stored relative to build location
             resource_paths = f"--resource-path={mdf.build_file.parent.absolute()}"
@@ -53,12 +57,13 @@ class WordExporter:
         composer_main = add_to_composer(self.main_tmpl, one.md_files_main)
         composer_app = add_to_composer(self.app_tmpl, one.md_files_app)
 
-        main_tables = self.format_tables(composer_main.doc, False)
-        app_tables = self.format_tables(composer_app.doc, True)
+        # Format tables and register them with the reference helper
+        main_tables = self.format_tables(composer_main.doc, False, ref_helper)
+        app_tables = self.format_tables(composer_app.doc, True, ref_helper)
 
-        # Format figures and collect them for reference conversion
-        main_figures = self.format_figures(composer_main.doc, False)
-        app_figures = self.format_figures(composer_app.doc, True)
+        # Format figures and register them with the reference helper
+        main_figures = self.format_figures(composer_main.doc, False, ref_helper)
+        app_figures = self.format_figures(composer_app.doc, True, ref_helper)
 
         format_paragraphs_and_headings(composer_app.doc, one.appendix_heading_map)
 
@@ -66,13 +71,16 @@ class WordExporter:
         composer_main.doc.add_page_break()
         composer_main.append(composer_app.doc)
 
-        # Convert figure references to REF fields after merging
-        all_figures = main_figures + app_figures
-        convert_figure_references_to_ref_fields(composer_main.doc, all_figures)
+        # Update display numbers in the reference helper
+        print("\n[WordExporter] Updating display numbers in ReferenceHelper")
+        ref_helper.update_display_numbers()
 
-        # Convert table references to REF fields after merging
-        all_tables = main_tables + app_tables
-        convert_table_references_to_ref_fields(composer_main.doc, all_tables)
+        # Print registry for debugging
+        ref_helper.print_registry()
+
+        # Use the new ReferenceHelper to convert all references
+        print("\n[WordExporter] Converting all text references to REF fields using ReferenceHelper")
+        ref_helper.convert_all_references(composer_main.doc)
 
         # Format all paragraphs
         format_paragraphs_and_headings(composer_main.doc, one.paragraph_style_map)
@@ -96,7 +104,7 @@ class WordExporter:
         if self.enable_word_com_automation:
             docx_update(str(dest_file))
 
-    def format_tables(self, composer_doc: Document, is_appendix):
+    def format_tables(self, composer_doc: Document, is_appendix, reference_helper=None):
         tables = []
         for i, docx_tbl in enumerate(self.get_all_tables(composer_doc)):
             try:
@@ -118,11 +126,11 @@ class WordExporter:
                 restart_caption_num = True
             else:
                 restart_caption_num = False
-            docx_tbl.format_table(is_appendix, restart_caption_numbering=restart_caption_num)
+            docx_tbl.format_table(is_appendix, restart_caption_numbering=restart_caption_num, reference_helper=reference_helper)
             tables.append(docx_tbl)
         return tables
 
-    def format_figures(self, composer_doc: Document, is_appendix):
+    def format_figures(self, composer_doc: Document, is_appendix, reference_helper=None):
         figures = self.get_all_figures(composer_doc)
         for i, docx_fig in enumerate(figures):
             # Restart numbering for:
@@ -133,7 +141,7 @@ class WordExporter:
                 restart_caption_num = True
             else:
                 restart_caption_num = False
-            docx_fig.format_figure(is_appendix, restart_caption_num)
+            docx_fig.format_figure(is_appendix, restart_caption_num, reference_helper=reference_helper)
         return figures
 
     def get_all_tables(self, doc: Document):

@@ -36,12 +36,13 @@ class DocXTableRef:
         tbl = self.docx_table
         return tbl.rows[1].cells[0].paragraphs[0]
 
-    def format_table(self, is_appendix: bool, restart_caption_numbering: bool = False):
+    def format_table(self, is_appendix: bool, restart_caption_numbering: bool = False, reference_helper=None):
         """Format the table and its caption with proper styling and numbering.
 
         Args:
             is_appendix: Whether this table is in the appendix
             restart_caption_numbering: Whether to restart caption numbering
+            reference_helper: Optional ReferenceHelper instance for managing cross-references
         """
         from .bookmarks import add_bookmark_around_seq_field
         from .captions import rebuild_caption
@@ -78,9 +79,19 @@ class DocXTableRef:
         # Add bookmark around the caption number for Word cross-references
         if self.table_ref.link_name_override or self.table_ref.name:
             table_id = self.table_ref.link_name_override or self.table_ref.name
-            bookmark_name = f"tbl:{table_id}"
-            # Capture the actual bookmark name that was created
-            self.actual_bookmark_name = add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
+
+            # Use ReferenceHelper if provided
+            if reference_helper:
+                # Register the table and get Word-style bookmark
+                bookmark_name = reference_helper.register_table(table_id, self.docx_caption)
+                self.actual_bookmark_name = bookmark_name
+                # Apply the bookmark to the caption paragraph
+                add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
+            else:
+                # Fallback to old method
+                bookmark_name = f"tbl:{table_id}"
+                # Capture the actual bookmark name that was created
+                self.actual_bookmark_name = add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
 
         for run in self.docx_caption.runs:
             run.font.name = tbl_format.font_style
@@ -128,12 +139,13 @@ class DocXFigureRef:
     document_index: int = None
     actual_bookmark_name: str = None  # Store the actual Word-style bookmark name
 
-    def format_figure(self, is_appendix: bool, restart_caption_numbering: bool):
+    def format_figure(self, is_appendix: bool, restart_caption_numbering: bool, reference_helper=None):
         """Format the figure caption with proper styling and numbering.
 
         Args:
             is_appendix: Whether this figure is in the appendix
             restart_caption_numbering: Whether to restart caption numbering
+            reference_helper: Optional ReferenceHelper instance for managing cross-references
         """
         from .bookmarks import add_bookmark_around_seq_field
         from .captions import rebuild_caption
@@ -146,9 +158,18 @@ class DocXFigureRef:
 
         # Add bookmark around the caption number (SEQ field) for Word cross-references
         if self.figure_ref.reference:
-            bookmark_name = f"fig:{self.figure_ref.reference}"
-            # Capture the actual bookmark name that was created
-            self.actual_bookmark_name = add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
+            # Use ReferenceHelper if provided
+            if reference_helper:
+                # Register the figure and get Word-style bookmark
+                bookmark_name = reference_helper.register_figure(self.figure_ref.reference, self.docx_caption)
+                self.actual_bookmark_name = bookmark_name
+                # Apply the bookmark to the caption paragraph
+                add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
+            else:
+                # Fallback to old method
+                bookmark_name = f"fig:{self.figure_ref.reference}"
+                # Capture the actual bookmark name that was created
+                self.actual_bookmark_name = add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
 
         for run in self.docx_caption.runs:
             run.font.name = figure_format.font_style

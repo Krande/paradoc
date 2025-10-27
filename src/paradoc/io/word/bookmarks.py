@@ -47,12 +47,20 @@ def add_bookmark_to_paragraph(paragraph: Paragraph, bookmark_name: str = None) -
     Args:
         paragraph: The paragraph to add the bookmark to
         bookmark_name: Optional bookmark name; if None, generates a Word-style name
+                      If the name already starts with '_Ref', it's used as-is (Word-style)
+                      Otherwise, it's normalized (semantic name like 'fig:test')
 
     Returns:
         The actual bookmark name that was created
     """
     if bookmark_name:
-        word_style_name = normalize_bookmark_name(bookmark_name)
+        # Check if this is already a Word-style bookmark (starts with _Ref and is all digits after)
+        if bookmark_name.startswith('_Ref') and bookmark_name[4:].isdigit():
+            # Already Word-style, use as-is
+            word_style_name = bookmark_name
+        else:
+            # Semantic name, normalize it
+            word_style_name = normalize_bookmark_name(bookmark_name)
         bookmark_id = str(random.randint(1, 999999))
     else:
         word_style_name, bookmark_id = generate_word_bookmark_name()
