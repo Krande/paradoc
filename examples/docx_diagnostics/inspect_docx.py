@@ -1,9 +1,12 @@
+import pathlib
+
 from paradoc import MY_DOCX_TMPL, OneDoc
 from paradoc.io.word.com_api import WordApplication
 from paradoc.io.word.inspect import DocxInspector
-import pathlib
 
-ROOT_DIR = pathlib.Path(__file__).parent.parent
+THIS_DIR = pathlib.Path(__file__).parent
+ROOT_DIR = THIS_DIR.parent
+
 
 def functional_doc(dest_doc):
     with WordApplication(visible=False) as word_app:
@@ -30,7 +33,7 @@ def functional_doc(dest_doc):
                 fig_ref = doc.add_figure_with_caption(
                     caption_text=f"Caption for figure in section {subsection_label}",
                     use_chapter_numbers=True,
-                    image_path="pdoc/00-main/images/31343C.png"
+                    image_path=str(THIS_DIR / "pdoc/00-main/images/31343C.png")
                 )
                 print(f"    Added Figure {section_num}-{subsection_num}")
 
@@ -63,6 +66,7 @@ def functional_doc(dest_doc):
         doc.update_fields()
         doc.save(str(dest_doc))
 
+
 def non_functional_doc(source_doc_dir, dest_doc):
     """This uses paradoc to create the exact same docx"""
     from paradoc import OneDoc
@@ -70,10 +74,11 @@ def non_functional_doc(source_doc_dir, dest_doc):
     od = OneDoc(source_doc_dir)
     od.compile(dest_doc, export_format="docx")
 
+
 def main():
-    this_dir = pathlib.Path(__file__).parent
-    tmp_path = this_dir / "temp"
-    pdoc_dir = this_dir / 'pdoc'
+    tmp_path = THIS_DIR / "temp"
+    pdoc_dir = THIS_DIR / 'pdoc'
+
     # Ensure directory exists
     tmp_path.mkdir(parents=True, exist_ok=True)
     working_doc_path = tmp_path / "working_reference.docx"
@@ -89,9 +94,9 @@ def main():
         non_functional_doc(pdoc_dir, non_func_path.as_posix())
 
     # Inspect working doc
-    print("="*80)
+    print("=" * 80)
     print("WORKING DOCUMENT ANALYSIS")
-    print("="*80)
+    print("=" * 80)
     di = DocxInspector(working_doc_path)
 
     print("\n--- BOOKMARKS ---")
@@ -129,9 +134,9 @@ def main():
     print(f"\nTotal missing targets: {len(missing)}")
 
     # Inspect Non-working doc
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("NON-FUNCTIONAL DOCUMENT ANALYSIS")
-    print("="*80)
+    print("=" * 80)
     di_n = DocxInspector(non_func_path)
 
     print("\n--- BOOKMARKS ---")
@@ -169,9 +174,9 @@ def main():
     print(f"\nTotal missing targets: {len(missing_n)}")
 
     # COMPARISON
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("COMPARISON SUMMARY")
-    print("="*80)
+    print("=" * 80)
     print(f"\nBookmarks:")
     print(f"  Working: {len(bookmarks)}")
     print(f"  Non-functional: {len(bookmarks_n)}")
@@ -201,9 +206,9 @@ def main():
         print(f"  - {name}")
 
     # Detailed field instruction comparison
-    print(f"\n" + "="*80)
+    print(f"\n" + "=" * 80)
     print("DETAILED FIELD INSTRUCTION ANALYSIS")
-    print("="*80)
+    print("=" * 80)
 
     working_ref_targets = [cr.target_or_label for cr in cross_refs if cr.ref_type == 'REF']
     nonfunc_ref_targets = [cr.target_or_label for cr in cross_refs_n if cr.ref_type == 'REF']

@@ -254,39 +254,221 @@ class ReferenceHelper:
         """
         print("[ReferenceHelper] Converting all references to REF fields")
 
-        # Convert figures
+        # Build mapping dictionaries and patterns for all reference types
+        ref_configs = []
+
+        # Configure figures
         figure_bookmarks = self.get_all_figure_bookmarks_in_order()
         if figure_bookmarks:
-            print(f"[ReferenceHelper] Converting {len(figure_bookmarks)} figure references")
-            self._convert_references(
-                document,
-                figure_bookmarks,
-                re.compile(r'\b(?:Figure|fig\.)[\s\xa0]*([\d.\-]+)', re.IGNORECASE),
-                "Figure"
-            )
+            print(f"[ReferenceHelper] Preparing {len(figure_bookmarks)} figure references")
+            fig_items = [item for item in self._all_items if item.ref_type == ReferenceType.FIGURE]
+            fig_display_to_idx = {}
+            fig_sequential_to_idx = {}
+            for idx, item in enumerate(fig_items):
+                fig_sequential_to_idx[str(idx + 1)] = idx
+                if item.display_number:
+                    fig_display_to_idx[item.display_number] = idx
+                    print(f"[ReferenceHelper]   Figure #{idx}: {item.display_number} -> {item.word_bookmark}")
+                else:
+                    print(f"[ReferenceHelper]   Figure #{idx}: (no display number) -> {item.word_bookmark}")
 
-        # Convert tables
+            ref_configs.append({
+                'label': 'Figure',
+                'pattern': re.compile(r'\b(?:Figure|fig\.)[\s\xa0]*([\d.\-]+)', re.IGNORECASE),
+                'bookmarks': figure_bookmarks,
+                'display_to_idx': fig_display_to_idx,
+                'sequential_to_idx': fig_sequential_to_idx,
+                'num_group': 1
+            })
+
+        # Configure tables
         table_bookmarks = self.get_all_table_bookmarks_in_order()
         if table_bookmarks:
-            print(f"[ReferenceHelper] Converting {len(table_bookmarks)} table references")
-            self._convert_references(
-                document,
-                table_bookmarks,
-                re.compile(r'\b(?:Table|tbl\.)[\s\xa0]*([\d.\-]+)', re.IGNORECASE),
-                "Table"
-            )
+            print(f"[ReferenceHelper] Preparing {len(table_bookmarks)} table references")
+            tbl_items = [item for item in self._all_items if item.ref_type == ReferenceType.TABLE]
+            tbl_display_to_idx = {}
+            tbl_sequential_to_idx = {}
+            for idx, item in enumerate(tbl_items):
+                tbl_sequential_to_idx[str(idx + 1)] = idx
+                if item.display_number:
+                    tbl_display_to_idx[item.display_number] = idx
+                    print(f"[ReferenceHelper]   Table #{idx}: {item.display_number} -> {item.word_bookmark}")
+                else:
+                    print(f"[ReferenceHelper]   Table #{idx}: (no display number) -> {item.word_bookmark}")
 
-        # Convert equations
+            ref_configs.append({
+                'label': 'Table',
+                'pattern': re.compile(r'\b(?:Table|tbl\.)[\s\xa0]*([\d.\-]+)', re.IGNORECASE),
+                'bookmarks': table_bookmarks,
+                'display_to_idx': tbl_display_to_idx,
+                'sequential_to_idx': tbl_sequential_to_idx,
+                'num_group': 1
+            })
+
+        # Configure equations
         equation_bookmarks = self.get_all_equation_bookmarks_in_order()
         if equation_bookmarks:
-            print(f"[ReferenceHelper] Converting {len(equation_bookmarks)} equation references")
-            self._convert_references(
-                document,
-                equation_bookmarks,
-                re.compile(r'\b((?:Eq(?:uation)?|eq\.)\s+([\d\-]+))\b', re.IGNORECASE),
-                "Eq",
-                num_group=2
-            )
+            print(f"[ReferenceHelper] Preparing {len(equation_bookmarks)} equation references")
+            eq_items = [item for item in self._all_items if item.ref_type == ReferenceType.EQUATION]
+            eq_display_to_idx = {}
+            eq_sequential_to_idx = {}
+            for idx, item in enumerate(eq_items):
+                eq_sequential_to_idx[str(idx + 1)] = idx
+                if item.display_number:
+                    eq_display_to_idx[item.display_number] = idx
+                    print(f"[ReferenceHelper]   Eq #{idx}: {item.display_number} -> {item.word_bookmark}")
+                else:
+                    print(f"[ReferenceHelper]   Eq #{idx}: (no display number) -> {item.word_bookmark}")
+
+            ref_configs.append({
+                'label': 'Eq',
+                'pattern': re.compile(r'\b((?:Eq(?:uation)?|eq\.)\s+([\d\-]+))\b', re.IGNORECASE),
+                'bookmarks': equation_bookmarks,
+                'display_to_idx': eq_display_to_idx,
+                'sequential_to_idx': eq_sequential_to_idx,
+                'num_group': 2
+            })
+
+        # Skip caption paragraphs
+        caption_styles = {"Image Caption", "Table Caption", "Captioned Figure"}
+
+        # Process all paragraphs ONCE, handling all reference types
+        processed_count = 0
+        for block in iter_block_items(document):
+            if not isinstance(block, Paragraph):
+                continue
+
+            # Skip caption paragraphs
+            if block.style.name in caption_styles:
+                continue
+
+            # Check if paragraph contains any references
+            paragraph_text = block.text
+            has_refs = any(re.search(cfg['pattern'], paragraph_text) for cfg in ref_configs)
+            if not has_refs:
+                continue
+
+            # Process this paragraph for ALL reference types at once
+            print(f"[ReferenceHelper] Processing paragraph: {paragraph_text[:80]}")
+            self._process_paragraph_all_refs(block, ref_configs)
+            processed_count += 1
+
+        print(f"[ReferenceHelper] Conversion complete: {processed_count} paragraphs processed")
+
+    def _process_paragraph_all_refs(self, paragraph: Paragraph, ref_configs: List[Dict]):
+        """Process a paragraph to replace ALL reference types with REF fields in one pass.
+
+        This avoids the problem of clearing the paragraph multiple times, which would remove
+        REF fields added in previous passes.
+
+        Args:
+            paragraph: The paragraph to process
+            ref_configs: List of reference configurations, each containing:
+                - label: The label for REF fields (e.g., "Figure", "Table")
+                - pattern: Regex pattern to match references
+                - bookmarks: List of bookmark names in order
+                - display_to_idx: Mapping of display numbers to indices
+                - sequential_to_idx: Mapping of sequential numbers to indices
+                - num_group: The regex group containing the number
+        """
+        original_text = paragraph.text
+
+        # Find ALL matches from ALL patterns, with their positions
+        all_matches = []
+        for config in ref_configs:
+            for match in config['pattern'].finditer(original_text):
+                all_matches.append({
+                    'start': match.start(),
+                    'end': match.end(),
+                    'match': match,
+                    'config': config
+                })
+
+        if not all_matches:
+            return
+
+        # Sort matches by position
+        all_matches.sort(key=lambda x: x['start'])
+
+        # Check for overlapping matches and keep only the first one for each position
+        non_overlapping = []
+        last_end = 0
+        for m in all_matches:
+            if m['start'] >= last_end:
+                non_overlapping.append(m)
+                last_end = m['end']
+
+        print(f"[ReferenceHelper]   Found {len(non_overlapping)} reference(s)")
+
+        # Store paragraph element before clearing
+        p_element = paragraph._p
+
+        # Clear all runs and hyperlinks
+        for run in list(paragraph.runs):
+            p_element.remove(run._element)
+        for child in list(p_element):
+            if child.tag == qn('w:hyperlink'):
+                p_element.remove(child)
+
+        # Rebuild the paragraph with text and REF fields
+        last_pos = 0
+        ref_fields_added = 0
+
+        for match_info in non_overlapping:
+            match = match_info['match']
+            config = match_info['config']
+            label = config['label']
+            bookmarks = config['bookmarks']
+            display_to_idx = config['display_to_idx']
+            sequential_to_idx = config['sequential_to_idx']
+            num_group = config['num_group']
+
+            # Extract the number from the matched text
+            if num_group == 2:
+                # For equations: group 1 is full match, group 2 is number
+                num_str = match.group(2)
+            else:
+                # For figures/tables: group 1 is number
+                num_str = match.group(1).split()[-1] if ' ' in match.group(1) else match.group(1)
+
+            # Map the reference number to the bookmark index
+            bookmark_idx = None
+            if num_str in display_to_idx:
+                bookmark_idx = display_to_idx[num_str]
+                print(f"[ReferenceHelper]     {label} '{num_str}' matched display number -> index {bookmark_idx}")
+            elif num_str in sequential_to_idx:
+                bookmark_idx = sequential_to_idx[num_str]
+                print(f"[ReferenceHelper]     {label} '{num_str}' matched sequential number -> index {bookmark_idx}")
+            else:
+                print(f"[ReferenceHelper]     WARNING: No mapping for {label} '{num_str}', skipping")
+                continue
+
+            # Get the bookmark name
+            if 0 <= bookmark_idx < len(bookmarks):
+                bookmark_name = bookmarks[bookmark_idx]
+            else:
+                print(f"[ReferenceHelper]     WARNING: Index {bookmark_idx} out of range (max {len(bookmarks)-1})")
+                continue
+
+            # Add text before the reference
+            if match.start() > last_pos:
+                before_text = original_text[last_pos:match.start()]
+                create_text_run(p_element, before_text)
+
+            # Add REF field
+            create_ref_field_runs(p_element, bookmark_name, label=label)
+            ref_fields_added += 1
+            print(f"[ReferenceHelper]     Added {label} REF field: '{num_str}' -> bookmark '{bookmark_name}'")
+
+            last_pos = match.end()
+
+        # Add remaining text after the last reference
+        if last_pos < len(original_text):
+            after_text = original_text[last_pos:]
+            create_text_run(p_element, after_text)
+
+        print(f"[ReferenceHelper]   Completed: {ref_fields_added} REF field(s) added")
+
 
     def _convert_references(self, document, bookmarks_in_order: List[str],
                           pattern: re.Pattern, label: str, num_group: int = 1):
@@ -304,6 +486,7 @@ class ReferenceHelper:
         """
         # Build a mapping of display numbers to bookmark indices
         reference_to_index = {}
+        sequential_to_index = {}  # Map sequential numbers (1, 2, 3...) to indices
 
         # Get all items of this type in document order
         if label == "Figure":
@@ -315,17 +498,19 @@ class ReferenceHelper:
         else:
             items = []
 
-        # Map display numbers to indices
+        # Map display numbers to indices AND sequential numbers to indices
         for idx, item in enumerate(items):
+            # Map sequential number (1-based)
+            sequential_to_index[str(idx + 1)] = idx
+
             if item.display_number:
                 reference_to_index[item.display_number] = idx
                 print(f"[ReferenceHelper]   {label} #{idx}: {item.display_number} -> {item.word_bookmark}")
+            else:
+                print(f"[ReferenceHelper]   {label} #{idx}: (no display number) -> {item.word_bookmark}")
 
         # Skip caption paragraphs - we don't want to convert numbers in captions themselves
         caption_styles = {"Image Caption", "Table Caption", "Captioned Figure"}
-
-        # Track occurrences for sequential matching
-        reference_occurrence_count = {}
 
         # Process all paragraphs
         processed_count = 0
@@ -345,7 +530,7 @@ class ReferenceHelper:
             print(f"[ReferenceHelper] Processing {label} references in: {block.text[:80]}")
             self._process_paragraph_references(
                 block, pattern, bookmarks_in_order, label, num_group,
-                reference_to_index, reference_occurrence_count
+                reference_to_index, sequential_to_index
             )
             processed_count += 1
 
@@ -354,7 +539,7 @@ class ReferenceHelper:
     def _process_paragraph_references(self, paragraph: Paragraph, pattern: re.Pattern,
                                      bookmarks: List[str], label: str, num_group: int,
                                      reference_to_index: Dict[str, int],
-                                     reference_occurrence_count: Dict[str, int]):
+                                     sequential_to_index: Dict[str, int]):
         """Process a single paragraph to replace text references with REF fields.
 
         Args:
@@ -363,8 +548,8 @@ class ReferenceHelper:
             bookmarks: List of bookmark names in order
             label: The label for REF fields
             num_group: The regex group containing the number
-            reference_to_index: Mapping of reference numbers to sequential indices
-            reference_occurrence_count: Track reference occurrences for sequential matching
+            reference_to_index: Mapping of display numbers (e.g., "1-1") to sequential indices
+            sequential_to_index: Mapping of simple sequential numbers (e.g., "1", "2") to indices
         """
         original_text = paragraph.text
         matches = list(pattern.finditer(original_text))
@@ -396,17 +581,17 @@ class ReferenceHelper:
                 # For figures/tables: group 1 is number
                 num_str = match.group(1).split()[-1] if ' ' in match.group(1) else match.group(1)
 
-            # Map the reference number to the bookmark
+            # Map the reference number to the bookmark index
+            # Try display number first (e.g., "1-1"), then simple sequential (e.g., "1")
             if num_str in reference_to_index:
-                # Use the pre-built mapping
                 bookmark_idx = reference_to_index[num_str]
+                print(f"[ReferenceHelper]     Matched display number '{num_str}' -> index {bookmark_idx}")
+            elif num_str in sequential_to_index:
+                bookmark_idx = sequential_to_index[num_str]
+                print(f"[ReferenceHelper]     Matched sequential number '{num_str}' -> index {bookmark_idx}")
             else:
-                # Sequential fallback: use occurrence count
-                if num_str not in reference_occurrence_count:
-                    reference_occurrence_count[num_str] = 0
-                bookmark_idx = reference_occurrence_count[num_str]
-                reference_occurrence_count[num_str] += 1
-                print(f"[ReferenceHelper]     No mapping for '{num_str}', using sequential index {bookmark_idx}")
+                print(f"[ReferenceHelper]     WARNING: No mapping for '{num_str}', skipping")
+                continue
 
             # Get the bookmark name
             if 0 <= bookmark_idx < len(bookmarks):
