@@ -74,11 +74,13 @@ class OneDoc:
             clean_build_dir=True,
             create_dirs=False,
             output_dir=None,
-            work_dir="temp",
+            work_dir=None,
             use_default_html_style=True,
             **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
+        if work_dir is None:
+            work_dir = pathlib.Path("temp") / self.source_dir.name
         self.work_dir = pathlib.Path(work_dir).resolve().absolute()
         self.work_dir = self.work_dir.resolve().absolute()
         # check if work_dir is a subdirectory of source_dir, then raise an error

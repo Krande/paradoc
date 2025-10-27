@@ -315,10 +315,10 @@ Run the test script to verify caching works:
 
 ```bash
 # First run (cold cache) - slower
-pixi run -e test python examples/send_to_frontend.py --embed-images
+pixi run -e test python examples/doc_lorum.py --embed-images
 
 # Second run (warm cache) - faster
-pixi run -e test python examples/send_to_frontend.py --embed-images
+pixi run -e test python examples/doc_lorum.py --embed-images
 
 # Check cache was created
 ls -la temp/.paradoc_cache/images/
