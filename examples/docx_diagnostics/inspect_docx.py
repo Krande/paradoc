@@ -68,6 +68,8 @@ def non_functional_doc(dest_doc):
     """This uses paradoc to create the exact same docx"""
     from paradoc import OneDoc
 
+    od = OneDoc('pdoc')
+    od.compile(dest_doc, export_format="docx")
 
 def main():
     tmp_path = pathlib.Path(__file__).parent / "temp"
@@ -75,11 +77,21 @@ def main():
     # Ensure directory exists
     tmp_path.mkdir(parents=True, exist_ok=True)
     working_doc_path = tmp_path / "working_reference.docx"
+    non_func_path = tmp_path / "non_functional_reference.docx"
 
-    functional_doc(working_doc_path.as_posix())
+    if not working_doc_path.exists():
+        functional_doc(working_doc_path.as_posix())
+
+    if not non_func_path.exists():
+        non_functional_doc(non_func_path.as_posix())
+
+    # Inspect working doc
     di = DocxInspector(working_doc_path)
 
-    print(di.fields())
+    print(di.bookmarks())
+    # Inspect Non-working doc
+    di_n = DocxInspector(non_func_path)
+    print(di_n.bookmarks())
 
 
 if __name__ == "__main__":
