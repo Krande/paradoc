@@ -447,7 +447,7 @@ class ReferenceHelper:
             if 0 <= bookmark_idx < len(bookmarks):
                 bookmark_name = bookmarks[bookmark_idx]
             else:
-                print(f"[ReferenceHelper]     WARNING: Index {bookmark_idx} out of range (max {len(bookmarks)-1})")
+                print(f"[ReferenceHelper]     WARNING: Index {bookmark_idx} out of range (max {len(bookmarks) - 1})")
                 continue
 
             # Add text before the reference
@@ -459,163 +459,6 @@ class ReferenceHelper:
             create_ref_field_runs(p_element, bookmark_name, label=label)
             ref_fields_added += 1
             print(f"[ReferenceHelper]     Added {label} REF field: '{num_str}' -> bookmark '{bookmark_name}'")
-
-            last_pos = match.end()
-
-        # Add remaining text after the last reference
-        if last_pos < len(original_text):
-            after_text = original_text[last_pos:]
-            create_text_run(p_element, after_text)
-
-        print(f"[ReferenceHelper]   Completed: {ref_fields_added} REF field(s) added")
-
-
-    def _convert_references(self, document, bookmarks_in_order: List[str],
-                          pattern: re.Pattern, label: str, num_group: int = 1):
-        """Generic function to convert text references to REF fields.
-
-        This is an improved version that uses the reference helper's knowledge
-        of all registered items.
-
-        Args:
-            document: The Word document
-            bookmarks_in_order: List of bookmark names in document order
-            pattern: Regex pattern to match references
-            label: The label to use in REF fields (e.g., "Figure", "Table", "Eq")
-            num_group: The regex group number containing the number (default 1)
-        """
-        # Build a mapping of display numbers to bookmark indices
-        reference_to_index = {}
-        sequential_to_index = {}  # Map sequential numbers (1, 2, 3...) to indices
-
-        # Get all items of this type in document order
-        if label == "Figure":
-            items = [item for item in self._all_items if item.ref_type == ReferenceType.FIGURE]
-        elif label == "Table":
-            items = [item for item in self._all_items if item.ref_type == ReferenceType.TABLE]
-        elif label == "Eq":
-            items = [item for item in self._all_items if item.ref_type == ReferenceType.EQUATION]
-        else:
-            items = []
-
-        # Map display numbers to indices AND sequential numbers to indices
-        for idx, item in enumerate(items):
-            # Map sequential number (1-based)
-            sequential_to_index[str(idx + 1)] = idx
-
-            if item.display_number:
-                reference_to_index[item.display_number] = idx
-                print(f"[ReferenceHelper]   {label} #{idx}: {item.display_number} -> {item.word_bookmark}")
-            else:
-                print(f"[ReferenceHelper]   {label} #{idx}: (no display number) -> {item.word_bookmark}")
-
-        # Skip caption paragraphs - we don't want to convert numbers in captions themselves
-        caption_styles = {"Image Caption", "Table Caption", "Captioned Figure"}
-
-        # Process all paragraphs
-        processed_count = 0
-        for block in iter_block_items(document):
-            if not isinstance(block, Paragraph):
-                continue
-
-            # Skip caption paragraphs
-            if block.style.name in caption_styles:
-                continue
-
-            # Check if paragraph contains references
-            if not re.search(pattern, block.text):
-                continue
-
-            # Process the paragraph
-            print(f"[ReferenceHelper] Processing {label} references in: {block.text[:80]}")
-            self._process_paragraph_references(
-                block, pattern, bookmarks_in_order, label, num_group,
-                reference_to_index, sequential_to_index
-            )
-            processed_count += 1
-
-        print(f"[ReferenceHelper] {label} conversion complete: {processed_count} paragraphs processed")
-
-    def _process_paragraph_references(self, paragraph: Paragraph, pattern: re.Pattern,
-                                     bookmarks: List[str], label: str, num_group: int,
-                                     reference_to_index: Dict[str, int],
-                                     sequential_to_index: Dict[str, int]):
-        """Process a single paragraph to replace text references with REF fields.
-
-        Args:
-            paragraph: The paragraph to process
-            pattern: Regex pattern to match references
-            bookmarks: List of bookmark names in order
-            label: The label for REF fields
-            num_group: The regex group containing the number
-            reference_to_index: Mapping of display numbers (e.g., "1-1") to sequential indices
-            sequential_to_index: Mapping of simple sequential numbers (e.g., "1", "2") to indices
-        """
-        original_text = paragraph.text
-        matches = list(pattern.finditer(original_text))
-        if not matches:
-            return
-
-        print(f"[ReferenceHelper]   Found {len(matches)} {label} reference(s)")
-
-        # Store paragraph element before clearing
-        p_element = paragraph._p
-
-        # Clear all runs and hyperlinks
-        for run in list(paragraph.runs):
-            p_element.remove(run._element)
-        for child in list(p_element):
-            if child.tag == qn('w:hyperlink'):
-                p_element.remove(child)
-
-        # Rebuild the paragraph with text and REF fields
-        last_pos = 0
-        ref_fields_added = 0
-
-        for match in matches:
-            # Extract the number from the matched text
-            if num_group == 2:
-                # For equations: group 1 is full match, group 2 is number
-                num_str = match.group(2)
-            else:
-                # For figures/tables: group 1 is number
-                num_str = match.group(1).split()[-1] if ' ' in match.group(1) else match.group(1)
-
-            # Map the reference number to the bookmark index
-            # Try display number first (e.g., "1-1"), then simple sequential (e.g., "1")
-            if num_str in reference_to_index:
-                bookmark_idx = reference_to_index[num_str]
-                print(f"[ReferenceHelper]     Matched display number '{num_str}' -> index {bookmark_idx}")
-            elif num_str in sequential_to_index:
-                bookmark_idx = sequential_to_index[num_str]
-                print(f"[ReferenceHelper]     Matched sequential number '{num_str}' -> index {bookmark_idx}")
-            else:
-                print(f"[ReferenceHelper]     WARNING: No mapping for '{num_str}', skipping")
-                continue
-
-            # Get the bookmark name
-            if 0 <= bookmark_idx < len(bookmarks):
-                bookmark_name = bookmarks[bookmark_idx]
-            else:
-                # Out of range, use last bookmark or skip
-                print(f"[ReferenceHelper]     WARNING: Index {bookmark_idx} out of range (max {len(bookmarks)-1})")
-                bookmark_name = bookmarks[-1] if bookmarks else None
-
-            if bookmark_name is None:
-                # No bookmark available, just add remaining text
-                if last_pos < len(original_text):
-                    create_text_run(p_element, original_text[last_pos:])
-                break
-
-            # Add text before the reference
-            if match.start() > last_pos:
-                before_text = original_text[last_pos:match.start()]
-                create_text_run(p_element, before_text)
-
-            # Add REF field
-            create_ref_field_runs(p_element, bookmark_name, label=label)
-            ref_fields_added += 1
-            print(f"[ReferenceHelper]     Added REF field: '{num_str}' -> bookmark '{bookmark_name}'")
 
             last_pos = match.end()
 
@@ -648,5 +491,5 @@ class ReferenceHelper:
         print(f"  Equations: {len(self._equations)}")
         print("\n  Items in document order:")
         for item in self._all_items:
-            print(f"    [{item.document_order}] {item.ref_type.value} '{item.semantic_id}' -> {item.word_bookmark} (display: {item.display_number})")
-
+            print(
+                f"    [{item.document_order}] {item.ref_type.value} '{item.semantic_id}' -> {item.word_bookmark} (display: {item.display_number})")

@@ -58,12 +58,12 @@ class WordExporter:
         composer_app = add_to_composer(self.app_tmpl, one.md_files_app)
 
         # Format tables and register them with the reference helper
-        main_tables = self.format_tables(composer_main.doc, False, ref_helper)
-        app_tables = self.format_tables(composer_app.doc, True, ref_helper)
+        self.format_tables(composer_main.doc, False, ref_helper)
+        self.format_tables(composer_app.doc, True, ref_helper)
 
         # Format figures and register them with the reference helper
-        main_figures = self.format_figures(composer_main.doc, False, ref_helper)
-        app_figures = self.format_figures(composer_app.doc, True, ref_helper)
+        self.format_figures(composer_main.doc, False, ref_helper)
+        self.format_figures(composer_app.doc, True, ref_helper)
 
         format_paragraphs_and_headings(composer_app.doc, one.appendix_heading_map)
 
