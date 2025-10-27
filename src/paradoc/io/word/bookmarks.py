@@ -80,24 +80,18 @@ def add_bookmark_to_paragraph(paragraph: Paragraph, bookmark_name: str = None) -
 
 
 def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> str:
-    """Add a bookmark around the entire caption paragraph.
+    """Add a bookmark around only the label and number portion of a caption.
 
-    IMPORTANT: For Word cross-references to work correctly, the bookmark MUST wrap
-    the entire caption paragraph, not just the field codes. When a REF field points
-    to a bookmark that wraps field codes (STYLEREF/SEQ), Word re-evaluates those
-    fields at the REF location, giving incorrect numbers.
-
-    By wrapping the entire paragraph, Word displays the visible text content of the
-    paragraph (after field evaluation), which gives the correct caption number.
-
-    This matches how Word's native Insert Caption feature works.
+    For Word cross-references with "Only label and number" behavior, the bookmark
+    should only wrap the label and number (e.g., "Figure 1-1"), NOT the caption text.
+    This matches Word's native Insert Caption cross-reference behavior.
 
     Caption structure (as created by rebuild_caption):
     - Run 0: "Figure " or "Table " text
     - Runs 1-5: STYLEREF field (chapter number: "2")
     - Run 6: hyphen text "-"
     - Runs 7-11: SEQ field (figure/table number: "1")
-    - Run 12+: ": caption text"
+    - Run 12+: ": caption text" <- This should NOT be included in the bookmark
 
     Args:
         paragraph: The caption paragraph containing the numbering fields
@@ -106,9 +100,66 @@ def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> s
     Returns:
         The actual Word-style bookmark name that was created (e.g., "_Ref306075071")
     """
-    # Always wrap the entire paragraph for correct cross-referencing
-    # This ensures REF fields display the evaluated text, not re-execute field codes
-    return add_bookmark_to_paragraph(paragraph, bookmark_name)
+    # Generate Word-style bookmark name
+    if bookmark_name.startswith('_Ref') and bookmark_name[4:].isdigit():
+        word_style_name = bookmark_name
+    else:
+        word_style_name = normalize_bookmark_name(bookmark_name)
+    bookmark_id = str(random.randint(1, 999999))
+
+    # Get all runs in the paragraph
+    runs = list(paragraph._p)
+
+    # Debug: print paragraph structure
+    print(f"[DEBUG add_bookmark_around_seq_field] Processing bookmark '{bookmark_name}'")
+    print(f"[DEBUG] Paragraph text: {paragraph.text}")
+    print(f"[DEBUG] Total runs: {len(runs)}")
+
+    # Find the run that contains the caption text (starts with ": ")
+    caption_text_start_idx = None
+    for i, run in enumerate(runs):
+        # Check if this is a text run (w:r element)
+        if run.tag != qn("w:r"):
+            continue
+
+        # Check text content
+        text_elements = run.findall(qn('w:t'))
+        for t_elem in text_elements:
+            text_content = t_elem.text if t_elem.text else ""
+            print(f"[DEBUG]   Run {i}: '{text_content[:50]}'")
+            if t_elem.text and t_elem.text.startswith(": "):
+                caption_text_start_idx = i
+                print(f"[DEBUG]   Found caption text separator at run {i}")
+                break
+        if caption_text_start_idx is not None:
+            break
+
+    # If we found where caption text starts, bookmark everything before it
+    # Otherwise, fall back to bookmarking the entire paragraph
+    if caption_text_start_idx is not None and caption_text_start_idx > 0:
+        # Bookmark from the first run up to (but not including) the caption text run
+        start = OxmlElement("w:bookmarkStart")
+        start.set(qn("w:id"), bookmark_id)
+        start.set(qn("w:name"), word_style_name)
+        # Insert at the beginning of the paragraph
+        paragraph._p.insert(0, start)
+
+        # Insert bookmark end just before the caption text run
+        end = OxmlElement("w:bookmarkEnd")
+        end.set(qn("w:id"), bookmark_id)
+        runs[caption_text_start_idx].addprevious(end)
+    else:
+        # Fallback: wrap entire paragraph if we can't find the caption text separator
+        start = OxmlElement("w:bookmarkStart")
+        start.set(qn("w:id"), bookmark_id)
+        start.set(qn("w:name"), word_style_name)
+        paragraph._p.insert(0, start)
+
+        end = OxmlElement("w:bookmarkEnd")
+        end.set(qn("w:id"), bookmark_id)
+        paragraph._p.append(end)
+
+    return word_style_name
 
 
 def _find_field_indices(runs) -> tuple[int | None, int | None]:
