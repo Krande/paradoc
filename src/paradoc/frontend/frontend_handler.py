@@ -1,4 +1,5 @@
 """Frontend handler for managing local static HTML frontends."""
+
 import pathlib
 import time
 import webbrowser
@@ -229,4 +230,3 @@ class FrontendHandler:
             print("✓ Sent document to Reader.")
             print(f"Serving JSON and assets via HTTP server at http://{self.host}:{http_port}/")
             print("The browser is open. Press Ctrl+C here to stop the servers.")
-

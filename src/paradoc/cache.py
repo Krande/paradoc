@@ -3,6 +3,7 @@ Caching utilities for Paradoc to improve performance.
 
 Provides timestamp-based caching for Plotly figure generation.
 """
+
 import logging
 import pathlib
 import pickle

@@ -20,6 +20,7 @@ def test_figure_reference_conversion_detailed(tmp_path):
 
     # Create test image
     import base64
+
     png_data = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
     )
@@ -50,9 +51,9 @@ Another reference: see [@fig:test_figure] for details.
     output_file = work_dir / "_dist" / "test_output.docx"
     doc = Document(str(output_file))
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("CHECKING FIGURE REFERENCES")
-    print("="*80)
+    print("=" * 80)
 
     # Find caption to get figure number
     caption_para = None
@@ -61,14 +62,14 @@ Another reference: see [@fig:test_figure] for details.
         if "Figure" in para.text and "Caption" in para.text:
             caption_para = para
             # Extract figure number
-            match = re.search(r'Figure\s+([\d\-]+)', para.text)
+            match = re.search(r"Figure\s+([\d\-]+)", para.text)
             if match:
                 figure_number = match.group(1)
             print(f"\nFound caption: {para.text}")
             print(f"  Figure number: {figure_number}")
 
             # Check for bookmark
-            xml_str = para._element.xml.decode('utf-8') if isinstance(para._element.xml, bytes) else para._element.xml
+            xml_str = para._element.xml.decode("utf-8") if isinstance(para._element.xml, bytes) else para._element.xml
             if "bookmarkStart" in xml_str:
                 bookmark_matches = re.findall(r'w:name="([^"]+)"', xml_str)
                 print(f"  ✓ Has bookmark: {bookmark_matches}")
@@ -82,18 +83,18 @@ Another reference: see [@fig:test_figure] for details.
         if "Reference" in para.text or "reference" in para.text.lower():
             print(f"\nReference paragraph: {para.text}")
 
-            xml_str = para._element.xml.decode('utf-8') if isinstance(para._element.xml, bytes) else para._element.xml
+            xml_str = para._element.xml.decode("utf-8") if isinstance(para._element.xml, bytes) else para._element.xml
 
             # Check for REF field
             if "REF" in xml_str and "STYLEREF" not in xml_str:
-                ref_matches = re.findall(r'<w:instrText[^>]*>([^<]*REF[^<]*)</w:instrText>', xml_str)
+                ref_matches = re.findall(r"<w:instrText[^>]*>([^<]*REF[^<]*)</w:instrText>", xml_str)
                 if ref_matches:
                     print(f"  ✓ Has REF field: {ref_matches}")
                     ref_field_count += 1
                 else:
-                    print(f"  ⚠ Contains 'REF' in XML but couldn't extract field")
+                    print("  ⚠ Contains 'REF' in XML but couldn't extract field")
             else:
-                print(f"  ✗ No REF field found")
+                print("  ✗ No REF field found")
 
                 # Check if it has the plain text reference
                 if figure_number and figure_number in para.text:
@@ -101,7 +102,7 @@ Another reference: see [@fig:test_figure] for details.
 
             ref_count += 1
 
-    print(f"\nSummary:")
+    print("\nSummary:")
     print(f"  Total reference paragraphs found: {ref_count}")
     print(f"  References with REF fields: {ref_field_count}")
 
@@ -109,8 +110,7 @@ Another reference: see [@fig:test_figure] for details.
         print("\n⚠️  WARNING: References found but none converted to REF fields!")
         print("This indicates the reference conversion function is not working.")
 
-    print("="*80)
+    print("=" * 80)
 
     if auto_open:
         os.startfile(output_file)
-

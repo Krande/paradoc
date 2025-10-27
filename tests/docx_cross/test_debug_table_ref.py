@@ -1,6 +1,5 @@
 """Debug test to examine table reference structure."""
 
-import os
 from pathlib import Path
 
 from docx import Document
@@ -10,9 +9,10 @@ from paradoc import OneDoc
 def test_debug_table_reference():
     """Debug test to see what pandoc-crossref outputs for table references."""
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
-        
+
         source_dir = tmp_path / "test_doc"
         main_dir = source_dir / "00-main"
         main_dir.mkdir(parents=True)
@@ -40,27 +40,26 @@ Table: Test Table Caption {#tbl:test_table}
         output_file = work_dir / "_dist" / "test_output.docx"
         doc = Document(str(output_file))
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("DOCUMENT PARAGRAPHS - Looking for table references")
-        print("="*80)
-        
+        print("=" * 80)
+
         for i, para in enumerate(doc.paragraphs):
             if "reference" in para.text.lower() or "table" in para.text.lower():
                 print(f"\nParagraph {i}:")
                 print(f"  Style: {para.style.name}")
                 print(f"  Text: '{para.text}'")
-                
+
                 # Check for hyperlinks
                 xml_str = para._element.xml
                 if isinstance(xml_str, bytes):
-                    xml_str = xml_str.decode('utf-8')
-                
-                if 'hyperlink' in xml_str.lower():
+                    xml_str = xml_str.decode("utf-8")
+
+                if "hyperlink" in xml_str.lower():
                     print("  Contains hyperlink")
-                if 'REF' in xml_str:
+                if "REF" in xml_str:
                     print("  Contains REF field")
 
 
 if __name__ == "__main__":
     test_debug_table_reference()
-

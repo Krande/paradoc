@@ -1,4 +1,5 @@
 """Pytest configuration for frontend tests."""
+
 import pytest
 import time
 import subprocess
@@ -13,13 +14,13 @@ def pytest_addoption(parser):
         "--pw-watch",
         action="store_true",
         default=False,
-        help="Run Playwright tests with visual feedback (non-headless mode)"
+        help="Run Playwright tests with visual feedback (non-headless mode)",
     )
     parser.addoption(
         "--pw-duration",
         action="store",
         default="2",
-        help="Duration in seconds to keep browser visible after each test (default: 2)"
+        help="Duration in seconds to keep browser visible after each test (default: 2)",
     )
 
 
@@ -32,13 +33,11 @@ def ensure_playwright_installed():
             try:
                 browser = p.chromium.launch(headless=True)
                 browser.close()
-            except Exception as e:
+            except Exception:
                 # Chromium not installed, install it now
                 print("\nChromium not found. Installing Playwright browsers...")
                 subprocess.run(
-                    [sys.executable, "-m", "playwright", "install", "chromium"],
-                    check=True,
-                    capture_output=False
+                    [sys.executable, "-m", "playwright", "install", "chromium"], check=True, capture_output=False
                 )
                 print("Playwright Chromium installed successfully.")
     except Exception as e:
@@ -46,9 +45,7 @@ def ensure_playwright_installed():
         # Try to install anyway
         try:
             subprocess.run(
-                [sys.executable, "-m", "playwright", "install", "chromium"],
-                check=True,
-                capture_output=False
+                [sys.executable, "-m", "playwright", "install", "chromium"], check=True, capture_output=False
             )
         except Exception as install_error:
             print(f"Failed to install Playwright: {install_error}")
@@ -61,8 +58,7 @@ def browser(request):
     pw_watch = request.config.getoption("--pw-watch")
     with sync_playwright() as p:
         browser = p.chromium.launch(
-            headless=not pw_watch,
-            slow_mo=500 if pw_watch else 0  # Slow down actions by 500ms when watching
+            headless=not pw_watch, slow_mo=500 if pw_watch else 0  # Slow down actions by 500ms when watching
         )
         yield browser
         browser.close()
@@ -98,6 +94,7 @@ def frontend_url(tmp_path):
     Returns a function that can generate a frontend URL for a given document.
     The actual URL is determined after send_to_frontend() extracts the HTML.
     """
+
     def _get_url(one_doc):
         """Get the URL for the frontend HTML."""
         from paradoc.io.ast.exporter import ASTExporter
@@ -119,6 +116,7 @@ def frontend_url(tmp_path):
 @pytest.fixture
 def wait_for_frontend():
     """Wait for frontend to load and initialize."""
+
     def _wait(page: Page, timeout: int = 10000):
         """
         Wait for the frontend to be ready.
@@ -163,7 +161,7 @@ def ws_server():
         target=run_server,
         args=(host, port),
         daemon=True,  # Daemon thread will be killed when main thread exits
-        name="WebSocketServerThread"
+        name="WebSocketServerThread",
     )
     server_thread.start()
 
@@ -187,4 +185,3 @@ def ws_server():
     # Note: We don't explicitly shut down the server as it's a daemon thread
     # and will be cleaned up when the test process exits
     logger.info("Test fixture: WebSocket server session completed")
-

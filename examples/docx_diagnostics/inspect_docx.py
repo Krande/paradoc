@@ -33,21 +33,18 @@ def functional_doc(dest_doc):
                 fig_ref = doc.add_figure_with_caption(
                     caption_text=f"Caption for figure in section {subsection_label}",
                     use_chapter_numbers=True,
-                    image_path=str(THIS_DIR / "pdoc/00-main/images/31343C.png")
+                    image_path=str(THIS_DIR / "pdoc/00-main/images/31343C.png"),
                 )
                 print(f"    Added Figure {section_num}-{subsection_num}")
 
                 # Add table
-                table_data = [
-                    ["Header 1", "Header 2"],
-                    [f"Data {subsection_label}.1", f"Data {subsection_label}.2"]
-                ]
+                table_data = [["Header 1", "Header 2"], [f"Data {subsection_label}.1", f"Data {subsection_label}.2"]]
                 tbl_ref = doc.add_table_with_caption(
                     caption_text=f"Caption for table in section {subsection_label}",
                     rows=2,
                     cols=2,
                     data=table_data,
-                    use_chapter_numbers=True
+                    use_chapter_numbers=True,
                 )
                 print(f"    Added Table {section_num}-{subsection_num}")
 
@@ -77,7 +74,7 @@ def non_functional_doc(source_doc_dir, dest_doc):
 
 def main():
     tmp_path = THIS_DIR / "temp"
-    pdoc_dir = THIS_DIR / 'pdoc'
+    pdoc_dir = THIS_DIR / "pdoc"
 
     # Ensure directory exists
     tmp_path.mkdir(parents=True, exist_ok=True)
@@ -210,8 +207,8 @@ def main():
     print("DETAILED FIELD INSTRUCTION ANALYSIS")
     print("=" * 80)
 
-    working_ref_targets = [cr.target_or_label for cr in cross_refs if cr.ref_type == 'REF']
-    nonfunc_ref_targets = [cr.target_or_label for cr in cross_refs_n if cr.ref_type == 'REF']
+    working_ref_targets = [cr.target_or_label for cr in cross_refs if cr.ref_type == "REF"]
+    nonfunc_ref_targets = [cr.target_or_label for cr in cross_refs_n if cr.ref_type == "REF"]
 
     print(f"\nWorking document REF targets ({len(working_ref_targets)}):")
     for target in working_ref_targets:
@@ -227,13 +224,13 @@ def main():
 
     print(f"\nWorking: Figure-related bookmarks vs REF targets:")
     for bm in bookmarks:
-        if bm.name and ('fig' in bm.name.lower() or 'Ref2' in bm.name or 'Ref551' in bm.name):
+        if bm.name and ("fig" in bm.name.lower() or "Ref2" in bm.name or "Ref551" in bm.name):
             is_referenced = bm.name in working_ref_set
             print(f"  {bm.name:30s} {'[X] REFERENCED' if is_referenced else '[ ] NOT REFERENCED'}")
 
     print(f"\nNon-functional: Figure-related bookmarks vs REF targets:")
     for bm in bookmarks_n:
-        if bm.name and 'fig' in bm.name.lower():
+        if bm.name and "fig" in bm.name.lower():
             is_referenced = bm.name in nonfunc_ref_set
             print(f"  {bm.name:30s} {'[X] REFERENCED' if is_referenced else '[ ] NOT REFERENCED'}")
 

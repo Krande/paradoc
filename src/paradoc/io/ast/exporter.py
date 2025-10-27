@@ -457,9 +457,7 @@ class ASTExporter:
                 # Store with normalized path (without ./)
                 embedded_images[normalized_path] = {"data": b64_data, "mimeType": mime_type}
 
-                logger.debug(
-                    f"Embedded image: {img_path} -> {normalized_path} ({len(img_data)} bytes, {mime_type})"
-                )
+                logger.debug(f"Embedded image: {img_path} -> {normalized_path} ({len(img_data)} bytes, {mime_type})")
 
             except Exception as e:
                 logger.warning(f"Failed to embed image {img_path}: {e}")
@@ -562,7 +560,6 @@ class ASTExporter:
 
         # For WebSocket mode, ensure server is running and frontend is ready
         from paradoc.frontend.frontend_handler import FrontendHandler
-        from paradoc.frontend.ws_client import WSClient
         from paradoc.frontend.ws_server import ensure_ws_server
 
         # Ensure WebSocket server is running
@@ -584,8 +581,7 @@ class ASTExporter:
         else:
             # Ensure at least one frontend is ready
             if not frontend_handler.ensure_frontend_ready(
-                auto_open=auto_open_frontend,
-                wait_for_connection=auto_open_frontend
+                auto_open=auto_open_frontend, wait_for_connection=auto_open_frontend
             ):
                 logger.warning("No active frontends and could not open new frontend")
                 print("Warning: No active frontends connected. Please open a Paradoc Reader frontend first.")
@@ -784,7 +780,6 @@ class ASTExporter:
         except Exception as e:
             logger.error(f"Failed to send document via WebSocket: {e}")
             return False
-
 
     def _extract_plot_data_from_db(self) -> Dict[str, Any]:
         """

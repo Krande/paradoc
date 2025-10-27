@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-import json
 import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -155,7 +154,6 @@ class PlotRenderer:
         else:
             # Use default plot types
             fig = self._create_default_plot(plot_data)
-
 
         return fig
 

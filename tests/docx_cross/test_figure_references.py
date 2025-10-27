@@ -7,12 +7,8 @@ This test verifies that:
 """
 
 import os
-from pathlib import Path
 
-import pytest
 from docx import Document
-from docx.oxml import parse_xml
-from docx.oxml.ns import qn
 
 from paradoc import OneDoc
 
@@ -36,7 +32,6 @@ def test_simple_figure_with_reference(tmp_path):
 
     # Create a simple test image (1x1 pixel PNG)
     import base64
-    from io import BytesIO
 
     # Minimal PNG image (1x1 red pixel)
     png_data = base64.b64decode(
@@ -88,9 +83,12 @@ The reference should display as "Figure 1-1" or similar.
     assert figure_caption is not None, "Figure caption not found in document"
 
     # Check that caption uses SEQ field for numbering
-    caption_xml = figure_caption._element.xml.decode('utf-8') if isinstance(figure_caption._element.xml, bytes) else figure_caption._element.xml
-    assert "SEQ" in caption_xml or "seq" in caption_xml.lower(), \
-        "Figure caption should use SEQ field for numbering"
+    caption_xml = (
+        figure_caption._element.xml.decode("utf-8")
+        if isinstance(figure_caption._element.xml, bytes)
+        else figure_caption._element.xml
+    )
+    assert "SEQ" in caption_xml or "seq" in caption_xml.lower(), "Figure caption should use SEQ field for numbering"
 
     # Check that caption has "Figure" prefix
     assert "Figure" in figure_caption.text, "Caption should start with 'Figure'"
@@ -105,13 +103,16 @@ The reference should display as "Figure 1-1" or similar.
     assert reference_para is not None, "Reference paragraph not found"
 
     # Check that reference contains a REF field or hyperlink
-    ref_xml = reference_para._element.xml.decode('utf-8') if isinstance(reference_para._element.xml, bytes) else reference_para._element.xml
+    ref_xml = (
+        reference_para._element.xml.decode("utf-8")
+        if isinstance(reference_para._element.xml, bytes)
+        else reference_para._element.xml
+    )
     has_ref_field = "REF" in ref_xml or "HYPERLINK" in ref_xml
 
     # The reference should point to a bookmark or use a REF field
     # For now, just verify the paragraph exists and contains figure reference
-    assert "figure" in reference_para.text.lower(), \
-        "Reference paragraph should mention the figure"
+    assert "figure" in reference_para.text.lower(), "Reference paragraph should mention the figure"
 
     print(f"\n✓ Test passed - Figure caption found: {figure_caption.text}")
     print(f"✓ Reference paragraph found: {reference_para.text}")
@@ -129,6 +130,7 @@ def test_multiple_figures_with_references(tmp_path):
 
     # Create test images
     import base64
+
     png_data = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
     )
@@ -189,4 +191,3 @@ References: [@fig:first], [@fig:second], and [@fig:third]
 
     if auto_open:
         os.startfile(output_file)
-

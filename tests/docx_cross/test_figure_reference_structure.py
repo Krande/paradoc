@@ -7,10 +7,8 @@ This test inspects the actual XML structure to ensure:
 """
 
 import os
-from pathlib import Path
 
 from docx import Document
-from docx.oxml.ns import qn
 
 from paradoc import OneDoc
 
@@ -29,6 +27,7 @@ def test_inspect_figure_reference_xml(tmp_path):
 
     # Create test image
     import base64
+
     png_data = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
     )
@@ -57,9 +56,9 @@ Reference to figure: [@fig:test_figure]
     output_file = work_dir / "_dist" / "test_output.docx"
     doc = Document(str(output_file))
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("DOCUMENT STRUCTURE INSPECTION")
-    print("="*80)
+    print("=" * 80)
 
     # Inspect all paragraphs
     for i, para in enumerate(doc.paragraphs):
@@ -67,37 +66,38 @@ Reference to figure: [@fig:test_figure]
         print(f"  Text: {para.text[:100]}")
 
         # Check for bookmarks
-        xml_str = para._element.xml.decode('utf-8') if isinstance(para._element.xml, bytes) else para._element.xml
+        xml_str = para._element.xml.decode("utf-8") if isinstance(para._element.xml, bytes) else para._element.xml
 
         if "bookmarkStart" in xml_str:
-            print(f"  ✓ Contains bookmarkStart")
+            print("  ✓ Contains bookmarkStart")
             # Extract bookmark name
             import re
+
             bookmark_matches = re.findall(r'w:name="([^"]+)"', xml_str)
             if bookmark_matches:
                 print(f"    Bookmark names: {bookmark_matches}")
 
         if "SEQ" in xml_str:
-            print(f"  ✓ Contains SEQ field")
+            print("  ✓ Contains SEQ field")
             # Extract SEQ field content
-            seq_matches = re.findall(r'SEQ\s+([^<]+)', xml_str)
+            seq_matches = re.findall(r"SEQ\s+([^<]+)", xml_str)
             if seq_matches:
                 print(f"    SEQ content: {seq_matches}")
 
         if "REF" in xml_str and "STYLEREF" not in xml_str:
-            print(f"  ✓ Contains REF field")
+            print("  ✓ Contains REF field")
             # Extract REF field content
-            ref_matches = re.findall(r'REF\s+([^<]+)', xml_str)
+            ref_matches = re.findall(r"REF\s+([^<]+)", xml_str)
             if ref_matches:
                 print(f"    REF content: {ref_matches}")
 
         if "HYPERLINK" in xml_str:
-            print(f"  ✓ Contains HYPERLINK")
+            print("  ✓ Contains HYPERLINK")
 
         if "Test Figure Caption" in para.text or "Reference to figure" in para.text:
             print(f"\n  Full XML:\n{xml_str[:500]}")
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
 
     if auto_open:
         os.startfile(output_file)
@@ -111,6 +111,7 @@ def test_figure_caption_bookmark_presence(tmp_path):
 
     # Create test image
     import base64
+
     png_data = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
     )
@@ -149,7 +150,11 @@ Reference: [@fig:test_figure]
     assert figure_caption is not None, "Figure caption not found"
 
     # Check for bookmark in caption
-    xml_str = figure_caption._element.xml.decode('utf-8') if isinstance(figure_caption._element.xml, bytes) else figure_caption._element.xml
+    xml_str = (
+        figure_caption._element.xml.decode("utf-8")
+        if isinstance(figure_caption._element.xml, bytes)
+        else figure_caption._element.xml
+    )
 
     has_bookmark = "bookmarkStart" in xml_str
     print(f"\nFigure caption has bookmark: {has_bookmark}")
@@ -161,4 +166,3 @@ Reference: [@fig:test_figure]
         print("\n⚠️  WARNING: Figure caption is missing bookmark!")
         print("This means cross-references won't work properly in Word.")
         print("The SEQ field needs to be wrapped in a bookmark for REF fields to reference it.")
-

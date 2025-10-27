@@ -18,11 +18,7 @@ from .models import (
 
 
 def dataframe_to_table_data(
-    key: str,
-    df: pd.DataFrame,
-    caption: str,
-    show_index: bool = True,
-    default_sort: Optional[Tuple[str, bool]] = None
+    key: str, df: pd.DataFrame, caption: str, show_index: bool = True, default_sort: Optional[Tuple[str, bool]] = None
 ) -> TableData:
     """
     Convert a pandas DataFrame to a TableData model.
@@ -71,6 +67,7 @@ def dataframe_to_table_data(
 
     # Create default sort config if provided
     from .models import TableSortConfig
+
     default_sort_config = None
     if default_sort:
         column_name, ascending = default_sort
@@ -82,7 +79,7 @@ def dataframe_to_table_data(
         cells=cells,
         caption=caption,
         show_index_default=show_index,
-        default_sort=default_sort_config
+        default_sort=default_sort_config,
     )
 
 

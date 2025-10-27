@@ -1,7 +1,6 @@
 """Test DOCX export regression - ensure database tables and images are correctly exported."""
 
 import os
-from pathlib import Path
 
 import pytest
 from docx import Document
@@ -125,8 +124,9 @@ def test_doc_with_nested_images_docx_export(files_dir, tmp_path):
     # correlation_matrix, distributions, surface_plot, box_plots (8 appendix) = 15 total
     # But we should verify at least 14 plots are present (allowing for variations)
     expected_min_figures = 14
-    assert image_count >= expected_min_figures, \
-        f"Expected at least {expected_min_figures} images in the document (from database plots), but found {image_count}"
+    assert (
+        image_count >= expected_min_figures
+    ), f"Expected at least {expected_min_figures} images in the document (from database plots), but found {image_count}"
 
     # Verify tables exist
     table_count = len(doc.tables)
@@ -161,8 +161,9 @@ def test_docx_export_table_lookup_fix(files_dir, tmp_path):
     final_table_count = len(one.tables)
 
     # We should have tables stored
-    assert final_table_count > initial_table_count, \
-        "Tables from database should be stored in self.tables after variable substitution"
+    assert (
+        final_table_count > initial_table_count
+    ), "Tables from database should be stored in self.tables after variable substitution"
 
     # DOCX files are created in _dist subdirectory
     dest = work_dir / "_dist" / f"{source.name}.docx"
@@ -198,7 +199,7 @@ And here it is again:
 
 {{__my_table__}}{tbl:sortby:Value:desc}
 """
-    
+
     md_file = main_dir / "test.md"
     md_file.write_text(md_content)
 
@@ -209,17 +210,9 @@ And here it is again:
     import pandas as pd
     from paradoc.db import dataframe_to_table_data
 
-    df = pd.DataFrame({
-        "Item": ["A", "B", "C"],
-        "Value": [10, 20, 15]
-    })
+    df = pd.DataFrame({"Item": ["A", "B", "C"], "Value": [10, 20, 15]})
 
-    table_data = dataframe_to_table_data(
-        key="my_table",
-        df=df,
-        caption="My Test Table",
-        show_index=False
-    )
+    table_data = dataframe_to_table_data(key="my_table", df=df, caption="My Test Table", show_index=False)
     one.db_manager.add_table(table_data)
 
     # Compile to DOCX
@@ -236,4 +229,3 @@ And here it is again:
     # Verify tables dictionary has unique keys for each instance
     assert "my_table" in one.tables, "Base table key should exist"
     # The second instance might be "my_table_1" or handled differently
-

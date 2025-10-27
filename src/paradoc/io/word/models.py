@@ -173,4 +173,3 @@ class DocXFigureRef:
 
         for run in self.docx_caption.runs:
             run.font.name = figure_format.font_style
-

@@ -65,56 +65,53 @@ Second section with another figure.
     root = tree.getroot()
 
     nsmap = {
-        'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+        "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
     }
 
     # Find all SEQ fields
     seq_fields = []
-    paragraphs = root.findall('.//w:p', nsmap)
+    paragraphs = root.findall(".//w:p", nsmap)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("ANALYZING CAPTION PARAGRAPHS")
-    print("="*80)
+    print("=" * 80)
 
     for para_idx, para in enumerate(paragraphs):
-        para_text = ''.join([t.text for t in para.findall('.//w:t', nsmap) if t.text])
+        para_text = "".join([t.text for t in para.findall(".//w:t", nsmap) if t.text])
 
         # Check if this is a caption paragraph
-        if 'Figure' in para_text or 'figure' in para_text.lower():
+        if "Figure" in para_text or "figure" in para_text.lower():
             print(f"\nParagraph {para_idx}: {para_text[:80]}")
 
             # Look for field characters in this paragraph
-            runs = para.findall('.//w:r', nsmap)
+            runs = para.findall(".//w:r", nsmap)
 
             has_fields = False
             field_instr = ""
 
             for run in runs:
-                fld_char = run.find('.//w:fldChar', nsmap)
+                fld_char = run.find(".//w:fldChar", nsmap)
                 if fld_char is not None:
                     has_fields = True
-                    fld_type = fld_char.get('{%s}fldCharType' % nsmap['w'])
+                    fld_type = fld_char.get("{%s}fldCharType" % nsmap["w"])
                     print(f"  Found fldChar: {fld_type}")
 
-                instr_text = run.find('.//w:instrText', nsmap)
+                instr_text = run.find(".//w:instrText", nsmap)
                 if instr_text is not None and instr_text.text:
                     field_instr += instr_text.text
                     print(f"  Field instruction: {instr_text.text}")
 
-                    if ' SEQ ' in instr_text.text:
-                        seq_fields.append({
-                            'para_idx': para_idx,
-                            'instr': instr_text.text.strip()
-                        })
+                    if " SEQ " in instr_text.text:
+                        seq_fields.append({"para_idx": para_idx, "instr": instr_text.text.strip()})
 
             if not has_fields:
-                print(f"  ⚠ NO FIELD CODES FOUND - Caption is static text!")
+                print("  ⚠ NO FIELD CODES FOUND - Caption is static text!")
                 # Print the raw XML for this paragraph
                 print(f"  Raw XML preview: {ET.tostring(para, encoding='unicode')[:200]}...")
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("SEQ FIELD SUMMARY")
-    print("="*80)
+    print("=" * 80)
     print(f"Total SEQ fields found: {len(seq_fields)}")
 
     for sf in seq_fields:
@@ -133,6 +130,5 @@ def extract_docx_xml(docx_path: Path, output_dir: Path):
     """Extract XML files from .docx file."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    with zipfile.ZipFile(docx_path, 'r') as zip_ref:
+    with zipfile.ZipFile(docx_path, "r") as zip_ref:
         zip_ref.extractall(output_dir)
-

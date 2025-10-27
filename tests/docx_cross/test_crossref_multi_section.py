@@ -2,7 +2,6 @@
 
 import base64
 
-import pytest
 
 from paradoc import OneDoc
 from paradoc.io.word.utils import docx_update
@@ -107,7 +106,8 @@ Also reference the first figure from section 1: [@fig:first_figure].
 
             # Should have format "Figure X-Y" where X and Y are digits
             import re
-            fig_match = re.search(r'Figure\s+(\d+)-(\d+)', text)
+
+            fig_match = re.search(r"Figure\s+(\d+)-(\d+)", text)
             assert fig_match is not None, f"Reference doesn't have correct numbering format: {text}"
 
             chapter_num = int(fig_match.group(1))
@@ -122,7 +122,9 @@ Also reference the first figure from section 1: [@fig:first_figure].
     # Should have found at least 4 references (2 for first figure, 2 for second figure, 1 cross-ref)
     assert len(all_refs) >= 4, f"Expected at least 4 references with Figure label, found {len(all_refs)}"
 
-    print(f"\n✓ All {len(all_refs)} cross-references have correct format with 'Figure' label and chapter-section numbering")
+    print(
+        f"\n✓ All {len(all_refs)} cross-references have correct format with 'Figure' label and chapter-section numbering"
+    )
 
 
 def test_multiple_figures_in_same_section(tmp_path):
@@ -180,6 +182,7 @@ All references: [@fig:fig1], [@fig:fig2], and [@fig:fig3].
     print("\n=== Multiple Figures Test ===")
 
     import re
+
     figure_numbers_found = []
 
     for para in doc.paragraphs:
@@ -187,7 +190,7 @@ All references: [@fig:fig1], [@fig:fig2], and [@fig:fig3].
         if "Figure" in text and "reference" in text.lower():
             print(f"Para: {text}")
             # Extract all figure numbers from this paragraph
-            fig_matches = re.findall(r'Figure\s+(\d+)-(\d+)', text)
+            fig_matches = re.findall(r"Figure\s+(\d+)-(\d+)", text)
             for chapter, fig_num in fig_matches:
                 figure_numbers_found.append(f"{chapter}-{fig_num}")
                 print(f"  Found: Figure {chapter}-{fig_num}")
@@ -203,4 +206,3 @@ All references: [@fig:fig1], [@fig:fig2], and [@fig:fig3].
     assert "1-3" in unique_numbers, "Should have Figure 1-3"
 
     print(f"\n✓ Found all expected figure numbers: {sorted(unique_numbers)}")
-

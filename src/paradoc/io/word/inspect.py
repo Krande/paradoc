@@ -19,7 +19,7 @@ import zipfile
 import pathlib
 from dataclasses import dataclass
 from xml.etree import ElementTree as ET
-from typing import Iterable, Iterator, Sequence
+from typing import Sequence
 
 
 # OOXML namespaces
@@ -48,8 +48,8 @@ class Field:
 @dataclass(frozen=True)
 class CrossRef:
     field: Field
-    ref_type: str          # "REF" | "PAGEREF" | "SEQ" | other
-    target_or_label: str   # bookmark name for REF/PAGEREF; label for SEQ
+    ref_type: str  # "REF" | "PAGEREF" | "SEQ" | other
+    target_or_label: str  # bookmark name for REF/PAGEREF; label for SEQ
     switches: tuple[str, ...]
 
 
@@ -167,9 +167,7 @@ class DocxInspector:
     def unused_bookmarks(self) -> list[Bookmark]:
         """Bookmarks that no REF/PAGEREF points to."""
         used_targets = {
-            cr.target_or_label
-            for cr in self.cross_refs()
-            if cr.ref_type in {"REF", "PAGEREF"} and cr.target_or_label
+            cr.target_or_label for cr in self.cross_refs() if cr.ref_type in {"REF", "PAGEREF"} and cr.target_or_label
         }
         return [b for b in self.bookmarks() if b.name and b.name not in used_targets]
 
@@ -215,6 +213,7 @@ class DocxInspector:
 
 # ---------------------- helpers & parsing ----------------------
 
+
 def _visible_text_of(elem: ET.Element) -> str:
     return "".join(t.text or "" for t in elem.findall(".//w:t", NS))
 
@@ -225,9 +224,9 @@ def _squash_ws(s: str) -> str:
 
 @dataclass(frozen=True)
 class ParsedInstr:
-    ref_type: str                  # REF | PAGEREF | SEQ | other
-    target_or_label: str           # bookmark name (REF/PAGEREF) or label (SEQ)
-    switches: tuple[str, ...]      # e.g. ("\h", "\p")
+    ref_type: str  # REF | PAGEREF | SEQ | other
+    target_or_label: str  # bookmark name (REF/PAGEREF) or label (SEQ)
+    switches: tuple[str, ...]  # e.g. ("\h", "\p")
 
 
 def _parse_instr(instr: str) -> ParsedInstr | None:
@@ -291,6 +290,7 @@ def _tokenize_instr(instr: str) -> list[str]:
 
 # ---------------------- CLI ----------------------
 
+
 def _print_summary(di: DocxInspector) -> None:
     bms = di.bookmarks()
     flds = di.fields()
@@ -339,6 +339,3 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 2
     return 0
-
-
-

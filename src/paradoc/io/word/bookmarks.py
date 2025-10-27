@@ -32,11 +32,11 @@ def normalize_bookmark_name(name: str) -> str:
         Word-compatible bookmark name (e.g., "_Reffig_test_figure")
     """
     # Replace colons with underscores
-    normalized = name.replace(':', '_')
+    normalized = name.replace(":", "_")
 
     # Add _Ref prefix if not already present (Word's convention)
-    if not normalized.startswith('_Ref'):
-        normalized = '_Ref' + normalized
+    if not normalized.startswith("_Ref"):
+        normalized = "_Ref" + normalized
 
     return normalized
 
@@ -55,7 +55,7 @@ def add_bookmark_to_paragraph(paragraph: Paragraph, bookmark_name: str = None) -
     """
     if bookmark_name:
         # Check if this is already a Word-style bookmark (starts with _Ref and is all digits after)
-        if bookmark_name.startswith('_Ref') and bookmark_name[4:].isdigit():
+        if bookmark_name.startswith("_Ref") and bookmark_name[4:].isdigit():
             # Already Word-style, use as-is
             word_style_name = bookmark_name
         else:
@@ -101,7 +101,7 @@ def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> s
         The actual Word-style bookmark name that was created (e.g., "_Ref306075071")
     """
     # Generate Word-style bookmark name
-    if bookmark_name.startswith('_Ref') and bookmark_name[4:].isdigit():
+    if bookmark_name.startswith("_Ref") and bookmark_name[4:].isdigit():
         word_style_name = bookmark_name
     else:
         word_style_name = normalize_bookmark_name(bookmark_name)
@@ -123,7 +123,7 @@ def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> s
             continue
 
         # Check text content
-        text_elements = run.findall(qn('w:t'))
+        text_elements = run.findall(qn("w:t"))
         for t_elem in text_elements:
             text_content = t_elem.text if t_elem.text else ""
             print(f"[DEBUG]   Run {i}: '{text_content[:50]}'")
@@ -177,44 +177,44 @@ def _find_field_indices(runs) -> tuple[int | None, int | None]:
 
     # First pass: identify all field begin positions and their types
     for i, run in enumerate(runs):
-        instr_texts = run.findall(qn('w:instrText'))
+        instr_texts = run.findall(qn("w:instrText"))
         for instr in instr_texts:
             if instr.text:
                 # Look back to find the corresponding field begin
                 for j in range(max(0, i - 3), i + 1):
-                    fld_chars = runs[j].findall(qn('w:fldChar'))
+                    fld_chars = runs[j].findall(qn("w:fldChar"))
                     for fld_char in fld_chars:
-                        if fld_char.get(qn('w:fldCharType')) == 'begin':
-                            if 'STYLEREF' in instr.text:
-                                field_begins.append((j, 'STYLEREF'))
+                        if fld_char.get(qn("w:fldCharType")) == "begin":
+                            if "STYLEREF" in instr.text:
+                                field_begins.append((j, "STYLEREF"))
                                 if styleref_begin_idx is None:
                                     styleref_begin_idx = j
-                            elif 'SEQ' in instr.text and 'STYLEREF' not in instr.text:
-                                field_begins.append((j, 'SEQ'))
+                            elif "SEQ" in instr.text and "STYLEREF" not in instr.text:
+                                field_begins.append((j, "SEQ"))
                             break
 
     # Second pass: find field ends and match them to their begins
     begin_stack = []  # Stack to track which field begins we've seen
 
     for i, run in enumerate(runs):
-        fld_chars = run.findall(qn('w:fldChar'))
+        fld_chars = run.findall(qn("w:fldChar"))
         for fld_char in fld_chars:
-            fld_type = fld_char.get(qn('w:fldCharType'))
+            fld_type = fld_char.get(qn("w:fldCharType"))
 
-            if fld_type == 'begin':
+            if fld_type == "begin":
                 # Check if this is one of our tracked field begins
                 for begin_idx, begin_field_type in field_begins:
                     if begin_idx == i:
                         begin_stack.append((i, begin_field_type))
                         break
 
-            elif fld_type == 'end':
+            elif fld_type == "end":
                 # This end corresponds to the most recent unmatched begin
                 if begin_stack:
                     begin_idx, begin_field_type = begin_stack.pop()
 
                     # Record the SEQ field end (but only after we've found STYLEREF)
-                    if begin_field_type == 'SEQ' and styleref_begin_idx is not None and seq_end_idx is None:
+                    if begin_field_type == "SEQ" and styleref_begin_idx is not None and seq_end_idx is None:
                         seq_end_idx = i
 
     return styleref_begin_idx, seq_end_idx
@@ -233,22 +233,22 @@ def _find_seq_field_only(runs) -> tuple[int | None, int | None]:
     seq_end_idx = None
 
     for i, run in enumerate(runs):
-        fld_chars = run.findall(qn('w:fldChar'))
+        fld_chars = run.findall(qn("w:fldChar"))
         for fld_char in fld_chars:
-            fld_type = fld_char.get(qn('w:fldCharType'))
+            fld_type = fld_char.get(qn("w:fldCharType"))
 
-            if fld_type == 'begin':
+            if fld_type == "begin":
                 # Check if this is SEQ field
                 for j in range(i, min(i + 5, len(runs))):
-                    check_instr = runs[j].findall(qn('w:instrText'))
+                    check_instr = runs[j].findall(qn("w:instrText"))
                     for instr in check_instr:
-                        if instr.text and 'SEQ' in instr.text and 'STYLEREF' not in instr.text:
+                        if instr.text and "SEQ" in instr.text and "STYLEREF" not in instr.text:
                             seq_begin_idx = i
                             break
                     if seq_begin_idx == i:
                         break
 
-            elif fld_type == 'end' and seq_begin_idx is not None and seq_end_idx is None:
+            elif fld_type == "end" and seq_begin_idx is not None and seq_end_idx is None:
                 seq_end_idx = i
                 break
 

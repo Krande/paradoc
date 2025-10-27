@@ -7,7 +7,6 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import pytest
-from docx.oxml.ns import qn
 
 from paradoc import OneDoc
 
@@ -17,9 +16,9 @@ def test_compare_com_vs_paradoc_xml(tmp_path):
     """Compare XML structure of COM API document vs Paradoc document."""
 
     # Step 1: Create COM API reference document
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("STEP 1: Creating COM API Reference Document")
-    print("="*80)
+    print("=" * 80)
 
     from paradoc.io.word.com_api import WordApplication
     from paradoc import MY_DOCX_TMPL
@@ -39,10 +38,7 @@ def test_compare_com_vs_paradoc_xml(tmp_path):
         doc.add_paragraph()
 
         fig1_ref = doc.add_figure_with_caption(
-            caption_text="First figure caption",
-            width=150,
-            height=100,
-            use_chapter_numbers=True
+            caption_text="First figure caption", width=150, height=100, use_chapter_numbers=True
         )
         print(f"  Added Figure 1-1 with bookmark: {fig1_ref}")
 
@@ -62,10 +58,7 @@ def test_compare_com_vs_paradoc_xml(tmp_path):
         doc.add_paragraph()
 
         fig2_ref = doc.add_figure_with_caption(
-            caption_text="Second figure caption",
-            width=150,
-            height=100,
-            use_chapter_numbers=True
+            caption_text="Second figure caption", width=150, height=100, use_chapter_numbers=True
         )
         print(f"  Added Figure 2-1 with bookmark: {fig2_ref}")
 
@@ -84,9 +77,9 @@ def test_compare_com_vs_paradoc_xml(tmp_path):
     print(f"✓ COM document saved to: {com_output}")
 
     # Step 2: Create Paradoc document
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("STEP 2: Creating Paradoc Document")
-    print("="*80)
+    print("=" * 80)
 
     source_dir = tmp_path / "paradoc_test"
     main_dir = source_dir / "00-main"
@@ -140,9 +133,9 @@ Reference to [@fig:second] and back to [@fig:first].
     print(f"✓ Paradoc document saved to: {paradoc_output}")
 
     # Step 3: Extract and compare XML
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("STEP 3: Extracting and Comparing XML")
-    print("="*80)
+    print("=" * 80)
 
     com_xml_dir = tmp_path / "com_xml"
     paradoc_xml_dir = tmp_path / "paradoc_xml"
@@ -154,21 +147,21 @@ Reference to [@fig:second] and back to [@fig:first].
     print(f"✓ Extracted Paradoc XML to: {paradoc_xml_dir}")
 
     # Analyze document.xml
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("ANALYZING DOCUMENT.XML")
-    print("="*80)
+    print("=" * 80)
 
     com_doc_xml = com_xml_dir / "word" / "document.xml"
     paradoc_doc_xml = paradoc_xml_dir / "word" / "document.xml"
 
-    print("\n" + "-"*80)
+    print("\n" + "-" * 80)
     print("COM API DOCUMENT STRUCTURE")
-    print("-"*80)
+    print("-" * 80)
     analyze_crossref_structure(com_doc_xml, "COM API")
 
-    print("\n" + "-"*80)
+    print("\n" + "-" * 80)
     print("PARADOC DOCUMENT STRUCTURE")
-    print("-"*80)
+    print("-" * 80)
     analyze_crossref_structure(paradoc_doc_xml, "Paradoc")
 
     # Generate diagnostic report
@@ -179,7 +172,7 @@ def extract_docx_xml(docx_path: Path, output_dir: Path):
     """Extract XML files from .docx file."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    with zipfile.ZipFile(docx_path, 'r') as zip_ref:
+    with zipfile.ZipFile(docx_path, "r") as zip_ref:
         zip_ref.extractall(output_dir)
 
 
@@ -190,18 +183,18 @@ def analyze_crossref_structure(xml_path: Path, label: str):
 
     # Namespaces
     nsmap = {
-        'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
-        'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+        "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+        "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
     }
 
     print(f"\n[{label}] Analyzing structure...")
 
     # Find all bookmarks
     bookmarks = []
-    for bookmark_start in root.findall('.//w:bookmarkStart', nsmap):
-        bm_id = bookmark_start.get('{%s}id' % nsmap['w'])
-        bm_name = bookmark_start.get('{%s}name' % nsmap['w'])
-        bookmarks.append({'id': bm_id, 'name': bm_name})
+    for bookmark_start in root.findall(".//w:bookmarkStart", nsmap):
+        bm_id = bookmark_start.get("{%s}id" % nsmap["w"])
+        bm_name = bookmark_start.get("{%s}name" % nsmap["w"])
+        bookmarks.append({"id": bm_id, "name": bm_name})
 
     print(f"\nBookmarks found: {len(bookmarks)}")
     for bm in bookmarks:
@@ -209,34 +202,31 @@ def analyze_crossref_structure(xml_path: Path, label: str):
 
     # Find all REF fields
     ref_fields = []
-    paragraphs = root.findall('.//w:p', nsmap)
+    paragraphs = root.findall(".//w:p", nsmap)
 
     for para_idx, para in enumerate(paragraphs):
         # Look for field characters
-        runs = para.findall('.//w:r', nsmap)
+        runs = para.findall(".//w:r", nsmap)
 
         in_field = False
         field_instr = ""
 
         for run in runs:
             # Check for field begin/end
-            fld_char = run.find('.//w:fldChar', nsmap)
+            fld_char = run.find(".//w:fldChar", nsmap)
             if fld_char is not None:
-                fld_type = fld_char.get('{%s}fldCharType' % nsmap['w'])
-                if fld_type == 'begin':
+                fld_type = fld_char.get("{%s}fldCharType" % nsmap["w"])
+                if fld_type == "begin":
                     in_field = True
                     field_instr = ""
-                elif fld_type == 'end':
-                    if ' REF ' in field_instr:
-                        ref_fields.append({
-                            'para_idx': para_idx,
-                            'instr': field_instr.strip()
-                        })
+                elif fld_type == "end":
+                    if " REF " in field_instr:
+                        ref_fields.append({"para_idx": para_idx, "instr": field_instr.strip()})
                     in_field = False
 
             # Collect instruction text
             if in_field:
-                instr_text = run.find('.//w:instrText', nsmap)
+                instr_text = run.find(".//w:instrText", nsmap)
                 if instr_text is not None and instr_text.text:
                     field_instr += instr_text.text
 
@@ -247,28 +237,25 @@ def analyze_crossref_structure(xml_path: Path, label: str):
     # Find all caption paragraphs (with SEQ fields)
     seq_fields = []
     for para_idx, para in enumerate(paragraphs):
-        runs = para.findall('.//w:r', nsmap)
+        runs = para.findall(".//w:r", nsmap)
 
         in_field = False
         field_instr = ""
 
         for run in runs:
-            fld_char = run.find('.//w:fldChar', nsmap)
+            fld_char = run.find(".//w:fldChar", nsmap)
             if fld_char is not None:
-                fld_type = fld_char.get('{%s}fldCharType' % nsmap['w'])
-                if fld_type == 'begin':
+                fld_type = fld_char.get("{%s}fldCharType" % nsmap["w"])
+                if fld_type == "begin":
                     in_field = True
                     field_instr = ""
-                elif fld_type == 'end':
-                    if ' SEQ ' in field_instr:
-                        seq_fields.append({
-                            'para_idx': para_idx,
-                            'instr': field_instr.strip()
-                        })
+                elif fld_type == "end":
+                    if " SEQ " in field_instr:
+                        seq_fields.append({"para_idx": para_idx, "instr": field_instr.strip()})
                     in_field = False
 
             if in_field:
-                instr_text = run.find('.//w:instrText', nsmap)
+                instr_text = run.find(".//w:instrText", nsmap)
                 if instr_text is not None and instr_text.text:
                     field_instr += instr_text.text
 
@@ -276,11 +263,7 @@ def analyze_crossref_structure(xml_path: Path, label: str):
     for sf in seq_fields:
         print(f"  • Para {sf['para_idx']}: {sf['instr']}")
 
-    return {
-        'bookmarks': bookmarks,
-        'ref_fields': ref_fields,
-        'seq_fields': seq_fields
-    }
+    return {"bookmarks": bookmarks, "ref_fields": ref_fields, "seq_fields": seq_fields}
 
 
 def generate_diagnostic_report(com_xml: Path, paradoc_xml: Path, output_dir: Path):
@@ -293,17 +276,15 @@ def generate_diagnostic_report(com_xml: Path, paradoc_xml: Path, output_dir: Pat
     paradoc_tree = ET.parse(paradoc_xml)
 
     nsmap = {
-        'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+        "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
     }
 
     # Extract first figure caption paragraph from each
     def find_first_caption(tree):
         """Find first paragraph containing 'Figure'."""
-        for para in tree.findall('.//w:p', nsmap):
-            para_text = ''.join([
-                t.text for t in para.findall('.//w:t', nsmap) if t.text
-            ])
-            if 'Figure' in para_text and ('caption' in para_text.lower() or '1-1' in para_text):
+        for para in tree.findall(".//w:p", nsmap):
+            para_text = "".join([t.text for t in para.findall(".//w:t", nsmap) if t.text])
+            if "Figure" in para_text and ("caption" in para_text.lower() or "1-1" in para_text):
                 return para
         return None
 
@@ -313,10 +294,10 @@ def generate_diagnostic_report(com_xml: Path, paradoc_xml: Path, output_dir: Pat
     # Extract first REF field paragraph from each
     def find_first_ref_paragraph(tree):
         """Find first paragraph with REF field."""
-        for para in tree.findall('.//w:p', nsmap):
-            for run in para.findall('.//w:r', nsmap):
-                instr_text = run.find('.//w:instrText', nsmap)
-                if instr_text is not None and instr_text.text and ' REF ' in instr_text.text:
+        for para in tree.findall(".//w:p", nsmap):
+            for run in para.findall(".//w:r", nsmap):
+                instr_text = run.find(".//w:instrText", nsmap)
+                if instr_text is not None and instr_text.text and " REF " in instr_text.text:
                     return para
         return None
 
@@ -377,8 +358,7 @@ Compare the XML structures above to identify differences in:
 - Paradoc document: {paradoc_xml.parent.parent.name}
 """
 
-    report_path.write_text(report, encoding='utf-8')
+    report_path.write_text(report, encoding="utf-8")
     print(f"\n✓ Diagnostic report saved to: {report_path}")
 
     return report_path
-

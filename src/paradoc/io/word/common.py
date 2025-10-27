@@ -8,4 +8,4 @@ The actual dataclass definitions have been moved to models.py for better organiz
 # Re-export the dataclasses from models.py for backward compatibility
 from .models import DocXFigureRef, DocXTableRef
 
-__all__ = ['DocXTableRef', 'DocXFigureRef']
+__all__ = ["DocXTableRef", "DocXFigureRef"]

@@ -39,9 +39,9 @@ def fix_bookmark_ids(document):
     bookmark_name_to_id = {}
 
     for elem in body.iter():
-        if elem.tag == qn('w:bookmarkStart'):
-            bm_id = elem.get(qn('w:id'))
-            bm_name = elem.get(qn('w:name'))
+        if elem.tag == qn("w:bookmarkStart"):
+            bm_id = elem.get(qn("w:id"))
+            bm_name = elem.get(qn("w:name"))
             if bm_id and bm_name:
                 bookmark_name_to_id[bm_name] = bm_id
 
@@ -54,9 +54,9 @@ def fix_bookmark_ids(document):
     bookmark_starts = {}
 
     for elem in body.iter():
-        if elem.tag == qn('w:bookmarkStart'):
-            bm_id = elem.get(qn('w:id'))
-            bm_name = elem.get(qn('w:name'))
+        if elem.tag == qn("w:bookmarkStart"):
+            bm_id = elem.get(qn("w:id"))
+            bm_name = elem.get(qn("w:name"))
             if bm_id and bm_name:
                 bookmark_starts[bm_id] = bm_name
 
@@ -64,17 +64,17 @@ def fix_bookmark_ids(document):
     # We need to track which starts have been closed
     open_bookmarks = {}  # Maps old_id -> new_id for currently open bookmarks
 
-    for paragraph in body.iter(qn('w:p')):
+    for paragraph in body.iter(qn("w:p")):
         for elem in paragraph:
-            if elem.tag == qn('w:bookmarkStart'):
-                old_id = elem.get(qn('w:id'))
-                bm_name = elem.get(qn('w:name'))
+            if elem.tag == qn("w:bookmarkStart"):
+                old_id = elem.get(qn("w:id"))
+                bm_name = elem.get(qn("w:name"))
                 if old_id and bm_name:
                     # Track this bookmark as open
                     open_bookmarks[old_id] = (old_id, bm_name)
 
-            elif elem.tag == qn('w:bookmarkEnd'):
-                end_id = elem.get(qn('w:id'))
+            elif elem.tag == qn("w:bookmarkEnd"):
+                end_id = elem.get(qn("w:id"))
                 if end_id and end_id in open_bookmarks:
                     # This end matches a start we've seen
                     start_id, bm_name = open_bookmarks[end_id]
@@ -88,7 +88,7 @@ def fix_bookmark_ids(document):
                         old_end_id = end_id
                         start_id, bm_name = list(open_bookmarks.values())[0]
                         # Update the end ID to match the start
-                        elem.set(qn('w:id'), start_id)
+                        elem.set(qn("w:id"), start_id)
                         # Remove from open bookmarks (use the old key)
                         for k, v in list(open_bookmarks.items()):
                             if v == (start_id, bm_name):

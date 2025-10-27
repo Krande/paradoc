@@ -25,6 +25,7 @@ def test_figure_crossref_label_and_numbering(tmp_path):
 
     # Create test image
     import base64
+
     png_data = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
     )
@@ -81,7 +82,7 @@ Another reference: see [@fig:test_figure] for details.
         # Check 2: There should be space before and after the reference
         # Look for pattern like "to Figure 1-1 in" or "see Figure 1-1 for"
         # Also check for "Figure 1 " at end of text
-        figure_pattern = re.search(r'\s(Figure\s+[\d\-]+)[\s\.]', text)
+        figure_pattern = re.search(r"\s(Figure\s+[\d\-]+)[\s\.]", text)
         assert figure_pattern is not None, f"Reference should have spaces around it, got: {text}"
 
         # Check 3: Full numbering should be present (e.g., "1-1" not just "1")
@@ -90,7 +91,7 @@ Another reference: see [@fig:test_figure] for details.
         print(f"  Found reference: '{figure_ref}'")
 
         # The numbering should include the chapter number and figure number (e.g., "1-1")
-        number_match = re.search(r'Figure\s+([\d\-]+)', figure_ref)
+        number_match = re.search(r"Figure\s+([\d\-]+)", figure_ref)
         assert number_match is not None, f"Could not extract figure number from: {figure_ref}"
 
         number = number_match.group(1)
@@ -165,10 +166,10 @@ Another reference: see [@tbl:test_table] for details.
         # Check 2: There should be space before and after the reference
         # Look for pattern like "to Table 1-1 in" or "see Table 1-1 for"
         # Also check for "Table 1 " at end of text
-        table_pattern = re.search(r'\s(Table\s+[\d\-]+)[\s\.]', text)
+        table_pattern = re.search(r"\s(Table\s+[\d\-]+)[\s\.]", text)
         if table_pattern is None:
             # Try without requiring trailing space (end of sentence)
-            table_pattern = re.search(r'(Table\s+[\d\-]+)', text)
+            table_pattern = re.search(r"(Table\s+[\d\-]+)", text)
         assert table_pattern is not None, f"Could not find table reference in: {text}"
 
         # Check 3: Full numbering should be present (e.g., "1-1" not just "1")
@@ -177,7 +178,7 @@ Another reference: see [@tbl:test_table] for details.
         print(f"  Found reference: '{table_ref}'")
 
         # The numbering should include the chapter number and table number (e.g., "1-1")
-        number_match = re.search(r'Table\s+([\d\-]+)', table_ref)
+        number_match = re.search(r"Table\s+([\d\-]+)", table_ref)
         assert number_match is not None, f"Could not extract table number from: {table_ref}"
 
         number = number_match.group(1)
@@ -249,19 +250,19 @@ Another reference: see [@eq:test_equation] for details.
         # pandoc-crossref generates "eq." (lowercase with period)
         if "Eq" in text or "Equation" in text or "eq." in text:
             found_eq_label = True
-            print(f"  ✓ Found equation label")
+            print("  ✓ Found equation label")
 
         # For now, equations from pandoc-crossref show as "eq.1" without full numbering
         # This test documents current behavior; full equation support would require
         # additional infrastructure similar to figures/tables
 
         # Check if there's an equation reference pattern
-        eq_pattern = re.search(r'((?:Eq|Equation|eq\.)\s*[\d\-]+)', text)
+        eq_pattern = re.search(r"((?:Eq|Equation|eq\.)\s*[\d\-]+)", text)
         if eq_pattern:
             eq_ref = eq_pattern.group(1)
             print(f"  Found reference: '{eq_ref}'")
 
-            number_match = re.search(r'(?:Eq|Equation|eq\.)\s*([\d\-]+)', eq_ref)
+            number_match = re.search(r"(?:Eq|Equation|eq\.)\s*([\d\-]+)", eq_ref)
             if number_match:
                 number = number_match.group(1)
                 print(f"  Equation number: {number}")
@@ -277,9 +278,10 @@ Another reference: see [@eq:test_equation] for details.
     # Currently pandoc-crossref generates "eq.1" format which doesn't include chapter numbers
     # This is documented behavior and would need equation caption formatting similar to figures/tables
     if not found_full_numbering:
-        print("\n  Note: Equations currently show simple numbering (e.g., '1') rather than full numbering (e.g., '1-1')")
+        print(
+            "\n  Note: Equations currently show simple numbering (e.g., '1') rather than full numbering (e.g., '1-1')"
+        )
         print("  Full equation numbering would require additional infrastructure similar to figures/tables")
 
     if auto_open:
         os.startfile(output_file)
-

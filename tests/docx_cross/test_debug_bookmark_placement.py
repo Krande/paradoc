@@ -1,6 +1,5 @@
 """Debug test to examine bookmark placement in figure captions."""
 
-import os
 from pathlib import Path
 
 from docx import Document
@@ -18,6 +17,7 @@ def test_debug_figure_caption_structure(tmp_path):
 
     # Create test image
     import base64
+
     png_data = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
     )
@@ -72,9 +72,9 @@ This is a reference to [@fig:test_figure] in the text.
     # Get the XML structure
     xml_str = caption_para._element.xml
     if isinstance(xml_str, bytes):
-        xml_str = xml_str.decode('utf-8')
+        xml_str = xml_str.decode("utf-8")
 
-    print(f"\nCaption XML (first 2000 chars):")
+    print("\nCaption XML (first 2000 chars):")
     print(xml_str[:2000])
 
     # Find bookmark locations
@@ -84,7 +84,7 @@ This is a reference to [@fig:test_figure] in the text.
     print("ANALYZING RUNS IN CAPTION PARAGRAPH")
     print(f"{'='*80}")
 
-    runs = list(p_element.findall(qn('w:r')))
+    runs = list(p_element.findall(qn("w:r")))
     bookmark_start_idx = None
     bookmark_end_idx = None
     bookmark_name = None
@@ -92,32 +92,32 @@ This is a reference to [@fig:test_figure] in the text.
     for idx, run in enumerate(runs):
         # Check what's before this run (bookmarkStart)
         prev_sibling = run.getprevious()
-        if prev_sibling is not None and prev_sibling.tag == qn('w:bookmarkStart'):
+        if prev_sibling is not None and prev_sibling.tag == qn("w:bookmarkStart"):
             bookmark_start_idx = idx
-            bookmark_name = prev_sibling.get(qn('w:name'))
+            bookmark_name = prev_sibling.get(qn("w:name"))
             print(f"\n>>> BOOKMARK START found before run {idx}")
             print(f"    Bookmark name: {bookmark_name}")
 
         # Check what's after this run (bookmarkEnd)
         next_sibling = run.getnext()
-        if next_sibling is not None and next_sibling.tag == qn('w:bookmarkEnd'):
+        if next_sibling is not None and next_sibling.tag == qn("w:bookmarkEnd"):
             bookmark_end_idx = idx
             print(f"\n>>> BOOKMARK END found after run {idx}")
 
         # Analyze the run content
         run_text = ""
-        for t_elem in run.findall(qn('w:t')):
+        for t_elem in run.findall(qn("w:t")):
             if t_elem.text:
                 run_text += t_elem.text
 
         # Check for field characters
-        fld_chars = run.findall(qn('w:fldChar'))
-        instr_texts = run.findall(qn('w:instrText'))
+        fld_chars = run.findall(qn("w:fldChar"))
+        instr_texts = run.findall(qn("w:instrText"))
 
         field_info = ""
         if fld_chars:
             for fld_char in fld_chars:
-                fld_type = fld_char.get(qn('w:fldCharType'))
+                fld_type = fld_char.get(qn("w:fldCharType"))
                 field_info += f"[{fld_type}] "
 
         if instr_texts:
@@ -148,13 +148,13 @@ This is a reference to [@fig:test_figure] in the text.
 
         for idx in range(bookmark_start_idx, bookmark_end_idx + 1):
             run = runs[idx]
-            instr_texts = run.findall(qn('w:instrText'))
+            instr_texts = run.findall(qn("w:instrText"))
             for instr in instr_texts:
                 if instr.text:
-                    if 'STYLEREF' in instr.text:
+                    if "STYLEREF" in instr.text:
                         has_styleref = True
                         print(f"  ✓ STYLEREF field at run {idx}")
-                    if 'SEQ' in instr.text and 'STYLEREF' not in instr.text:
+                    if "SEQ" in instr.text and "STYLEREF" not in instr.text:
                         has_seq = True
                         print(f"  ✓ SEQ field at run {idx}")
 
@@ -183,11 +183,12 @@ This is a reference to [@fig:test_figure] in the text.
 
         ref_xml = ref_para._element.xml
         if isinstance(ref_xml, bytes):
-            ref_xml = ref_xml.decode('utf-8')
+            ref_xml = ref_xml.decode("utf-8")
 
         # Extract REF field
         import re
-        ref_match = re.search(r'REF\s+([^\s\\]+)', ref_xml)
+
+        ref_match = re.search(r"REF\s+([^\s\\]+)", ref_xml)
         if ref_match:
             ref_bookmark = ref_match.group(1)
             print(f"REF field references bookmark: {ref_bookmark}")
@@ -200,6 +201,6 @@ This is a reference to [@fig:test_figure] in the text.
 
 if __name__ == "__main__":
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmpdir:
         test_debug_figure_caption_structure(Path(tmpdir))
-

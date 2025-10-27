@@ -2,6 +2,7 @@
 Enhanced test script to demonstrate frontend connection tracking with multiple frontends.
 This script shows how to query the number of connected frontends and their IDs.
 """
+
 from paradoc.frontend.ws_server import (
     ensure_ws_server,
     has_active_frontends,
@@ -9,6 +10,7 @@ from paradoc.frontend.ws_server import (
     ping_ws_server,
 )
 import time
+
 
 def main():
     print("=== Enhanced Paradoc Frontend Tracking Demo ===\n")
@@ -60,6 +62,6 @@ def main():
 
     print("\n=== Demo Complete ===")
 
+
 if __name__ == "__main__":
     main()
-

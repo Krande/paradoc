@@ -26,6 +26,7 @@ from .utils import iter_block_items
 
 class ReferenceType(Enum):
     """Types of cross-referenceable items."""
+
     FIGURE = "Figure"
     TABLE = "Table"
     EQUATION = "Eq"
@@ -43,6 +44,7 @@ class ReferenceItem:
         caption_paragraph: The actual Word paragraph containing the caption
         document_order: Sequential order in the document (0, 1, 2, ...)
     """
+
     ref_type: ReferenceType
     semantic_id: str
     word_bookmark: str
@@ -106,7 +108,7 @@ class ReferenceHelper:
             semantic_id=semantic_id,
             word_bookmark=bookmark,
             caption_paragraph=caption_para,
-            document_order=len(self._all_items)
+            document_order=len(self._all_items),
         )
         self._figures[semantic_id] = item
         self._all_items.append(item)
@@ -132,7 +134,7 @@ class ReferenceHelper:
             semantic_id=semantic_id,
             word_bookmark=bookmark,
             caption_paragraph=caption_para,
-            document_order=len(self._all_items)
+            document_order=len(self._all_items),
         )
         self._tables[semantic_id] = item
         self._all_items.append(item)
@@ -158,7 +160,7 @@ class ReferenceHelper:
             semantic_id=semantic_id,
             word_bookmark=bookmark,
             caption_paragraph=caption_para,
-            document_order=len(self._all_items)
+            document_order=len(self._all_items),
         )
         self._equations[semantic_id] = item
         self._all_items.append(item)
@@ -238,7 +240,7 @@ class ReferenceHelper:
                 # Extract the number from the caption text
                 # Caption format: "Figure 2-1: Caption text" or "Table 1-1: Caption text"
                 text = item.caption_paragraph.text
-                number_match = re.search(r'(\d+[-.]\d+)', text)
+                number_match = re.search(r"(\d+[-.]\d+)", text)
                 if number_match:
                     item.display_number = number_match.group(1)
 
@@ -272,14 +274,16 @@ class ReferenceHelper:
                 else:
                     print(f"[ReferenceHelper]   Figure #{idx}: (no display number) -> {item.word_bookmark}")
 
-            ref_configs.append({
-                'label': 'Figure',
-                'pattern': re.compile(r'\b(?:Figure|fig\.)[\s\xa0]*([\d.\-]+)', re.IGNORECASE),
-                'bookmarks': figure_bookmarks,
-                'display_to_idx': fig_display_to_idx,
-                'sequential_to_idx': fig_sequential_to_idx,
-                'num_group': 1
-            })
+            ref_configs.append(
+                {
+                    "label": "Figure",
+                    "pattern": re.compile(r"\b(?:Figure|fig\.)[\s\xa0]*([\d.\-]+)", re.IGNORECASE),
+                    "bookmarks": figure_bookmarks,
+                    "display_to_idx": fig_display_to_idx,
+                    "sequential_to_idx": fig_sequential_to_idx,
+                    "num_group": 1,
+                }
+            )
 
         # Configure tables
         table_bookmarks = self.get_all_table_bookmarks_in_order()
@@ -296,14 +300,16 @@ class ReferenceHelper:
                 else:
                     print(f"[ReferenceHelper]   Table #{idx}: (no display number) -> {item.word_bookmark}")
 
-            ref_configs.append({
-                'label': 'Table',
-                'pattern': re.compile(r'\b(?:Table|tbl\.)[\s\xa0]*([\d.\-]+)', re.IGNORECASE),
-                'bookmarks': table_bookmarks,
-                'display_to_idx': tbl_display_to_idx,
-                'sequential_to_idx': tbl_sequential_to_idx,
-                'num_group': 1
-            })
+            ref_configs.append(
+                {
+                    "label": "Table",
+                    "pattern": re.compile(r"\b(?:Table|tbl\.)[\s\xa0]*([\d.\-]+)", re.IGNORECASE),
+                    "bookmarks": table_bookmarks,
+                    "display_to_idx": tbl_display_to_idx,
+                    "sequential_to_idx": tbl_sequential_to_idx,
+                    "num_group": 1,
+                }
+            )
 
         # Configure equations
         equation_bookmarks = self.get_all_equation_bookmarks_in_order()
@@ -320,14 +326,16 @@ class ReferenceHelper:
                 else:
                     print(f"[ReferenceHelper]   Eq #{idx}: (no display number) -> {item.word_bookmark}")
 
-            ref_configs.append({
-                'label': 'Eq',
-                'pattern': re.compile(r'\b((?:Eq(?:uation)?|eq\.)\s+([\d\-]+))\b', re.IGNORECASE),
-                'bookmarks': equation_bookmarks,
-                'display_to_idx': eq_display_to_idx,
-                'sequential_to_idx': eq_sequential_to_idx,
-                'num_group': 2
-            })
+            ref_configs.append(
+                {
+                    "label": "Eq",
+                    "pattern": re.compile(r"\b((?:Eq(?:uation)?|eq\.)\s+([\d\-]+))\b", re.IGNORECASE),
+                    "bookmarks": equation_bookmarks,
+                    "display_to_idx": eq_display_to_idx,
+                    "sequential_to_idx": eq_sequential_to_idx,
+                    "num_group": 2,
+                }
+            )
 
         # Skip caption paragraphs
         caption_styles = {"Image Caption", "Table Caption", "Captioned Figure"}
@@ -344,7 +352,7 @@ class ReferenceHelper:
 
             # Check if paragraph contains any references
             paragraph_text = block.text
-            has_refs = any(re.search(cfg['pattern'], paragraph_text) for cfg in ref_configs)
+            has_refs = any(re.search(cfg["pattern"], paragraph_text) for cfg in ref_configs)
             if not has_refs:
                 continue
 
@@ -376,27 +384,22 @@ class ReferenceHelper:
         # Find ALL matches from ALL patterns, with their positions
         all_matches = []
         for config in ref_configs:
-            for match in config['pattern'].finditer(original_text):
-                all_matches.append({
-                    'start': match.start(),
-                    'end': match.end(),
-                    'match': match,
-                    'config': config
-                })
+            for match in config["pattern"].finditer(original_text):
+                all_matches.append({"start": match.start(), "end": match.end(), "match": match, "config": config})
 
         if not all_matches:
             return
 
         # Sort matches by position
-        all_matches.sort(key=lambda x: x['start'])
+        all_matches.sort(key=lambda x: x["start"])
 
         # Check for overlapping matches and keep only the first one for each position
         non_overlapping = []
         last_end = 0
         for m in all_matches:
-            if m['start'] >= last_end:
+            if m["start"] >= last_end:
                 non_overlapping.append(m)
-                last_end = m['end']
+                last_end = m["end"]
 
         print(f"[ReferenceHelper]   Found {len(non_overlapping)} reference(s)")
 
@@ -407,7 +410,7 @@ class ReferenceHelper:
         for run in list(paragraph.runs):
             p_element.remove(run._element)
         for child in list(p_element):
-            if child.tag == qn('w:hyperlink'):
+            if child.tag == qn("w:hyperlink"):
                 p_element.remove(child)
 
         # Rebuild the paragraph with text and REF fields
@@ -415,13 +418,13 @@ class ReferenceHelper:
         ref_fields_added = 0
 
         for match_info in non_overlapping:
-            match = match_info['match']
-            config = match_info['config']
-            label = config['label']
-            bookmarks = config['bookmarks']
-            display_to_idx = config['display_to_idx']
-            sequential_to_idx = config['sequential_to_idx']
-            num_group = config['num_group']
+            match = match_info["match"]
+            config = match_info["config"]
+            label = config["label"]
+            bookmarks = config["bookmarks"]
+            display_to_idx = config["display_to_idx"]
+            sequential_to_idx = config["sequential_to_idx"]
+            num_group = config["num_group"]
 
             # Extract the number from the matched text
             if num_group == 2:
@@ -429,7 +432,7 @@ class ReferenceHelper:
                 num_str = match.group(2)
             else:
                 # For figures/tables: group 1 is number
-                num_str = match.group(1).split()[-1] if ' ' in match.group(1) else match.group(1)
+                num_str = match.group(1).split()[-1] if " " in match.group(1) else match.group(1)
 
             # Map the reference number to the bookmark index
             bookmark_idx = None
@@ -452,7 +455,7 @@ class ReferenceHelper:
 
             # Add text before the reference
             if match.start() > last_pos:
-                before_text = original_text[last_pos:match.start()]
+                before_text = original_text[last_pos : match.start()]
                 create_text_run(p_element, before_text)
 
             # Add REF field
@@ -479,7 +482,7 @@ class ReferenceHelper:
             "figures": len(self._figures),
             "tables": len(self._tables),
             "equations": len(self._equations),
-            "total": len(self._all_items)
+            "total": len(self._all_items),
         }
 
     def print_registry(self):
@@ -492,4 +495,5 @@ class ReferenceHelper:
         print("\n  Items in document order:")
         for item in self._all_items:
             print(
-                f"    [{item.document_order}] {item.ref_type.value} '{item.semantic_id}' -> {item.word_bookmark} (display: {item.display_number})")
+                f"    [{item.document_order}] {item.ref_type.value} '{item.semantic_id}' -> {item.word_bookmark} (display: {item.display_number})"
+            )

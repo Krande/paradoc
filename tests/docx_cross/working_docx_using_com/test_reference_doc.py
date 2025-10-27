@@ -55,7 +55,7 @@ def test_com_api_reference_document_primary(tmp_path):
                 doc.add_heading(f"Section {subsection_label}", level=2)
 
                 # Add paragraph with cross-reference placeholders
-                doc.add_text(f"This subsection discusses ")
+                doc.add_text("This subsection discusses ")
                 doc.add_paragraph()
 
                 # Add figure
@@ -63,21 +63,18 @@ def test_com_api_reference_document_primary(tmp_path):
                     caption_text=f"Caption for figure in section {subsection_label}",
                     width=150,
                     height=100,
-                    use_chapter_numbers=True
+                    use_chapter_numbers=True,
                 )
                 print(f"    Added Figure {section_num}-{subsection_num}")
 
                 # Add table
-                table_data = [
-                    ["Header 1", "Header 2"],
-                    [f"Data {subsection_label}.1", f"Data {subsection_label}.2"]
-                ]
+                table_data = [["Header 1", "Header 2"], [f"Data {subsection_label}.1", f"Data {subsection_label}.2"]]
                 tbl_ref = doc.add_table_with_caption(
                     caption_text=f"Caption for table in section {subsection_label}",
                     rows=2,
                     cols=2,
                     data=table_data,
-                    use_chapter_numbers=True
+                    use_chapter_numbers=True,
                 )
                 print(f"    Added Table {section_num}-{subsection_num}")
 

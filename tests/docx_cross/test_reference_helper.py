@@ -3,7 +3,7 @@
 import pytest
 from docx import Document
 
-from paradoc.io.word.reference_helper import ReferenceHelper, ReferenceType
+from paradoc.io.word.reference_helper import ReferenceHelper
 
 
 def test_reference_helper_initialization():
@@ -161,4 +161,3 @@ def test_print_registry(capsys):
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

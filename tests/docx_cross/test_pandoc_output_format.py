@@ -3,7 +3,6 @@
 import base64
 import platform
 import subprocess
-from pathlib import Path
 
 import pytest
 from docx import Document
@@ -59,15 +58,17 @@ tableTitle: "Table"
     cmd = [
         "pandoc",
         str(md_file),
-        "-o", str(output_file),
-        "--filter", "pandoc-crossref",
+        "-o",
+        str(output_file),
+        "--filter",
+        "pandoc-crossref",
         f"--metadata-file={metadata_file}",
-        f"--resource-path={test_dir}"
+        f"--resource-path={test_dir}",
     ]
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("RUNNING PANDOC")
-    print("="*80)
+    print("=" * 80)
     print(f"Command: {' '.join(cmd)}")
 
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -76,14 +77,14 @@ tableTitle: "Table"
         print(f"STDERR: {result.stderr}")
         pytest.fail(f"Pandoc failed with return code {result.returncode}")
 
-    print(f"✓ Pandoc completed successfully")
+    print("✓ Pandoc completed successfully")
 
     # Read the document and check what text was generated
     doc = Document(str(output_file))
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("DOCUMENT PARAGRAPHS")
-    print("="*80)
+    print("=" * 80)
 
     for i, para in enumerate(doc.paragraphs):
         text = para.text
@@ -91,23 +92,23 @@ tableTitle: "Table"
             print(f"\nPara {i}: {text}")
 
             # Check for figure references
-            if 'fig' in text.lower() and 'reference' in text.lower():
-                print(f"  ^^^ THIS IS THE REFERENCE PARAGRAPH")
+            if "fig" in text.lower() and "reference" in text.lower():
+                print("  ^^^ THIS IS THE REFERENCE PARAGRAPH")
                 print(f"  Raw text: '{text}'")
 
                 # Check all runs
-                print(f"  Runs in this paragraph:")
+                print("  Runs in this paragraph:")
                 for j, run in enumerate(para.runs):
                     print(f"    Run {j}: '{run.text}'")
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("ANALYSIS")
-    print("="*80)
+    print("=" * 80)
 
     # Find the reference paragraph
     ref_para = None
     for para in doc.paragraphs:
-        if 'reference to' in para.text.lower():
+        if "reference to" in para.text.lower():
             ref_para = para
             break
 
@@ -130,4 +131,3 @@ tableTitle: "Table"
             print("  Has chapter numbering: '1-1'")
 
     return ref_text
-

@@ -24,5 +24,6 @@ def main():
     if args.docx:
         od.compile("Main", export_format="docx")
 
+
 if __name__ == "__main__":
     main()

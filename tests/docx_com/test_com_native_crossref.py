@@ -1,6 +1,5 @@
 """Test 1: Create a complete document using only COM to understand Word's native cross-reference structure."""
 
-import os
 import platform
 import re
 import time
@@ -22,9 +21,9 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
 
     Then we'll analyze the XML before and after field updates.
     """
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("TEST 1: PURE COM - FIGURES & TABLES WITH CROSS-REFERENCES")
-    print("="*80)
+    print("=" * 80)
 
     import win32com.client
 
@@ -73,7 +72,7 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
             Range=word.Selection.Range,
             Type=-1,
             Text="SEQ Figure \\* ARABIC \\s 1",  # \s 1 means restart at each Heading 1
-            PreserveFormatting=True
+            PreserveFormatting=True,
         )
         word.Selection.TypeText(": First Figure Caption")
 
@@ -102,10 +101,7 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
         word.Selection.TypeText("Table ")
 
         field2 = word.Selection.Fields.Add(
-            Range=word.Selection.Range,
-            Type=-1,
-            Text="SEQ Table \\* ARABIC \\s 1",
-            PreserveFormatting=True
+            Range=word.Selection.Range, Type=-1, Text="SEQ Table \\* ARABIC \\s 1", PreserveFormatting=True
         )
         word.Selection.TypeText(": First Table Caption")
 
@@ -139,10 +135,7 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
         word.Selection.Style = "Caption"
         word.Selection.TypeText("Figure ")
         field3 = word.Selection.Fields.Add(
-            Range=word.Selection.Range,
-            Type=-1,
-            Text="SEQ Figure \\* ARABIC \\s 1",
-            PreserveFormatting=True
+            Range=word.Selection.Range, Type=-1, Text="SEQ Figure \\* ARABIC \\s 1", PreserveFormatting=True
         )
         word.Selection.TypeText(": Second Figure Caption")
 
@@ -168,10 +161,7 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
         word.Selection.Style = "Caption"
         word.Selection.TypeText("Table ")
         field4 = word.Selection.Fields.Add(
-            Range=word.Selection.Range,
-            Type=-1,
-            Text="SEQ Table \\* ARABIC \\s 1",
-            PreserveFormatting=True
+            Range=word.Selection.Range, Type=-1, Text="SEQ Table \\* ARABIC \\s 1", PreserveFormatting=True
         )
         word.Selection.TypeText(": Second Table Caption")
 
@@ -202,17 +192,17 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
 
         # Store bookmark info for later
         bookmarks = {
-            'fig1': (bookmark1_name, 1),
-            'fig2': (bookmark3_name, 2),
-            'tbl1': (bookmark2_name, 1),
-            'tbl2': (bookmark4_name, 2)
+            "fig1": (bookmark1_name, 1),
+            "fig2": (bookmark3_name, 2),
+            "tbl1": (bookmark2_name, 1),
+            "tbl2": (bookmark4_name, 2),
         }
 
         # Find and replace [FIGREF1]
         word.Selection.HomeKey(Unit=6)  # Go to start of document
         found = word.Selection.Find.Execute(FindText="[FIGREF1]", Forward=True, MatchWholeWord=False)
         if found:
-            print(f"  Replacing [FIGREF1] with cross-reference...")
+            print("  Replacing [FIGREF1] with cross-reference...")
             word.Selection.Delete()
             try:
                 # Insert cross-reference using InsertCrossReference
@@ -222,7 +212,7 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
                     ReferenceType="Figure",
                     ReferenceKind=2,  # Only label and number
                     ReferenceItem=1,  # First figure
-                    InsertAsHyperlink=True
+                    InsertAsHyperlink=True,
                 )
                 print("    [OK] Cross-reference inserted")
             except Exception as e:
@@ -232,14 +222,11 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
         word.Selection.HomeKey(Unit=6)
         found = word.Selection.Find.Execute(FindText="[FIGREF2]", Forward=True, MatchWholeWord=False)
         if found:
-            print(f"  Replacing [FIGREF2] with cross-reference...")
+            print("  Replacing [FIGREF2] with cross-reference...")
             word.Selection.Delete()
             try:
                 word.Selection.InsertCrossReference(
-                    ReferenceType="Figure",
-                    ReferenceKind=2,
-                    ReferenceItem=2,  # Second figure
-                    InsertAsHyperlink=True
+                    ReferenceType="Figure", ReferenceKind=2, ReferenceItem=2, InsertAsHyperlink=True  # Second figure
                 )
                 print("    [OK] Cross-reference inserted")
             except Exception as e:
@@ -249,14 +236,11 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
         word.Selection.HomeKey(Unit=6)
         found = word.Selection.Find.Execute(FindText="[FIGREF2B]", Forward=True, MatchWholeWord=False)
         if found:
-            print(f"  Replacing [FIGREF2B] with cross-reference...")
+            print("  Replacing [FIGREF2B] with cross-reference...")
             word.Selection.Delete()
             try:
                 word.Selection.InsertCrossReference(
-                    ReferenceType="Figure",
-                    ReferenceKind=2,
-                    ReferenceItem=2,
-                    InsertAsHyperlink=True
+                    ReferenceType="Figure", ReferenceKind=2, ReferenceItem=2, InsertAsHyperlink=True
                 )
                 print("    [OK] Cross-reference inserted")
             except Exception as e:
@@ -266,14 +250,11 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
         word.Selection.HomeKey(Unit=6)
         found = word.Selection.Find.Execute(FindText="[FIGREF1B]", Forward=True, MatchWholeWord=False)
         if found:
-            print(f"  Replacing [FIGREF1B] with cross-reference...")
+            print("  Replacing [FIGREF1B] with cross-reference...")
             word.Selection.Delete()
             try:
                 word.Selection.InsertCrossReference(
-                    ReferenceType="Figure",
-                    ReferenceKind=2,
-                    ReferenceItem=1,
-                    InsertAsHyperlink=True
+                    ReferenceType="Figure", ReferenceKind=2, ReferenceItem=1, InsertAsHyperlink=True
                 )
                 print("    [OK] Cross-reference inserted")
             except Exception as e:
@@ -302,29 +283,29 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
         word.Quit()
 
     # === ANALYSIS ===
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("ANALYSIS: Comparing XML at each stage")
-    print("="*80)
+    print("=" * 80)
 
     # Analyze each document
     for filename in ["before_crossrefs.docx", "after_crossrefs_before_update.docx", "after_field_update.docx"]:
         filepath = tmp_path / filename
         if filepath.exists():
             print(f"\n### {filename} ###")
-            analyze_document_xml(filepath, tmp_path, filename.replace('.docx', ''))
+            analyze_document_xml(filepath, tmp_path, filename.replace(".docx", ""))
 
     # Verify the final document
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("VERIFICATION: Checking final document text")
-    print("="*80)
+    print("=" * 80)
 
     doc = Document(str(final_file))
     full_text = "\n".join([p.text for p in doc.paragraphs])
     print(full_text)
 
     # Check for duplicated labels
-    duplicated_figure = re.findall(r'Figure\s+Figure', full_text, re.IGNORECASE)
-    duplicated_table = re.findall(r'Table\s+Table', full_text, re.IGNORECASE)
+    duplicated_figure = re.findall(r"Figure\s+Figure", full_text, re.IGNORECASE)
+    duplicated_table = re.findall(r"Table\s+Table", full_text, re.IGNORECASE)
 
     if duplicated_figure:
         print(f"\n[X] ERROR: Found duplicated 'Figure' labels: {duplicated_figure}")
@@ -337,7 +318,7 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
         print("[✓] No duplicated 'Table' labels")
 
     # Check for correct numbering
-    fig_refs = re.findall(r'Figure\s+(\d+-\d+)', full_text)
+    fig_refs = re.findall(r"Figure\s+(\d+-\d+)", full_text)
     print(f"\nFigure references found: {fig_refs}")
 
     assert not duplicated_figure, f"Found duplicated 'Figure' labels: {duplicated_figure}"
@@ -351,13 +332,13 @@ def test_com_create_figures_and_tables_with_crossrefs(tmp_path):
 
 def analyze_document_xml(docx_file: Path, output_dir: Path, prefix: str):
     """Analyze and extract key XML patterns from a document."""
-    with zipfile.ZipFile(docx_file, 'r') as zip_ref:
-        with zip_ref.open('word/document.xml') as xml_file:
-            xml_content = xml_file.read().decode('utf-8')
+    with zipfile.ZipFile(docx_file, "r") as zip_ref:
+        with zip_ref.open("word/document.xml") as xml_file:
+            xml_content = xml_file.read().decode("utf-8")
 
     # Save full XML
     xml_out = output_dir / f"{prefix}_document.xml"
-    xml_out.write_text(xml_content, encoding='utf-8')
+    xml_out.write_text(xml_content, encoding="utf-8")
     print(f"  Full XML saved to: {xml_out.name}")
 
     # Extract bookmarks
@@ -367,13 +348,13 @@ def analyze_document_xml(docx_file: Path, output_dir: Path, prefix: str):
         print(f"    - {bm_name} (id={bm_id})")
 
     # Extract REF fields
-    ref_fields = re.findall(r'<w:instrText[^>]*>\s*REF\s+([^<]+)</w:instrText>', xml_content)
+    ref_fields = re.findall(r"<w:instrText[^>]*>\s*REF\s+([^<]+)</w:instrText>", xml_content)
     print(f"  REF fields: {len(ref_fields)}")
     for ref in ref_fields[:5]:
         print(f"    - REF {ref.strip()}")
 
     # Extract SEQ fields
-    seq_fields = re.findall(r'<w:instrText[^>]*>\s*SEQ\s+([^<]+)</w:instrText>', xml_content)
+    seq_fields = re.findall(r"<w:instrText[^>]*>\s*SEQ\s+([^<]+)</w:instrText>", xml_content)
     print(f"  SEQ fields: {len(seq_fields)}")
     for seq in seq_fields[:5]:
         print(f"    - SEQ {seq.strip()}")
@@ -381,6 +362,6 @@ def analyze_document_xml(docx_file: Path, output_dir: Path, prefix: str):
 
 if __name__ == "__main__":
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmp:
         test_com_create_figures_and_tables_with_crossrefs(Path(tmp))
-

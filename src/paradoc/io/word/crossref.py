@@ -30,7 +30,7 @@ def convert_figure_references_to_ref_fields(document, figures):
     # Pandoc-crossref may output with or without space, and uses period or hyphen as separator
     # Use [\s\xa0]* to match optional space (zero or more)
     # Use [\d\.\-]+ to match numbers with period or hyphen separators
-    fig_ref_pattern = re.compile(r'\b(?:Figure|fig\.)[\s\xa0]*([\d\.\-]+)', re.IGNORECASE)
+    fig_ref_pattern = re.compile(r"\b(?:Figure|fig\.)[\s\xa0]*([\d\.\-]+)", re.IGNORECASE)
 
     _convert_references(document, bookmarks_in_order, fig_ref_pattern, "Figure")
 
@@ -56,7 +56,7 @@ def convert_table_references_to_ref_fields(document, tables):
     # Pandoc-crossref may output with or without space, and uses period or hyphen as separator
     # Use [\s\xa0]* to match optional space (zero or more)
     # Use [\d\.\-]+ to match numbers with period or hyphen separators
-    tbl_ref_pattern = re.compile(r'\b(?:Table|tbl\.)[\s\xa0]*([\d\.\-]+)', re.IGNORECASE)
+    tbl_ref_pattern = re.compile(r"\b(?:Table|tbl\.)[\s\xa0]*([\d\.\-]+)", re.IGNORECASE)
 
     _convert_references(document, bookmarks_in_order, tbl_ref_pattern, "Table")
 
@@ -75,7 +75,7 @@ def convert_equation_references_to_ref_fields(document, equations):
     if not bookmarks_in_order:
         return  # No equations to process
 
-    eq_ref_pattern = re.compile(r'\b((?:Eq(?:uation)?|eq\.)\s+([\d\-]+))\b', re.IGNORECASE)
+    eq_ref_pattern = re.compile(r"\b((?:Eq(?:uation)?|eq\.)\s+([\d\-]+))\b", re.IGNORECASE)
 
     _convert_references(document, bookmarks_in_order, eq_ref_pattern, "Eq", num_group=2)
 
@@ -91,8 +91,8 @@ def _extract_bookmarks_from_figures(figures) -> list[str]:
     """
     bookmarks = []
     for fig in figures:
-        if hasattr(fig, 'figure_ref') and fig.figure_ref.reference:
-            if hasattr(fig, 'actual_bookmark_name') and fig.actual_bookmark_name:
+        if hasattr(fig, "figure_ref") and fig.figure_ref.reference:
+            if hasattr(fig, "actual_bookmark_name") and fig.actual_bookmark_name:
                 bookmarks.append(fig.actual_bookmark_name)
     return bookmarks
 
@@ -108,8 +108,8 @@ def _extract_bookmarks_from_tables(tables) -> list[str]:
     """
     bookmarks = []
     for tbl in tables:
-        if hasattr(tbl, 'table_ref') and hasattr(tbl.table_ref, 'link_name_override'):
-            if hasattr(tbl, 'actual_bookmark_name') and tbl.actual_bookmark_name:
+        if hasattr(tbl, "table_ref") and hasattr(tbl.table_ref, "link_name_override"):
+            if hasattr(tbl, "actual_bookmark_name") and tbl.actual_bookmark_name:
                 bookmarks.append(tbl.actual_bookmark_name)
     return bookmarks
 
@@ -125,8 +125,8 @@ def _extract_bookmarks_from_equations(equations) -> list[str]:
     """
     bookmarks = []
     for eq in equations:
-        if hasattr(eq, 'reference') and eq.reference:
-            if hasattr(eq, 'actual_bookmark_name') and eq.actual_bookmark_name:
+        if hasattr(eq, "reference") and eq.reference:
+            if hasattr(eq, "actual_bookmark_name") and eq.actual_bookmark_name:
                 bookmarks.append(eq.actual_bookmark_name)
     return bookmarks
 
@@ -149,7 +149,7 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
     caption_count = 0
 
     # Pattern to identify caption paragraphs (matches both "Figure 1-1:" and "Figure 1.1:")
-    caption_pattern = re.compile(rf'{label}\s+[\d\.\-]+:', re.IGNORECASE)
+    caption_pattern = re.compile(rf"{label}\s+[\d\.\-]+:", re.IGNORECASE)
 
     # Also track the actual numbers we see for later mapping
     seen_numbers = []
@@ -164,7 +164,7 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
             # Extract the full matched pattern to get the number
             full_match = match.group(0)
             # Extract just the number part (e.g., "1-1" or "1.1" from "Figure 1-1:" or "Figure 1.1:")
-            num_match = re.search(r'([\d\.\-]+):', full_match)
+            num_match = re.search(r"([\d\.\-]+):", full_match)
             if num_match:
                 ref_num = num_match.group(1)
                 seen_numbers.append(ref_num)
@@ -177,8 +177,10 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
     # we need to handle references by sequential order instead
     unique_numbers = set(seen_numbers)
     if len(unique_numbers) == 1 and len(seen_numbers) > 1:
-        print(f"[DEBUG _convert_references]   WARNING: All captions show same number '{list(unique_numbers)[0]}' - likely unevaluated SEQ fields")
-        print(f"[DEBUG _convert_references]   Will use sequential matching for references")
+        print(
+            f"[DEBUG _convert_references]   WARNING: All captions show same number '{list(unique_numbers)[0]}' - likely unevaluated SEQ fields"
+        )
+        print("[DEBUG _convert_references]   Will use sequential matching for references")
         # In this case, we can't reliably map by number, so we'll need to match references
         # to captions in the order they appear in the document
 
@@ -189,7 +191,7 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
     processed_count = 0
     skipped_caption = 0
     no_match = 0
-    
+
     # Track reference occurrences for sequential matching when all captions have same number
     reference_occurrence_count = {}
 
@@ -209,13 +211,25 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
 
         # Process the paragraph
         print(f"[DEBUG _convert_references] Processing paragraph with {label}: {block.text[:80]}")
-        _process_paragraph_references(block, pattern, bookmarks_in_order, label, num_group, reference_to_index, reference_occurrence_count)
+        _process_paragraph_references(
+            block, pattern, bookmarks_in_order, label, num_group, reference_to_index, reference_occurrence_count
+        )
         processed_count += 1
-    
-    print(f"[DEBUG _convert_references] {label} summary: processed={processed_count}, skipped_caption={skipped_caption}, no_match={no_match}")
+
+    print(
+        f"[DEBUG _convert_references] {label} summary: processed={processed_count}, skipped_caption={skipped_caption}, no_match={no_match}"
+    )
 
 
-def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, bookmarks: list[str], label: str, num_group: int, reference_to_index: dict = None, reference_occurrence_count: dict = None):
+def _process_paragraph_references(
+    paragraph: Paragraph,
+    pattern: re.Pattern,
+    bookmarks: list[str],
+    label: str,
+    num_group: int,
+    reference_to_index: dict = None,
+    reference_occurrence_count: dict = None,
+):
     """Process a single paragraph to replace text references with REF fields.
 
     Args:
@@ -231,7 +245,7 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
     matches = list(pattern.finditer(original_text))
     if not matches:
         return
-    
+
     print(f"[DEBUG _process_paragraph_references] Found {len(matches)} matches in: {original_text[:80]}")
 
     # Store paragraph element before clearing
@@ -241,7 +255,7 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
     for run in list(paragraph.runs):
         p_element.remove(run._element)
     for child in list(p_element):
-        if child.tag == qn('w:hyperlink'):
+        if child.tag == qn("w:hyperlink"):
             p_element.remove(child)
 
     # Rebuild the paragraph with text and REF fields
@@ -259,7 +273,7 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
             num_str = match.group(2)
         else:
             # For figures/tables: group 1 is number
-            num_str = match.group(1).split()[-1] if ' ' in match.group(1) else match.group(1)
+            num_str = match.group(1).split()[-1] if " " in match.group(1) else match.group(1)
 
         # Map the reference number to the bookmark
         if all_same_number and reference_occurrence_count is not None:
@@ -269,7 +283,9 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
                 reference_occurrence_count[num_str] = 0
             bookmark_idx = reference_occurrence_count[num_str]
             reference_occurrence_count[num_str] += 1
-            print(f"[DEBUG _process_paragraph_references]   Sequential match: reference #{bookmark_idx} (number: {num_str})")
+            print(
+                f"[DEBUG _process_paragraph_references]   Sequential match: reference #{bookmark_idx} (number: {num_str})"
+            )
         elif reference_to_index and num_str in reference_to_index:
             # Use the pre-built mapping
             bookmark_idx = reference_to_index[num_str]
@@ -278,10 +294,10 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
             try:
                 if num_str in ("-", "."):
                     bookmark_idx = 0
-                elif '-' in num_str or '.' in num_str:
+                elif "-" in num_str or "." in num_str:
                     # For chapter-based numbers (e.g., "1-1" or "1.1"), can't determine sequential position without mapping
                     # Fall back to using the section number - 1
-                    separator = '-' if '-' in num_str else '.'
+                    separator = "-" if "-" in num_str else "."
                     bookmark_idx = int(num_str.split(separator)[0]) - 1
                 else:
                     bookmark_idx = int(num_str) - 1
@@ -302,13 +318,15 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
 
         # Add text before the reference
         if match.start() > last_pos:
-            before_text = original_text[last_pos:match.start()]
+            before_text = original_text[last_pos : match.start()]
             create_text_run(p_element, before_text)
 
         # Add REF field
         create_ref_field_runs(p_element, bookmark_name, label=label)
         ref_fields_added += 1
-        print(f"[DEBUG _process_paragraph_references]   Added REF field #{ref_fields_added}: {num_str} -> index {bookmark_idx} -> {bookmark_name}")
+        print(
+            f"[DEBUG _process_paragraph_references]   Added REF field #{ref_fields_added}: {num_str} -> index {bookmark_idx} -> {bookmark_name}"
+        )
 
         last_pos = match.end()
 
@@ -316,7 +334,5 @@ def _process_paragraph_references(paragraph: Paragraph, pattern: re.Pattern, boo
     if last_pos < len(original_text):
         after_text = original_text[last_pos:]
         create_text_run(p_element, after_text)
-    
+
     print(f"[DEBUG _process_paragraph_references] Completed: added {ref_fields_added} REF fields")
-
-

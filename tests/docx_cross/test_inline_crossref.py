@@ -22,26 +22,18 @@ def test_cross_reference_inline(tmp_path):
 
         # Add figures with captions
         fig1 = doc.add_figure_with_caption(
-            caption_text="First Example Figure",
-            create_bookmark=True,
-            use_chapter_numbers=False
+            caption_text="First Example Figure", create_bookmark=True, use_chapter_numbers=False
         )
         doc.add_paragraph()
 
         fig2 = doc.add_figure_with_caption(
-            caption_text="Second Example Figure",
-            create_bookmark=True,
-            use_chapter_numbers=False
+            caption_text="Second Example Figure", create_bookmark=True, use_chapter_numbers=False
         )
         doc.add_paragraph()
 
         # Add table with caption
         tbl1 = doc.add_table_with_caption(
-            caption_text="Example Table",
-            rows=2,
-            cols=2,
-            create_bookmark=True,
-            use_chapter_numbers=False
+            caption_text="Example Table", rows=2, cols=2, create_bookmark=True, use_chapter_numbers=False
         )
         doc.add_paragraph()
 
@@ -82,7 +74,7 @@ def test_cross_reference_inline(tmp_path):
     paragraphs_with_crossrefs = []
     for para in docx_doc.paragraphs:
         text = para.text.strip()
-        if text and para.style.name != 'Caption' and 'Figure' in text or 'Table' in text:
+        if text and para.style.name != "Caption" and "Figure" in text or "Table" in text:
             paragraphs_with_crossrefs.append(text)
 
     print(f"\n✓ Found {len(paragraphs_with_crossrefs)} paragraphs with cross-references:")
@@ -119,12 +111,12 @@ def test_cross_reference_inline(tmp_path):
             break
     assert test3_found, "Test 3: Should find table cross-reference inline"
 
-    print(f"\n✓ All inline cross-reference tests passed!")
+    print("\n✓ All inline cross-reference tests passed!")
     print(f"✓ Document saved to: {output_file}")
 
 
 if __name__ == "__main__":
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmp:
         test_cross_reference_inline(Path(tmp))
-

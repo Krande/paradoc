@@ -126,7 +126,9 @@ class WordExporter:
                 restart_caption_num = True
             else:
                 restart_caption_num = False
-            docx_tbl.format_table(is_appendix, restart_caption_numbering=restart_caption_num, reference_helper=reference_helper)
+            docx_tbl.format_table(
+                is_appendix, restart_caption_numbering=restart_caption_num, reference_helper=reference_helper
+            )
             tables.append(docx_tbl)
         return tables
 

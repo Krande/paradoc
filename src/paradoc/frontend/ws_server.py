@@ -33,16 +33,16 @@ logger = logging.getLogger("paradoc.ws_server")
 logger.setLevel(logging.DEBUG)
 
 # File handler
-file_handler = logging.FileHandler(LOG_FILE, mode='a', encoding='utf-8')
+file_handler = logging.FileHandler(LOG_FILE, mode="a", encoding="utf-8")
 file_handler.setLevel(logging.DEBUG)
-file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 file_handler.setFormatter(file_formatter)
 logger.addHandler(file_handler)
 
 # Console handler (optional, for when run directly)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
-console_formatter = logging.Formatter('%(levelname)s - %(message)s')
+console_formatter = logging.Formatter("%(levelname)s - %(message)s")
 console_handler.setFormatter(console_formatter)
 logger.addHandler(console_handler)
 
@@ -79,7 +79,7 @@ async def _cleanup_stale_frontends() -> None:
 async def _handle_client(ws: ProtocolType) -> None:
     CLIENTS.add(ws)
     client_frontend_id = None  # Track this client's frontend_id for cleanup
-    client_addr = ws.remote_address if hasattr(ws, 'remote_address') else 'unknown'
+    client_addr = ws.remote_address if hasattr(ws, "remote_address") else "unknown"
 
     logger.info(f"New client connected from {client_addr}. Total clients: {len(CLIENTS)}")
 
@@ -111,10 +111,12 @@ async def _handle_client(ws: ProtocolType) -> None:
                                 CONNECTED_FRONTENDS[frontend_id] = {
                                     "ws": ws,
                                     "last_heartbeat": time.time(),
-                                    "frontend_id": frontend_id
+                                    "frontend_id": frontend_id,
                                 }
                                 if was_new:
-                                    logger.info(f"Frontend registered: {frontend_id}. Total frontends: {len(CONNECTED_FRONTENDS)}")
+                                    logger.info(
+                                        f"Frontend registered: {frontend_id}. Total frontends: {len(CONNECTED_FRONTENDS)}"
+                                    )
                                 else:
                                     logger.debug(f"Frontend heartbeat updated: {frontend_id}")
                                 await ws.send(json.dumps({"kind": "heartbeat_ack", "frontend_id": frontend_id}))
@@ -123,11 +125,13 @@ async def _handle_client(ws: ProtocolType) -> None:
                         # Handle get_connected_frontends request
                         if kind == "get_connected_frontends":
                             frontend_ids = list(CONNECTED_FRONTENDS.keys())
-                            logger.debug(f"Connected frontends requested. Count: {len(frontend_ids)}, IDs: {frontend_ids}")
+                            logger.debug(
+                                f"Connected frontends requested. Count: {len(frontend_ids)}, IDs: {frontend_ids}"
+                            )
                             response = {
                                 "kind": "connected_frontends",
                                 "frontend_ids": frontend_ids,
-                                "count": len(frontend_ids)
+                                "count": len(frontend_ids),
                             }
                             await ws.send(json.dumps(response))
                             continue
@@ -136,10 +140,7 @@ async def _handle_client(ws: ProtocolType) -> None:
                         if kind == "get_log_file_path":
                             log_path = str(LOG_FILE.absolute())
                             logger.debug(f"Log file path requested: {log_path}")
-                            response = {
-                                "kind": "log_file_path",
-                                "path": log_path
-                            }
+                            response = {"kind": "log_file_path", "path": log_path}
                             await ws.send(json.dumps(response))
                             continue
 

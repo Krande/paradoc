@@ -6,7 +6,9 @@ from docx.text.run import Run
 from .fields import add_seq_reference
 
 
-def rebuild_caption(caption: Paragraph, caption_prefix: str, caption_str: str, is_appendix: bool, should_restart: bool = False):
+def rebuild_caption(
+    caption: Paragraph, caption_prefix: str, caption_str: str, is_appendix: bool, should_restart: bool = False
+):
     """Rebuild a caption paragraph with proper SEQ and STYLEREF fields.
 
     Creates a caption like "Figure 2-1: Caption text" where:
@@ -43,7 +45,6 @@ def rebuild_caption(caption: Paragraph, caption_prefix: str, caption_str: str, i
         # Continue the sequence within the chapter
         seq_instruction = f"SEQ {caption_prefix} \\* ARABIC \\s 1"
 
-
     # Add caption prefix text (e.g., "Figure ")
     seq1 = caption._element._new_r()
     seq1.text = caption_prefix + " "
@@ -68,5 +69,3 @@ def rebuild_caption(caption: Paragraph, caption_prefix: str, caption_str: str, i
     fin_run = Run(fin, run._parent)
     fin_run.text = ": " + caption_str
     run._element.addprevious(fin)
-
-

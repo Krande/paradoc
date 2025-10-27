@@ -31,9 +31,9 @@ def test_com_api_reference_document(tmp_path):
 
     All figures and tables are cross-referenced within their sections.
     """
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("TEST: COM API REFERENCE DOCUMENT")
-    print("="*80)
+    print("=" * 80)
 
     from paradoc.io.word.com_api import WordApplication
 
@@ -58,7 +58,7 @@ def test_com_api_reference_document(tmp_path):
                 doc.add_heading(f"Section {subsection_label}", level=2)
 
                 # Add paragraph with cross-reference placeholders
-                doc.add_text(f"This subsection discusses ")
+                doc.add_text("This subsection discusses ")
                 doc.add_paragraph()
 
                 # Add figure
@@ -66,21 +66,18 @@ def test_com_api_reference_document(tmp_path):
                     caption_text=f"Caption for figure in section {subsection_label}",
                     width=150,
                     height=100,
-                    use_chapter_numbers=True
+                    use_chapter_numbers=True,
                 )
                 print(f"    Added Figure {section_num}-{subsection_num}")
 
                 # Add table
-                table_data = [
-                    ["Header 1", "Header 2"],
-                    [f"Data {subsection_label}.1", f"Data {subsection_label}.2"]
-                ]
+                table_data = [["Header 1", "Header 2"], [f"Data {subsection_label}.1", f"Data {subsection_label}.2"]]
                 tbl_ref = doc.add_table_with_caption(
                     caption_text=f"Caption for table in section {subsection_label}",
                     rows=2,
                     cols=2,
                     data=table_data,
-                    use_chapter_numbers=True
+                    use_chapter_numbers=True,
                 )
                 print(f"    Added Table {section_num}-{subsection_num}")
 
@@ -111,9 +108,9 @@ def test_paradoc_document(tmp_path):
 
     Same structure as COM API test.
     """
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("TEST: PARADOC DOCUMENT")
-    print("="*80)
+    print("=" * 80)
 
     from paradoc import OneDoc
 
@@ -146,17 +143,19 @@ def test_paradoc_document(tmp_path):
             subsection_label = f"{section_num}.{subsection_num}"
 
             md_content += f"## Section {subsection_label}\n\n"
-            md_content += f"This subsection discusses\n\n"
+            md_content += "This subsection discusses\n\n"
 
             # Add figure
             fig_id = f"fig{section_num}_{subsection_num}"
-            md_content += f"![Caption for figure in section {subsection_label}](images/fig{fig_counter}.png){{#fig:{fig_id}}}\n\n"
+            md_content += (
+                f"![Caption for figure in section {subsection_label}](images/fig{fig_counter}.png){{#fig:{fig_id}}}\n\n"
+            )
 
             # Add table - use simple markdown table without database integration
             tbl_id = f"tbl{section_num}_{subsection_num}"
             md_content += f"Table: Caption for table in section {subsection_label} {{#tbl:{tbl_id}}}\n\n"
-            md_content += f"| Header 1 | Header 2 |\n"
-            md_content += f"|:---------|:---------|\n"
+            md_content += "| Header 1 | Header 2 |\n"
+            md_content += "|:---------|:---------|\n"
             md_content += f"| Data {subsection_label}.1 | Data {subsection_label}.2 |\n\n"
 
             # Add cross-references
@@ -192,9 +191,9 @@ def test_compare_documents_from_files(tmp_path):
     This should be run after both test_com_api_reference_document and
     test_paradoc_document have been run successfully.
     """
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("TEST: COMPARE DOCUMENTS FROM FILES")
-    print("="*80)
+    print("=" * 80)
 
     # Look for existing files
     com_file = tmp_path / "com_reference.docx"
@@ -206,9 +205,9 @@ def test_compare_documents_from_files(tmp_path):
         pytest.skip(f"Paradoc output file not found: {paradoc_file}")
 
     # Extract and compare XML
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("COMPARING XML STRUCTURES")
-    print("="*80)
+    print("=" * 80)
 
     com_xml = extract_document_xml(com_file)
     paradoc_xml = extract_document_xml(paradoc_file)
@@ -277,7 +276,7 @@ def test_compare_documents_from_files(tmp_path):
     com_xml_file.write_text(com_xml, encoding="utf-8")
     paradoc_xml_file.write_text(paradoc_xml, encoding="utf-8")
 
-    print(f"\n[SAVED] Detailed XML files:")
+    print("\n[SAVED] Detailed XML files:")
     print(f"  COM API: {com_xml_file}")
     print(f"  Paradoc: {paradoc_xml_file}")
 
@@ -307,8 +306,8 @@ def analyze_document_structure(docx_path: Path, label: str):
 
 def extract_document_xml(docx_path: Path) -> str:
     """Extract document.xml from docx file."""
-    with zipfile.ZipFile(docx_path, 'r') as zip_ref:
-        return zip_ref.read('word/document.xml').decode('utf-8')
+    with zipfile.ZipFile(docx_path, "r") as zip_ref:
+        return zip_ref.read("word/document.xml").decode("utf-8")
 
 
 def extract_captions(xml_content: str, caption_type: str) -> list[str]:
@@ -317,14 +316,14 @@ def extract_captions(xml_content: str, caption_type: str) -> list[str]:
 
     # Pattern to find caption paragraphs
     # Look for paragraphs containing the caption type
-    para_pattern = r'<w:p\b[^>]*>.*?</w:p>'
+    para_pattern = r"<w:p\b[^>]*>.*?</w:p>"
 
     for para_match in re.finditer(para_pattern, xml_content, re.DOTALL):
         para_xml = para_match.group(0)
 
         # Extract text from the paragraph
-        text_parts = re.findall(r'<w:t[^>]*>(.*?)</w:t>', para_xml)
-        full_text = ''.join(text_parts)
+        text_parts = re.findall(r"<w:t[^>]*>(.*?)</w:t>", para_xml)
+        full_text = "".join(text_parts)
 
         if caption_type in full_text and ("Caption" in para_xml or "SEQ" in para_xml):
             captions.append(full_text)
@@ -337,7 +336,7 @@ def extract_cross_references(xml_content: str) -> list[str]:
     refs = []
 
     # Pattern for REF fields
-    ref_pattern = r'<w:instrText[^>]*>(.*?REF.*?)</w:instrText>'
+    ref_pattern = r"<w:instrText[^>]*>(.*?REF.*?)</w:instrText>"
 
     for match in re.finditer(ref_pattern, xml_content):
         refs.append(match.group(1))
@@ -362,10 +361,10 @@ def extract_bookmarks(xml_content: str) -> dict[str, str]:
         end_match = re.search(end_pattern, xml_content[start_pos:])
 
         if end_match:
-            content = xml_content[start_pos:start_pos + end_match.start()]
+            content = xml_content[start_pos : start_pos + end_match.start()]
             # Extract text
-            text_parts = re.findall(r'<w:t[^>]*>(.*?)</w:t>', content)
-            bookmarks[name] = ''.join(text_parts)
+            text_parts = re.findall(r"<w:t[^>]*>(.*?)</w:t>", content)
+            bookmarks[name] = "".join(text_parts)
 
     return bookmarks
 
@@ -375,7 +374,7 @@ def analyze_field_structure(xml_content: str, label: str):
     print(f"\n{label} Field Structure:")
 
     # Find all SEQ fields
-    seq_pattern = r'<w:instrText[^>]*>(.*?SEQ.*?)</w:instrText>'
+    seq_pattern = r"<w:instrText[^>]*>(.*?SEQ.*?)</w:instrText>"
     seq_fields = re.findall(seq_pattern, xml_content)
 
     print(f"  SEQ fields ({len(seq_fields)}):")
@@ -383,7 +382,7 @@ def analyze_field_structure(xml_content: str, label: str):
         print(f"    {i}. {field}")
 
     # Find all REF fields
-    ref_pattern = r'<w:instrText[^>]*>(.*?REF.*?)</w:instrText>'
+    ref_pattern = r"<w:instrText[^>]*>(.*?REF.*?)</w:instrText>"
     ref_fields = re.findall(ref_pattern, xml_content)
 
     print(f"  REF fields ({len(ref_fields)}):")
@@ -391,7 +390,7 @@ def analyze_field_structure(xml_content: str, label: str):
         print(f"    {i}. {field}")
 
     # Find all STYLEREF fields
-    styleref_pattern = r'<w:instrText[^>]*>(.*?STYLEREF.*?)</w:instrText>'
+    styleref_pattern = r"<w:instrText[^>]*>(.*?STYLEREF.*?)</w:instrText>"
     styleref_fields = re.findall(styleref_pattern, xml_content)
 
     print(f"  STYLEREF fields ({len(styleref_fields)}):")
@@ -401,6 +400,6 @@ def analyze_field_structure(xml_content: str, label: str):
 
 if __name__ == "__main__":
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmp:
         test_compare_com_and_paradoc(Path(tmp))
-

@@ -1,6 +1,5 @@
 """Debug test to check if REF fields are being created."""
 
-import os
 import platform
 import re
 
@@ -21,6 +20,7 @@ def test_debug_ref_conversion(tmp_path, capsys):
 
     # Create test image
     import base64
+
     png_data = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
     )
@@ -58,7 +58,7 @@ Reference to figure: [@fig:test_figure]
     bookmark_id = None
 
     for para in doc.paragraphs:
-        xml_str = para._element.xml.decode('utf-8') if isinstance(para._element.xml, bytes) else para._element.xml
+        xml_str = para._element.xml.decode("utf-8") if isinstance(para._element.xml, bytes) else para._element.xml
 
         if "Test Figure Caption" in para.text:
             # Check for Word's native _Ref bookmark (e.g., _Ref695480937)
@@ -88,10 +88,9 @@ Reference to figure: [@fig:test_figure]
 
             if not has_ref_field and "REF" in xml_str:
                 # Extract REF instructions
-                ref_matches = re.findall(r'<w:instrText[^>]*>([^<]*)</w:instrText>', xml_str)
+                ref_matches = re.findall(r"<w:instrText[^>]*>([^<]*)</w:instrText>", xml_str)
                 print(f"REF instructions found: {ref_matches}")
 
     assert has_bookmark, "Caption should have Word's native _Ref bookmark"
     assert has_ref_field, "Reference should have REF field pointing to _Ref bookmark"
     assert correct_order, "Figure reference should appear AFTER 'Reference to figure:', not before"
-

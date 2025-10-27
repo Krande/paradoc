@@ -67,16 +67,16 @@ class OneDoc:
     FORMATS = ExportFormats
 
     def __init__(
-            self,
-            source_dir=None,
-            main_prefix="00-main",
-            app_prefix="01-app",
-            clean_build_dir=True,
-            create_dirs=False,
-            output_dir=None,
-            work_dir=None,
-            use_default_html_style=True,
-            **kwargs,
+        self,
+        source_dir=None,
+        main_prefix="00-main",
+        app_prefix="01-app",
+        clean_build_dir=True,
+        create_dirs=False,
+        output_dir=None,
+        work_dir=None,
+        use_default_html_style=True,
+        **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
         if work_dir is None:
@@ -162,7 +162,7 @@ class OneDoc:
                 # Check if the figure is commented out
                 # Get first newline right before regex search found start and till the end (capture entire line)
                 start = fig.string[: fig.start()].rfind("\n") + 1
-                end = fig.string[fig.start():].find("\n") + fig.start()
+                end = fig.string[fig.start() :].find("\n") + fig.start()
                 line = fig.string[start:end]
                 if line.startswith("[//]: #"):
                     continue
@@ -232,7 +232,7 @@ class OneDoc:
             shutil.copy(fp, build_file)
 
             # Skip markdown and already under dist_dir
-            if fp.suffix.lower() in (".md", ):
+            if fp.suffix.lower() in (".md",):
                 continue
             try:
                 if self.dist_dir in fp.parents:
@@ -250,8 +250,8 @@ class OneDoc:
             with open(self.metadata_file, "w") as f:
                 # Use correct pandoc-crossref metadata format
                 # figureTitle and tableTitle are the proper settings for pandoc-crossref
-                f.write('linkReferences: true\n')
-                f.write('nameInLink: true\n')
+                f.write("linkReferences: true\n")
+                f.write("nameInLink: true\n")
                 f.write('figureTitle: "Figure"\n')
                 f.write('tableTitle: "Table"\n')
                 f.write('figPrefix: "Figure"\n')  # Keep for backwards compatibility
@@ -263,14 +263,14 @@ class OneDoc:
                 shutil.copy(MY_DEFAULT_HTML_CSS, css_style)
 
     def compile(
-            self,
-            output_name,
-            auto_open=False,
-            metadata_file=None,
-            export_format: ExportFormats | str = ExportFormats.DOCX,
-            send_to_frontend=False,
-            update_docx_with_com=True,
-            **kwargs,
+        self,
+        output_name,
+        auto_open=False,
+        metadata_file=None,
+        export_format: ExportFormats | str = ExportFormats.DOCX,
+        send_to_frontend=False,
+        update_docx_with_com=True,
+        **kwargs,
     ):
         """
         Compiles a report into the specified format and handles the resultant exported
@@ -325,6 +325,7 @@ class OneDoc:
 
             if update_docx_with_com and platform.system() == "Windows":
                 from paradoc.io.word.utils import docx_update
+
                 docx_update(dest_file)
 
         elif export_format == ExportFormats.PDF:
@@ -437,12 +438,7 @@ class OneDoc:
 
         # Create and store Table object for DOCX export compatibility
         # Store with unique_key (including usage count suffix) to handle multiple instances
-        table_obj = Table(
-            name=unique_key,
-            df=df,
-            caption=table_data.caption,
-            link_name_override=unique_key
-        )
+        table_obj = Table(name=unique_key, df=df, caption=table_data.caption, link_name_override=unique_key)
         self.tables[unique_key] = table_obj
 
         return tbl_str
@@ -561,13 +557,10 @@ class OneDoc:
         # This ensures format_figures() can find database-generated plots
         if caption:
             from paradoc.common import Figure
+
             file_path_str = f"images/{plot_filename}"
             self.figures[caption] = Figure(
-                name=unique_key,
-                caption=caption,
-                reference=fig_id,
-                file_path=file_path_str,
-                md_instance=mdf
+                name=unique_key, caption=caption, reference=fig_id, file_path=file_path_str, md_instance=mdf
             )
 
         return img_markdown

@@ -1,4 +1,5 @@
 """WebSocket client wrapper for communicating with the Paradoc WS server."""
+
 import json
 from typing import Any, Dict, List
 
@@ -239,4 +240,3 @@ class WSClient:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         self.disconnect()
-

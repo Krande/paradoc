@@ -19,13 +19,13 @@ print("\n=== BEFORE BOOKMARK ===")
 print(f"Paragraph text: {caption_para.text}")
 print(f"Number of runs: {len(list(caption_para._p))}")
 for i, run in enumerate(caption_para._p):
-    if hasattr(run, 'text'):
+    if hasattr(run, "text"):
         print(f"  Run {i}: {run.text[:50] if len(run.text) > 50 else run.text}")
 
 # Add bookmark
 bookmark_name = add_bookmark_around_seq_field(caption_para, "fig:test")
 
-print(f"\n=== AFTER BOOKMARK ===")
+print("\n=== AFTER BOOKMARK ===")
 print(f"Bookmark name: {bookmark_name}")
 
 # Save to temp file
@@ -35,9 +35,9 @@ print(f"\nSaved to: {output_path}")
 
 # Inspect the bookmark
 from paradoc.io.word.inspect import DocxInspector
+
 inspector = DocxInspector(output_path)
 bookmarks = inspector.bookmarks()
-print(f"\n=== BOOKMARKS ===")
+print("\n=== BOOKMARKS ===")
 for bm in bookmarks:
     print(f"  {bm.name}: {bm.context}")
-

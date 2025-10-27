@@ -28,6 +28,7 @@ def test_figure_reference_with_com_update(tmp_path):
 
     # Create test image
     import base64
+
     png_data = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
     )
@@ -60,9 +61,9 @@ Another reference: see [@fig:test_figure] for details.
     # Now run the COM update manually to update fields
     from paradoc.io.word.utils import docx_update
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("RUNNING COM FIELD UPDATE")
-    print("="*80)
+    print("=" * 80)
 
     try:
         docx_update(str(output_file))
@@ -74,9 +75,9 @@ Another reference: see [@fig:test_figure] for details.
     # Reload document to check results after field update
     doc = Document(str(output_file))
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("CHECKING DOCUMENT AFTER COM UPDATE")
-    print("="*80)
+    print("=" * 80)
 
     # Find caption with bookmark
     caption_found = False
@@ -87,7 +88,7 @@ Another reference: see [@fig:test_figure] for details.
             print(f"\nFound caption: {para.text}")
 
             # Check for bookmark
-            xml_str = para._element.xml.decode('utf-8') if isinstance(para._element.xml, bytes) else para._element.xml
+            xml_str = para._element.xml.decode("utf-8") if isinstance(para._element.xml, bytes) else para._element.xml
             if "bookmarkStart" in xml_str:
                 bookmark_matches = re.findall(r'w:name="([^"]+)"', xml_str)
                 if bookmark_matches:
@@ -111,21 +112,21 @@ Another reference: see [@fig:test_figure] for details.
             else:
                 # Check for proper figure number (should be "Figure 1", not "Figure -")
                 if "Figure" in para.text:
-                    figure_match = re.search(r'Figure\s+([\d]+)', para.text)
+                    figure_match = re.search(r"Figure\s+([\d]+)", para.text)
                     if figure_match:
                         fig_num = figure_match.group(1)
                         print(f"  ✓ Contains valid figure reference: Figure {fig_num}")
                     else:
-                        print(f"  ⚠ Figure reference format unclear")
+                        print("  ⚠ Figure reference format unclear")
 
             # Check XML for REF field structure
-            xml_str = para._element.xml.decode('utf-8') if isinstance(para._element.xml, bytes) else para._element.xml
+            xml_str = para._element.xml.decode("utf-8") if isinstance(para._element.xml, bytes) else para._element.xml
             if "REF" in xml_str and "STYLEREF" not in xml_str:
-                ref_matches = re.findall(r'<w:instrText[^>]*>([^<]*REF[^<]*)</w:instrText>', xml_str)
+                ref_matches = re.findall(r"<w:instrText[^>]*>([^<]*REF[^<]*)</w:instrText>", xml_str)
                 if ref_matches:
                     print(f"  REF field instruction: {ref_matches[0]}")
 
-    print(f"\nSummary:")
+    print("\nSummary:")
     print(f"  Caption found: {caption_found}")
     print(f"  Bookmark name: {bookmark_name}")
     print(f"  Reference paragraphs found: {len(ref_paragraphs)}")
@@ -137,7 +138,7 @@ Another reference: see [@fig:test_figure] for details.
     else:
         print("\n✅ PASS: No errors found - bookmark format is compatible with Word COM update")
 
-    print("="*80)
+    print("=" * 80)
 
     if auto_open:
         os.startfile(output_file)
@@ -148,4 +149,3 @@ Another reference: see [@fig:test_figure] for details.
     assert bookmark_name.startswith("_Ref"), f"Bookmark should start with '_Ref' but is '{bookmark_name}'"
     assert len(ref_paragraphs) == 2, f"Should find 2 reference paragraphs, found {len(ref_paragraphs)}"
     assert not error_found, "Should not have 'Error! Not a valid bookmark' messages in references"
-

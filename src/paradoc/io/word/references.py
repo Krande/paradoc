@@ -32,20 +32,19 @@ from .fields import (
 
 __all__ = [
     # Bookmarks
-    'add_bookmark_around_seq_field',
-    'add_bookmark_to_caption',
-    '_normalize_bookmark_name',
+    "add_bookmark_around_seq_field",
+    "add_bookmark_to_caption",
+    "_normalize_bookmark_name",
     # Captions
-    'insert_caption',
-    'insert_caption_into_runs',
-    'rebuild_caption',
+    "insert_caption",
+    "insert_caption_into_runs",
+    "rebuild_caption",
     # Cross-references
-    'convert_equation_references_to_ref_fields',
-    'convert_figure_references_to_ref_fields',
-    'convert_table_references_to_ref_fields',
+    "convert_equation_references_to_ref_fields",
+    "convert_figure_references_to_ref_fields",
+    "convert_table_references_to_ref_fields",
     # Fields
-    'add_ref_field_to_paragraph',
-    'add_seq_reference',
-    'add_table_reference',
+    "add_ref_field_to_paragraph",
+    "add_seq_reference",
+    "add_table_reference",
 ]
-

@@ -5,15 +5,13 @@ import re
 import zipfile
 from pathlib import Path
 
-import pytest
-from docx import Document
 
 
 def test_diagnose_paradoc_bookmarks(tmp_path):
     """Create a simple Paradoc document and analyze bookmark structure."""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("DIAGNOSE PARADOC BOOKMARKS")
-    print("="*80)
+    print("=" * 80)
 
     from paradoc import OneDoc
     from paradoc.io.word.utils import docx_update
@@ -72,8 +70,8 @@ Reference to [@fig:fig2] and [@fig:fig1].
 def analyze_bookmarks_and_refs(docx_path: Path):
     """Analyze bookmark structure and cross-references."""
     # Extract XML
-    with zipfile.ZipFile(docx_path, 'r') as zip_ref:
-        xml_content = zip_ref.read('word/document.xml').decode('utf-8')
+    with zipfile.ZipFile(docx_path, "r") as zip_ref:
+        xml_content = zip_ref.read("word/document.xml").decode("utf-8")
 
     # Find all bookmarks
     print("\n  === BOOKMARKS ===")
@@ -81,7 +79,7 @@ def analyze_bookmarks_and_refs(docx_path: Path):
     bookmarks = re.findall(bookmark_pattern, xml_content)
 
     for name, bm_id in bookmarks:
-        if name.startswith('_Ref') or 'fig' in name.lower():
+        if name.startswith("_Ref") or "fig" in name.lower():
             # Find bookmark content
             start_pattern = f'<w:bookmarkStart[^>]*w:id="{bm_id}"[^>]*/>'
             end_pattern = f'<w:bookmarkEnd[^>]*w:id="{bm_id}"[^>]*/>'
@@ -90,13 +88,13 @@ def analyze_bookmarks_and_refs(docx_path: Path):
             end_match = re.search(end_pattern, xml_content)
 
             if start_match and end_match:
-                content = xml_content[start_match.end():end_match.start()]
+                content = xml_content[start_match.end() : end_match.start()]
                 # Extract text
-                text_parts = re.findall(r'<w:t[^>]*>(.*?)</w:t>', content)
-                text = ''.join(text_parts)
+                text_parts = re.findall(r"<w:t[^>]*>(.*?)</w:t>", content)
+                text = "".join(text_parts)
 
                 # Extract field instructions
-                field_parts = re.findall(r'<w:instrText[^>]*>(.*?)</w:instrText>', content)
+                field_parts = re.findall(r"<w:instrText[^>]*>(.*?)</w:instrText>", content)
 
                 print(f"\n  Bookmark: {name} (ID: {bm_id})")
                 print(f"    Text: {text[:100]}")
@@ -105,29 +103,29 @@ def analyze_bookmarks_and_refs(docx_path: Path):
 
     # Find all REF fields
     print("\n  === REF FIELDS ===")
-    ref_pattern = r'<w:instrText[^>]*>(.*?REF[^<]*)</w:instrText>'
+    ref_pattern = r"<w:instrText[^>]*>(.*?REF[^<]*)</w:instrText>"
     refs = re.findall(ref_pattern, xml_content)
 
     for i, ref in enumerate(refs, 1):
         # Find the field result (text after separate, before end)
         # This is complex, so let's find the context
-        ref_pos = xml_content.find(f'>{ref}<')
+        ref_pos = xml_content.find(f">{ref}<")
         if ref_pos > 0:
             # Find next separate and end
-            after_ref = xml_content[ref_pos + len(ref) + 2:]
+            after_ref = xml_content[ref_pos + len(ref) + 2 :]
             sep_match = re.search(r'<w:fldChar[^>]*w:fldCharType="separate"[^>]*/>', after_ref)
             if sep_match:
-                after_sep = after_ref[sep_match.end():]
+                after_sep = after_ref[sep_match.end() :]
                 end_match = re.search(r'<w:fldChar[^>]*w:fldCharType="end"[^>]*/>', after_sep)
                 if end_match:
-                    result_content = after_sep[:end_match.start()]
-                    result_text = ''.join(re.findall(r'<w:t[^>]*>(.*?)</w:t>', result_content))
+                    result_content = after_sep[: end_match.start()]
+                    result_text = "".join(re.findall(r"<w:t[^>]*>(.*?)</w:t>", result_content))
                     print(f"\n  REF {i}: {ref}")
                     print(f"    Result: '{result_text}'")
 
 
 if __name__ == "__main__":
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmp:
         test_diagnose_paradoc_bookmarks(Path(tmp))
-
