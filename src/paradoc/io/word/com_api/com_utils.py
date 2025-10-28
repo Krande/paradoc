@@ -1,30 +1,57 @@
 import pathlib
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Iterable
 
 from paradoc.io.word.utils import logger
 
+if TYPE_CHECKING:
+    from .com_handler import WordSession
 
-def open_word_win32():
+
+@contextmanager
+def word_session_context() -> Iterable[WordSession | None]:
+    """
+    Context manager for Word COM automation that properly manages WordSession lifecycle.
+
+    Yields the Word Application COM object if available, None otherwise.
+    Ensures proper cleanup of COM handles on exit.
+
+    Usage:
+        with word_session_context() as word:
+            if word is not None:
+                # Use word application object
+                doc = word.Documents.Open(path)
+                # ... work with document ...
+    """
     import sys
 
     if sys.platform != "win32":
-        return None
+        yield None
+        return
 
+    session = None
     try:
         from .com_handler import WordSession
 
         # Use early binding to avoid some COM issues
-        ws = WordSession(visible=False)
-
-        return ws.app
+        session = WordSession(visible=False)
+        yield session
     except (ModuleNotFoundError, ImportError):
         logger.warning(
             "win32com not available - Word COM automation will be skipped. "
             'Install with "conda install -c conda-forge pywin32" if needed.'
         )
-        return None
+        yield None
     except Exception as e:
         logger.warning(f"Unable to start Word COM automation - will be skipped. Error: {e}")
-        return None
+        yield None
+    finally:
+        if session is not None:
+            try:
+                session.close_all()
+                session.quit()
+            except Exception as e:
+                logger.warning(f"Failed to cleanup Word session: {e}")
 
 
 def docx_update(docx_file):
@@ -33,70 +60,53 @@ def docx_update(docx_file):
     This is optional - if it fails, the document will still be saved correctly,
     just without automatically updated field numbers.
     """
-    word = open_word_win32()
-    if word is None:
-        logger.debug("Skipping Word COM update - automation not available")
-        return
+    with word_session_context() as session:
+        if session is None:
+            logger.debug("Skipping Word COM update - automation not available")
+            return
 
-    doc = None
-    try:
-        # Convert to absolute path for COM
-        abs_path = str(pathlib.Path(docx_file).absolute())
-        doc = word.Documents.Open(abs_path, ReadOnly=False)
+        try:
 
-        # update all figure / table numbers
-        word.ActiveDocument.Fields.Update()
+            word = session.app
+            # Convert to absolute path for COM
+            abs_path = str(pathlib.Path(docx_file).absolute())
+            word.Documents.Open(abs_path, ReadOnly=False)
 
-        # update Table of content / figure / table
-        if len(word.ActiveDocument.TablesOfContents) > 0:
-            word.ActiveDocument.TablesOfContents(1).Update()
-        else:
-            logger.debug("No table of contents found in document")
+            # update all figure / table numbers
+            word.ActiveDocument.Fields.Update()
 
-    except Exception as e:
-        logger.warning(f"Failed to update document via Word COM (non-critical): {e}")
-    finally:
-        # Clean up in reverse order
-        if doc is not None:
-            try:
-                doc.Close(SaveChanges=True)
-            except Exception as e:
-                logger.warning(f"Failed to close document: {e}")
+            # update Table of content / figure / table
+            if len(word.ActiveDocument.TablesOfContents) > 0:
+                word.ActiveDocument.TablesOfContents(1).Update()
+            else:
+                logger.debug("No table of contents found in document")
 
-        if word is not None:
-            try:
-                word.Quit()
-            except Exception as e:
-                logger.warning(f"Failed to quit Word application: {e}")
-
-
+        except BaseException as e:
+            logger.warning(f"Failed to update document via Word COM (non-critical): {e}")
+        finally:
+            session.close_all()
+            session.quit()
 def close_word_docs_by_name(names: list) -> None:
     """
     Close Word documents by name using COM automation.
     This is optional - if it fails, documents will remain open which is non-critical.
     """
-    word = open_word_win32()
-    if word is None:
-        logger.debug("Skipping Word document close - COM automation not available")
-        return
+    with word_session_context() as word:
+        if word is None:
+            logger.debug("Skipping Word document close - COM automation not available")
+            return
 
-    try:
-        if len(word.Documents) > 0:
-            for doc in word.Documents:
-                try:
-                    doc_name = doc.Name
-                    if doc_name in names:
-                        logger.info(f'Closing "{doc_name}"')
-                        doc.Close()
-                except Exception as e:
-                    logger.warning(f"Failed to close document: {e}")
-        else:
-            logger.debug(f"No Word docs named {names} found to be open")
-    except Exception as e:
-        logger.warning(f"Failed to access Word documents: {e}")
-    finally:
-        if word is not None:
-            try:
-                word.Quit()
-            except Exception as e:
-                logger.warning(f"Failed to quit Word application: {e}")
+        try:
+            if len(word.Documents) > 0:
+                for doc in word.Documents:
+                    try:
+                        doc_name = doc.Name
+                        if doc_name in names:
+                            logger.info(f'Closing "{doc_name}"')
+                            doc.Close()
+                    except Exception as e:
+                        logger.warning(f"Failed to close document: {e}")
+            else:
+                logger.debug(f"No Word docs named {names} found to be open")
+        except Exception as e:
+            logger.warning(f"Failed to access Word documents: {e}")
