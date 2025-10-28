@@ -41,7 +41,7 @@ def test_com_api_reference_document(tmp_path):
     tmp_path.mkdir(parents=True, exist_ok=True)
     output_file = tmp_path / "com_reference.docx"
 
-    with WordApplication(visible=False) as word_app:
+    with WordApplication(visible=False, run_isolated=True) as word_app:
         doc = word_app.create_document()
 
         # Create 3 sections, each with 2 subsections

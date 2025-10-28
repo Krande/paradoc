@@ -14,7 +14,7 @@ def test_cross_reference_inline(tmp_path):
 
     output_file = Path(tmp_path) / "test_inline_crossref.docx"
 
-    with WordApplication(visible=False) as word_app:
+    with WordApplication(visible=False, run_isolated=True) as word_app:
         doc = word_app.create_document()
 
         # Add heading

@@ -3,12 +3,14 @@
 This module provides high-level wrapper classes around win32com for Word automation.
 """
 
+import ctypes
+import gc
 import platform
 import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Literal, Union
+from typing import Optional, Literal, Union, Any, Callable
 
 # Constants for Word COM API
 WD_STORY = 6  # End of document
@@ -27,6 +29,54 @@ WD_WRAP_THROUGH = 2  # wdWrapThrough
 WD_WRAP_TOP_BOTTOM = 3  # wdWrapTopAndBottom
 WD_WRAP_BEHIND = 3  # wdWrapBehind (uses different enum)
 WD_WRAP_FRONT = 4  # wdWrapInFrontOf (uses different enum)
+
+# Windows error-mode flags for suppressing error dialogs
+SEM_FAILCRITICALERRORS = 0x0001
+SEM_NOGPFAULTERRORBOX = 0x0002
+SEM_NOOPENFILEERRORBOX = 0x8000
+
+
+def _suppress_windows_error_ui() -> None:
+    """Suppress Windows error dialog boxes in worker processes."""
+    try:
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        kernel32.SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+
+def _word_worker(operation: Callable, args: tuple, kwargs: dict) -> tuple[bool, Any, str]:
+    """
+    Worker function that runs in an isolated process.
+
+    Args:
+        operation: Function to execute (must be picklable)
+        args: Positional arguments for the operation
+        kwargs: Keyword arguments for the operation
+
+    Returns:
+        Tuple of (success: bool, result: Any, message: str)
+    """
+    _suppress_windows_error_ui()
+
+    try:
+        import pythoncom
+        pythoncom.CoInitialize()  # STA for this process
+    except ImportError:
+        return (False, None, "pythoncom not available - pywin32 required")
+
+    result = None
+    try:
+        result = operation(*args, **kwargs)
+        return (True, result, "Success")
+    except Exception as e:
+        return (False, None, f"Worker failed: {e!r}")
+    finally:
+        try:
+            gc.collect()
+            pythoncom.CoUninitialize()
+        except:
+            pass
 
 
 class FigureLayout(str, Enum):
@@ -76,11 +126,14 @@ class WordApplication:
             doc.save("output.docx")
     """
 
-    def __init__(self, visible: bool = False):
+    def __init__(self, visible: bool = False, run_isolated: bool = False):
         """Initialize Word application.
 
         Args:
             visible: Whether to show the Word application window
+            run_isolated: If True, runs Word COM automation in an isolated process
+                         to suppress C stack error logs. This provides a cleaner
+                         logging experience but may be slightly slower.
 
         Raises:
             ImportError: If win32com is not available (non-Windows platform)
@@ -89,16 +142,26 @@ class WordApplication:
         if platform.system() != "Windows":
             raise ImportError("Word COM automation is only available on Windows")
 
-        try:
-            import win32com.client as com_client
+        # Suppress Windows error dialogs to reduce C stack error logs
+        _suppress_windows_error_ui()
 
-            self._com = com_client
-        except ImportError:
-            raise ImportError("pywin32 package is required for Word COM automation")
-
-        self._app = None
+        self._run_isolated = run_isolated
         self._visible = visible
-        self._documents = []
+
+        if not run_isolated:
+            try:
+                import win32com.client as com_client
+                self._com = com_client
+            except ImportError:
+                raise ImportError("pywin32 package is required for Word COM automation")
+            self._app = None
+            self._documents = []
+        else:
+            # In isolated mode, we don't initialize COM in this process
+            self._com = None
+            self._app = None
+            self._documents = []
+            self._isolated_doc_proxy = None
 
     def __enter__(self):
         """Context manager entry - start Word application."""
@@ -112,6 +175,10 @@ class WordApplication:
 
     def start(self):
         """Start the Word application."""
+        if self._run_isolated:
+            # In isolated mode, we don't maintain a persistent application instance
+            return
+
         if self._app is None:
             # Use DispatchEx for late-binding
             self._app = self._com.DispatchEx("Word.Application")
@@ -144,6 +211,14 @@ class WordApplication:
         Returns:
             WordDocument wrapper around the new document
         """
+        if self._run_isolated:
+            # In isolated mode, return a proxy that records operations
+            from .isolated_proxy import IsolatedWordDocument
+            doc = IsolatedWordDocument(template=template, visible=self._visible)
+            self._isolated_doc_proxy = doc
+            self._documents.append(doc)
+            return doc
+
         if self._app is None:
             self.start()
 

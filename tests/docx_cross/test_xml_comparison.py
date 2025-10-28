@@ -25,7 +25,7 @@ def test_compare_com_vs_paradoc_xml(tmp_path):
 
     com_output = tmp_path / "com_reference.docx"
 
-    with WordApplication(visible=False) as word_app:
+    with WordApplication(visible=False, run_isolated=True) as word_app:
         doc = word_app.create_document(template=MY_DOCX_TMPL)
 
         # Section 1

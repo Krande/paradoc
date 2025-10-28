@@ -12,5 +12,12 @@ The wrapper is only available on Windows platforms.
 """
 
 from .wrapper import WordApplication, WordDocument, FigureLayout, CaptionReference
+from .isolated import run_word_operation_isolated
 
-__all__ = ["WordApplication", "WordDocument", "FigureLayout", "CaptionReference"]
+__all__ = [
+    "WordApplication",
+    "WordDocument",
+    "FigureLayout",
+    "CaptionReference",
+    "run_word_operation_isolated",
+]
