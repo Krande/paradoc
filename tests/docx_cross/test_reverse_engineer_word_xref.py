@@ -3,7 +3,6 @@
 import os
 import platform
 import re
-import time
 import zipfile
 from pathlib import Path
 
@@ -25,140 +24,64 @@ def test_reverse_engineer_word_crossref(tmp_path):
     4. Updates all fields
     5. Scans the modified structure to see what changed
     """
+    from paradoc.io.word.com_api import WordApplication
+
     print("\n" + "=" * 80)
     print("REVERSE ENGINEERING WORD CROSS-REFERENCE SYSTEM")
     print("=" * 80)
 
-    # Step 1: Use Word COM to create everything properly from scratch
-    print("\n[STEP 3] Using Word COM to create proper caption and cross-reference...")
+    # Use WordApplication with isolated mode to avoid C stack errors
+    print("\n[STEP 1] Using WordApplication to create proper caption and cross-reference...")
 
-    import win32com.client
+    modified_file = tmp_path / "word_created.docx"
 
-    # Use late-binding (DispatchEx) instead of early-binding to avoid strict timing issues
-    word = win32com.client.DispatchEx("Word.Application")
-    word.Visible = False
-
-    try:
+    with WordApplication(visible=False, run_isolated=True) as word_app:
         # Create a new document from scratch
-        word_doc = word.Documents.Add()
+        doc = word_app.create_document()
 
         # Add a heading
-        word.Selection.Style = "Heading 1"
-        word.Selection.TypeText("Test Document Created by Word")
-        word.Selection.TypeParagraph()
+        print("  Creating heading...")
+        doc.add_heading("Test Document Created by Word", level=1)
 
-        # Add a dummy image placeholder (just a shape for the caption to attach to)
-        word.Selection.Style = "Normal"
-        word.Selection.TypeParagraph()
-
-        # Insert a caption using Word's built-in caption feature
-        # This is the OFFICIAL way Word creates captions with bookmarks
-        print("  Creating caption with Word's InsertCaption...")
-
-        # Insert an actual shape for the caption to attach to
-        print("  Inserting a shape for the caption to attach to...")
-        # Use Shapes.AddShape (not InlineShapes) - msoShapeRectangle = 1
-        shape = word_doc.Shapes.AddShape(1, 100, 100, 100, 100)
-
-        # Move to end of document and add caption manually
-        # InsertCaption can be unreliable across different Word configurations
-        word.Selection.EndKey(Unit=6)  # wdStory = 6 (end of document)
-        word.Selection.TypeParagraph()
-        word.Selection.Style = "Caption"
-
-        # Create a SEQ field for the figure number (what Word does internally)
-        word.Selection.TypeText("Figure ")
-        word.Selection.Fields.Add(
-            Range=word.Selection.Range, Type=-1, Text="SEQ Figure \\* ARABIC", PreserveFormatting=True  # wdFieldEmpty
+        # Add a figure with caption using the high-level API
+        print("  Creating caption with Word's SEQ field...")
+        fig_ref = doc.add_figure_with_caption(
+            caption_text="Test Caption Created by Word",
+            create_bookmark=True,
+            use_chapter_numbers=False
         )
-        word.Selection.TypeText(": Test Caption Created by Word")
 
-        # Create a bookmark for this caption (what Word does for cross-references)
-        caption_range = word.Selection.Paragraphs(1).Range
-        bookmark_name = "_Ref" + str(int(time.time() * 1000) % 1000000000)
-        word_doc.Bookmarks.Add(bookmark_name, caption_range)
-
-        print("  [OK] Caption created with bookmark:", bookmark_name)
+        print(f"  [OK] Caption created with bookmark: {fig_ref.bookmark_name}")
 
         # Add some spacing
-        word.Selection.TypeParagraph()
-        word.Selection.TypeParagraph()
+        doc.add_paragraph()
 
-        # Now insert a cross-reference to the figure caption
+        # Now add a cross-reference to the figure caption
         print("  Inserting cross-reference...")
-        word.Selection.TypeText("See ")
+        doc.add_text("See ")
+        doc.add_cross_reference(fig_ref, include_hyperlink=True)
+        doc.add_text(" for details.")
+        doc.add_paragraph()
 
-        # Use InsertCrossReference method
-        # We need to set the Selection first
-        try:
-            # Constants for InsertCrossReference
-            # wdRefTypeNumberedItem = 0 (for any numbered item including figures)
-            # wdNumberNoContext = 0, wdNumberRelativeContext = 2, wdNumberFullContext = 5
-            # For figures specifically, we might need wdRefTypeFigure
+        print("  [OK] Cross-reference inserted successfully")
 
-            # Get the number of figure captions
-            # The item index is 1-based
-            word.Selection.InsertCrossReference(
-                ReferenceType="Figure",  # Can use string instead of constant
-                ReferenceKind=2,  # wdOnlyLabelAndNumber = 2
-                ReferenceItem=1,  # First (and only) figure
-                InsertAsHyperlink=True,
-                IncludePosition=False,
-            )
-            print("  [OK] Cross-reference inserted successfully")
-        except Exception as e:
-            print(f"  [X] InsertCrossReference failed: {e}")
-            print(f"    Error type: {type(e)}")
-            import traceback
+        # Update all fields
+        print("\n[STEP 2] Updating all fields...")
+        doc.update_fields()
+        print("  [OK] Fields updated")
 
-            traceback.print_exc()
+        # Save the document
+        print("\n[STEP 3] Saving document...")
+        doc.save(modified_file)
+        print(f"  [OK] Word-created document saved: {modified_file}")
 
-        # Add some more text
-        word.Selection.TypeText(" for details.")
-        word.Selection.TypeParagraph()
-
-        # Step 4: Update all fields
-        print("\n[STEP 4] Updating all fields...")
-        try:
-            word_doc.Fields.Update()
-            print("  [OK] Fields updated")
-        except Exception as e:
-            print(f"  [!] Fields.Update failed (non-critical): {e}")
-
-        # Wait for Word to finish processing before saving
-        print("\n[STEP 5] Waiting for Word to finish processing...")
-        time.sleep(2)  # Give Word time to complete all operations
-
-        # Save the document created by Word
-        modified_file = tmp_path / "word_created.docx"
-        try:
-            word_doc.SaveAs(str(modified_file.absolute()))
-            print(f"  [OK] Word-created document saved: {modified_file}")
-        except Exception as e:
-            print(f"  [!] SaveAs failed: {e}")
-            # Try alternative save method
-            time.sleep(1)
-            try:
-                word_doc.SaveAs(str(modified_file.absolute()))
-                print("  [OK] SaveAs succeeded on retry")
-            except:
-                print("  [X] SaveAs failed on retry - document may not be saved")
-
-        try:
-            word_doc.Close(SaveChanges=False)
-        except Exception as e:
-            print(f"  [!] Close failed (non-critical): {e}")
-
-    finally:
-        word.Quit()
-
-    # Step 5: Scan the Word-created document structure
-    print("\n[STEP 5] Scanning Word-created document structure...")
+    # Step 4: Scan the Word-created document structure
+    print("\n[STEP 4] Scanning Word-created document structure...")
     word_structure = scan_document_structure(modified_file)
     print_structure("WORD-CREATED", word_structure)
 
-    # Step 5b: Dump full XML for detailed analysis
-    print("\n[STEP 5b] Dumping full XML structure for analysis...")
+    # Step 5: Dump full XML for detailed analysis
+    print("\n[STEP 5] Dumping full XML structure for analysis...")
     dump_full_xml(modified_file, tmp_path)
 
     # Step 6: Analyze the structure
@@ -394,6 +317,7 @@ def analyze_word_structure(structure: dict):
 
         # Extract REF field details
         ref_match = re.search(r"<w:instrText[^>]*>([^<]*REF[^<]*)</w:instrText>", ref_xml)
+        bookmark_ref = None  # Initialize to avoid potential undefined reference
         if ref_match:
             ref_instruction = ref_match.group(1).strip()
             print(f"    REF Field: {ref_instruction}")
@@ -414,7 +338,7 @@ def analyze_word_structure(structure: dict):
                 print(f"    Hyperlink Anchor: {anchor}")
 
                 # Compare REF field bookmark to hyperlink anchor
-                if ref_match and bookmark_ref == anchor:
+                if bookmark_ref and bookmark_ref == anchor:
                     print("      [OK] REF bookmark matches hyperlink anchor")
 
     # Final summary
