@@ -14,12 +14,13 @@ from __future__ import annotations
 
 import argparse
 import re
-import sys
 import zipfile
 import pathlib
 from dataclasses import dataclass
 from xml.etree import ElementTree as ET
 from typing import Sequence
+
+from paradoc.config import logger
 
 
 # OOXML namespaces
@@ -296,35 +297,35 @@ def _print_summary(di: DocxInspector) -> None:
     flds = di.fields()
     xrs = di.cross_refs()
 
-    print(f"[Bookmarks] count={len(bms)}")
+    logger.info(f"[Bookmarks] count={len(bms)}")
     dup = di.duplicate_bookmark_names()
     if dup:
-        print("  Duplicates:")
+        logger.info("  Duplicates:")
         for name, items in dup.items():
             parts = ", ".join(sorted({it.part for it in items}))
-            print(f"   - {name!r}: {len(items)} occurrences (parts: {parts})")
+            logger.info(f"   - {name!r}: {len(items)} occurrences (parts: {parts})")
 
-    print(f"\n[Fields] count={len(flds)}")
-    print(f"[Cross-Refs] count={len(xrs)}")
-    print("  Types:", ", ".join(sorted({xr.ref_type for xr in xrs})) or "-")
+    logger.info(f"\n[Fields] count={len(flds)}")
+    logger.info(f"[Cross-Refs] count={len(xrs)}")
+    logger.info(f"  Types: {', '.join(sorted({xr.ref_type for xr in xrs})) or '-'}")
 
     missing = di.missing_ref_targets()
     if missing:
-        print("\n[Missing REF/PAGEREF targets]")
+        logger.info("\n[Missing REF/PAGEREF targets]")
         for xr in missing:
-            print(f"  - part={xr.field.part} | instr={xr.field.instr!r} | target={xr.target_or_label!r}")
+            logger.info(f"  - part={xr.field.part} | instr={xr.field.instr!r} | target={xr.target_or_label!r}")
 
     unused = di.unused_bookmarks()
     if unused:
-        print("\n[Unused bookmarks] (not referenced by REF/PAGEREF)")
+        logger.info("\n[Unused bookmarks] (not referenced by REF/PAGEREF)")
         for b in unused[:50]:  # cap output
-            print(f"  - {b.name!r} in {b.part}  context={b.context[:80]!r}")
+            logger.info(f"  - {b.name!r} in {b.part}  context={b.context[:80]!r}")
         if len(unused) > 50:
-            print(f"  ... and {len(unused) - 50} more")
+            logger.info(f"  ... and {len(unused) - 50} more")
 
     labels = di.seq_labels()
     if labels:
-        print("\n[SEQ labels] ->", ", ".join(sorted(labels)))
+        logger.info(f"\n[SEQ labels] -> {', '.join(sorted(labels))}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -336,6 +337,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         di = DocxInspector(args.docx)
         _print_summary(di)
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error(f"Error: {e}")
         return 2
     return 0

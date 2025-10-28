@@ -20,6 +20,8 @@ from typing import Dict, List, Optional
 from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 
+from paradoc.config import logger
+
 from .fields import create_ref_field_runs, create_text_run
 from .utils import iter_block_items
 
@@ -254,7 +256,7 @@ class ReferenceHelper:
         Args:
             document: The Word document to process
         """
-        print("[ReferenceHelper] Converting all references to REF fields")
+        logger.info("[ReferenceHelper] Converting all references to REF fields")
 
         # Build mapping dictionaries and patterns for all reference types
         ref_configs = []
@@ -262,7 +264,7 @@ class ReferenceHelper:
         # Configure figures
         figure_bookmarks = self.get_all_figure_bookmarks_in_order()
         if figure_bookmarks:
-            print(f"[ReferenceHelper] Preparing {len(figure_bookmarks)} figure references")
+            logger.info(f"[ReferenceHelper] Preparing {len(figure_bookmarks)} figure references")
             fig_items = [item for item in self._all_items if item.ref_type == ReferenceType.FIGURE]
             fig_display_to_idx = {}
             fig_sequential_to_idx = {}
@@ -270,9 +272,9 @@ class ReferenceHelper:
                 fig_sequential_to_idx[str(idx + 1)] = idx
                 if item.display_number:
                     fig_display_to_idx[item.display_number] = idx
-                    print(f"[ReferenceHelper]   Figure #{idx}: {item.display_number} -> {item.word_bookmark}")
+                    logger.debug(f"[ReferenceHelper]   Figure #{idx}: {item.display_number} -> {item.word_bookmark}")
                 else:
-                    print(f"[ReferenceHelper]   Figure #{idx}: (no display number) -> {item.word_bookmark}")
+                    logger.debug(f"[ReferenceHelper]   Figure #{idx}: (no display number) -> {item.word_bookmark}")
 
             ref_configs.append(
                 {
@@ -288,7 +290,7 @@ class ReferenceHelper:
         # Configure tables
         table_bookmarks = self.get_all_table_bookmarks_in_order()
         if table_bookmarks:
-            print(f"[ReferenceHelper] Preparing {len(table_bookmarks)} table references")
+            logger.info(f"[ReferenceHelper] Preparing {len(table_bookmarks)} table references")
             tbl_items = [item for item in self._all_items if item.ref_type == ReferenceType.TABLE]
             tbl_display_to_idx = {}
             tbl_sequential_to_idx = {}
@@ -296,9 +298,9 @@ class ReferenceHelper:
                 tbl_sequential_to_idx[str(idx + 1)] = idx
                 if item.display_number:
                     tbl_display_to_idx[item.display_number] = idx
-                    print(f"[ReferenceHelper]   Table #{idx}: {item.display_number} -> {item.word_bookmark}")
+                    logger.debug(f"[ReferenceHelper]   Table #{idx}: {item.display_number} -> {item.word_bookmark}")
                 else:
-                    print(f"[ReferenceHelper]   Table #{idx}: (no display number) -> {item.word_bookmark}")
+                    logger.debug(f"[ReferenceHelper]   Table #{idx}: (no display number) -> {item.word_bookmark}")
 
             ref_configs.append(
                 {
@@ -314,7 +316,7 @@ class ReferenceHelper:
         # Configure equations
         equation_bookmarks = self.get_all_equation_bookmarks_in_order()
         if equation_bookmarks:
-            print(f"[ReferenceHelper] Preparing {len(equation_bookmarks)} equation references")
+            logger.info(f"[ReferenceHelper] Preparing {len(equation_bookmarks)} equation references")
             eq_items = [item for item in self._all_items if item.ref_type == ReferenceType.EQUATION]
             eq_display_to_idx = {}
             eq_sequential_to_idx = {}
@@ -322,9 +324,9 @@ class ReferenceHelper:
                 eq_sequential_to_idx[str(idx + 1)] = idx
                 if item.display_number:
                     eq_display_to_idx[item.display_number] = idx
-                    print(f"[ReferenceHelper]   Eq #{idx}: {item.display_number} -> {item.word_bookmark}")
+                    logger.debug(f"[ReferenceHelper]   Eq #{idx}: {item.display_number} -> {item.word_bookmark}")
                 else:
-                    print(f"[ReferenceHelper]   Eq #{idx}: (no display number) -> {item.word_bookmark}")
+                    logger.debug(f"[ReferenceHelper]   Eq #{idx}: (no display number) -> {item.word_bookmark}")
 
             ref_configs.append(
                 {
@@ -357,11 +359,11 @@ class ReferenceHelper:
                 continue
 
             # Process this paragraph for ALL reference types at once
-            print(f"[ReferenceHelper] Processing paragraph: {paragraph_text[:80]}")
+            logger.debug(f"[ReferenceHelper] Processing paragraph: {paragraph_text[:80]}")
             self._process_paragraph_all_refs(block, ref_configs)
             processed_count += 1
 
-        print(f"[ReferenceHelper] Conversion complete: {processed_count} paragraphs processed")
+        logger.info(f"[ReferenceHelper] Conversion complete: {processed_count} paragraphs processed")
 
     def _process_paragraph_all_refs(self, paragraph: Paragraph, ref_configs: List[Dict]):
         """Process a paragraph to replace ALL reference types with REF fields in one pass.
@@ -401,7 +403,7 @@ class ReferenceHelper:
                 non_overlapping.append(m)
                 last_end = m["end"]
 
-        print(f"[ReferenceHelper]   Found {len(non_overlapping)} reference(s)")
+        logger.debug(f"[ReferenceHelper]   Found {len(non_overlapping)} reference(s)")
 
         # Store paragraph element before clearing
         p_element = paragraph._p
@@ -442,19 +444,19 @@ class ReferenceHelper:
             bookmark_idx = None
             if num_str in display_to_idx:
                 bookmark_idx = display_to_idx[num_str]
-                print(f"[ReferenceHelper]     {label} '{num_str}' matched display number -> index {bookmark_idx}")
+                logger.debug(f"[ReferenceHelper]     {label} '{num_str}' matched display number -> index {bookmark_idx}")
             elif num_str in sequential_to_idx:
                 bookmark_idx = sequential_to_idx[num_str]
-                print(f"[ReferenceHelper]     {label} '{num_str}' matched sequential number -> index {bookmark_idx}")
+                logger.debug(f"[ReferenceHelper]     {label} '{num_str}' matched sequential number -> index {bookmark_idx}")
             else:
-                print(f"[ReferenceHelper]     WARNING: No mapping for {label} '{num_str}', skipping")
+                logger.warning(f"[ReferenceHelper]     WARNING: No mapping for {label} '{num_str}', skipping")
                 continue
 
             # Get the bookmark name
             if 0 <= bookmark_idx < len(bookmarks):
                 bookmark_name = bookmarks[bookmark_idx]
             else:
-                print(f"[ReferenceHelper]     WARNING: Index {bookmark_idx} out of range (max {len(bookmarks) - 1})")
+                logger.warning(f"[ReferenceHelper]     WARNING: Index {bookmark_idx} out of range (max {len(bookmarks) - 1})")
                 continue
 
             # Add text before the reference
@@ -465,7 +467,7 @@ class ReferenceHelper:
             # Add REF field
             create_ref_field_runs(p_element, bookmark_name, label=label)
             ref_fields_added += 1
-            print(f"[ReferenceHelper]     Added {label} REF field: '{num_str}' -> bookmark '{bookmark_name}'")
+            logger.debug(f"[ReferenceHelper]     Added {label} REF field: '{num_str}' -> bookmark '{bookmark_name}'")
 
             last_pos = match.end()
 
@@ -474,7 +476,7 @@ class ReferenceHelper:
             after_text = original_text[last_pos:]
             create_text_run(p_element, after_text)
 
-        print(f"[ReferenceHelper]   Completed: {ref_fields_added} REF field(s) added")
+        logger.debug(f"[ReferenceHelper]   Completed: {ref_fields_added} REF field(s) added")
 
     def get_statistics(self) -> Dict[str, int]:
         """Get statistics about registered references.
@@ -491,13 +493,13 @@ class ReferenceHelper:
 
     def print_registry(self):
         """Print the complete registry for debugging."""
-        print("\n[ReferenceHelper] Complete Registry:")
-        print(f"  Total items: {len(self._all_items)}")
-        print(f"  Figures: {len(self._figures)}")
-        print(f"  Tables: {len(self._tables)}")
-        print(f"  Equations: {len(self._equations)}")
-        print("\n  Items in document order:")
+        logger.debug("\n[ReferenceHelper] Complete Registry:")
+        logger.debug(f"  Total items: {len(self._all_items)}")
+        logger.debug(f"  Figures: {len(self._figures)}")
+        logger.debug(f"  Tables: {len(self._tables)}")
+        logger.debug(f"  Equations: {len(self._equations)}")
+        logger.debug("\n  Items in document order:")
         for item in self._all_items:
-            print(
+            logger.debug(
                 f"    [{item.document_order}] {item.ref_type.value} '{item.semantic_id}' -> {item.word_bookmark} (display: {item.display_number})"
             )

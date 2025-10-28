@@ -305,7 +305,7 @@ class OneDoc:
 
         dest_file = (self.dist_dir / output_name).with_suffix(f".{export_format.value}").resolve().absolute()
 
-        print(f'Compiling OneDoc report to "{dest_file}"')
+        logger.info(f'Compiling OneDoc report to "{dest_file}"')
         self._prep_compilation(metadata_file=metadata_file)
 
         if export_format == ExportFormats.DOCX:
@@ -353,7 +353,7 @@ class OneDoc:
             raise NotImplementedError(f'Export format "{export_format}" is not yet supported')
 
         if self.output_dir is not None:
-            print(f'Copying outputted document from "{dest_file}" to "{self.output_dir}"')
+            logger.info(f'Copying outputted document from "{dest_file}" to "{self.output_dir}"')
             shutil.copy(dest_file, self.output_dir)
 
         if auto_open is True:

@@ -10,6 +10,8 @@ import multiprocessing as mp
 import sys
 from typing import Any, Callable
 
+from paradoc.config import logger
+
 # Windows error-mode flags for suppressing error dialogs
 SEM_FAILCRITICALERRORS = 0x0001
 SEM_NOGPFAULTERRORBOX = 0x0002
@@ -139,9 +141,9 @@ def run_word_operation_isolated(
             pool.join()
             return (False, None, f"Pool error: {e!r}")
 
-    # Print captured output if any
+    # Log captured output if any
     if redirect_stdout and output:
-        print(output, end='')
+        logger.info(output.rstrip())
 
     return (success, result, message)
 

@@ -5,6 +5,8 @@ import re
 from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 
+from paradoc.config import logger
+
 from .fields import create_ref_field_runs, create_text_run
 from .utils import iter_block_items
 
@@ -20,9 +22,9 @@ def convert_figure_references_to_ref_fields(document, figures):
         figures: List of DocXFigureRef objects containing figure information
     """
     bookmarks_in_order = _extract_bookmarks_from_figures(figures)
-    print(f"[DEBUG convert_figure_references] Found {len(bookmarks_in_order)} figure bookmarks: {bookmarks_in_order}")
+    logger.debug(f"[DEBUG convert_figure_references] Found {len(bookmarks_in_order)} figure bookmarks: {bookmarks_in_order}")
     if not bookmarks_in_order:
-        print("[DEBUG convert_figure_references] No bookmarks found, returning early")
+        logger.debug("[DEBUG convert_figure_references] No bookmarks found, returning early")
         return  # No figures to process
 
     # Pattern to match figure references from pandoc-crossref
@@ -46,9 +48,9 @@ def convert_table_references_to_ref_fields(document, tables):
         tables: List of DocXTableRef objects containing table information
     """
     bookmarks_in_order = _extract_bookmarks_from_tables(tables)
-    print(f"[DEBUG convert_table_references] Found {len(bookmarks_in_order)} table bookmarks: {bookmarks_in_order}")
+    logger.debug(f"[DEBUG convert_table_references] Found {len(bookmarks_in_order)} table bookmarks: {bookmarks_in_order}")
     if not bookmarks_in_order:
-        print("[DEBUG convert_table_references] No bookmarks found, returning early")
+        logger.debug("[DEBUG convert_table_references] No bookmarks found, returning early")
         return  # No tables to process
 
     # Pattern to match table references from pandoc-crossref
@@ -170,22 +172,22 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
                 seen_numbers.append(ref_num)
                 # Map this reference number to its sequential position
                 reference_to_index[ref_num] = caption_count
-                print(f"[DEBUG _convert_references]   Caption #{caption_count}: {label} {ref_num} (text: {text[:50]})")
+                logger.debug(f"[DEBUG _convert_references]   Caption #{caption_count}: {label} {ref_num} (text: {text[:50]})")
                 caption_count += 1
 
     # If all captions have the same number (e.g., all show "1-1" as placeholder),
     # we need to handle references by sequential order instead
     unique_numbers = set(seen_numbers)
     if len(unique_numbers) == 1 and len(seen_numbers) > 1:
-        print(
+        logger.debug(
             f"[DEBUG _convert_references]   WARNING: All captions show same number '{list(unique_numbers)[0]}' - likely unevaluated SEQ fields"
         )
-        print("[DEBUG _convert_references]   Will use sequential matching for references")
+        logger.debug("[DEBUG _convert_references]   Will use sequential matching for references")
         # In this case, we can't reliably map by number, so we'll need to match references
         # to captions in the order they appear in the document
 
-    print(f"[DEBUG _convert_references] Built reference mapping for {label}: {reference_to_index}")
-    print(f"[DEBUG _convert_references] Total {label} captions found: {caption_count}")
+    logger.debug(f"[DEBUG _convert_references] Built reference mapping for {label}: {reference_to_index}")
+    logger.debug(f"[DEBUG _convert_references] Total {label} captions found: {caption_count}")
 
     # Second pass: Convert references to REF fields using the mapping
     processed_count = 0
@@ -210,13 +212,13 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
             continue
 
         # Process the paragraph
-        print(f"[DEBUG _convert_references] Processing paragraph with {label}: {block.text[:80]}")
+        logger.debug(f"[DEBUG _convert_references] Processing paragraph with {label}: {block.text[:80]}")
         _process_paragraph_references(
             block, pattern, bookmarks_in_order, label, num_group, reference_to_index, reference_occurrence_count
         )
         processed_count += 1
 
-    print(
+    logger.debug(
         f"[DEBUG _convert_references] {label} summary: processed={processed_count}, skipped_caption={skipped_caption}, no_match={no_match}"
     )
 
@@ -246,7 +248,7 @@ def _process_paragraph_references(
     if not matches:
         return
 
-    print(f"[DEBUG _process_paragraph_references] Found {len(matches)} matches in: {original_text[:80]}")
+    logger.debug(f"[DEBUG _process_paragraph_references] Found {len(matches)} matches in: {original_text[:80]}")
 
     # Store paragraph element before clearing
     p_element = paragraph._p
@@ -283,7 +285,7 @@ def _process_paragraph_references(
                 reference_occurrence_count[num_str] = 0
             bookmark_idx = reference_occurrence_count[num_str]
             reference_occurrence_count[num_str] += 1
-            print(
+            logger.debug(
                 f"[DEBUG _process_paragraph_references]   Sequential match: reference #{bookmark_idx} (number: {num_str})"
             )
         elif reference_to_index and num_str in reference_to_index:
@@ -324,7 +326,7 @@ def _process_paragraph_references(
         # Add REF field
         create_ref_field_runs(p_element, bookmark_name, label=label)
         ref_fields_added += 1
-        print(
+        logger.debug(
             f"[DEBUG _process_paragraph_references]   Added REF field #{ref_fields_added}: {num_str} -> index {bookmark_idx} -> {bookmark_name}"
         )
 
@@ -335,4 +337,4 @@ def _process_paragraph_references(
         after_text = original_text[last_pos:]
         create_text_run(p_element, after_text)
 
-    print(f"[DEBUG _process_paragraph_references] Completed: added {ref_fields_added} REF fields")
+    logger.debug(f"[DEBUG _process_paragraph_references] Completed: added {ref_fields_added} REF fields")

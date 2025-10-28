@@ -12,6 +12,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, Literal, Union, Any, Callable
 
+from paradoc.config import logger
+
 # Constants for Word COM API
 WD_STORY = 6  # End of document
 WD_FIELD_EMPTY = -1
@@ -657,7 +659,7 @@ class WordDocument:
             self._doc.Fields.Update()
         except Exception as e:
             # Field update failures are often non-critical
-            print(f"Warning: Field update failed: {e}")
+            logger.warning(f"Warning: Field update failed: {e}")
 
     def save(self, path: Union[str, Path]):
         """Save the document.
@@ -689,7 +691,7 @@ class WordDocument:
         try:
             self._doc.Close(SaveChanges=save_changes)
         except Exception as e:
-            print(f"Warning: Failed to close document: {e}")
+            logger.warning(f"Warning: Failed to close document: {e}")
 
     def get_bookmark_names(self) -> list[str]:
         """Get all bookmark names in the document.

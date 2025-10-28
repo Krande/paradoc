@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Union, Literal, Any
 
+from paradoc.config import logger
+
 from .wrapper import CaptionReference, FigureLayout
 
 
@@ -257,8 +259,8 @@ def _execute_document_operations(
     # Import here since this runs in isolated process
     from .wrapper import WordApplication, CaptionReference, FigureLayout
 
-    # Print to stdout (will be captured if redirect_stdout=True)
-    print(f"\nExecuting {len(operations)} operations in isolated process...")
+    # Log to stdout (will be captured if redirect_stdout=True)
+    logger.info(f"\nExecuting {len(operations)} operations in isolated process...")
 
     with WordApplication(visible=visible, run_isolated=False) as word_app:
         doc = word_app.create_document(template=template)
@@ -315,15 +317,15 @@ def _execute_document_operations(
                     doc.update_fields()
 
                 else:
-                    print(f"Warning: Unknown operation: {op.operation}", file=sys.stderr)
+                    logger.warning(f"Warning: Unknown operation: {op.operation}")
 
             except Exception as e:
-                print(f"Error executing operation {i} ({op.operation}): {e}", file=sys.stderr)
+                logger.error(f"Error executing operation {i} ({op.operation}): {e}")
                 raise
 
         # Save the document
         doc.save(output_path)
 
-    print(f"Document saved to {output_path}")
+    logger.info(f"Document saved to {output_path}")
     return output_path
 

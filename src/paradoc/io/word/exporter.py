@@ -5,6 +5,7 @@ from docx import Document
 from docx.table import Table as DocxTable
 
 from paradoc.common import MY_DOCX_TMPL, MY_DOCX_TMPL_BLANK, ExportFormats
+from paradoc.config import logger
 from paradoc.document import OneDoc
 
 from .formatting import fix_headers_after_compose, format_paragraphs_and_headings
@@ -38,7 +39,7 @@ class WordExporter:
 
         # Initialize the reference helper to manage all cross-references
         ref_helper = ReferenceHelper()
-        print("\n[WordExporter] Initialized ReferenceHelper for cross-reference management")
+        logger.info("[WordExporter] Initialized ReferenceHelper for cross-reference management")
 
         for mdf in one.md_files_main + one.md_files_app:
             # Use build_file parent as resource path since images are stored relative to build location
@@ -71,14 +72,14 @@ class WordExporter:
         composer_main.append(composer_app.doc)
 
         # Update display numbers in the reference helper
-        print("\n[WordExporter] Updating display numbers in ReferenceHelper")
+        logger.info("[WordExporter] Updating display numbers in ReferenceHelper")
         ref_helper.update_display_numbers()
 
         # Print registry for debugging
         ref_helper.print_registry()
 
         # Use the new ReferenceHelper to convert all references
-        print("\n[WordExporter] Converting all text references to REF fields using ReferenceHelper")
+        logger.info("[WordExporter] Converting all text references to REF fields using ReferenceHelper")
         ref_helper.convert_all_references(composer_main.doc)
 
         # Format all paragraphs
@@ -91,11 +92,11 @@ class WordExporter:
         # This is critical for cross-references to work correctly
         fix_bookmark_ids(composer_main.doc)
 
-        print("Close Existing Word documents")
+        logger.info("Close Existing Word documents")
         if check_open_docs and self.enable_word_com_automation:
             close_word_docs_by_name([output_name, f"{output_name}.docx"])
 
-        print(f'Saving Composed Document to "{dest_file}"')
+        logger.info(f'Saving Composed Document to "{dest_file}"')
         composer_main.save(dest_file)
 
         # Only attempt Word COM automation if explicitly enabled

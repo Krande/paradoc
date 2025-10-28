@@ -6,6 +6,8 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
 
+from paradoc.config import logger
+
 
 def generate_word_bookmark_name() -> tuple[str, str]:
     """Generate a Word-style bookmark name and ID.
@@ -110,10 +112,10 @@ def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> s
     # Get all runs in the paragraph
     runs = list(paragraph._p)
 
-    # Debug: print paragraph structure
-    print(f"[DEBUG add_bookmark_around_seq_field] Processing bookmark '{bookmark_name}'")
-    print(f"[DEBUG] Paragraph text: {paragraph.text}")
-    print(f"[DEBUG] Total runs: {len(runs)}")
+    # Debug: log paragraph structure
+    logger.debug(f"[DEBUG add_bookmark_around_seq_field] Processing bookmark '{bookmark_name}'")
+    logger.debug(f"[DEBUG] Paragraph text: {paragraph.text}")
+    logger.debug(f"[DEBUG] Total runs: {len(runs)}")
 
     # Find the run that contains the caption text (starts with ": ")
     caption_text_start_idx = None
@@ -126,10 +128,10 @@ def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> s
         text_elements = run.findall(qn("w:t"))
         for t_elem in text_elements:
             text_content = t_elem.text if t_elem.text else ""
-            print(f"[DEBUG]   Run {i}: '{text_content[:50]}'")
+            logger.debug(f"[DEBUG]   Run {i}: '{text_content[:50]}'")
             if t_elem.text and t_elem.text.startswith(": "):
                 caption_text_start_idx = i
-                print(f"[DEBUG]   Found caption text separator at run {i}")
+                logger.debug(f"[DEBUG]   Found caption text separator at run {i}")
                 break
         if caption_text_start_idx is not None:
             break

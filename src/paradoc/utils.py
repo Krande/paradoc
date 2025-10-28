@@ -9,14 +9,13 @@ from typing import TYPE_CHECKING
 
 import pypandoc
 
-from paradoc.config import create_logger
+from paradoc.config import logger
 
 from .common import MarkDownFile, Table
 from .equations import Equation
 
 if TYPE_CHECKING:
     from paradoc import OneDoc
-logger = create_logger()
 
 
 def copy_figures_to_dist(one: OneDoc, dest_dir: pathlib.Path):
@@ -74,7 +73,7 @@ def convert_markdown(
         extra_args += [f"--reference-doc={style_doc}"]
 
     extra_args += [f"--resource-path={source.parent}"]
-    print(f"Converting {source}")
+    logger.info(f"Converting {source}")
     if source.is_dir():
         convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_doc=style_doc)
     else:
