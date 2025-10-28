@@ -100,9 +100,6 @@ def test_com_api_reference_document(tmp_path):
     # Analyze the document
     analyze_document_structure(output_file, "COM API")
 
-    return output_file
-
-
 def test_paradoc_document(tmp_path):
     """Create an identical document using Paradoc.
 
