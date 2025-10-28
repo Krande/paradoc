@@ -1,3 +1,4 @@
+import multiprocessing as mp
 import pathlib
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Iterable
@@ -5,8 +6,26 @@ from typing import TYPE_CHECKING, Iterable
 from paradoc.io.word.utils import logger
 
 if TYPE_CHECKING:
-    from .com_handler import WordSession
+    from .com_handler import WordSession, _update_docx_worker
 
+
+def docx_update_isolated(docx_file: pathlib.Path, timeout_s: float = 120.0) -> bool:
+    """
+    Run the Word COM update in an isolated process. Returns True/False for success.
+    """
+    from .com_handler import _update_docx_worker
+
+
+    ctx = mp.get_context("spawn")  # Windows default, explicit for clarity
+    with ctx.Pool(processes=1) as pool:
+        async_res = pool.apply_async(_update_docx_worker, (str(docx_file),))
+        try:
+            ok, msg = async_res.get(timeout=timeout_s)
+        except TimeoutError:
+            pool.terminate()
+            # Optionally: kill spawned WINWORD if it lingered; usually Word exits with the worker.
+            return False
+        return bool(ok)
 
 @contextmanager
 def word_session_context() -> Iterable[WordSession | None]:
@@ -60,32 +79,14 @@ def docx_update(docx_file):
     This is optional - if it fails, the document will still be saved correctly,
     just without automatically updated field numbers.
     """
-    with word_session_context() as session:
-        if session is None:
-            logger.debug("Skipping Word COM update - automation not available")
-            return
+    p = pathlib.Path(docx_file)
+    success = docx_update_isolated(p)
+    if not success:
+        # Keep it non-fatal for your pipeline, but you can log if you want
+        logger.warning("Word COM update failed (non-critical)")
 
-        try:
 
-            word = session.app
-            # Convert to absolute path for COM
-            abs_path = str(pathlib.Path(docx_file).absolute())
-            word.Documents.Open(abs_path, ReadOnly=False)
 
-            # update all figure / table numbers
-            word.ActiveDocument.Fields.Update()
-
-            # update Table of content / figure / table
-            if len(word.ActiveDocument.TablesOfContents) > 0:
-                word.ActiveDocument.TablesOfContents(1).Update()
-            else:
-                logger.debug("No table of contents found in document")
-
-        except BaseException as e:
-            logger.warning(f"Failed to update document via Word COM (non-critical): {e}")
-        finally:
-            session.close_all()
-            session.quit()
 def close_word_docs_by_name(names: list) -> None:
     """
     Close Word documents by name using COM automation.
