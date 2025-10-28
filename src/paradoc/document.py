@@ -324,7 +324,7 @@ class OneDoc:
             wordx.export(output_name, dest_file, check_open_docs=check_open_docs)
 
             if update_docx_with_com and platform.system() == "Windows":
-                from paradoc.io.word.utils import docx_update
+                from paradoc.io.word.com_utils import docx_update
 
                 docx_update(dest_file)
 

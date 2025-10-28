@@ -12,12 +12,11 @@ from .models import DocXFigureRef, DocXTableRef
 from .reference_helper import ReferenceHelper
 from .utils import (
     add_to_composer,
-    close_word_docs_by_name,
-    docx_update,
     fix_bookmark_ids,
     get_from_doc_by_index,
     iter_block_items,
 )
+from .com_utils import docx_update, close_word_docs_by_name
 
 
 class WordExporter:

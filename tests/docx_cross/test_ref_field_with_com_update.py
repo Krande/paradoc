@@ -1,5 +1,6 @@
 """Test that figure references work correctly with Word COM field updates."""
 
+import base64
 import os
 import platform
 import re
@@ -8,7 +9,6 @@ import pytest
 from docx import Document
 
 from paradoc import OneDoc
-
 
 auto_open = os.getenv("AUTO_OPEN", False)
 
@@ -25,9 +25,6 @@ def test_figure_reference_with_com_update(tmp_path):
     source_dir = tmp_path / "test_doc"
     main_dir = source_dir / "00-main"
     main_dir.mkdir(parents=True)
-
-    # Create test image
-    import base64
 
     png_data = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
@@ -57,20 +54,6 @@ Another reference: see [@fig:test_figure] for details.
     one.compile("test_output_wcom", auto_open=False, export_format="docx", enable_word_com_automation=True)
 
     output_file = work_dir / "_dist" / "test_output_wcom.docx"
-
-    # Now run the COM update manually to update fields
-    from paradoc.io.word.utils import docx_update
-
-    print("\n" + "=" * 80)
-    print("RUNNING COM FIELD UPDATE")
-    print("=" * 80)
-
-    try:
-        docx_update(str(output_file))
-        print("✓ COM field update completed successfully")
-    except Exception as e:
-        print(f"✗ COM field update failed: {e}")
-        pytest.fail(f"COM field update failed: {e}")
 
     # Reload document to check results after field update
     doc = Document(str(output_file))

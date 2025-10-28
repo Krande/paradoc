@@ -361,7 +361,7 @@ def extract_bookmarks(xml_content: str) -> dict[str, str]:
         end_match = re.search(end_pattern, xml_content[start_pos:])
 
         if end_match:
-            content = xml_content[start_pos : start_pos + end_match.start()]
+            content = xml_content[start_pos: start_pos + end_match.start()]
             # Extract text
             text_parts = re.findall(r"<w:t[^>]*>(.*?)</w:t>", content)
             bookmarks[name] = "".join(text_parts)
@@ -396,10 +396,3 @@ def analyze_field_structure(xml_content: str, label: str):
     print(f"  STYLEREF fields ({len(styleref_fields)}):")
     for i, field in enumerate(styleref_fields[:10], 1):  # Show first 10
         print(f"    {i}. {field}")
-
-
-if __name__ == "__main__":
-    import tempfile
-
-    with tempfile.TemporaryDirectory() as tmp:
-        test_compare_com_and_paradoc(Path(tmp))

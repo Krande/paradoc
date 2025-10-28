@@ -12,7 +12,6 @@ import re
 from docx import Document
 
 from paradoc import OneDoc
-from paradoc.io.word.utils import docx_update
 
 auto_open = os.getenv("AUTO_OPEN", False)
 
@@ -54,9 +53,6 @@ Another reference: see [@fig:test_figure] for details.
     one.compile("test_output", auto_open=False, export_format="docx")
 
     output_file = work_dir / "_dist" / "test_output.docx"
-
-    # Update fields using Word COM automation
-    docx_update(str(output_file))
 
     # Re-open document after field update
     doc = Document(str(output_file))
@@ -139,9 +135,6 @@ Another reference: see [@tbl:test_table] for details.
 
     output_file = work_dir / "_dist" / "test_output.docx"
 
-    # Update fields using Word COM automation
-    docx_update(str(output_file))
-
     # Re-open document after field update
     doc = Document(str(output_file))
 
@@ -223,9 +216,6 @@ Another reference: see [@eq:test_equation] for details.
     one.compile("test_output", auto_open=False, export_format="docx")
 
     output_file = work_dir / "_dist" / "test_output.docx"
-
-    # Update fields using Word COM automation
-    docx_update(str(output_file))
 
     # Re-open document after field update
     doc = Document(str(output_file))

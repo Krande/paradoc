@@ -2,10 +2,9 @@
 
 import base64
 
+from docx import Document
 
 from paradoc import OneDoc
-from paradoc.io.word.utils import docx_update
-from docx import Document
 
 
 def test_figure_crossref_numbering_across_sections(tmp_path):
@@ -63,9 +62,6 @@ Also reference the first figure from section 1: [@fig:first_figure].
     one.compile("test_output", auto_open=False, export_format="docx")
 
     output_file = work_dir / "_dist" / "test_output.docx"
-
-    # Update fields using Word COM automation
-    docx_update(str(output_file))
 
     # Re-open document after field update
     doc = Document(str(output_file))
@@ -172,9 +168,6 @@ All references: [@fig:fig1], [@fig:fig2], and [@fig:fig3].
     one.compile("test_output", auto_open=False, export_format="docx")
 
     output_file = work_dir / "_dist" / "test_output.docx"
-
-    # Update fields using Word COM automation
-    docx_update(str(output_file))
 
     # Re-open document after field update
     doc = Document(str(output_file))

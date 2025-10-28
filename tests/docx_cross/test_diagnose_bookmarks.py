@@ -5,6 +5,8 @@ import re
 import zipfile
 from pathlib import Path
 
+from paradoc import OneDoc
+from paradoc.io.word.com_utils import docx_update
 
 
 def test_diagnose_paradoc_bookmarks(tmp_path):
@@ -12,9 +14,6 @@ def test_diagnose_paradoc_bookmarks(tmp_path):
     print("\n" + "=" * 80)
     print("DIAGNOSE PARADOC BOOKMARKS")
     print("=" * 80)
-
-    from paradoc import OneDoc
-    from paradoc.io.word.utils import docx_update
 
     # Create source directory
     source_dir = tmp_path / "source"
@@ -50,7 +49,7 @@ Reference to [@fig:fig2] and [@fig:fig1].
     # Compile document
     work_dir = tmp_path / "work"
     one = OneDoc(source_dir, work_dir=work_dir)
-    one.compile("output", auto_open=False, export_format="docx")
+    one.compile("output", auto_open=False, export_format="docx", update_docx_with_com=False)
 
     output_file = work_dir / "_dist" / "output.docx"
 

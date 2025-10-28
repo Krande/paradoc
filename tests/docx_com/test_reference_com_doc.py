@@ -93,5 +93,3 @@ def test_com_api_reference_document_primary(tmp_path):
         doc.save(str(output_file))
 
     print(f"\n[SAVED] {output_file}")
-
-    return output_file

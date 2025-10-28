@@ -108,8 +108,6 @@ The reference should display as "Figure 1-1" or similar.
         if isinstance(reference_para._element.xml, bytes)
         else reference_para._element.xml
     )
-    has_ref_field = "REF" in ref_xml or "HYPERLINK" in ref_xml
-
     # The reference should point to a bookmark or use a REF field
     # For now, just verify the paragraph exists and contains figure reference
     assert "figure" in reference_para.text.lower(), "Reference paragraph should mention the figure"

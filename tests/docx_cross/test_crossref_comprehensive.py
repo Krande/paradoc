@@ -9,7 +9,7 @@ from docx import Document
 from docx.oxml.ns import qn
 
 from paradoc import OneDoc
-from paradoc.io.word.utils import docx_update
+from paradoc.io.word.com_utils import docx_update
 
 
 @pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")

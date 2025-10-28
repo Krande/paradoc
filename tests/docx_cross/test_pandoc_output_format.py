@@ -129,5 +129,3 @@ tableTitle: "Table"
 
         if "-1" in ref_text or " 1-1" in ref_text:
             print("  Has chapter numbering: '1-1'")
-
-    return ref_text

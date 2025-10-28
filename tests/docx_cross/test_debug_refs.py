@@ -7,7 +7,6 @@ import pytest
 from docx import Document
 
 from paradoc import OneDoc
-from paradoc.io.word.utils import docx_update
 
 
 @pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
@@ -47,7 +46,6 @@ Reference to figure: [@fig:test_figure]
     one.compile("test_output", auto_open=False, export_format="docx")
 
     output_file = work_dir / "_dist" / "test_output.docx"
-    docx_update(output_file)
 
     doc = Document(str(output_file))
 

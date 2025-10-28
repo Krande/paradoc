@@ -6,7 +6,6 @@ from docx import Document
 from docx.oxml.ns import qn
 
 from paradoc import OneDoc
-from paradoc.io.word.utils import docx_update
 
 
 def test_debug_figure_caption_structure(tmp_path):
@@ -48,9 +47,6 @@ This is a reference to [@fig:test_figure] in the text.
     one.compile("test_output", auto_open=False, export_format="docx")
 
     output_file = work_dir / "_dist" / "test_output.docx"
-
-    # Update fields using Word COM automation
-    docx_update(str(output_file))
 
     # Re-open document after field update
     doc = Document(str(output_file))

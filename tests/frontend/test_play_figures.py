@@ -232,7 +232,7 @@ def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_fronte
 
     # Verify the plot has interactive elements (like the modebar)
     # Plotly typically creates a modebar with buttons
-    modebar = page.locator(".modebar, .js-plotly-plot .modebar-container")
+    page.locator(".modebar, .js-plotly-plot .modebar-container")
     # The modebar might not always be visible until hover, so just check it exists
     # We can at least verify the plot container exists
 

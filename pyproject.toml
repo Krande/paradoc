@@ -101,6 +101,7 @@ pytest-playwright = "*"
 
 [tool.pixi.feature.prod.target.win-64.dependencies]
 pywin32 = "*"
+types-pywin32 = "*"
 
 [tool.pixi.feature.test-core.dependencies]
 pytest = "*"
