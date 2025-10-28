@@ -434,6 +434,10 @@ class ReferenceHelper:
                 # For figures/tables: group 1 is number
                 num_str = match.group(1).split()[-1] if " " in match.group(1) else match.group(1)
 
+            # Strip trailing periods that may have been captured by the regex
+            # (e.g., "1." becomes "1", "1-1." becomes "1-1")
+            num_str = num_str.rstrip(".")
+
             # Map the reference number to the bookmark index
             bookmark_idx = None
             if num_str in display_to_idx:

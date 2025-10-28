@@ -230,7 +230,7 @@ class ParsedInstr:
 
 
 def _parse_instr(instr: str) -> ParsedInstr | None:
-    """
+    r"""
     Parse common Word field instruction formats:
       - REF BookmarkName \h \p
       - PAGEREF BookmarkName \h
@@ -261,7 +261,7 @@ def _parse_instr(instr: str) -> ParsedInstr | None:
 
 
 def _tokenize_instr(instr: str) -> list[str]:
-    """
+    r"""
     Tokenize instruction text. Handles simple quoted targets:
       REF "_Ref1234 5678" \h
     """
