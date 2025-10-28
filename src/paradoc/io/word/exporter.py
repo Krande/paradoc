@@ -16,7 +16,7 @@ from .utils import (
     get_from_doc_by_index,
     iter_block_items,
 )
-from .com_utils import docx_update, close_word_docs_by_name
+from paradoc.io.word.com_api.com_utils import docx_update, close_word_docs_by_name
 
 
 class WordExporter:

@@ -1,7 +1,9 @@
 """Test cross-reference numbering across multiple sections."""
 
 import base64
+import platform
 
+import pytest
 from docx import Document
 
 from paradoc import OneDoc
@@ -122,7 +124,7 @@ Also reference the first figure from section 1: [@fig:first_figure].
         f"\n✓ All {len(all_refs)} cross-references have correct format with 'Figure' label and chapter-section numbering"
     )
 
-
+@pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
 def test_multiple_figures_in_same_section(tmp_path):
     """Test that multiple figures in the same section get sequential numbering."""
     source_dir = tmp_path / "test_doc"

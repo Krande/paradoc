@@ -10,13 +10,12 @@ def open_word_win32():
         return None
 
     try:
-        import win32com.client
+        from .com_handler import WordSession
 
         # Use early binding to avoid some COM issues
-        word = win32com.client.DispatchEx("Word.Application")
-        word.Visible = False
+        ws = WordSession(visible=False)
 
-        return word
+        return ws.app
     except (ModuleNotFoundError, ImportError):
         logger.warning(
             "win32com not available - Word COM automation will be skipped. "

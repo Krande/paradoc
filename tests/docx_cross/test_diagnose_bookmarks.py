@@ -6,7 +6,7 @@ import zipfile
 from pathlib import Path
 
 from paradoc import OneDoc
-from paradoc.io.word.com_utils import docx_update
+from paradoc.io.word.com_api.com_utils import docx_update
 
 
 def test_diagnose_paradoc_bookmarks(tmp_path):

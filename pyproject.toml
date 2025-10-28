@@ -60,9 +60,9 @@ ignore = ["E24", "E121", "E123", "E126", "E203", "E226", "E704", "E741", "W503",
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "--basetemp=temp"
+addopts = "--basetemp=temp -q"
 
-[tool.pixi.project]
+[tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64"]
 
