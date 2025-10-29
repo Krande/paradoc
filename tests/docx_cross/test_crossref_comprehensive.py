@@ -12,7 +12,7 @@ from paradoc import OneDoc
 from paradoc.io.word.com_api.com_utils import docx_update, is_word_com_available
 
 
-@pytest.mark.skipif(not is_word_com_available, reason="COM automation only if Word COM is available")
+@pytest.mark.skipif(not is_word_com_available(), reason="COM automation only if Word COM is available")
 def test_comprehensive_crossref_with_figures_and_tables(tmp_path):
     r"""Test cross-references with 3 figures and 3 tables spread across different sections.
 

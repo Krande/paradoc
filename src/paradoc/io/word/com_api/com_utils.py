@@ -1,5 +1,6 @@
 import multiprocessing as mp
 import pathlib
+import platform
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Iterable
 
@@ -10,11 +11,43 @@ if TYPE_CHECKING:
 
 
 def is_word_com_available() -> bool:
+    """Return True if the Word COM server appears to be registered and usable.
+
+    1) Fast path: check ProgID is registered (no process launch).
+    2) Fallback: very short COM instantiation with Dispatch if registry probe fails,
+       guarded to avoid noisy errors; immediately release if successful.
+    """
+    if platform.system() != "Windows":
+        return False
+
     try:
-        import pythoncom  # from pywin32
-        # Lightweight registry probe; doesn’t instantiate Word
+        import pythoncom
+        # Fast, non‑intrusive: consult registry
         pythoncom.CLSIDFromProgID("Word.Application")
         return True
+    except Exception:
+        pass
+
+    # Fallback: try a minimal Dispatch to confirm availability.
+    # This may briefly instantiate a COM proxy, but we avoid touching the UI.
+    try:
+        import win32com.client
+        # Ensure COM is initialized on this thread
+        import pythoncom
+        pythoncom.CoInitialize()
+        try:
+            app = win32com.client.Dispatch("Word.Application")
+            try:
+                # If we got here, COM server is available
+                return True
+            finally:
+                # Clean up in case it created an instance
+                try:
+                    app.Quit()
+                except Exception:
+                    pass
+        finally:
+            pythoncom.CoUninitialize()
     except Exception:
         return False
 

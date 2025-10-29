@@ -10,7 +10,7 @@ from paradoc import MY_DOCX_TMPL
 from paradoc.io.word.com_api.com_utils import is_word_com_available
 
 
-@pytest.mark.skipif(not is_word_com_available, reason="COM automation only if Word COM is available")
+@pytest.mark.skipif(not is_word_com_available(), reason="COM automation only if Word COM is available")
 def test_com_api_reference_document_primary(tmp_path):
     """Create a reference document using pure COM API.
 

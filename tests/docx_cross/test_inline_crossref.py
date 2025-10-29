@@ -8,7 +8,7 @@ from docx import Document
 from paradoc.io.word.com_api import is_word_com_available
 
 
-@pytest.mark.skipif(not is_word_com_available, reason="COM automation only if Word COM is available")
+@pytest.mark.skipif(not is_word_com_available(), reason="COM automation only if Word COM is available")
 def test_cross_reference_inline(tmp_path):
     """Test that cross-references can be added inline without creating new paragraphs."""
     from paradoc.io.word.com_api import WordApplication

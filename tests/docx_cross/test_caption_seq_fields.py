@@ -11,7 +11,7 @@ from paradoc import OneDoc
 from paradoc.io.word.com_api import is_word_com_available
 
 
-@pytest.mark.skipif(not is_word_com_available, reason="COM automation only if Word COM is available")
+@pytest.mark.skipif(not is_word_com_available(), reason="COM automation only if Word COM is available")
 def test_caption_seq_fields_are_created(tmp_path):
     """Verify that SEQ fields are actually created in captions."""
 

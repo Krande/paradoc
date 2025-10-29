@@ -14,7 +14,7 @@ from paradoc.io.word.com_api import is_word_com_available
 auto_open = os.getenv("AUTO_OPEN", False)
 
 
-@pytest.mark.skipif(not is_word_com_available, reason="COM automation only if Word COM is available")
+@pytest.mark.skipif(not is_word_com_available(), reason="COM automation only if Word COM is available")
 def test_reverse_engineer_word_crossref(tmp_path):
     """Reverse engineer how Word creates cross-references by comparing before/after.
 

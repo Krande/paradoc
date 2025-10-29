@@ -9,7 +9,7 @@ from paradoc import OneDoc
 from paradoc.io.word.com_api import is_word_com_available
 
 
-@pytest.mark.skipif(not is_word_com_available, reason="COM automation only if Word COM is available")
+@pytest.mark.skipif(not is_word_com_available(), reason="COM automation only if Word COM is available")
 def test_debug_ref_conversion(tmp_path, capsys):
     """Debug test with explicit output."""
     # Create test document

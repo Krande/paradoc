@@ -9,7 +9,7 @@ from docx import Document
 from paradoc.io.word.com_api import is_word_com_available
 
 
-@pytest.mark.skipif(not is_word_com_available, reason="COM automation only if Word COM is available")
+@pytest.mark.skipif(not is_word_com_available(), reason="COM automation only if Word COM is available")
 def test_pandoc_crossref_output(tmp_path):
     """Check what pandoc-crossref actually outputs for cross-references."""
 
