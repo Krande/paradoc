@@ -2,18 +2,18 @@
 
 import base64
 import os
-import platform
 import re
 
 import pytest
 from docx import Document
 
 from paradoc import OneDoc
+from paradoc.io.word.com_api import is_word_com_available
 
 auto_open = os.getenv("AUTO_OPEN", False)
 
 
-@pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
+@pytest.mark.skipif(not is_word_com_available, reason="COM automation only if Word COM is available")
 def test_figure_reference_with_com_update(tmp_path):
     """Test that figure references work correctly after COM field update.
 

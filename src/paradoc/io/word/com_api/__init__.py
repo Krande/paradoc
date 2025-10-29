@@ -13,6 +13,7 @@ The wrapper is only available on Windows platforms.
 
 from .wrapper import WordApplication, WordDocument, FigureLayout, CaptionReference
 from .isolated import run_word_operation_isolated
+from .com_utils import is_word_com_available
 
 __all__ = [
     "WordApplication",
@@ -20,4 +21,5 @@ __all__ = [
     "FigureLayout",
     "CaptionReference",
     "run_word_operation_isolated",
+    "is_word_com_available"
 ]

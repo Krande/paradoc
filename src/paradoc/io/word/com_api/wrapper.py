@@ -42,7 +42,8 @@ def _suppress_windows_error_ui() -> None:
     """Suppress Windows error dialog boxes in worker processes."""
     try:
         kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
-        kernel32.SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX)  # type: ignore[attr-defined]
+        kernel32.SetErrorMode(
+            SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX)  # type: ignore[attr-defined]
     except Exception:
         pass
 
@@ -177,6 +178,13 @@ class WordApplication:
 
     def start(self):
         """Start the Word application."""
+        from paradoc.io.word.com_api import is_word_com_available
+
+        if not is_word_com_available():
+            raise EnvironmentError(
+                "Microsoft Word is not installed or its COM server is not registered (Word.Application)."
+            )
+
         if self._run_isolated:
             # In isolated mode, we don't maintain a persistent application instance
             return
@@ -372,14 +380,14 @@ class WordDocument:
         self._app.Selection.InsertBreak(break_constants[break_type])
 
     def add_figure_with_caption(
-        self,
-        caption_text: str,
-        image_path: Optional[Union[str, Path]] = None,
-        width: Optional[float] = None,
-        height: Optional[float] = None,
-        layout: Union[FigureLayout, str] = FigureLayout.INLINE,
-        create_bookmark: bool = True,
-        use_chapter_numbers: bool = True,
+            self,
+            caption_text: str,
+            image_path: Optional[Union[str, Path]] = None,
+            width: Optional[float] = None,
+            height: Optional[float] = None,
+            layout: Union[FigureLayout, str] = FigureLayout.INLINE,
+            create_bookmark: bool = True,
+            use_chapter_numbers: bool = True,
     ) -> Optional[CaptionReference]:
         """Add a figure with a caption.
 
@@ -491,13 +499,13 @@ class WordDocument:
         return caption_ref
 
     def add_table_with_caption(
-        self,
-        caption_text: str,
-        rows: int = 2,
-        cols: int = 2,
-        data: Optional[list[list]] = None,
-        create_bookmark: bool = True,
-        use_chapter_numbers: bool = True,
+            self,
+            caption_text: str,
+            rows: int = 2,
+            cols: int = 2,
+            data: Optional[list[list]] = None,
+            create_bookmark: bool = True,
+            use_chapter_numbers: bool = True,
     ) -> Optional[CaptionReference]:
         """Add a table with a caption.
 
@@ -587,12 +595,12 @@ class WordDocument:
         return caption_ref
 
     def add_cross_reference(
-        self,
-        bookmark_name: Union[CaptionReference, str, int],
-        reference_type: Optional[Literal["figure", "table"]] = None,
-        include_hyperlink: bool = True,
-        prefix_text: str = "",
-        include_caption_text: bool = False,
+            self,
+            bookmark_name: Union[CaptionReference, str, int],
+            reference_type: Optional[Literal["figure", "table"]] = None,
+            include_hyperlink: bool = True,
+            prefix_text: str = "",
+            include_caption_text: bool = False,
     ):
         """Add a cross-reference to a figure or table.
 

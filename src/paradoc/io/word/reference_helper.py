@@ -493,13 +493,13 @@ class ReferenceHelper:
 
     def print_registry(self):
         """Print the complete registry for debugging."""
-        logger.debug("\n[ReferenceHelper] Complete Registry:")
-        logger.debug(f"  Total items: {len(self._all_items)}")
-        logger.debug(f"  Figures: {len(self._figures)}")
-        logger.debug(f"  Tables: {len(self._tables)}")
-        logger.debug(f"  Equations: {len(self._equations)}")
-        logger.debug("\n  Items in document order:")
+        print("\n[ReferenceHelper] Complete Registry:")
+        print(f"  Total items: {len(self._all_items)}")
+        print(f"  Figures: {len(self._figures)}")
+        print(f"  Tables: {len(self._tables)}")
+        print(f"  Equations: {len(self._equations)}")
+        print("\n  Items in document order:")
         for item in self._all_items:
-            logger.debug(
+            print(
                 f"    [{item.document_order}] {item.ref_type.value} '{item.semantic_id}' -> {item.word_bookmark} (display: {item.display_number})"
             )

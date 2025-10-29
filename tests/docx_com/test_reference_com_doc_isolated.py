@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from paradoc import MY_DOCX_TMPL
-from paradoc.io.word.com_api import run_word_operation_isolated
+from paradoc.io.word.com_api import run_word_operation_isolated, is_word_com_available
 
 
 def _create_reference_document_worker(output_file: str, template: str):
@@ -78,7 +78,7 @@ def _create_reference_document_worker(output_file: str, template: str):
     return output_file
 
 
-@pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
+@pytest.mark.skipif(not is_word_com_available, reason="COM automation only if Word COM is available")
 def test_com_api_reference_document_isolated(tmp_path):
     """Create a reference document using COM API in isolated process.
 

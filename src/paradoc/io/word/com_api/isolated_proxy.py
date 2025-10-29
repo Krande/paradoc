@@ -4,13 +4,11 @@ This module provides a proxy that records document operations and executes
 them in an isolated process to suppress C stack error logs.
 """
 
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Union, Literal, Any
 
 from paradoc.config import logger
-
 from .wrapper import CaptionReference, FigureLayout
 
 
@@ -93,14 +91,14 @@ class IsolatedWordDocument:
         self._record_operation("add_section_break", break_type)
 
     def add_figure_with_caption(
-        self,
-        caption_text: str,
-        image_path: Optional[Union[str, Path]] = None,
-        width: Optional[float] = None,
-        height: Optional[float] = None,
-        layout: Union[FigureLayout, str] = FigureLayout.INLINE,
-        create_bookmark: bool = True,
-        use_chapter_numbers: bool = True,
+            self,
+            caption_text: str,
+            image_path: Optional[Union[str, Path]] = None,
+            width: Optional[float] = None,
+            height: Optional[float] = None,
+            layout: Union[FigureLayout, str] = FigureLayout.INLINE,
+            create_bookmark: bool = True,
+            use_chapter_numbers: bool = True,
     ) -> Optional[CaptionReference]:
         """Record add_figure_with_caption operation and return a placeholder reference."""
         # Convert layout to string for serialization
@@ -131,13 +129,13 @@ class IsolatedWordDocument:
         return ref
 
     def add_table_with_caption(
-        self,
-        caption_text: str,
-        rows: int = 2,
-        cols: int = 2,
-        data: Optional[list[list]] = None,
-        create_bookmark: bool = True,
-        use_chapter_numbers: bool = True,
+            self,
+            caption_text: str,
+            rows: int = 2,
+            cols: int = 2,
+            data: Optional[list[list]] = None,
+            create_bookmark: bool = True,
+            use_chapter_numbers: bool = True,
     ) -> Optional[CaptionReference]:
         """Record add_table_with_caption operation and return a placeholder reference."""
         # Create a placeholder reference that will be valid when executed
@@ -164,12 +162,12 @@ class IsolatedWordDocument:
         return ref
 
     def add_cross_reference(
-        self,
-        bookmark_name: Union[CaptionReference, str, int],
-        reference_type: Optional[Literal["figure", "table"]] = None,
-        include_hyperlink: bool = True,
-        prefix_text: str = "",
-        include_caption_text: bool = False,
+            self,
+            bookmark_name: Union[CaptionReference, str, int],
+            reference_type: Optional[Literal["figure", "table"]] = None,
+            include_hyperlink: bool = True,
+            prefix_text: str = "",
+            include_caption_text: bool = False,
     ):
         """Record add_cross_reference operation."""
         # Convert CaptionReference to serializable form
@@ -226,7 +224,7 @@ class IsolatedWordDocument:
     def get_bookmark_names(self) -> list[str]:
         """Get bookmark names - returns placeholder names in isolated mode."""
         return [f"_placeholder_fig_{i}" for i in range(self._figure_count)] + \
-               [f"_placeholder_tbl_{i}" for i in range(self._table_count)]
+            [f"_placeholder_tbl_{i}" for i in range(self._table_count)]
 
     @property
     def com_document(self):
@@ -240,10 +238,10 @@ class IsolatedWordDocument:
 
 
 def _execute_document_operations(
-    template: Optional[str],
-    visible: bool,
-    operations: list[DocumentOperation],
-    output_path: str
+        template: Optional[str],
+        visible: bool,
+        operations: list[DocumentOperation],
+        output_path: str
 ) -> str:
     """Worker function that executes recorded operations in isolated process.
 
@@ -258,6 +256,13 @@ def _execute_document_operations(
     """
     # Import here since this runs in isolated process
     from .wrapper import WordApplication, CaptionReference, FigureLayout
+
+    from paradoc.io.word.com_api.com_utils import is_word_com_available
+
+    if not is_word_com_available():
+        raise RuntimeError(
+            "Microsoft Word COM server not available. Install desktop Word or skip COM tests."
+        )
 
     # Log to stdout (will be captured if redirect_stdout=True)
     logger.info(f"\nExecuting {len(operations)} operations in isolated process...")
@@ -328,4 +333,3 @@ def _execute_document_operations(
 
     logger.info(f"Document saved to {output_path}")
     return output_path
-

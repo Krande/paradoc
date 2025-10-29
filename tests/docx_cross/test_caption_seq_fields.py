@@ -1,7 +1,6 @@
 """Test to verify that rebuild_caption creates proper SEQ fields."""
 
 import base64
-import platform
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -9,9 +8,10 @@ from xml.etree import ElementTree as ET
 import pytest
 
 from paradoc import OneDoc
+from paradoc.io.word.com_api import is_word_com_available
 
 
-@pytest.mark.skipif(platform.system() != "Windows", reason="Test designed for Windows")
+@pytest.mark.skipif(not is_word_com_available, reason="COM automation only if Word COM is available")
 def test_caption_seq_fields_are_created(tmp_path):
     """Verify that SEQ fields are actually created in captions."""
 
@@ -28,7 +28,7 @@ def test_caption_seq_fields_are_created(tmp_path):
     images_dir.mkdir(parents=True)
 
     for i in range(2):
-        img_path = images_dir / f"fig{i+1}.png"
+        img_path = images_dir / f"fig{i + 1}.png"
         img_path.write_bytes(png_data)
 
     # Simple markdown with 2 figures

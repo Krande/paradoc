@@ -1,13 +1,14 @@
 """Test that cross-references stay on the same line."""
 
-import platform
 from pathlib import Path
 
 import pytest
 from docx import Document
 
+from paradoc.io.word.com_api import is_word_com_available
 
-@pytest.mark.skipif(platform.system() != "Windows", reason="COM automation only available on Windows")
+
+@pytest.mark.skipif(not is_word_com_available, reason="COM automation only if Word COM is available")
 def test_cross_reference_inline(tmp_path):
     """Test that cross-references can be added inline without creating new paragraphs."""
     from paradoc.io.word.com_api import WordApplication

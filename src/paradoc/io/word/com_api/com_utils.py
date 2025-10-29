@@ -9,12 +9,21 @@ if TYPE_CHECKING:
     from .com_handler import WordSession, _update_docx_worker
 
 
+def is_word_com_available() -> bool:
+    try:
+        import pythoncom  # from pywin32
+        # Lightweight registry probe; doesn’t instantiate Word
+        pythoncom.CLSIDFromProgID("Word.Application")
+        return True
+    except Exception:
+        return False
+
+
 def docx_update_isolated(docx_file: pathlib.Path, timeout_s: float = 120.0) -> bool:
     """
     Run the Word COM update in an isolated process. Returns True/False for success.
     """
     from .com_handler import _update_docx_worker
-
 
     ctx = mp.get_context("spawn")  # Windows default, explicit for clarity
     with ctx.Pool(processes=1) as pool:
@@ -26,6 +35,7 @@ def docx_update_isolated(docx_file: pathlib.Path, timeout_s: float = 120.0) -> b
             # Optionally: kill spawned WINWORD if it lingered; usually Word exits with the worker.
             return False
         return bool(ok)
+
 
 @contextmanager
 def word_session_context() -> Iterable[WordSession | None]:
@@ -84,7 +94,6 @@ def docx_update(docx_file):
     if not success:
         # Keep it non-fatal for your pipeline, but you can log if you want
         logger.warning("Word COM update failed (non-critical)")
-
 
 
 def close_word_docs_by_name(names: list) -> None:
