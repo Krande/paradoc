@@ -1,3 +1,4 @@
+import functools
 import multiprocessing as mp
 import pathlib
 import platform
@@ -9,7 +10,7 @@ from paradoc.io.word.utils import logger
 if TYPE_CHECKING:
     from .com_handler import WordSession, _update_docx_worker
 
-
+@functools.lru_cache(maxsize=1)
 def is_word_com_available() -> bool:
     """Return True if the Word COM server appears to be registered and usable.
 
