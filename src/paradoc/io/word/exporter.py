@@ -65,6 +65,7 @@ class WordExporter:
         composer_main = add_to_composer(self.main_tmpl, one.md_files_main)
         composer_app = add_to_composer(self.app_tmpl, one.md_files_app)
 
+
         # Format tables and register them with the reference helper
         self.format_tables(composer_main.doc, False, ref_helper)
         self.format_tables(composer_app.doc, True, ref_helper)
@@ -78,6 +79,7 @@ class WordExporter:
         # Merge docs
         composer_main.doc.add_page_break()
         composer_main.append(composer_app.doc)
+        logger.info("[WordExporter] Merged main document and appendix")
 
         # Update display numbers in the reference helper
         logger.info("[WordExporter] Updating display numbers in ReferenceHelper")
@@ -112,7 +114,7 @@ class WordExporter:
         if check_open_docs and self.enable_word_com_automation:
             close_word_docs_by_name([output_name, f"{output_name}.docx"])
 
-        logger.info(f'Saving Composed Document to "{dest_file}"')
+        print(f'Saving Composed Document to "{dest_file}"')
         composer_main.save(dest_file)
 
         # Only attempt Word COM automation if explicitly enabled

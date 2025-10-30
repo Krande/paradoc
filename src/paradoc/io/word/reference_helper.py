@@ -338,6 +338,9 @@ class ReferenceHelper:
         (with linkReferences: true) and returns structured information about each
         reference that needs to be converted to a native Word REF field.
 
+        This method is completely independent and does not rely on pre-registered items.
+        It scans the entire document to find both hyperlinks and their target captions.
+
         Args:
             document: The Word document to scan
 
@@ -347,35 +350,72 @@ class ReferenceHelper:
         """
         logger.info("[ReferenceHelper] Extracting hyperlink-based cross-references")
 
-        # Build mapping from semantic IDs (e.g., "fig:test_figure") to reference info
-        semantic_to_info = {}
+        # First pass: Find all caption bookmarks in the document
+        # These are the targets that hyperlinks will point to
+        anchor_to_bookmark = {}  # Maps anchor (e.g., "fig:test_figure") to Word bookmark name
+        anchor_to_info = {}      # Maps anchor to metadata (type, label, etc.)
 
-        for item in self._all_items:
-            # Pandoc-crossref uses "fig:id", "tbl:id", "eq:id" format
-            if item.ref_type == ReferenceType.FIGURE:
-                semantic_key = f"fig:{item.semantic_id}"
-                label = "Figure"
-            elif item.ref_type == ReferenceType.TABLE:
-                semantic_key = f"tbl:{item.semantic_id}"
-                label = "Table"
-            elif item.ref_type == ReferenceType.EQUATION:
-                semantic_key = f"eq:{item.semantic_id}"
-                label = "Eq"
-            else:
+        logger.debug("[ReferenceHelper] First pass: scanning for caption bookmarks...")
+
+        for block in iter_block_items(document):
+            if not isinstance(block, Paragraph):
                 continue
 
-            semantic_to_info[semantic_key] = {
-                'ref_type': item.ref_type,
-                'semantic_id': item.semantic_id,
-                'word_bookmark': item.word_bookmark,
-                'label': label
-            }
+            p_element = block._p
 
+            # Look for bookmarkStart elements in captions
+            bookmark_starts = p_element.findall('.//w:bookmarkStart', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+
+            for bm_start in bookmark_starts:
+                bm_name = bm_start.get(qn('w:name'))
+                if not bm_name or not bm_name.startswith('_Ref'):
+                    continue
+
+                # Check if this paragraph has a hyperlink with an anchor (pandoc-crossref creates these)
+                hyperlinks_in_para = p_element.findall('.//w:hyperlink', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+
+                for hl in hyperlinks_in_para:
+                    anchor = hl.get(qn('w:anchor'))
+                    if not anchor:
+                        continue
+
+                    # Check if this looks like a pandoc-crossref anchor
+                    if anchor.startswith('fig:'):
+                        ref_type = ReferenceType.FIGURE
+                        semantic_id = anchor[4:]
+                        label = "Figure"
+                    elif anchor.startswith('tbl:'):
+                        ref_type = ReferenceType.TABLE
+                        semantic_id = anchor[4:]
+                        label = "Table"
+                    elif anchor.startswith('eq:'):
+                        ref_type = ReferenceType.EQUATION
+                        semantic_id = anchor[3:]
+                        label = "Eq"
+                    else:
+                        continue
+
+                    # Store the mapping
+                    anchor_to_bookmark[anchor] = bm_name
+                    anchor_to_info[anchor] = {
+                        'ref_type': ref_type,
+                        'semantic_id': semantic_id,
+                        'label': label,
+                        'word_bookmark': bm_name
+                    }
+
+                    logger.debug(f"[ReferenceHelper]   Found caption bookmark: {anchor} -> {bm_name}")
+                    break  # Only one anchor per caption paragraph
+
+        logger.info(f"[ReferenceHelper] Found {len(anchor_to_bookmark)} caption bookmarks")
+
+        # Second pass: Find all hyperlink references in the document
         # Skip caption paragraphs
         caption_styles = {"Image Caption", "Table Caption", "Captioned Figure"}
 
-        # Collect all hyperlink references
         hyperlink_refs = []
+
+        logger.debug("[ReferenceHelper] Second pass: scanning for hyperlink references...")
 
         for block in iter_block_items(document):
             if not isinstance(block, Paragraph):
@@ -387,26 +427,75 @@ class ReferenceHelper:
 
             p_element = block._p
 
-            # Convert to list for proper indexing
+            # Find ALL hyperlinks in the paragraph using xpath (not just direct children)
+            hyperlinks = p_element.findall('.//w:hyperlink', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+
+            if not hyperlinks:
+                continue
+
+            # Convert to list for proper indexing (to find position in parent)
             children = list(p_element)
 
-            # Scan all child elements to find hyperlinks
-            for elem_index, child in enumerate(children):
-                if child.tag != qn("w:hyperlink"):
+            # Scan all hyperlink elements found
+            for hyperlink_elem in hyperlinks:
+                # Find the index of this hyperlink in the paragraph's children
+                elem_index = -1
+                try:
+                    elem_index = children.index(hyperlink_elem)
+                except ValueError:
+                    # Hyperlink is not a direct child, find its ancestor that is
+                    for idx, child in enumerate(children):
+                        if hyperlink_elem in child.iter():
+                            elem_index = idx
+                            break
+
+                if hyperlink_elem.tag != qn("w:hyperlink"):
                     continue
 
-                anchor = child.get(qn('w:anchor'))
-                if not anchor or anchor not in semantic_to_info:
-                    # Not a cross-reference hyperlink we care about
+                anchor = hyperlink_elem.get(qn('w:anchor'))
+                if not anchor:
+                    continue
+
+                # Check if this looks like a pandoc-crossref anchor
+                if not (anchor.startswith('fig:') or anchor.startswith('tbl:') or anchor.startswith('eq:')):
                     continue
 
                 # Extract the text inside the hyperlink
                 hyperlink_text = ""
-                for text_elem in child.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                for text_elem in hyperlink_elem.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
                     hyperlink_text += text_elem.text or ""
 
-                # Get reference info
-                info = semantic_to_info[anchor]
+                # Try to find the target bookmark for this anchor
+                info = anchor_to_info.get(anchor)
+
+                if not info:
+                    # This hyperlink references something that doesn't have a caption/bookmark yet
+                    # Infer the type and label from the anchor prefix, and create a bookmark
+                    logger.warning(f"[ReferenceHelper]   Hyperlink {anchor} has no caption bookmark - will auto-register")
+
+                    if anchor.startswith('fig:'):
+                        ref_type = ReferenceType.FIGURE
+                        semantic_id = anchor[4:]
+                        label = "Figure"
+                        word_bookmark = self.register_figure(semantic_id)
+                    elif anchor.startswith('tbl:'):
+                        ref_type = ReferenceType.TABLE
+                        semantic_id = anchor[4:]
+                        label = "Table"
+                        word_bookmark = self.register_table(semantic_id)
+                    elif anchor.startswith('eq:'):
+                        ref_type = ReferenceType.EQUATION
+                        semantic_id = anchor[3:]
+                        label = "Eq"
+                        word_bookmark = self.register_equation(semantic_id)
+                    else:
+                        continue
+                else:
+                    # Use info from the caption we found
+                    ref_type = info['ref_type']
+                    semantic_id = info['semantic_id']
+                    word_bookmark = info['word_bookmark']
+                    label = info['label']
 
                 # Look for prefix text in the previous run
                 prefix_text = None
@@ -430,13 +519,13 @@ class ReferenceHelper:
                 # Create HyperlinkReference object
                 hyperlink_ref = HyperlinkReference(
                     paragraph=block,
-                    hyperlink_element=child,
+                    hyperlink_element=hyperlink_elem,
                     anchor=anchor,
                     hyperlink_text=hyperlink_text,
-                    ref_type=info['ref_type'],
-                    semantic_id=info['semantic_id'],
-                    word_bookmark=info['word_bookmark'],
-                    label=info['label'],
+                    ref_type=ref_type,
+                    semantic_id=semantic_id,
+                    word_bookmark=word_bookmark,
+                    label=label,
                     prefix_text=prefix_text,
                     prefix_run_element=prefix_run_element,
                     element_index=elem_index
@@ -444,8 +533,8 @@ class ReferenceHelper:
 
                 hyperlink_refs.append(hyperlink_ref)
                 logger.debug(
-                    f"[ReferenceHelper]   Found: {anchor} -> {info['word_bookmark']} "
-                    f"(label={info['label']}, prefix='{prefix_text}')"
+                    f"[ReferenceHelper]   Found: {anchor} -> {word_bookmark} "
+                    f"(label={label}, prefix='{prefix_text}')"
                 )
 
         logger.info(f"[ReferenceHelper] Extracted {len(hyperlink_refs)} hyperlink references")
