@@ -16,6 +16,8 @@ from .common import (
     MarkDownFile,
     Table,
     TableFormat,
+    MY_DOCX_TMPL,
+    MY_DOCX_TMPL_BLANK,
 )
 from .config import logger
 from .db import (
@@ -191,6 +193,25 @@ class OneDoc:
         self._perform_variable_substitution()
         return ASTExporter(self)
 
+    def get_docx(
+        self,
+        main_tmpl=MY_DOCX_TMPL,
+        app_tmpl=MY_DOCX_TMPL_BLANK,
+        use_hyperlink_references=True,
+        enable_word_com_automation=False,
+        use_custom_docx_compile=True,
+    ):
+        from paradoc.io.word.exporter import WordExporter
+
+        return WordExporter(
+            self,
+            main_tmpl=main_tmpl,
+            app_tmpl=app_tmpl,
+            use_hyperlink_references=use_hyperlink_references,
+            enable_word_com_automation=enable_word_com_automation,
+            use_custom_docx_compile=use_custom_docx_compile,
+        )
+
     def send_to_frontend(self, metadata_file=None, embed_images=True, use_static_html=False, frontend_id=None):
         """
         Send document to Paradoc frontend reader via WebSocket.
@@ -308,12 +329,10 @@ class OneDoc:
 
         if export_format == ExportFormats.DOCX:
             import platform
-            from paradoc.io.word.exporter import WordExporter
 
             # No longer need to inject table names into cells - using bookmark-based identification
-            check_open_docs = auto_open is True
-            wordx = WordExporter(self, **kwargs)
-            wordx.export(output_name, dest_file, check_open_docs=check_open_docs)
+            wordx = self.get_docx(**kwargs)
+            wordx.export(output_name, dest_file, check_open_docs=auto_open)
 
             if update_docx_with_com and platform.system() == "Windows":
                 from paradoc.io.word.com_api.com_utils import docx_update
@@ -337,8 +356,6 @@ class OneDoc:
 
             html = HTMLExporter(self)
             html.export(dest_file, include_navbar=kwargs.get("include_navbar", True))
-            if send_to_frontend:
-                html.send_to_frontend()
         else:
             raise NotImplementedError(f'Export format "{export_format}" is not yet supported')
 
@@ -496,6 +513,7 @@ class OneDoc:
                     fig.write_image(str(cache_png), format="png")
                 except Exception:
                     from plotly.io._kaleido import get_chrome
+
                     get_chrome()
                     fig.write_image(str(cache_png), format="png")
                 cache_timestamp.write_text(str(db_timestamp), encoding="utf-8")
@@ -600,9 +618,7 @@ class OneDoc:
                             full_reference += remaining_str[:annotation_end]
 
                     # Try table substitution first
-                    db_table_markdown = self._get_table_markdown_from_db(
-                        full_reference, key_clean
-                    )
+                    db_table_markdown = self._get_table_markdown_from_db(full_reference, key_clean)
                     if db_table_markdown is not None:
                         logger.info(f'Substituting table "{key_clean}" from database')
                         new_str = db_table_markdown

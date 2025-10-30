@@ -35,6 +35,7 @@ class WordExporter:
         self.use_custom_docx_compile = use_custom_docx_compile
         self.enable_word_com_automation = enable_word_com_automation
         self.use_hyperlink_references = use_hyperlink_references
+        self.ref_helper = ReferenceHelper()
 
     def export(self, output_name, dest_file, check_open_docs=False):
         if self.use_custom_docx_compile:
@@ -46,7 +47,7 @@ class WordExporter:
         one = self.one_doc
 
         # Initialize the reference helper to manage all cross-references
-        ref_helper = ReferenceHelper()
+
         logger.info("[WordExporter] Initialized ReferenceHelper for cross-reference management")
 
         # Step 1: Convert individual markdown files to DOCX
@@ -58,7 +59,7 @@ class WordExporter:
 
         # Step 3: Extract and format all caption elements (tables, figures, equations)
         # This replaces the previous approach of calling format_tables/format_figures twice
-        self._extract_and_format_captions(composer_main.doc, composer_app.doc, ref_helper)
+        self._extract_and_format_captions(composer_main.doc, composer_app.doc)
 
         # Step 4: Format appendix headings
         format_paragraphs_and_headings(composer_app.doc, one.appendix_heading_map)
@@ -69,7 +70,7 @@ class WordExporter:
         logger.info("[WordExporter] Merged main document and appendix")
 
         # Step 6: Update display numbers and convert cross-references
-        self._update_and_convert_references(composer_main.doc, ref_helper)
+        self._update_and_convert_references(composer_main.doc)
 
         # Step 7: Format all paragraphs
         format_paragraphs_and_headings(composer_main.doc, one.paragraph_style_map)
@@ -104,7 +105,7 @@ class WordExporter:
 
         logger.info(f"[WordExporter] Converted {len(one_doc.md_files_main) + len(one_doc.md_files_app)} markdown files")
 
-    def _extract_and_format_captions(self, main_doc, app_doc, ref_helper):
+    def _extract_and_format_captions(self, main_doc, app_doc):
         """Extract and format all caption elements (tables, figures, equations) from both documents.
 
         This method replaces the previous approach of calling format_tables and format_figures
@@ -117,6 +118,8 @@ class WordExporter:
             ref_helper: The ReferenceHelper instance
         """
         logger.info("[WordExporter] Extracting and formatting caption elements")
+
+        ref_helper = self.ref_helper
 
         # Extract all tables, figures, and equations from both documents
         main_tables = ref_helper.extract_all_tables(main_doc, self.one_doc, is_appendix=False)
@@ -166,14 +169,16 @@ class WordExporter:
             f"{len(main_equations) + len(app_equations)} equations"
         )
 
-    def _update_and_convert_references(self, document, ref_helper):
+    def _update_and_convert_references(self, document):
         """Update display numbers and convert cross-references to REF fields.
 
         Args:
             document: The merged Word document
-            ref_helper: The ReferenceHelper instance
         """
         logger.info("[WordExporter] Updating display numbers in ReferenceHelper")
+
+        ref_helper = self.ref_helper
+
         ref_helper.update_display_numbers()
 
         # Print registry for debugging
