@@ -15,7 +15,7 @@ import random
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
@@ -53,6 +53,40 @@ class ReferenceItem:
     display_number: Optional[str] = None
     caption_paragraph: Optional[Paragraph] = None
     document_order: int = 0
+
+
+@dataclass
+class HyperlinkReference:
+    """Represents a hyperlink-based cross-reference that needs to be converted.
+
+    This dataclass holds all necessary information to replace a hyperlink with
+    a proper native Word cross-reference using REF and SEQ fields.
+
+    Attributes:
+        paragraph: The Word paragraph containing the hyperlink
+        hyperlink_element: The XML element of the hyperlink
+        anchor: The hyperlink anchor (e.g., "fig:test_figure")
+        hyperlink_text: The text inside the hyperlink (e.g., "1")
+        ref_type: The type of reference (FIGURE, TABLE, or EQUATION)
+        semantic_id: The semantic identifier (e.g., "test_figure")
+        word_bookmark: The Word-style bookmark name to reference (e.g., "_Ref306075071")
+        label: The label for the REF field (e.g., "Figure", "Table", "Eq")
+        prefix_text: The text before the hyperlink that should be removed (e.g., "fig.")
+        prefix_run_element: The XML run element containing the prefix text (if any)
+        element_index: Index of the hyperlink in the paragraph's children
+    """
+
+    paragraph: Paragraph
+    hyperlink_element: Any  # XML element
+    anchor: str
+    hyperlink_text: str
+    ref_type: ReferenceType
+    semantic_id: str
+    word_bookmark: str
+    label: str
+    prefix_text: Optional[str] = None
+    prefix_run_element: Optional[Any] = None
+    element_index: int = 0
 
 
 class ReferenceHelper:
@@ -203,6 +237,126 @@ class ReferenceHelper:
         """
         item = self._equations.get(semantic_id)
         return item.word_bookmark if item else None
+
+    def extract_hyperlink_references(self, document) -> List[HyperlinkReference]:
+        """Extract all hyperlink-based cross-references from the document.
+
+        This method scans the document for hyperlinks created by pandoc-crossref
+        (with linkReferences: true) and returns structured information about each
+        reference that needs to be converted to a native Word REF field.
+
+        Args:
+            document: The Word document to scan
+
+        Returns:
+            List of HyperlinkReference objects containing all information needed
+            for conversion to REF fields
+        """
+        logger.info("[ReferenceHelper] Extracting hyperlink-based cross-references")
+
+        # Build mapping from semantic IDs (e.g., "fig:test_figure") to reference info
+        semantic_to_info = {}
+
+        for item in self._all_items:
+            # Pandoc-crossref uses "fig:id", "tbl:id", "eq:id" format
+            if item.ref_type == ReferenceType.FIGURE:
+                semantic_key = f"fig:{item.semantic_id}"
+                label = "Figure"
+            elif item.ref_type == ReferenceType.TABLE:
+                semantic_key = f"tbl:{item.semantic_id}"
+                label = "Table"
+            elif item.ref_type == ReferenceType.EQUATION:
+                semantic_key = f"eq:{item.semantic_id}"
+                label = "Eq"
+            else:
+                continue
+
+            semantic_to_info[semantic_key] = {
+                'ref_type': item.ref_type,
+                'semantic_id': item.semantic_id,
+                'word_bookmark': item.word_bookmark,
+                'label': label
+            }
+
+        # Skip caption paragraphs
+        caption_styles = {"Image Caption", "Table Caption", "Captioned Figure"}
+
+        # Collect all hyperlink references
+        hyperlink_refs = []
+
+        for block in iter_block_items(document):
+            if not isinstance(block, Paragraph):
+                continue
+
+            # Skip caption paragraphs
+            if block.style.name in caption_styles:
+                continue
+
+            p_element = block._p
+
+            # Convert to list for proper indexing
+            children = list(p_element)
+
+            # Scan all child elements to find hyperlinks
+            for elem_index, child in enumerate(children):
+                if child.tag != qn("w:hyperlink"):
+                    continue
+
+                anchor = child.get(qn('w:anchor'))
+                if not anchor or anchor not in semantic_to_info:
+                    # Not a cross-reference hyperlink we care about
+                    continue
+
+                # Extract the text inside the hyperlink
+                hyperlink_text = ""
+                for text_elem in child.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                    hyperlink_text += text_elem.text or ""
+
+                # Get reference info
+                info = semantic_to_info[anchor]
+
+                # Look for prefix text in the previous run
+                prefix_text = None
+                prefix_run_element = None
+
+                if elem_index > 0:
+                    prev_child = children[elem_index - 1]
+                    if prev_child.tag == qn("w:r"):
+                        # Extract text from the run
+                        prev_text = ""
+                        for text_elem in prev_child.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                            prev_text += text_elem.text or ""
+
+                        # Check if it ends with a prefix pattern (with optional trailing whitespace)
+                        prefix_pattern = r'(fig\.|tbl\.|eq\.)\s*$'
+                        match = re.search(prefix_pattern, prev_text, re.IGNORECASE)
+                        if match:
+                            prefix_text = match.group()
+                            prefix_run_element = prev_child
+
+                # Create HyperlinkReference object
+                hyperlink_ref = HyperlinkReference(
+                    paragraph=block,
+                    hyperlink_element=child,
+                    anchor=anchor,
+                    hyperlink_text=hyperlink_text,
+                    ref_type=info['ref_type'],
+                    semantic_id=info['semantic_id'],
+                    word_bookmark=info['word_bookmark'],
+                    label=info['label'],
+                    prefix_text=prefix_text,
+                    prefix_run_element=prefix_run_element,
+                    element_index=elem_index
+                )
+
+                hyperlink_refs.append(hyperlink_ref)
+                logger.debug(
+                    f"[ReferenceHelper]   Found: {anchor} -> {info['word_bookmark']} "
+                    f"(label={info['label']}, prefix='{prefix_text}')"
+                )
+
+        logger.info(f"[ReferenceHelper] Extracted {len(hyperlink_refs)} hyperlink references")
+        return hyperlink_refs
 
     def get_all_figure_bookmarks_in_order(self) -> List[str]:
         """Get all figure bookmarks in document order.
@@ -490,6 +644,203 @@ class ReferenceHelper:
             "equations": len(self._equations),
             "total": len(self._all_items),
         }
+
+    def convert_all_references_by_hyperlinks(self, document):
+        """Convert hyperlink-based references to REF fields in the document.
+
+        This method uses the hyperlinks created by pandoc-crossref (when linkReferences: true)
+        instead of regex pattern matching. It's more robust because it directly identifies
+        cross-references by their hyperlink anchors pointing to bookmarks.
+
+        Args:
+            document: The Word document to process
+        """
+        logger.info("[ReferenceHelper] Converting hyperlink-based references to REF fields")
+
+        # Build mapping from semantic IDs (e.g., "fig:test_figure") to Word bookmarks
+        semantic_to_word_bookmark = {}
+        semantic_to_label = {}
+
+        for item in self._all_items:
+            # Pandoc-crossref uses "fig:id", "tbl:id", "eq:id" format
+            if item.ref_type == ReferenceType.FIGURE:
+                semantic_key = f"fig:{item.semantic_id}"
+                label = "Figure"
+            elif item.ref_type == ReferenceType.TABLE:
+                semantic_key = f"tbl:{item.semantic_id}"
+                label = "Table"
+            elif item.ref_type == ReferenceType.EQUATION:
+                semantic_key = f"eq:{item.semantic_id}"
+                label = "Eq"
+            else:
+                continue
+
+            semantic_to_word_bookmark[semantic_key] = item.word_bookmark
+            semantic_to_label[semantic_key] = label
+            logger.debug(f"[ReferenceHelper]   Mapped '{semantic_key}' -> '{item.word_bookmark}' ({label})")
+
+        # Skip caption paragraphs
+        caption_styles = {"Image Caption", "Table Caption", "Captioned Figure"}
+
+        # Process all paragraphs looking for hyperlinks
+        processed_count = 0
+        hyperlink_count = 0
+
+        for block in iter_block_items(document):
+            if not isinstance(block, Paragraph):
+                continue
+
+            # Skip caption paragraphs
+            if block.style.name in caption_styles:
+                continue
+
+            p_element = block._p
+
+            # Look for hyperlink elements with anchors
+            hyperlinks = p_element.findall('.//w:hyperlink', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+
+            if not hyperlinks:
+                continue
+
+            # Check if any hyperlinks point to our registered references
+            has_matching_refs = False
+            for hyperlink in hyperlinks:
+                anchor = hyperlink.get(qn('w:anchor'))
+                if anchor and anchor in semantic_to_word_bookmark:
+                    has_matching_refs = True
+                    break
+
+            if not has_matching_refs:
+                continue
+
+            # Process this paragraph to replace hyperlinks with REF fields
+            logger.debug(f"[ReferenceHelper] Processing paragraph: {block.text[:80]}")
+            refs_converted = self._process_paragraph_hyperlinks(block, semantic_to_word_bookmark, semantic_to_label)
+            if refs_converted > 0:
+                processed_count += 1
+                hyperlink_count += refs_converted
+
+        logger.info(f"[ReferenceHelper] Conversion complete: {processed_count} paragraphs processed, {hyperlink_count} hyperlinks converted")
+
+    def _process_paragraph_hyperlinks(self, paragraph: Paragraph, semantic_to_word_bookmark: Dict[str, str], semantic_to_label: Dict[str, str]) -> int:
+        """Process a paragraph to replace hyperlinks with REF fields.
+
+        Args:
+            paragraph: The paragraph to process
+            semantic_to_word_bookmark: Mapping from semantic IDs to Word bookmarks
+            semantic_to_label: Mapping from semantic IDs to labels (Figure, Table, Eq)
+
+        Returns:
+            Number of hyperlinks converted
+        """
+        p_element = paragraph._p
+
+        # Build a list of all child elements in order, tracking which are hyperlinks
+        # and what their positions are
+        elements_info = []
+
+        for child in p_element:
+            if child.tag == qn("w:hyperlink"):
+                anchor = child.get(qn('w:anchor'))
+                if anchor and anchor in semantic_to_word_bookmark:
+                    # This is a reference hyperlink we need to convert
+                    # Extract the text from the hyperlink
+                    hyperlink_text = ""
+                    for text_elem in child.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                        hyperlink_text += text_elem.text or ""
+
+                    elements_info.append({
+                        'type': 'ref_hyperlink',
+                        'element': child,
+                        'anchor': anchor,
+                        'text': hyperlink_text
+                    })
+                else:
+                    # Regular hyperlink, keep as-is
+                    elements_info.append({
+                        'type': 'hyperlink',
+                        'element': child
+                    })
+            elif child.tag == qn("w:r"):
+                # Regular run with text
+                text_content = ""
+                for text_elem in child.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                    text_content += text_elem.text or ""
+
+                elements_info.append({
+                    'type': 'run',
+                    'element': child,
+                    'text': text_content
+                })
+            else:
+                # Other element (bookmarkStart, bookmarkEnd, etc.), keep as-is
+                elements_info.append({
+                    'type': 'other',
+                    'element': child
+                })
+
+        # Check if there are any ref_hyperlinks to convert
+        has_refs = any(elem['type'] == 'ref_hyperlink' for elem in elements_info)
+        if not has_refs:
+            return 0
+
+        # Clear the paragraph
+        for child in list(p_element):
+            p_element.remove(child)
+
+        # Rebuild the paragraph, converting ref_hyperlinks to REF fields
+        # and removing the prefix text before each hyperlink
+        refs_converted = 0
+
+        # Pre-process to mark runs that need prefix removal
+        for i, elem_info in enumerate(elements_info):
+            if elem_info['type'] == 'ref_hyperlink':
+                # Check if the previous element is a run with prefix text
+                # Pandoc-crossref creates text like "fig." or "tbl." or "eq." before the hyperlink
+                if i > 0 and elements_info[i-1]['type'] == 'run':
+                    prev_text = elements_info[i-1].get('text', '')
+                    # Remove prefix patterns like "fig.", "tbl.", "eq." at the end of the previous run
+                    # Note: pandoc-crossref uses lowercase abbreviations
+                    prefix_pattern = r'(fig\.|tbl\.|eq\.)$'
+                    match = re.search(prefix_pattern, prev_text, re.IGNORECASE)
+                    if match:
+                        # Mark this run as having its suffix removed
+                        new_text = re.sub(prefix_pattern, '', prev_text, flags=re.IGNORECASE)
+                        elements_info[i-1]['text'] = new_text
+                        elements_info[i-1]['prefix_removed'] = True
+
+        # Now rebuild the paragraph
+        for i, elem_info in enumerate(elements_info):
+            if elem_info['type'] == 'ref_hyperlink':
+                # Convert to REF field
+                anchor = elem_info['anchor']
+                word_bookmark = semantic_to_word_bookmark[anchor]
+                label = semantic_to_label[anchor]
+
+                create_ref_field_runs(p_element, word_bookmark, label=label)
+                refs_converted += 1
+                logger.debug(f"[ReferenceHelper]     Converted hyperlink '{anchor}' -> REF field '{word_bookmark}' ({label})")
+
+            elif elem_info['type'] == 'hyperlink':
+                # Keep regular hyperlink as-is
+                p_element.append(elem_info['element'])
+
+            elif elem_info['type'] == 'run':
+                # Check if we modified the text
+                if elem_info.get('prefix_removed'):
+                    # Create a new run with the modified text
+                    new_text = elem_info['text']
+                    if new_text:  # Only add if there's still text left
+                        create_text_run(p_element, new_text)
+                else:
+                    # Keep run as-is
+                    p_element.append(elem_info['element'])
+
+            else:
+                # Keep other elements as-is
+                p_element.append(elem_info['element'])
+
+        return refs_converted
 
     def print_registry(self):
         """Print the complete registry for debugging."""
