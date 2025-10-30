@@ -81,9 +81,6 @@ def main():
     working_doc_path = tmp_path / "working_reference.docx"
     non_func_path = tmp_path / "non_functional_reference.docx"
 
-    od = OneDoc(pdoc_dir)
-    ast = od.get_ast()
-
     if not working_doc_path.exists():
         functional_doc(working_doc_path.as_posix())
 

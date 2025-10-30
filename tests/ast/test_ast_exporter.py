@@ -8,10 +8,7 @@ def test_build_ast_and_slice_sections(files_dir, tmp_path):
     one = OneDoc(source, work_dir=tmp_path / "ast_doc")
 
     # Prepare compilation artifacts (metadata, moved assets)
-    one._prep_compilation()
-    one._perform_variable_substitution(False)
-
-    exporter = ASTExporter(one)
+    exporter = one.get_ast()
     ast = exporter.build_ast()
 
     # Basic shape

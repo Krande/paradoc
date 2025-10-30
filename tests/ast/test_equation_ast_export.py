@@ -3,7 +3,6 @@
 import pytest
 
 from paradoc import OneDoc
-from paradoc.io.ast.exporter import ASTExporter
 
 
 @pytest.fixture(scope="function")
@@ -11,14 +10,12 @@ def doc_with_equations(files_dir, tmp_path):
     """Create a test document with equations."""
     source = files_dir / "doc_lorum"
     one = OneDoc(source, work_dir=tmp_path / "test_equation_ast")
-    one._prep_compilation()
-    one._perform_variable_substitution(False)
     return one
 
 
 def test_equation_ast_structure(doc_with_equations):
     """Test that equations are exported as Math elements in the AST with proper structure."""
-    exporter = ASTExporter(doc_with_equations)
+    exporter = doc_with_equations.get_ast()
     ast = exporter.build_ast()
 
     blocks = ast.get("blocks", [])
@@ -104,7 +101,7 @@ def test_equation_ast_structure(doc_with_equations):
 
 def test_equation_with_crossref_id(doc_with_equations):
     """Test that equations with crossref IDs are properly structured in AST."""
-    exporter = ASTExporter(doc_with_equations)
+    exporter = doc_with_equations.get_ast()
     ast = exporter.build_ast()
 
     blocks = ast.get("blocks", [])
@@ -169,7 +166,7 @@ def test_equation_with_crossref_id(doc_with_equations):
 
 def test_display_vs_inline_math(doc_with_equations):
     """Test that display math ($$) and inline math ($) are properly distinguished."""
-    exporter = ASTExporter(doc_with_equations)
+    exporter = doc_with_equations.get_ast()
     ast = exporter.build_ast()
 
     blocks = ast.get("blocks", [])

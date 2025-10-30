@@ -18,10 +18,7 @@ def test_doc1_subsection_in_manifest(files_dir, tmp_path):
     one = OneDoc(source, work_dir=tmp_path / "test_subsections")
 
     # Prepare compilation artifacts
-    one._prep_compilation()
-    one._perform_variable_substitution(False)
-
-    exporter = ASTExporter(one)
+    exporter = one.get_ast()
     ast = exporter.build_ast()
     manifest, sections = exporter.slice_sections(ast)
 
@@ -79,10 +76,7 @@ def test_all_header_levels_exported(files_dir, tmp_path):
     source = files_dir / "doc1"
     one = OneDoc(source, work_dir=tmp_path / "test_all_levels")
 
-    one._prep_compilation()
-    one._perform_variable_substitution(False)
-
-    exporter = ASTExporter(one)
+    exporter = one.get_ast()
     ast = exporter.build_ast()
 
     # Manually inspect the AST blocks to find all headers

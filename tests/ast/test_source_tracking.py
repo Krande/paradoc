@@ -9,10 +9,7 @@ def test_source_tracking_in_ast(files_dir, tmp_path):
     source = files_dir / "doc_lorum"
     one = OneDoc(source, work_dir=tmp_path / "test_source_tracking")
 
-    one._prep_compilation()
-    one._perform_variable_substitution(False)
-
-    exporter = ASTExporter(one)
+    exporter = one.get_ast()
     ast = exporter.build_ast()
 
     blocks = ast.get("blocks", [])
@@ -37,10 +34,7 @@ def test_image_extraction_with_source_context(files_dir, tmp_path):
     source = files_dir / "doc_lorum"
     one = OneDoc(source, work_dir=tmp_path / "test_image_context")
 
-    one._prep_compilation()
-    one._perform_variable_substitution(False)
-
-    exporter = ASTExporter(one)
+    exporter = one.get_ast()
     ast = exporter.build_ast()
     manifest, sections = exporter.slice_sections(ast)
 
@@ -68,11 +62,7 @@ def test_no_source_markers_in_final_ast(files_dir, tmp_path):
     """Test that HTML comment markers are removed from the final AST."""
     source = files_dir / "doc_lorum"
     one = OneDoc(source, work_dir=tmp_path / "test_no_markers")
-
-    one._prep_compilation()
-    one._perform_variable_substitution(False)
-
-    exporter = ASTExporter(one)
+    exporter = one.get_ast()
     ast = exporter.build_ast()
 
     blocks = ast.get("blocks", [])

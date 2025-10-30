@@ -186,9 +186,10 @@ class OneDoc:
         if clean_build_dir is True:
             shutil.rmtree(self.build_dir, ignore_errors=True)
 
-    def get_ast(self) -> dict:
-        self._prep_compilation()
-        return ASTExporter(self).build_ast()
+    def get_ast(self, metadata_file=None) -> ASTExporter:
+        self._prep_compilation(metadata_file=metadata_file)
+        self._perform_variable_substitution()
+        return ASTExporter(self)
 
     def send_to_frontend(self, metadata_file=None, embed_images=True, use_static_html=False, frontend_id=None):
         """
@@ -200,13 +201,9 @@ class OneDoc:
             use_static_html: If True, extract frontend.zip and open in browser
             frontend_id: Optional frontend ID to target specific frontend instance. If None, sends to all connected frontends.
         """
-        from paradoc.io.ast.exporter import ASTExporter
-
         shutil.rmtree(self.dist_dir, ignore_errors=True)
-        self._prep_compilation(metadata_file=metadata_file)
-        # Set frontend export flag before variable substitution
-        self._perform_variable_substitution()
-        html = ASTExporter(self)
+
+        html = self.get_ast(metadata_file=metadata_file)
         html.send_to_frontend(embed_images=embed_images, use_static_html=use_static_html, frontend_id=frontend_id)
 
     def _prep_compilation(self, metadata_file=None):
@@ -307,13 +304,13 @@ class OneDoc:
 
         logger.info(f'Compiling OneDoc report to "{dest_file}"')
         self._prep_compilation(metadata_file=metadata_file)
+        self._perform_variable_substitution()
 
         if export_format == ExportFormats.DOCX:
             import platform
             from paradoc.io.word.exporter import WordExporter
 
             # No longer need to inject table names into cells - using bookmark-based identification
-            self._perform_variable_substitution()
             check_open_docs = auto_open is True
             wordx = WordExporter(self, **kwargs)
             wordx.export(output_name, dest_file, check_open_docs=check_open_docs)
@@ -333,13 +330,11 @@ class OneDoc:
                     "Latex was not installed on your system. "
                     f'Please install latex before exporting to pdf. See "{latex_url}" for installation packages'
                 )
-            self._perform_variable_substitution()
             pdf = PdfExporter(self)
             pdf.export(dest_file)
         elif export_format == ExportFormats.HTML:
             from paradoc.io.html.exporter import HTMLExporter
 
-            self._perform_variable_substitution()
             html = HTMLExporter(self)
             html.export(dest_file, include_navbar=kwargs.get("include_navbar", True))
             if send_to_frontend:

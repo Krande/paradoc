@@ -62,10 +62,7 @@ def test_figure_ids_in_ast(files_dir, tmp_path):
     source = files_dir / "doc_lorum"
     one = OneDoc(source, work_dir=tmp_path / "test_figure_ids")
 
-    one._prep_compilation()
-    one._perform_variable_substitution(False)
-
-    exporter = ASTExporter(one)
+    exporter = one.get_ast()
     ast = exporter.build_ast()
 
     blocks = ast.get("blocks", [])
@@ -102,10 +99,7 @@ def test_table_ids_in_ast(files_dir, tmp_path):
     source = files_dir / "doc_lorum"
     one = OneDoc(source, work_dir=tmp_path / "test_table_ids")
 
-    one._prep_compilation()
-    one._perform_variable_substitution(False)
-
-    exporter = ASTExporter(one)
+    exporter = one.get_ast()
     ast = exporter.build_ast()
 
     blocks = ast.get("blocks", [])
@@ -164,10 +158,7 @@ def test_equation_ids_in_ast(files_dir, tmp_path):
     source = files_dir / "doc_lorum"
     one = OneDoc(source, work_dir=tmp_path / "test_equation_ids")
 
-    one._prep_compilation()
-    one._perform_variable_substitution(False)
-
-    exporter = ASTExporter(one)
+    exporter = one.get_ast()
     ast = exporter.build_ast()
 
     blocks = ast.get("blocks", [])

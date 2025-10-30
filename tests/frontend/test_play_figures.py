@@ -74,11 +74,7 @@ def test_plot_static_interactive_buttons_exist(
     assert index_html.exists(), f"Frontend HTML not found at {index_html}"
 
     # Send document via WebSocket (without auto-opening browser)
-    from paradoc.io.ast.exporter import ASTExporter
-
-    doc_with_plot._prep_compilation(metadata_file=None)
-    doc_with_plot._perform_variable_substitution(False)
-    exporter = ASTExporter(doc_with_plot)
+    exporter = doc_with_plot.get_ast()
 
     # Navigate to the page first
     page.goto(f"file:///{index_html.as_posix()}")
@@ -204,9 +200,7 @@ def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_fronte
     wait_for_frontend(page)
 
     # Send document via WebSocket (without auto-opening browser)
-    doc_with_plot._prep_compilation(metadata_file=None)
-    doc_with_plot._perform_variable_substitution(False)
-    exporter = ASTExporter(doc_with_plot)
+    exporter = doc_with_plot.get_ast()
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
@@ -258,9 +252,7 @@ def test_plot_static_mode_shows_image(doc_with_plot, page, wait_for_frontend, fr
     wait_for_frontend(page)
 
     # Send document via WebSocket (without auto-opening browser)
-    doc_with_plot._prep_compilation(metadata_file=None)
-    doc_with_plot._perform_variable_substitution(False)
-    exporter = ASTExporter(doc_with_plot)
+    exporter = doc_with_plot.get_ast()
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render

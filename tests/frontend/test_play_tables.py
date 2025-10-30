@@ -1,9 +1,10 @@
 """Test frontend rendering of interactive tables using Playwright."""
 
-import pytest
 from pathlib import Path
-import pandas as pd
 from unittest.mock import patch
+
+import pandas as pd
+import pytest
 
 from paradoc import OneDoc
 from paradoc.db import dataframe_to_table_data
@@ -81,11 +82,7 @@ def test_table_static_interactive_buttons_exist(
     assert index_html.exists(), f"Frontend HTML not found at {index_html}"
 
     # Send document via WebSocket (without auto-opening browser)
-    from paradoc.io.ast.exporter import ASTExporter
-
-    doc_with_table._prep_compilation(metadata_file=None)
-    doc_with_table._perform_variable_substitution(False)
-    exporter = ASTExporter(doc_with_table)
+    exporter = doc_with_table.get_ast()
 
     # Navigate to the page first
     page.goto(f"file:///{index_html.as_posix()}")
@@ -206,9 +203,7 @@ def test_table_toggle_between_static_and_interactive(
     wait_for_frontend(page)
 
     # Send document via WebSocket (without auto-opening browser)
-    doc_with_table._prep_compilation(metadata_file=None)
-    doc_with_table._perform_variable_substitution(False)
-    exporter = ASTExporter(doc_with_table)
+    exporter = doc_with_table.get_ast()
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
@@ -255,7 +250,6 @@ def test_table_interactive_mode_renders_table(
 ):
     """Test that Interactive mode loads and renders an interactive table with sorting/filtering."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.io.ast.exporter import ASTExporter
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)
@@ -273,9 +267,7 @@ def test_table_interactive_mode_renders_table(
     wait_for_frontend(page)
 
     # Send document via WebSocket (without auto-opening browser)
-    doc_with_table._prep_compilation(metadata_file=None)
-    doc_with_table._perform_variable_substitution(False)
-    exporter = ASTExporter(doc_with_table)
+    exporter = doc_with_table.get_ast()
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
@@ -311,7 +303,6 @@ def test_table_interactive_mode_renders_table(
 def test_table_interactive_filtering(doc_with_table, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that the filter functionality works in interactive table mode."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.io.ast.exporter import ASTExporter
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)
@@ -329,9 +320,7 @@ def test_table_interactive_filtering(doc_with_table, page, wait_for_frontend, fr
     wait_for_frontend(page)
 
     # Send document via WebSocket (without auto-opening browser)
-    doc_with_table._prep_compilation(metadata_file=None)
-    doc_with_table._perform_variable_substitution(False)
-    exporter = ASTExporter(doc_with_table)
+    exporter = doc_with_table.get_ast()
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
@@ -367,7 +356,6 @@ def test_table_interactive_filtering(doc_with_table, page, wait_for_frontend, fr
 def test_table_interactive_sorting(doc_with_table, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that column sorting works in interactive table mode."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.io.ast.exporter import ASTExporter
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)
@@ -385,9 +373,7 @@ def test_table_interactive_sorting(doc_with_table, page, wait_for_frontend, fron
     wait_for_frontend(page)
 
     # Send document via WebSocket (without auto-opening browser)
-    doc_with_table._prep_compilation(metadata_file=None)
-    doc_with_table._perform_variable_substitution(False)
-    exporter = ASTExporter(doc_with_table)
+    exporter = doc_with_table.get_ast()
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
@@ -454,9 +440,7 @@ def test_table_static_mode_shows_html_table(doc_with_table, page, wait_for_front
     wait_for_frontend(page)
 
     # Send document via WebSocket (without auto-opening browser)
-    doc_with_table._prep_compilation(metadata_file=None)
-    doc_with_table._perform_variable_substitution(False)
-    exporter = ASTExporter(doc_with_table)
+    exporter = doc_with_table.get_ast()
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
@@ -477,7 +461,6 @@ def test_table_static_mode_shows_html_table(doc_with_table, page, wait_for_front
 def test_table_caption_displayed(doc_with_table, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that table caption is displayed in both static and interactive modes."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.io.ast.exporter import ASTExporter
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)
@@ -495,9 +478,7 @@ def test_table_caption_displayed(doc_with_table, page, wait_for_frontend, fronte
     wait_for_frontend(page)
 
     # Send document via WebSocket (without auto-opening browser)
-    doc_with_table._prep_compilation(metadata_file=None)
-    doc_with_table._perform_variable_substitution(False)
-    exporter = ASTExporter(doc_with_table)
+    exporter = doc_with_table.get_ast()
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
