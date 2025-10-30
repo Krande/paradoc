@@ -96,7 +96,7 @@ def test_crossref_extractor_doc_lorum(files_dir, tmp_path):
     primary_results_citations = data.get_citations_for_target('fig:primary_results')
     assert len(primary_results_citations) == 2, \
         f"Expected 2 citations for 'fig:primary_results', found {len(primary_results_citations)}"
-    print(f"\n✓ CrossRefExtractor test passed!")
+    print(f"\n[OK] CrossRefExtractor test passed!")
     print(f"  Figures: {stats['figures']}")
     print(f"  Tables: {stats['tables']}")
     print(f"  Equations: {stats['equations']}")
@@ -145,7 +145,7 @@ def test_crossref_extractor_detailed_analysis(files_dir, tmp_path):
 
     # Check for unreferenced targets (should be none if document is well-written)
     unreferenced = stats['unreferenced_targets']
-    print(f"\n✓ Detailed analysis passed!")
+    print(f"\n[OK] Detailed analysis passed!")
     print(f"  Citation counts: {len(citation_counts)} unique targets cited")
     print(f"  Unreferenced targets: {len(unreferenced)}")
     if unreferenced:
@@ -178,7 +178,7 @@ def test_crossref_extractor_caption_extraction(files_dir, tmp_path):
     targets_with_captions = [t for t in data.targets.values() if t.caption_text]
     targets_without_captions = [t for t in data.targets.values() if not t.caption_text]
 
-    print(f"\n✓ Caption extraction test passed!")
+    print(f"\n[OK] Caption extraction test passed!")
     print(f"  Targets with captions: {len(targets_with_captions)}/{len(data.targets)}")
     print(f"  Targets without captions: {len(targets_without_captions)}/{len(data.targets)}")
 
