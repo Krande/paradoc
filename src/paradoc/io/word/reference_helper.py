@@ -1152,31 +1152,26 @@ class ReferenceHelper:
                 f"    [{item.document_order}] {item.ref_type.value} '{item.semantic_id}' -> {item.word_bookmark} (display: {item.display_number})"
             )
 
-    def _extract_table_id_from_caption(self, caption_para: Paragraph) -> Optional[str]:
-        """Extract table ID from caption paragraph's hyperlink anchor.
+    def _extract_caption_text_from_caption(self, caption_para: Paragraph) -> Optional[str]:
+        """Extract the caption text from a table caption paragraph.
 
-        Pandoc-crossref creates captions with hyperlinks like:
-        <w:hyperlink w:anchor="tbl:test_table">Table 1</w:hyperlink>: Caption text
+        Pandoc-crossref creates captions like:
+        "Table 1: A basic table" or "Table 1-1: A basic table"
 
         Args:
             caption_para: The caption paragraph
 
         Returns:
-            The table ID (e.g., "test_table"), or None if not found
+            The caption text after the colon (e.g., "A basic table"), or None if not found
         """
         if caption_para is None:
             return None
 
-        p_element = caption_para._p
-
-        # Look for hyperlink with tbl: anchor
-        hyperlinks = p_element.findall('.//w:hyperlink',
-                                       namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
-
-        for hl in hyperlinks:
-            anchor = hl.get(qn('w:anchor'))
-            if anchor and anchor.startswith('tbl:'):
-                return anchor[4:]  # Remove "tbl:" prefix
+        caption_text = caption_para.text
+        # Caption format: "Table X: Caption text" or "Table X-Y: Caption text"
+        # Extract the text after the colon
+        if ':' in caption_text:
+            return caption_text.split(':', 1)[1].strip()
 
         return None
 
@@ -1186,8 +1181,8 @@ class ReferenceHelper:
         This method scans the document for tables and their captions, creates
         DocXTableRef instances, and registers them with the ReferenceHelper.
 
-        Uses the bookmark/hyperlink anchor system from pandoc-crossref to identify
-        tables, rather than the old method of reading the first cell content.
+        Matches tables by caption text since pandoc-crossref doesn't create
+        hyperlink anchors IN the caption paragraph (only in references TO tables).
 
         Args:
             document: The Word document to scan
@@ -1213,25 +1208,36 @@ class ReferenceHelper:
                 current_table.document_index = i
                 current_table.is_appendix = is_appendix
 
-                # NEW: Extract table ID from caption hyperlink anchor (e.g., "tbl:test_table")
-                table_id = self._extract_table_id_from_caption(current_table.docx_caption)
+                # Extract caption text from the caption paragraph
+                caption_text = self._extract_caption_text_from_caption(current_table.docx_caption)
 
-                if table_id is None:
-                    logger.warning(f"[ReferenceHelper]   Skipping table at index {i} - no valid table ID found in caption")
+                if caption_text is None:
+                    logger.warning(f"[ReferenceHelper]   Skipping table at index {i} - no valid caption text found")
                     continue
 
-                # Match to OneDoc table using the ID
-                # The table_id could be "test_table" or "test_table_1" (for reused tables)
-                tbl = one_doc.tables.get(table_id, None)
+                # Match to OneDoc table using the caption text
+                # Clean up any fancy quotes that might have been converted
+                caption_text = caption_text.replace('"', '"').replace('"', '"')
+
+                tbl = None
+                table_id = None
+
+                # Search through all tables in one_doc.tables to find a match by caption
+                for key, table_obj in one_doc.tables.items():
+                    if table_obj.caption == caption_text:
+                        tbl = table_obj
+                        # Use link_name_override if available, otherwise use the key
+                        table_id = table_obj.link_name_override if table_obj.link_name_override else key
+                        break
 
                 if tbl is None:
-                    logger.warning(f"[ReferenceHelper]   Unable to find table '{table_id}' in OneDoc.tables")
+                    logger.warning(f"[ReferenceHelper]   Unable to find table with caption '{caption_text}' in OneDoc.tables")
                     continue
 
                 current_table.table_ref = tbl
                 tables.append(current_table)
 
-                logger.debug(f"[ReferenceHelper]   Found table: {table_id}")
+                logger.debug(f"[ReferenceHelper]   Found table: {table_id} (caption: {caption_text})")
 
         logger.info(f"[ReferenceHelper] Extracted {len(tables)} tables from {'appendix' if is_appendix else 'main'} document")
         return tables
