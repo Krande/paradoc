@@ -842,6 +842,121 @@ class ReferenceHelper:
 
         return refs_converted
 
+    def convert_hyperlink_references(self, hyperlink_refs: List[HyperlinkReference]):
+        """Convert a list of hyperlink references to REF fields.
+
+        This method is a slot-in replacement for convert_all_references that operates
+        on a pre-extracted list of HyperlinkReference objects. This provides more control
+        and efficiency when you already have the references extracted.
+
+        Args:
+            hyperlink_refs: List of HyperlinkReference objects to convert
+        """
+        logger.info(f"[ReferenceHelper] Converting {len(hyperlink_refs)} hyperlink references to REF fields")
+
+        # Group references by paragraph to process them efficiently
+        from collections import defaultdict
+        refs_by_paragraph = defaultdict(list)
+
+        for ref in hyperlink_refs:
+            refs_by_paragraph[id(ref.paragraph)].append(ref)
+
+        processed_count = 0
+        total_converted = 0
+
+        for para_id, para_refs in refs_by_paragraph.items():
+            # Sort by element_index in reverse order so we can process from end to start
+            # This prevents index shifting issues when removing elements
+            para_refs.sort(key=lambda r: r.element_index, reverse=True)
+
+            # Get the paragraph element
+            paragraph = para_refs[0].paragraph
+            p_element = paragraph._p
+
+            logger.debug(f"[ReferenceHelper] Processing paragraph with {len(para_refs)} reference(s): {paragraph.text[:80]}")
+
+            # Build a list of all child elements
+            children = list(p_element)
+
+            # Create a reconstruction plan
+            reconstruction_plan = []
+            elements_to_remove = set()
+
+            for ref in para_refs:
+                # Mark hyperlink element for removal
+                elements_to_remove.add(id(ref.hyperlink_element))
+
+                # Mark prefix run for removal if it exists
+                if ref.prefix_run_element is not None:
+                    elements_to_remove.add(id(ref.prefix_run_element))
+
+            # Build reconstruction plan by scanning all children
+            for idx, child in enumerate(children):
+                child_id = id(child)
+
+                # Check if this is a hyperlink we're converting
+                ref_for_this = None
+                for ref in para_refs:
+                    if id(ref.hyperlink_element) == child_id:
+                        ref_for_this = ref
+                        break
+
+                if ref_for_this:
+                    # This hyperlink needs to be converted to a REF field
+                    reconstruction_plan.append({
+                        'type': 'ref_field',
+                        'word_bookmark': ref_for_this.word_bookmark,
+                        'label': ref_for_this.label
+                    })
+                elif child_id in elements_to_remove:
+                    # This is a prefix run that should be removed
+                    # But we need to check if there's any text after the prefix
+                    if child.tag == qn("w:r"):
+                        # Extract text from the run
+                        run_text = ""
+                        for text_elem in child.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                            run_text += text_elem.text or ""
+
+                        # Remove the prefix pattern
+                        for ref in para_refs:
+                            if ref.prefix_run_element is not None and id(ref.prefix_run_element) == child_id:
+                                if ref.prefix_text:
+                                    # Remove the prefix text from the run
+                                    remaining_text = run_text[:-len(ref.prefix_text)]
+                                    if remaining_text:
+                                        reconstruction_plan.append({
+                                            'type': 'text',
+                                            'text': remaining_text
+                                        })
+                                break
+                else:
+                    # Keep this element as-is
+                    reconstruction_plan.append({
+                        'type': 'element',
+                        'element': child
+                    })
+
+            # Clear the paragraph
+            for child in list(p_element):
+                p_element.remove(child)
+
+            # Rebuild the paragraph according to the plan
+            refs_converted = 0
+            for item in reconstruction_plan:
+                if item['type'] == 'ref_field':
+                    create_ref_field_runs(p_element, item['word_bookmark'], label=item['label'])
+                    refs_converted += 1
+                    logger.debug(f"[ReferenceHelper]     Added REF field: {item['label']} -> bookmark '{item['word_bookmark']}'")
+                elif item['type'] == 'text':
+                    create_text_run(p_element, item['text'])
+                elif item['type'] == 'element':
+                    p_element.append(item['element'])
+
+            processed_count += 1
+            total_converted += refs_converted
+
+        logger.info(f"[ReferenceHelper] Conversion complete: {processed_count} paragraphs processed, {total_converted} references converted")
+
     def print_registry(self):
         """Print the complete registry for debugging."""
         print("\n[ReferenceHelper] Complete Registry:")

@@ -159,5 +159,109 @@ def test_print_registry(capsys):
     assert "tbl1" in captured.out
 
 
+def test_extract_and_convert_hyperlink_references():
+    """Test extracting hyperlink references and converting them using the new method."""
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import qn
+
+    helper = ReferenceHelper()
+    doc = Document()
+
+    # Register some figures and tables
+    fig1_bookmark = helper.register_figure("test_figure")
+    tbl1_bookmark = helper.register_table("results_table")
+
+    # Create a paragraph with hyperlinks simulating pandoc-crossref output
+    para = doc.add_paragraph()
+    p_element = para._p
+
+    # Add text "See "
+    run1_xml = f'''
+    <w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:t>See fig.</w:t>
+    </w:r>
+    '''
+    run1 = parse_xml(run1_xml)
+    p_element.append(run1)
+
+    # Add hyperlink for figure
+    hyperlink1_xml = f'''
+    <w:hyperlink xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:anchor="fig:test_figure">
+        <w:r>
+            <w:t>1</w:t>
+        </w:r>
+    </w:hyperlink>
+    '''
+    hyperlink1 = parse_xml(hyperlink1_xml)
+    p_element.append(hyperlink1)
+
+    # Add text " and tbl."
+    run2_xml = f'''
+    <w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+        <w:t> and tbl.</w:t>
+    </w:r>
+    '''
+    run2 = parse_xml(run2_xml)
+    p_element.append(run2)
+
+    # Add hyperlink for table
+    hyperlink2_xml = f'''
+    <w:hyperlink xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:anchor="tbl:results_table">
+        <w:r>
+            <w:t>1</w:t>
+        </w:r>
+    </w:hyperlink>
+    '''
+    hyperlink2 = parse_xml(hyperlink2_xml)
+    p_element.append(hyperlink2)
+
+    # Extract hyperlink references
+    hyperlink_refs = helper.extract_hyperlink_references(doc)
+
+    # Should find 2 references
+    assert len(hyperlink_refs) == 2
+
+    # Check the first reference
+    assert hyperlink_refs[0].anchor == "fig:test_figure"
+    assert hyperlink_refs[0].semantic_id == "test_figure"
+    assert hyperlink_refs[0].word_bookmark == fig1_bookmark
+    assert hyperlink_refs[0].label == "Figure"
+    assert hyperlink_refs[0].prefix_text is not None
+    assert "fig." in hyperlink_refs[0].prefix_text.lower()
+
+    # Check the second reference
+    assert hyperlink_refs[1].anchor == "tbl:results_table"
+    assert hyperlink_refs[1].semantic_id == "results_table"
+    assert hyperlink_refs[1].word_bookmark == tbl1_bookmark
+    assert hyperlink_refs[1].label == "Table"
+    assert hyperlink_refs[1].prefix_text is not None
+    assert "tbl." in hyperlink_refs[1].prefix_text.lower()
+
+    # Now convert the hyperlink references using the new method
+    helper.convert_hyperlink_references(hyperlink_refs)
+
+    # Check that the paragraph has been modified
+    # The hyperlinks should be replaced with REF fields
+    # And the prefix text should be removed
+    from lxml import etree
+    paragraph_xml = etree.tostring(para._p, encoding='unicode')
+
+    # Should contain REF field instructions
+    assert 'REF' in paragraph_xml
+    assert fig1_bookmark in paragraph_xml
+    assert tbl1_bookmark in paragraph_xml
+
+    # Should contain the labels
+    assert 'Figure' in paragraph_xml or 'Figure' in para.text
+    assert 'Table' in paragraph_xml or 'Table' in para.text
+
+    # The hyperlinks should be gone
+    hyperlinks = p_element.findall('.//w:hyperlink', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+    # Should have no hyperlinks with our specific anchors
+    for hyperlink in hyperlinks:
+        anchor = hyperlink.get(qn('w:anchor'))
+        assert anchor not in ["fig:test_figure", "tbl:results_table"]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

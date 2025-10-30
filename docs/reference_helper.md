@@ -137,7 +137,107 @@ Similar to figures, tables register themselves during formatting.
 #### Conversion
 
 - `update_display_numbers()` - Extract display numbers from caption paragraphs
-- `convert_all_references(document)` - Convert all text references to REF fields
+- `convert_all_references(document)` - Convert all text references to REF fields using regex pattern matching
+- `extract_hyperlink_references(document)` - Extract all hyperlink-based cross-references created by pandoc-crossref
+- `convert_hyperlink_references(hyperlink_refs)` - Convert a list of HyperlinkReference objects to REF fields (slot-in replacement for convert_all_references)
+- `convert_all_references_by_hyperlinks(document)` - Alternative conversion method that uses hyperlink anchors instead of regex patterns
+
+## Two Approaches to Reference Conversion
+
+The ReferenceHelper now supports two different approaches for converting cross-references:
+
+### 1. Pattern-Based Conversion (Original)
+
+Uses regex patterns to find and convert text references like "Figure 1-1", "Table 2-3", etc.
+
+```python
+# After formatting all items
+helper.update_display_numbers()
+helper.convert_all_references(document)
+```
+
+**Pros:**
+- Works with any reference format
+- Flexible pattern matching
+
+**Cons:**
+- Relies on accurate pattern matching
+- Can be fragile if reference format varies
+- Less precise than hyperlink-based approach
+
+### 2. Hyperlink-Based Conversion (New)
+
+Uses the hyperlinks created by pandoc-crossref (when `linkReferences: true`) to identify cross-references.
+
+```python
+# Extract hyperlink references first
+hyperlink_refs = helper.extract_hyperlink_references(document)
+
+# Convert them to REF fields
+helper.convert_hyperlink_references(hyperlink_refs)
+```
+
+Or use the combined method:
+
+```python
+# Extract and convert in one call
+helper.convert_all_references_by_hyperlinks(document)
+```
+
+**Pros:**
+- More reliable - uses hyperlink anchors to identify references
+- No regex pattern matching needed
+- Can filter or inspect references before conversion
+- Handles prefix text removal automatically (e.g., "fig.", "tbl.")
+
+**Cons:**
+- Requires pandoc-crossref to create hyperlinks (linkReferences: true)
+- Only works with pandoc-crossref format
+
+### When to Use Each Approach
+
+**Use Pattern-Based (`convert_all_references`):**
+- When working with documents not created by pandoc-crossref
+- When you need to match custom reference formats
+- When hyperlinks are not available
+
+**Use Hyperlink-Based (`convert_hyperlink_references`):**
+- When working with pandoc-crossref output
+- When you need precise reference identification
+- When you need to filter or inspect references before conversion
+- For better reliability and maintainability
+
+### HyperlinkReference Workflow
+
+The new hyperlink-based approach provides a two-step workflow that gives you more control:
+
+```python
+# Step 1: Extract references (returns list of HyperlinkReference objects)
+refs = helper.extract_hyperlink_references(document)
+
+# Optional: Inspect or filter references
+for ref in refs:
+    print(f"{ref.label} '{ref.semantic_id}' -> {ref.word_bookmark}")
+
+# Optional: Filter references
+important_refs = [r for r in refs if r.semantic_id in important_ids]
+
+# Step 2: Convert the references to REF fields
+helper.convert_hyperlink_references(important_refs)
+```
+
+Each `HyperlinkReference` contains:
+- `paragraph` - The Word paragraph containing the hyperlink
+- `hyperlink_element` - The XML element of the hyperlink
+- `anchor` - The hyperlink anchor (e.g., "fig:test_figure")
+- `hyperlink_text` - The text inside the hyperlink (e.g., "1")
+- `ref_type` - The type of reference (FIGURE, TABLE, or EQUATION)
+- `semantic_id` - The semantic identifier (e.g., "test_figure")
+- `word_bookmark` - The Word bookmark to reference
+- `label` - The label for the REF field (e.g., "Figure", "Table")
+- `prefix_text` - The text before the hyperlink (e.g., "fig.")
+- `prefix_run_element` - The XML run element containing the prefix
+- `element_index` - Index of the hyperlink in the paragraph
 
 ## Benefits
 
@@ -161,6 +261,8 @@ Similar to figures, tables register themselves during formatting.
 
 ## Usage Example
 
+### Basic Pattern-Based Approach
+
 ```python
 from paradoc.io.word.reference_helper import ReferenceHelper
 
@@ -177,6 +279,48 @@ helper.convert_all_references(document)
 
 # Debug if needed
 helper.print_registry()
+```
+
+### Hyperlink-Based Approach (Recommended)
+
+```python
+from paradoc.io.word.reference_helper import ReferenceHelper
+
+# Initialize
+helper = ReferenceHelper()
+
+# Register items as you format them
+fig1_bookmark = helper.register_figure("intro_chart", figure_caption_para)
+tbl1_bookmark = helper.register_table("results", table_caption_para)
+
+# Extract hyperlink references from the document
+hyperlink_refs = helper.extract_hyperlink_references(document)
+
+# Optional: Inspect or filter references
+print(f"Found {len(hyperlink_refs)} references")
+for ref in hyperlink_refs:
+    print(f"  {ref.label} '{ref.semantic_id}' -> {ref.word_bookmark}")
+
+# Convert to REF fields
+helper.convert_hyperlink_references(hyperlink_refs)
+
+# Or use the combined method
+# helper.convert_all_references_by_hyperlinks(document)
+```
+
+### Advanced: Filtering References
+
+```python
+# Extract all references
+all_refs = helper.extract_hyperlink_references(document)
+
+# Only convert figure references
+figure_refs = [r for r in all_refs if r.ref_type == ReferenceType.FIGURE]
+helper.convert_hyperlink_references(figure_refs)
+
+# Or filter by semantic ID
+important_refs = [r for r in all_refs if r.semantic_id in ["key_figure", "main_table"]]
+helper.convert_hyperlink_references(important_refs)
 ```
 
 ## Migration from Old System

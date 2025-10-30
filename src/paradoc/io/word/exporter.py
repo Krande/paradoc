@@ -7,7 +7,7 @@ from docx.table import Table as DocxTable
 from paradoc.common import MY_DOCX_TMPL, MY_DOCX_TMPL_BLANK, ExportFormats
 from paradoc.config import logger
 from paradoc.document import OneDoc
-
+from paradoc.io.word.com_api.com_utils import docx_update, close_word_docs_by_name
 from .formatting import fix_headers_after_compose, format_paragraphs_and_headings
 from .models import DocXFigureRef, DocXTableRef
 from .reference_helper import ReferenceHelper
@@ -17,16 +17,24 @@ from .utils import (
     get_from_doc_by_index,
     iter_block_items,
 )
-from paradoc.io.word.com_api.com_utils import docx_update, close_word_docs_by_name
 
 
 class WordExporter:
-    def __init__(self, one_doc: OneDoc, main_tmpl=MY_DOCX_TMPL, app_tmpl=MY_DOCX_TMPL_BLANK, **kwargs):
+    def __init__(
+        self,
+        one_doc: OneDoc,
+        main_tmpl=MY_DOCX_TMPL,
+        app_tmpl=MY_DOCX_TMPL_BLANK,
+        use_hyperlink_references=True,
+        enable_word_com_automation=False,
+        use_custom_docx_compile=True,
+    ):
         self.one_doc = one_doc
         self.main_tmpl = main_tmpl
         self.app_tmpl = app_tmpl
-        self.use_custom_docx_compile = kwargs.get("use_custom_docx_compile", True)
-        self.enable_word_com_automation = kwargs.get("enable_word_com_automation", False)
+        self.use_custom_docx_compile = use_custom_docx_compile
+        self.enable_word_com_automation = enable_word_com_automation
+        self.use_hyperlink_references = use_hyperlink_references
 
     def export(self, output_name, dest_file, check_open_docs=False):
         if self.use_custom_docx_compile:
@@ -78,9 +86,17 @@ class WordExporter:
         # Print registry for debugging
         ref_helper.print_registry()
 
-        # Use the new ReferenceHelper to convert all references
-        logger.info("[WordExporter] Converting all text references to REF fields using ReferenceHelper")
-        ref_helper.convert_all_references(composer_main.doc)
+        # Convert references using the configured method
+        if self.use_hyperlink_references:
+            # New method: Extract hyperlink references and convert them
+            logger.info("[WordExporter] Converting hyperlink-based cross-references to REF fields")
+            hyperlink_refs = ref_helper.extract_hyperlink_references(composer_main.doc)
+            logger.info(f"[WordExporter] Found {len(hyperlink_refs)} hyperlink references")
+            ref_helper.convert_hyperlink_references(hyperlink_refs)
+        else:
+            # Old method: Use pattern-based conversion
+            logger.info("[WordExporter] Converting text references to REF fields using pattern matching")
+            ref_helper.convert_all_references(composer_main.doc)
 
         # Format all paragraphs
         format_paragraphs_and_headings(composer_main.doc, one.paragraph_style_map)

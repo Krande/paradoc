@@ -77,7 +77,7 @@ docs = { features = ["docs", "prod", "test-core"], no-default-feature = true }
 
 
 [tool.pixi.feature.prod.dependencies]
-pandoc = "==3.8.2.1"
+pandoc = "==3.8.2"
 pandoc-crossref = "==0.3.22"
 pypandoc = "==1.15"
 python-docx = "*"
