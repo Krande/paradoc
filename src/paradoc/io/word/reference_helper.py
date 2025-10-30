@@ -88,6 +88,99 @@ class HyperlinkReference:
     prefix_run_element: Optional[Any] = None
     element_index: int = 0
 
+    def __repr__(self) -> str:
+        """Succinct, descriptive representation used for debugging/logging.
+
+        Format example:
+            HyperLink(refType=Table, refNum=1, anchor="tbl:'current_metrics'", pg="...two words before... Table 1 ...two words after...")
+
+        Notes:
+        - "pg" shows 2 words before and 2 words after the cross-reference location in the paragraph.
+        - The cross-reference in the middle is normalized to "{label} {refNum}" regardless of how it is abbreviated in the paragraph.
+        """
+        try:
+            # Normalize number
+            ref_num = (self.hyperlink_text or "").strip().rstrip('.')
+            label = self.ref_type.value if getattr(self, 'ref_type', None) else (self.label or "")
+
+            # Attempt to extract two words before and after around our hyperlink element
+            before_words: List[str] = []
+            after_words: List[str] = []
+
+            p_element = getattr(self.paragraph, '_p', None)
+            target_elem = self.hyperlink_element
+
+            def _text_from_element(elem: Any) -> str:
+                # Gather all w:t text under element
+                parts: List[str] = []
+                for t in elem.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                    if t.text:
+                        parts.append(t.text)
+                    else:
+                        parts.append("")
+                return "".join(parts)
+
+            def _tokenize_words(s: str) -> List[str]:
+                # Keep only word-like tokens; ignore punctuation for context windows
+                return [tok for tok in re.findall(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)?", s)]
+
+            if p_element is not None and target_elem is not None:
+                children = list(p_element)
+
+                # Resolve index of our hyperlink in current paragraph children
+                idx = None
+                # Prefer stored element_index if it still matches the same element
+                if 0 <= self.element_index < len(children) and children[self.element_index] is target_elem:
+                    idx = self.element_index
+                else:
+                    # Fallback: locate by identity
+                    for i, ch in enumerate(children):
+                        if ch is target_elem:
+                            idx = i
+                            break
+
+                if idx is not None:
+                    # Build text before and after by concatenating siblings' text
+                    before_text = "".join(_text_from_element(e) for e in children[:idx])
+                    after_text = "".join(_text_from_element(e) for e in children[idx+1:])
+
+                    # Remove known prefix abbreviation from the boundary of before_text
+                    if self.prefix_text:
+                        before_text = re.sub(re.escape(self.prefix_text) + r"\s*$", " ", before_text)
+
+                    before_tokens = _tokenize_words(before_text)
+                    after_tokens = _tokenize_words(after_text)
+
+                    before_words = before_tokens[-2:] if len(before_tokens) >= 2 else before_tokens
+                    after_words = after_tokens[:2] if len(after_tokens) >= 2 else after_tokens
+
+            # Compose page context string
+            parts = []
+            if before_words:
+                parts.append(" ".join(before_words))
+            # The cross-reference itself, normalized to "Label N"
+            center = f"{label} {ref_num}".strip()
+            if center:
+                parts.append(center)
+            if after_words:
+                parts.append(" ".join(after_words))
+
+            pg = " ".join(p for p in parts if p)
+            # Collapse multiple spaces
+            pg = re.sub(r"\s+", " ", pg).strip()
+
+            # Anchor formatted as in example: anchor="tbl:'semantic'"
+            anchor_repr = self.anchor
+            # Ensure quotes around semantic id part if present
+            if ':' in anchor_repr:
+                kind, sem = anchor_repr.split(':', 1)
+                anchor_repr = f"{kind}:'{sem}'"
+
+            return f"HyperLink(refType={label}, refNum={ref_num}, anchor=\"{anchor_repr}\", pg=\"{pg}\")"
+        except Exception:
+            # Fallback simple representation
+            return f"HyperLink(refType={getattr(self.ref_type, 'value', self.label)}, refNum={self.hyperlink_text}, anchor=\"{self.anchor}\")"
+
 
 class ReferenceHelper:
     """Central manager for all cross-references in a Word document.
