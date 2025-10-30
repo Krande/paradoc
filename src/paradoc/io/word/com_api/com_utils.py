@@ -17,6 +17,10 @@ def is_word_com_available() -> bool:
     1) Fast path: check ProgID is registered (no process launch).
     2) Fallback: very short COM instantiation with Dispatch if registry probe fails,
        guarded to avoid noisy errors; immediately release if successful.
+
+    Note: This function initializes COM if needed but does NOT uninitialize it.
+    COM will be cleaned up automatically when the process exits. This avoids issues
+    in worker processes where COM might already be initialized.
     """
     if platform.system() != "Windows":
         return False
@@ -24,8 +28,10 @@ def is_word_com_available() -> bool:
     try:
         import pythoncom
         # Fast, non‑intrusive: consult registry
-        pythoncom.CLSIDFromProgID("Word.Application")
-        return True
+        # Note: CLSIDFromProgID might not exist in all pythoncom versions
+        if hasattr(pythoncom, 'CLSIDFromProgID'):
+            pythoncom.CLSIDFromProgID("Word.Application")
+            return True
     except Exception:
         pass
 
@@ -33,23 +39,29 @@ def is_word_com_available() -> bool:
     # This may briefly instantiate a COM proxy, but we avoid touching the UI.
     try:
         import win32com.client
-        # Ensure COM is initialized on this thread
         import pythoncom
+
+        # Initialize COM if not already initialized
+        # We don't uninitialize because:
+        # 1. pythoncom doesn't reliably report if COM was already initialized
+        # 2. Uninitializing can break other code that expects COM to be initialized
+        # 3. COM will be cleaned up automatically when the process exits
         pythoncom.CoInitialize()
+
+        app = win32com.client.Dispatch("Word.Application")
         try:
-            app = win32com.client.Dispatch("Word.Application")
-            try:
-                # If we got here, COM server is available
-                return True
-            finally:
-                # Clean up in case it created an instance
-                try:
-                    app.Quit()
-                except Exception:
-                    pass
+            # If we got here, COM server is available
+            return True
         finally:
-            pythoncom.CoUninitialize()
+            # Clean up the Word instance we created
+            try:
+                app.Quit()
+            except Exception:
+                pass
     except Exception:
+        return False
+    except Exception as e:
+        print(f"DEBUG is_word_com_available: Exception in fallback: {e}", flush=True)
         return False
 
 

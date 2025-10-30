@@ -135,9 +135,7 @@ def test_plot_toggle_between_static_and_interactive(
     wait_for_frontend(page)
 
     # Send document via WebSocket (without auto-opening browser)
-    doc_with_plot._prep_compilation(metadata_file=None)
-    doc_with_plot._perform_variable_substitution(False)
-    exporter = ASTExporter(doc_with_plot)
+    exporter = doc_with_plot.get_ast()
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render

@@ -27,6 +27,24 @@ def _suppress_windows_error_ui() -> None:
         pass
 
 
+def _init_pool_worker() -> None:
+    """Initialize each pool worker process with COM support.
+
+    This is called once per worker process when the pool is created.
+    It ensures COM is properly initialized before any tasks run.
+    """
+    _suppress_windows_error_ui()
+
+    try:
+        import pythoncom
+        # COINIT_APARTMENTTHREADED = 2 (STA mode, required for Word COM)
+        pythoncom.CoInitializeEx(2)
+    except Exception:
+        # If initialization fails here, tasks will fail with proper error messages
+        pass
+
+
+
 def _isolated_worker(func: Callable, args: tuple, kwargs: dict, redirect_stdout: bool) -> tuple[bool, Any, str, str]:
     """
     Worker function that runs in an isolated process.
@@ -39,9 +57,12 @@ def _isolated_worker(func: Callable, args: tuple, kwargs: dict, redirect_stdout:
 
     Returns:
         Tuple of (success: bool, result: Any, message: str, output: str)
-    """
-    _suppress_windows_error_ui()
 
+    Note:
+        We also initialize COM in this worker thread to be absolutely sure the
+        thread that invokes Word COM is COM-initialized (STA). The pool
+        initializer sets process-level state, but COM is a per-thread init.
+    """
     # Capture stdout/stderr if requested
     output = ""
     old_stdout = None
@@ -54,17 +75,22 @@ def _isolated_worker(func: Callable, args: tuple, kwargs: dict, redirect_stdout:
         sys.stdout = StringIO()
         sys.stderr = StringIO()
 
-    try:
-        import pythoncom
-        pythoncom.CoInitialize()  # STA for this process
-    except ImportError:
-        return (False, None, "pythoncom not available - pywin32 required", "")
-
     result = None
     success = False
     message = ""
 
     try:
+        try:
+            import pythoncom  # type: ignore
+            # Explicitly initialize COM in STA mode on this thread
+            # COINIT_APARTMENTTHREADED = 2
+            # We call this even if pool initializer already did, to ensure COM is initialized
+            # on this thread. Multiple calls are safe (reference counted).
+            pythoncom.CoInitializeEx(2)
+        except Exception:
+            # If initialization fails, continue anyway - will fail later with clear error
+            pass
+
         result = func(*args, **kwargs)
         success = True
         message = "Success"
@@ -80,9 +106,12 @@ def _isolated_worker(func: Callable, args: tuple, kwargs: dict, redirect_stdout:
                 sys.stdout = old_stdout
                 sys.stderr = old_stderr
             gc.collect()
-            pythoncom.CoUninitialize()
         except:
             pass
+        # Note: We don't call CoUninitialize here because:
+        # 1. pythoncom doesn't reliably report if we initialized COM or it was already initialized
+        # 2. COM will be cleaned up automatically when the worker process exits
+        # 3. Uninitializing prematurely can break subsequent operations in the same worker
 
     return (success, result, message, output)
 
@@ -125,7 +154,13 @@ def run_word_operation_isolated(
         )
     """
     ctx = mp.get_context("spawn")  # Windows default, explicit for clarity
-    with ctx.Pool(processes=1) as pool:
+    success: bool = False
+    result: Any = None
+    message: str = ""
+    output: str = ""
+
+    # Use a single-process pool with an initializer that sets up COM in the worker
+    with ctx.Pool(processes=1, initializer=_init_pool_worker) as pool:
         async_res = pool.apply_async(
             _isolated_worker,
             (func, args, kwargs, redirect_stdout)
