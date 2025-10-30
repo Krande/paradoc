@@ -10,7 +10,7 @@ and some additional formatting tweaks to ensure better output when exporting to 
 
 ### Python library Paradoc
 
-In addition to wrap conversion capabilities around pandoc, 
+In addition to wrap conversion capabilities around pandoc (and using pandoc-crossref),
 paradoc also provides a websocket server that can be used to
 stream the document (streamed as AST JSON chunks and figures separately) to a frontend document reader app.
 

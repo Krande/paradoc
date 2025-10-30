@@ -6,6 +6,9 @@ edit_uri: edit/main/docs/
 nav:
   - Home: index.md
   - Tables: table_database.md
+  - Reference Helper: reference_helper.md
+  - Caching System: caching_system.md
+  - Isolated COM Execution: isolated_com_execution.md
 
 plugins:
   - mkdocstrings:
