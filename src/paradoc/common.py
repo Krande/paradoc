@@ -48,13 +48,21 @@ class Table:
             raise ValueError('Passed in dataframe "df" cannot be None')
 
     def to_markdown(self, include_name_in_cell=False, flags=None):
+        """Convert table to markdown format.
+
+        Args:
+            include_name_in_cell: DEPRECATED - no longer used. Table identification now uses
+                                bookmark/hyperlink anchors instead of injecting name into first cell.
+            flags: Optional flags to control caption generation
+
+        Returns:
+            Markdown string representation of the table
+        """
         df = self.df.copy()
-        if include_name_in_cell:
-            col_name = df.columns[0]
-            col_index = df.columns.get_loc(col_name)
-            # Convert the entire column to object dtype first
-            df[col_name] = df[col_name].astype(object)
-            df.iloc[0, int(col_index)] = self.name
+
+        # NOTE: include_name_in_cell parameter is deprecated but kept for API compatibility
+        # Table identification now uses bookmark/hyperlink anchor system from pandoc-crossref
+        # This eliminates the need to corrupt the first cell with a temporary identifier
 
         props = dict(index=False, tablefmt="grid")
         if self.format.float_fmt is not None:

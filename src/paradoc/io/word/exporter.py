@@ -131,12 +131,12 @@ class WordExporter:
         # Format tables
         logger.info("[WordExporter] Formatting tables")
         for i, docx_tbl in enumerate(main_tables):
-            docx_tbl.substitute_back_temp_var()
+            # No longer need substitute_back_temp_var() - using bookmark-based identification
             restart_caption_num = (i == 0)  # Restart numbering for first table
             docx_tbl.format_table(False, restart_caption_numbering=restart_caption_num, reference_helper=ref_helper)
 
         for i, docx_tbl in enumerate(app_tables):
-            docx_tbl.substitute_back_temp_var()
+            # No longer need substitute_back_temp_var() - using bookmark-based identification
             restart_caption_num = (i == 0)  # Restart numbering for first appendix table
             docx_tbl.format_table(True, restart_caption_numbering=restart_caption_num, reference_helper=ref_helper)
 
@@ -220,17 +220,11 @@ class WordExporter:
         """
         tables = []
         for i, docx_tbl in enumerate(self.get_all_tables(composer_doc)):
-            try:
-                cell0 = docx_tbl.get_content_cell0_pg()
-            except IndexError:
-                continue
-            tbl_name = cell0.text
-            tbl = self.one_doc.tables.get(tbl_name, None)
-            if tbl is None:
-                raise ValueError(f"Unable to retrieve originally parsed table '{tbl_name}'")
+            # Note: This deprecated method doesn't have access to one_doc.tables mapping
+            # It relies on the table_ref being set elsewhere
+            # For new code, use extract_all_tables from ReferenceHelper instead
 
-            docx_tbl.table_ref = tbl
-            docx_tbl.substitute_back_temp_var()
+            # No longer need substitute_back_temp_var() - using bookmark-based identification
             # Restart numbering for:
             # 1. The very first table in the main document (i == 0 and not is_appendix)
             # 2. The first table in the appendix (i == 0 and is_appendix)

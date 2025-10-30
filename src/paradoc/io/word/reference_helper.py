@@ -1152,11 +1152,42 @@ class ReferenceHelper:
                 f"    [{item.document_order}] {item.ref_type.value} '{item.semantic_id}' -> {item.word_bookmark} (display: {item.display_number})"
             )
 
+    def _extract_table_id_from_caption(self, caption_para: Paragraph) -> Optional[str]:
+        """Extract table ID from caption paragraph's hyperlink anchor.
+
+        Pandoc-crossref creates captions with hyperlinks like:
+        <w:hyperlink w:anchor="tbl:test_table">Table 1</w:hyperlink>: Caption text
+
+        Args:
+            caption_para: The caption paragraph
+
+        Returns:
+            The table ID (e.g., "test_table"), or None if not found
+        """
+        if caption_para is None:
+            return None
+
+        p_element = caption_para._p
+
+        # Look for hyperlink with tbl: anchor
+        hyperlinks = p_element.findall('.//w:hyperlink',
+                                       namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+
+        for hl in hyperlinks:
+            anchor = hl.get(qn('w:anchor'))
+            if anchor and anchor.startswith('tbl:'):
+                return anchor[4:]  # Remove "tbl:" prefix
+
+        return None
+
     def extract_all_tables(self, document, one_doc, is_appendix: bool):
         """Extract all tables from the document and create DocXTableRef objects.
 
         This method scans the document for tables and their captions, creates
         DocXTableRef instances, and registers them with the ReferenceHelper.
+
+        Uses the bookmark/hyperlink anchor system from pandoc-crossref to identify
+        tables, rather than the old method of reading the first cell content.
 
         Args:
             document: The Word document to scan
@@ -1182,23 +1213,25 @@ class ReferenceHelper:
                 current_table.document_index = i
                 current_table.is_appendix = is_appendix
 
-                # Extract table name and match with OneDoc table metadata
-                try:
-                    cell0 = current_table.get_content_cell0_pg()
-                except IndexError:
-                    logger.warning(f"[ReferenceHelper]   Skipping table at index {i} - unable to get content cell")
+                # NEW: Extract table ID from caption hyperlink anchor (e.g., "tbl:test_table")
+                table_id = self._extract_table_id_from_caption(current_table.docx_caption)
+
+                if table_id is None:
+                    logger.warning(f"[ReferenceHelper]   Skipping table at index {i} - no valid table ID found in caption")
                     continue
 
-                tbl_name = cell0.text
-                tbl = one_doc.tables.get(tbl_name, None)
+                # Match to OneDoc table using the ID
+                # The table_id could be "test_table" or "test_table_1" (for reused tables)
+                tbl = one_doc.tables.get(table_id, None)
+
                 if tbl is None:
-                    logger.warning(f"[ReferenceHelper]   Unable to retrieve originally parsed table '{tbl_name}'")
+                    logger.warning(f"[ReferenceHelper]   Unable to find table '{table_id}' in OneDoc.tables")
                     continue
 
                 current_table.table_ref = tbl
                 tables.append(current_table)
 
-                logger.debug(f"[ReferenceHelper]   Found table: {tbl_name}")
+                logger.debug(f"[ReferenceHelper]   Found table: {table_id}")
 
         logger.info(f"[ReferenceHelper] Extracted {len(tables)} tables from {'appendix' if is_appendix else 'main'} document")
         return tables

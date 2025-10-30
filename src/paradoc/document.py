@@ -205,7 +205,7 @@ class OneDoc:
         shutil.rmtree(self.dist_dir, ignore_errors=True)
         self._prep_compilation(metadata_file=metadata_file)
         # Set frontend export flag before variable substitution
-        self._perform_variable_substitution(False)
+        self._perform_variable_substitution()
         html = ASTExporter(self)
         html.send_to_frontend(embed_images=embed_images, use_static_html=use_static_html, frontend_id=frontend_id)
 
@@ -312,13 +312,8 @@ class OneDoc:
             import platform
             from paradoc.io.word.exporter import WordExporter
 
-            use_custom_compile = kwargs.get("use_custom_docx_compile", True)
-            if use_custom_compile is False:
-                use_table_name_in_cell_as_index = False
-            else:
-                use_table_name_in_cell_as_index = True
-
-            self._perform_variable_substitution(use_table_name_in_cell_as_index)
+            # No longer need to inject table names into cells - using bookmark-based identification
+            self._perform_variable_substitution()
             check_open_docs = auto_open is True
             wordx = WordExporter(self, **kwargs)
             wordx.export(output_name, dest_file, check_open_docs=check_open_docs)
@@ -338,13 +333,13 @@ class OneDoc:
                     "Latex was not installed on your system. "
                     f'Please install latex before exporting to pdf. See "{latex_url}" for installation packages'
                 )
-            self._perform_variable_substitution(False)
+            self._perform_variable_substitution()
             pdf = PdfExporter(self)
             pdf.export(dest_file)
         elif export_format == ExportFormats.HTML:
             from paradoc.io.html.exporter import HTMLExporter
 
-            self._perform_variable_substitution(False)
+            self._perform_variable_substitution()
             html = HTMLExporter(self)
             html.export(dest_file, include_navbar=kwargs.get("include_navbar", True))
             if send_to_frontend:
@@ -369,14 +364,13 @@ class OneDoc:
         self._uniqueness_check(name)
         self.equations[name] = Equation(name, func, custom_eq_str_compiler=custom_eq_str_compiler, **kwargs)
 
-    def _get_table_markdown_from_db(self, full_reference: str, key_clean: str, use_table_var_substitution: bool):
+    def _get_table_markdown_from_db(self, full_reference: str, key_clean: str):
         """
         Generate markdown table from database using annotations.
 
         Args:
             full_reference: Full markdown reference including annotations (e.g., {{__my_table__}}{tbl:index:no})
             key_clean: Clean table key (without __ markers)
-            use_table_var_substitution: Whether to include table name in first cell
 
         Returns:
             Markdown table string or None if not found in database
@@ -410,21 +404,9 @@ class OneDoc:
             self._table_key_usage_count[key_clean] += 1
             unique_key = f"{key_clean}_{self._table_key_usage_count[key_clean]}"
 
-        # Handle table name in first cell for DOCX compatibility
-        # IMPORTANT: The name in the cell must match the key in self.tables dictionary
-        # For DOCX export, we use unique_key in the cell so each instance can be looked up
-        if use_table_var_substitution:
-            df = df.copy()
-            if show_index:
-                # When index is shown, put the table name as the first index value
-                # Create a new index with the table name as the first element
-                new_index = [unique_key] + list(df.index[1:])
-                df.index = new_index
-            else:
-                # When index is hidden, put the table name in the first data cell
-                col_name = df.columns[0]
-                df[col_name] = df[col_name].astype(object)
-                df.iat[0, 0] = unique_key
+        # NOTE: We no longer need to inject the table name into the first cell
+        # Table identification now uses the bookmark/hyperlink anchor system from pandoc-crossref
+        # This eliminates data corruption and makes the system more robust
 
         # Convert to markdown
         props = dict(index=show_index, tablefmt="grid")
@@ -571,7 +553,13 @@ class OneDoc:
 
         return img_markdown
 
-    def _perform_variable_substitution(self, use_table_var_substitution):
+    def _perform_variable_substitution(self):
+        """Perform variable substitution in markdown files.
+
+        This replaces placeholders like {{table_name}} with actual content.
+        Table identification in DOCX now uses bookmark/hyperlink anchors,
+        so we no longer inject table names into cells.
+        """
         logger.info("Performing variable substitution")
 
         # Reset table and plot key usage counters for each compilation
@@ -618,7 +606,7 @@ class OneDoc:
 
                     # Try table substitution first
                     db_table_markdown = self._get_table_markdown_from_db(
-                        full_reference, key_clean, use_table_var_substitution
+                        full_reference, key_clean
                     )
                     if db_table_markdown is not None:
                         logger.info(f'Substituting table "{key_clean}" from database')
@@ -630,7 +618,7 @@ class OneDoc:
 
                     # Try plot substitution
                     db_plot_markdown = self._get_plot_markdown_from_db(full_reference, key_clean, mdf)
-                    if db_plot_markdown is not None:
+                    if db_plot_markdown != "":
                         logger.info(f'Substituting plot "{key_clean}" from database')
                         new_str = db_plot_markdown
                         # Replace both the variable and annotation if present
@@ -645,7 +633,8 @@ class OneDoc:
 
                 if tbl is not None:
                     tbl.md_instances.append(mdf)
-                    new_str = tbl.to_markdown(use_table_var_substitution, list_of_flags)
+                    # No longer need to pass use_table_var_substitution - using bookmark-based identification
+                    new_str = tbl.to_markdown(include_name_in_cell=False, flags=list_of_flags)
                 elif eq is not None:
                     eq.md_instances.append(mdf)
                     new_str = eq.to_latex()
