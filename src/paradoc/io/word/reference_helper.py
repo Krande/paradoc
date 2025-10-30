@@ -1151,3 +1151,159 @@ class ReferenceHelper:
             print(
                 f"    [{item.document_order}] {item.ref_type.value} '{item.semantic_id}' -> {item.word_bookmark} (display: {item.display_number})"
             )
+
+    def extract_all_tables(self, document, one_doc, is_appendix: bool):
+        """Extract all tables from the document and create DocXTableRef objects.
+
+        This method scans the document for tables and their captions, creates
+        DocXTableRef instances, and registers them with the ReferenceHelper.
+
+        Args:
+            document: The Word document to scan
+            one_doc: The OneDoc instance containing table metadata
+            is_appendix: Whether this is the appendix document
+
+        Returns:
+            List of DocXTableRef objects
+        """
+        from docx.table import Table as DocxTable
+        from .models import DocXTableRef
+        from .utils import iter_block_items, get_from_doc_by_index
+
+        logger.info(f"[ReferenceHelper] Extracting tables from {'appendix' if is_appendix else 'main'} document")
+
+        tables = []
+        for i, block in enumerate(iter_block_items(document)):
+            if type(block) is DocxTable:
+                current_table = DocXTableRef()
+                current_table.docx_table = block
+                current_table.docx_caption = get_from_doc_by_index(i - 1, document)
+                current_table.docx_following_pg = get_from_doc_by_index(i + 1, document)
+                current_table.document_index = i
+                current_table.is_appendix = is_appendix
+
+                # Extract table name and match with OneDoc table metadata
+                try:
+                    cell0 = current_table.get_content_cell0_pg()
+                except IndexError:
+                    logger.warning(f"[ReferenceHelper]   Skipping table at index {i} - unable to get content cell")
+                    continue
+
+                tbl_name = cell0.text
+                tbl = one_doc.tables.get(tbl_name, None)
+                if tbl is None:
+                    logger.warning(f"[ReferenceHelper]   Unable to retrieve originally parsed table '{tbl_name}'")
+                    continue
+
+                current_table.table_ref = tbl
+                tables.append(current_table)
+
+                logger.debug(f"[ReferenceHelper]   Found table: {tbl_name}")
+
+        logger.info(f"[ReferenceHelper] Extracted {len(tables)} tables from {'appendix' if is_appendix else 'main'} document")
+        return tables
+
+    def extract_all_figures(self, document, one_doc, is_appendix: bool):
+        """Extract all figures from the document and create DocXFigureRef objects.
+
+        This method scans the document for figures and their captions, creates
+        DocXFigureRef instances, and registers them with the ReferenceHelper.
+
+        Args:
+            document: The Word document to scan
+            one_doc: The OneDoc instance containing figure metadata
+            is_appendix: Whether this is the appendix document
+
+        Returns:
+            List of DocXFigureRef objects
+        """
+        from .models import DocXFigureRef
+        from .utils import iter_block_items, get_from_doc_by_index
+
+        logger.info(f"[ReferenceHelper] Extracting figures from {'appendix' if is_appendix else 'main'} document")
+
+        figures = []
+        for i, block in enumerate(iter_block_items(document)):
+            if not isinstance(block, Paragraph):
+                continue
+
+            if block.style.name == "Captioned Figure":
+                caption = get_from_doc_by_index(i + 1, document)
+                caption_str = caption.text.split(":")[-1].strip().replace(""", '"').replace(""", '"')
+                figure = one_doc.figures.get(caption_str, None)
+
+                if figure is None:
+                    logger.warning(f'[ReferenceHelper]   Figure with caption "{caption_str}" not found in OneDoc')
+                    continue
+
+                current_fig = DocXFigureRef(figure, document)
+                current_fig.docx_figure = block
+                current_fig.docx_caption = caption
+                current_fig.docx_following_pg = get_from_doc_by_index(i + 2, document)
+                current_fig.document_index = i
+                current_fig.is_appendix = is_appendix
+                figures.append(current_fig)
+
+                logger.debug(f"[ReferenceHelper]   Found figure: {caption_str}")
+
+        logger.info(f"[ReferenceHelper] Extracted {len(figures)} figures from {'appendix' if is_appendix else 'main'} document")
+        return figures
+
+    def extract_all_equations(self, document, is_appendix: bool):
+        """Extract all equations from the document and create DocXEquationRef objects.
+
+        This method scans the document for equation bookmarks/captions and creates
+        DocXEquationRef instances.
+
+        Args:
+            document: The Word document to scan
+            is_appendix: Whether this is the appendix document
+
+        Returns:
+            List of DocXEquationRef objects
+        """
+        from .models import DocXEquationRef
+
+        logger.info(f"[ReferenceHelper] Extracting equations from {'appendix' if is_appendix else 'main'} document")
+
+        equations = []
+
+        # Scan for equation bookmarks in captions
+        for i, block in enumerate(iter_block_items(document)):
+            if not isinstance(block, Paragraph):
+                continue
+
+            p_element = block._p
+
+            # Look for bookmarkStart elements in the paragraph
+            bookmark_starts = p_element.findall('.//w:bookmarkStart', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+
+            for bm_start in bookmark_starts:
+                bm_name = bm_start.get(qn('w:name'))
+                if not bm_name:
+                    continue
+
+                # Check if this paragraph has a hyperlink with an eq: anchor
+                hyperlinks_in_para = p_element.findall('.//w:hyperlink', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+
+                for hl in hyperlinks_in_para:
+                    anchor = hl.get(qn('w:anchor'))
+                    if not anchor or not anchor.startswith('eq:'):
+                        continue
+
+                    semantic_id = anchor[3:]  # Remove "eq:" prefix
+
+                    current_eq = DocXEquationRef()
+                    current_eq.semantic_id = semantic_id
+                    current_eq.docx_caption = block
+                    current_eq.document_index = i
+                    current_eq.is_appendix = is_appendix
+                    current_eq.actual_bookmark_name = bm_name
+                    equations.append(current_eq)
+
+                    logger.debug(f"[ReferenceHelper]   Found equation: {semantic_id} (bookmark: {bm_name})")
+                    break  # Only one equation per caption paragraph
+
+        logger.info(f"[ReferenceHelper] Extracted {len(equations)} equations from {'appendix' if is_appendix else 'main'} document")
+        return equations
+

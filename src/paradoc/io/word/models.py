@@ -173,3 +173,41 @@ class DocXFigureRef:
 
         for run in self.docx_caption.runs:
             run.font.name = figure_format.font_style
+
+
+@dataclass
+class DocXEquationRef:
+    """Reference to an equation in a Word document with associated metadata."""
+
+    semantic_id: str = None  # e.g., "maxwell_equation" from "eq:maxwell_equation"
+    docx_equation: Paragraph = None  # The paragraph containing the equation
+    docx_caption: Paragraph = None  # The caption paragraph (if any)
+    is_appendix: bool = False
+    document_index: int = None
+    actual_bookmark_name: str = None  # Store the actual Word-style bookmark name
+
+    def format_equation(self, is_appendix: bool, restart_caption_numbering: bool = False, reference_helper=None):
+        """Format the equation caption with proper styling and numbering.
+
+        Args:
+            is_appendix: Whether this equation is in the appendix
+            restart_caption_numbering: Whether to restart caption numbering
+            reference_helper: Optional ReferenceHelper instance for managing cross-references
+        """
+        from .bookmarks import add_bookmark_around_seq_field
+
+        # If there's a caption paragraph, add bookmark around it
+        if self.docx_caption and self.semantic_id:
+            # Use ReferenceHelper if provided
+            if reference_helper:
+                # Register the equation and get Word-style bookmark
+                bookmark_name = reference_helper.register_equation(self.semantic_id, self.docx_caption)
+                self.actual_bookmark_name = bookmark_name
+                # Apply the bookmark to the caption paragraph
+                add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
+            else:
+                # Fallback to old method
+                bookmark_name = f"eq:{self.semantic_id}"
+                # Capture the actual bookmark name that was created
+                self.actual_bookmark_name = add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
+
