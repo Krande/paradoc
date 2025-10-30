@@ -515,10 +515,16 @@ class OneDoc:
                 fig.update_layout(width=width, height=height)
 
                 # Write to cache
-                fig.write_image(str(cache_png), format="png")
+                try:
+                    fig.write_image(str(cache_png), format="png")
+                except Exception:
+                    from plotly.io._kaleido import get_chrome
+                    get_chrome()
+                    fig.write_image(str(cache_png), format="png")
                 cache_timestamp.write_text(str(db_timestamp), encoding="utf-8")
                 logger.info(f'Rendered and cached plot "{key_clean}"')
             except Exception as e:
+
                 logger.error(f'Failed to render plot "{key_clean}": {e}')
                 return f"[Error rendering plot: {key_clean}]"
 
