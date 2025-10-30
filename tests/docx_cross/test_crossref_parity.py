@@ -5,7 +5,6 @@ that figure and table numbering and cross-references match exactly.
 """
 
 import base64
-import platform
 import re
 import zipfile
 from pathlib import Path
@@ -13,6 +12,7 @@ from pathlib import Path
 import pytest
 from docx import Document
 
+from paradoc import OneDoc
 from paradoc.io.word.com_api import is_word_com_available
 
 
@@ -102,6 +102,7 @@ def test_com_api_reference_document(tmp_path):
     # Analyze the document
     analyze_document_structure(output_file, "COM API")
 
+
 def test_paradoc_document(tmp_path):
     """Create an identical document using Paradoc.
 
@@ -110,8 +111,6 @@ def test_paradoc_document(tmp_path):
     print("\n" + "=" * 80)
     print("TEST: PARADOC DOCUMENT")
     print("=" * 80)
-
-    from paradoc import OneDoc
 
     # Create source directory structure
     source_dir = tmp_path / "paradoc_source"

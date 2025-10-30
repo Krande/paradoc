@@ -5,10 +5,13 @@ import re
 import zipfile
 from pathlib import Path
 
+import pytest
+
 from paradoc import OneDoc
-from paradoc.io.word.com_api.com_utils import docx_update
+from paradoc.io.word.com_api.com_utils import docx_update, is_word_com_available
 
 
+@pytest.mark.skipif(not is_word_com_available(), reason="COM automation only if Word COM is available")
 def test_diagnose_paradoc_bookmarks(tmp_path):
     """Create a simple Paradoc document and analyze bookmark structure."""
     print("\n" + "=" * 80)
@@ -87,7 +90,7 @@ def analyze_bookmarks_and_refs(docx_path: Path):
             end_match = re.search(end_pattern, xml_content)
 
             if start_match and end_match:
-                content = xml_content[start_match.end() : end_match.start()]
+                content = xml_content[start_match.end(): end_match.start()]
                 # Extract text
                 text_parts = re.findall(r"<w:t[^>]*>(.*?)</w:t>", content)
                 text = "".join(text_parts)
@@ -111,10 +114,10 @@ def analyze_bookmarks_and_refs(docx_path: Path):
         ref_pos = xml_content.find(f">{ref}<")
         if ref_pos > 0:
             # Find next separate and end
-            after_ref = xml_content[ref_pos + len(ref) + 2 :]
+            after_ref = xml_content[ref_pos + len(ref) + 2:]
             sep_match = re.search(r'<w:fldChar[^>]*w:fldCharType="separate"[^>]*/>', after_ref)
             if sep_match:
-                after_sep = after_ref[sep_match.end() :]
+                after_sep = after_ref[sep_match.end():]
                 end_match = re.search(r'<w:fldChar[^>]*w:fldCharType="end"[^>]*/>', after_sep)
                 if end_match:
                     result_content = after_sep[: end_match.start()]
