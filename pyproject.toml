@@ -142,7 +142,8 @@ test-doc = { cmd = "python cli_document_tester.py", cwd = "examples" }
 
 [tool.pixi.feature.profile.tasks]
 test-doc-profile = { cmd = ["pyinstrument", "-r", "html", "-o", "profile_doc.html", "$PIXI_PROJECT_ROOT/examples/cli_document_tester.py"], cwd= "examples" }
-test-profile = { cmd = "pyinstrument -r html -o profile_tests.html -r json -o profile_tests.json  -m pytest tests" }
+test-profile = { cmd = "pyinstrument -r html -o profile_tests.html -m pytest tests" }
+test-profile-json = { cmd = "pyinstrument -r json -o profile_tests.json -m pytest tests" }
 
 [tool.pixi.feature.lint.tasks]
 lint = "black . --config pyproject.toml && ruff check . --fix && isort ."
