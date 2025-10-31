@@ -3,8 +3,9 @@ from __future__ import annotations
 import os
 import pathlib
 import shutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import chain
-from typing import Callable, Dict, Iterable
+from typing import Callable, Dict, Iterable, Optional, Tuple
 
 import pandas as pd
 
@@ -32,6 +33,67 @@ from .equations import Equation
 from .exceptions import LatexNotInstalled
 from .io.ast.exporter import ASTExporter
 from .utils import get_list_of_files
+
+
+def _render_plot_worker(args: Tuple) -> Tuple[str, bool, Optional[str]]:
+    """
+    Worker function for parallel plot rendering.
+
+    This is a module-level function to ensure it can be pickled for multiprocessing.
+    Fetches plot data from database within the worker to avoid pickling large objects.
+
+    Args:
+        args: Tuple of (cache_key, key_clean, db_path_str, cache_png_str, cache_timestamp_str, width, height, db_timestamp)
+
+    Returns:
+        Tuple of (cache_key, success, error_message)
+    """
+    cache_key, key_clean, db_path_str, cache_png_str, cache_timestamp_str, width, height, db_timestamp = args
+
+    try:
+        from pathlib import Path
+        from .db import DbManager
+        from .db.plot_renderer import PlotRenderer
+
+        # Fetch plot data from database within worker thread
+        db_path = Path(db_path_str)
+        db_manager = DbManager(db_path)
+
+        result = db_manager.get_plot_with_timestamp(key_clean)
+        if result is None:
+            return (cache_key, False, f"Plot {key_clean} not found in database")
+
+        plot_data, _ = result
+
+        # Create renderer
+        renderer = PlotRenderer()
+
+        # Create figure
+        fig = renderer._create_figure(plot_data)
+
+        # Apply size
+        fig.update_layout(width=width, height=height)
+
+        # Convert path strings back to Path objects
+        cache_png = Path(cache_png_str)
+        cache_timestamp = Path(cache_timestamp_str)
+
+        # Write image
+        try:
+            fig.write_image(str(cache_png), format="png")
+        except Exception:
+            # Fallback to ensure chrome is initialized
+            from plotly.io._kaleido import get_chrome
+            get_chrome()
+            fig.write_image(str(cache_png), format="png")
+
+        # Write timestamp
+        cache_timestamp.write_text(str(db_timestamp), encoding="utf-8")
+
+        return (cache_key, True, None)
+    except Exception as e:
+        import traceback
+        return (cache_key, False, f"{str(e)}\n{traceback.format_exc()}")
 
 
 class OneDoc:
@@ -513,13 +575,18 @@ class OneDoc:
             self._plot_key_usage_count[key_clean] += 1
             unique_key = f"{key_clean}_{self._plot_key_usage_count[key_clean]}"
 
+        # Determine size for cache key
+        width = annotation.width if annotation and annotation.width else plot_data.width or 800
+        height = annotation.height if annotation and annotation.height else plot_data.height or 600
+        
         # Cache directory for rendered plots
         cache_dir = self.work_dir / ".paradoc_cache" / "rendered_plots"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Cache files: PNG image + timestamp
-        cache_png = cache_dir / f"{key_clean}.png"
-        cache_timestamp = cache_dir / f"{key_clean}.timestamp"
+        # Cache files: PNG image + timestamp (using dimensions in key to handle different sizes)
+        cache_key = f"{key_clean}_{width}x{height}"
+        cache_png = cache_dir / f"{cache_key}.png"
+        cache_timestamp = cache_dir / f"{cache_key}.timestamp"
 
         # Check if cache is valid
         cache_valid = False
@@ -528,11 +595,11 @@ class OneDoc:
                 cached_ts = float(cache_timestamp.read_text(encoding="utf-8").strip())
                 if cached_ts >= db_timestamp:
                     cache_valid = True
-                    logger.debug(f"Cache hit for plot {key_clean}")
+                    logger.debug(f"Cache hit for plot {key_clean} ({width}x{height})")
             except Exception as e:
                 logger.debug(f"Cache validation failed for {key_clean}: {e}")
 
-        # Render plot if cache is invalid
+        # Render plot if cache is invalid (shouldn't happen after parallel rendering)
         if not cache_valid:
             logger.debug(f"Rendering plot {key_clean} (cache miss or stale)")
             try:
@@ -602,6 +669,131 @@ class OneDoc:
 
         return img_markdown
 
+    def _collect_and_render_plots_parallel(self, max_workers: Optional[int] = None):
+        """
+        Collect all plots that need rendering and render them in parallel.
+
+        This pre-renders plots before variable substitution to speed up the process.
+
+        Args:
+            max_workers: Maximum number of worker processes. If None, uses cpu_count().
+        """
+        logger.info("Collecting plots for parallel rendering")
+
+        # Dictionary to track which plots need rendering: key -> (plot_data, db_timestamp, annotation, width, height)
+        plots_to_render = {}
+
+        # Cache directory for rendered plots
+        cache_dir = self.work_dir / ".paradoc_cache" / "rendered_plots"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # Scan all markdown files to find plot references
+        for mdf in self.md_files_main + self.md_files_app:
+            md_str = mdf.read_original_file()
+
+            for m in mdf.get_variables():
+                res = m.group(1)
+                key = res.split("|")[0] if "|" in res else res
+                key_clean = key[2:-2] if key.startswith("__") and key.endswith("__") else key
+
+                # Only process database plot keys (keys with __ markers)
+                if not (key.startswith("__") and key.endswith("__")):
+                    continue
+
+                # Get full reference including any annotation that follows
+                full_reference = m.group(0)
+                match_end = m.end()
+                remaining_str = md_str[match_end:]
+
+                # Check if there's a {plt:...} annotation following
+                if remaining_str.startswith("{plt:"):
+                    brace_depth = 0
+                    annotation_end = 0
+                    for i, char in enumerate(remaining_str):
+                        if char == "{":
+                            brace_depth += 1
+                        elif char == "}":
+                            brace_depth -= 1
+                            if brace_depth == 0:
+                                annotation_end = i + 1
+                                break
+                    if annotation_end > 0:
+                        full_reference += remaining_str[:annotation_end]
+
+                # Try to get plot data
+                result = self.db_manager.get_plot_with_timestamp(key_clean)
+                if result is None:
+                    continue
+
+                plot_data, db_timestamp = result
+
+                # Parse annotation
+                annotation = None
+                try:
+                    _, annotation = parse_plot_reference(full_reference)
+                except (ValueError, AttributeError):
+                    pass
+
+                # Determine size
+                width = annotation.width if annotation and annotation.width else plot_data.width or 800
+                height = annotation.height if annotation and annotation.height else plot_data.height or 600
+
+                # Use cache key that includes dimensions to handle different sizes
+                cache_key = f"{key_clean}_{width}x{height}"
+                cache_png = cache_dir / f"{cache_key}.png"
+                cache_timestamp = cache_dir / f"{cache_key}.timestamp"
+
+                cache_valid = False
+                if cache_png.exists() and cache_timestamp.exists():
+                    try:
+                        cached_ts = float(cache_timestamp.read_text(encoding="utf-8").strip())
+                        if cached_ts >= db_timestamp:
+                            cache_valid = True
+                    except Exception:
+                        pass
+
+                # Only render if cache is invalid
+                if not cache_valid and cache_key not in plots_to_render:
+                    plots_to_render[cache_key] = (plot_data, db_timestamp, width, height, cache_png, cache_timestamp, key_clean)
+
+        if not plots_to_render:
+            logger.info("No plots need rendering (all cached)")
+            return
+
+        logger.info(f"Rendering {len(plots_to_render)} plots in parallel")
+
+        # Get database path as string for passing to workers
+        db_path_str = str(self.db_manager.db_path)
+
+        # Prepare arguments for parallel rendering - pass minimal data to avoid pickling overhead
+        render_args = []
+        for cache_key, (plot_data, db_timestamp, width, height, cache_png, cache_timestamp, key_clean) in plots_to_render.items():
+            render_args.append((
+                cache_key,
+                key_clean,  # Worker will fetch plot data from DB using this key
+                db_path_str,
+                str(cache_png),
+                str(cache_timestamp),
+                width,
+                height,
+                db_timestamp
+            ))
+
+        # Render plots in parallel using threads (better for I/O-bound Kaleido subprocess calls)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(_render_plot_worker, args): args[0] for args in render_args}
+
+            for future in as_completed(futures):
+                cache_key = futures[future]
+                try:
+                    result_key, success, error = future.result()
+                    if success:
+                        logger.info(f'Rendered and cached plot "{result_key}"')
+                    else:
+                        logger.error(f'Failed to render plot "{result_key}": {error}')
+                except Exception as e:
+                    logger.error(f'Exception rendering plot "{cache_key}": {e}')
+
     def _perform_variable_substitution(self):
         """Perform variable substitution in markdown files.
 
@@ -614,6 +806,9 @@ class OneDoc:
         # Reset table and plot key usage counters for each compilation
         self._table_key_usage_count.clear()
         self._plot_key_usage_count.clear()
+
+        # Pre-render all plots in parallel before substitution
+        self._collect_and_render_plots_parallel()
 
         for mdf in self.md_files_main + self.md_files_app:
             md_file = mdf.path
