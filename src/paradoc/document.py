@@ -193,6 +193,42 @@ class OneDoc:
         self._perform_variable_substitution()
         return ASTExporter(self)
 
+    def get_document_structure(self, metadata_file=None):
+        """Get the complete document structure with section hierarchy.
+
+        This method extracts a comprehensive hierarchical structure of the document,
+        including sections, paragraphs, figures, tables, equations, and cross-references.
+
+        Args:
+            metadata_file: Optional metadata file path
+
+        Returns:
+            DocumentStructure object containing the complete document hierarchy
+
+        Example:
+            >>> one = OneDoc(source_dir)
+            >>> structure = one.get_document_structure()
+            >>> stats = structure.validate()
+            >>> print(f"Document has {stats['total_sections']} sections")
+            >>>
+            >>> # Navigate sections
+            >>> for root_section in structure.root_sections:
+            >>>     print(f"{root_section.number}: {root_section.title}")
+            >>>     for child in root_section.children:
+            >>>         print(f"  {child.number}: {child.title}")
+        """
+        from paradoc.io.ast.document_structure import DocumentStructureExtractor
+
+        # Build the AST
+        exporter = self.get_ast(metadata_file=metadata_file)
+        ast = exporter.build_ast()
+
+        # Extract document structure
+        extractor = DocumentStructureExtractor(ast)
+        structure = extractor.extract()
+
+        return structure
+
     def get_docx(
         self,
         main_tmpl=MY_DOCX_TMPL,
