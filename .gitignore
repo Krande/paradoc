@@ -5,3 +5,4 @@ node_modules/
 **/dist/
 .pixi/
 tex2pdf*/
+profile_tests*
