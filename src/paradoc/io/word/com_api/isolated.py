@@ -78,18 +78,18 @@ def _isolated_worker(func: Callable, args: tuple, kwargs: dict, redirect_stdout:
     result = None
     success = False
     message = ""
+    com_initialized = False
 
     try:
         try:
             import pythoncom  # type: ignore
             # Explicitly initialize COM in STA mode on this thread
             # COINIT_APARTMENTTHREADED = 2
-            # We call this even if pool initializer already did, to ensure COM is initialized
-            # on this thread. Multiple calls are safe (reference counted).
             pythoncom.CoInitializeEx(2)
-        except Exception:
+            com_initialized = True
+        except Exception as e:
             # If initialization fails, continue anyway - will fail later with clear error
-            pass
+            logger.warning(f"COM initialization warning: {e}")
 
         result = func(*args, **kwargs)
         success = True
@@ -105,13 +105,22 @@ def _isolated_worker(func: Callable, args: tuple, kwargs: dict, redirect_stdout:
                 output = sys.stdout.getvalue() + "\n" + sys.stderr.getvalue()
                 sys.stdout = old_stdout
                 sys.stderr = old_stderr
-            gc.collect()
-        except:
+        except Exception:
             pass
-        # Note: We don't call CoUninitialize here because:
-        # 1. pythoncom doesn't reliably report if we initialized COM or it was already initialized
-        # 2. COM will be cleaned up automatically when the worker process exits
-        # 3. Uninitializing prematurely can break subsequent operations in the same worker
+
+        # Force garbage collection to release COM objects before uninitializing
+        try:
+            gc.collect()
+        except Exception:
+            pass
+
+        # Uninitialize COM to ensure clean shutdown
+        if com_initialized:
+            try:
+                import pythoncom
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
 
     return (success, result, message, output)
 
@@ -158,9 +167,11 @@ def run_word_operation_isolated(
     result: Any = None
     message: str = ""
     output: str = ""
+    pool = None
 
-    # Use a single-process pool with an initializer that sets up COM in the worker
-    with ctx.Pool(processes=1, initializer=_init_pool_worker) as pool:
+    try:
+        # Use a single-process pool with an initializer that sets up COM in the worker
+        pool = ctx.Pool(processes=1, initializer=_init_pool_worker)
         async_res = pool.apply_async(
             _isolated_worker,
             (func, args, kwargs, redirect_stdout)
@@ -168,13 +179,25 @@ def run_word_operation_isolated(
         try:
             success, result, message, output = async_res.get(timeout=timeout_s)
         except mp.TimeoutError:
-            pool.terminate()
-            pool.join()
-            return (False, None, f"Operation timed out after {timeout_s}s")
+            logger.warning(f"Operation timed out after {timeout_s}s")
+            success = False
+            result = None
+            message = f"Operation timed out after {timeout_s}s"
         except Exception as e:
-            pool.terminate()
-            pool.join()
-            return (False, None, f"Pool error: {e!r}")
+            logger.error(f"Pool error: {e!r}")
+            success = False
+            result = None
+            message = f"Pool error: {e!r}"
+    finally:
+        # Ensure pool is always properly closed and terminated
+        if pool is not None:
+            # Always use terminate to force immediate cleanup and prevent hanging
+            # This is safe because we're using a single-use pool
+            try:
+                pool.terminate()
+                pool.join()
+            except Exception as e:
+                logger.debug(f"Pool terminate/join exception: {e}")
 
     # Log captured output if any
     if redirect_stdout and output:
