@@ -35,12 +35,14 @@ class Paragraph(BaseModel):
         text: Plain text content of the paragraph
         ast_block: The original AST block (for debugging)
         source_file: Source markdown file this paragraph came from
+        section: Back-reference to the Section this paragraph belongs to
     """
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     text: str
     ast_block: Optional[Dict[str, Any]] = None
     source_file: Optional[str] = None
+    section: Optional[Section] = None
 
 
 class FigureRef(BaseModel):
@@ -51,11 +53,15 @@ class FigureRef(BaseModel):
         full_id: The full identifier with prefix (e.g., "fig:historical_trends")
         caption: The caption text (if available)
         source_file: Source markdown file
+        section: Back-reference to the Section this figure belongs to
     """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     ref_id: str
     full_id: str
     caption: Optional[str] = None
     source_file: Optional[str] = None
+    section: Optional[Section] = None
 
 
 class TableRef(BaseModel):
@@ -66,11 +72,15 @@ class TableRef(BaseModel):
         full_id: The full identifier with prefix (e.g., "tbl:current_metrics")
         caption: The caption text (if available)
         source_file: Source markdown file
+        section: Back-reference to the Section this table belongs to
     """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     ref_id: str
     full_id: str
     caption: Optional[str] = None
     source_file: Optional[str] = None
+    section: Optional[Section] = None
 
 
 class EquationRef(BaseModel):
@@ -81,11 +91,15 @@ class EquationRef(BaseModel):
         full_id: The full identifier with prefix (e.g., "eq:energy")
         latex: The LaTeX content (if available)
         source_file: Source markdown file
+        section: Back-reference to the Section this equation belongs to
     """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     ref_id: str
     full_id: str
     latex: Optional[str] = None
     source_file: Optional[str] = None
+    section: Optional[Section] = None
 
 
 class CrossReferenceUsage(BaseModel):
@@ -96,11 +110,15 @@ class CrossReferenceUsage(BaseModel):
         target_type: Type of target (fig, tbl, eq)
         context: Surrounding text context
         source_file: Source markdown file
+        section: Back-reference to the Section where this cross-reference occurs
     """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     target_id: str
     target_type: str
     context: Optional[str] = None
     source_file: Optional[str] = None
+    section: Optional[Section] = None
 
 
 class Section(BaseModel):
@@ -342,6 +360,7 @@ class DocumentStructureExtractor:
                 if block_type in ['Para', 'Plain']:
                     paragraph = self._extract_paragraph(block)
                     if paragraph:
+                        paragraph.section = current_section
                         current_section.paragraphs.append(paragraph)
                         # Extract cross-references from paragraph
                         self._extract_crossrefs_from_block(block, current_section, structure)
@@ -349,12 +368,14 @@ class DocumentStructureExtractor:
                 elif block_type == 'Figure':
                     figure = self._extract_figure(block)
                     if figure:
+                        figure.section = current_section
                         current_section.figures.append(figure)
                         structure.figures[figure.full_id] = figure
 
                 elif block_type == 'Table':
                     table = self._extract_table(block)
                     if table:
+                        table.section = current_section
                         current_section.tables.append(table)
                         structure.tables[table.full_id] = table
 
@@ -582,7 +603,8 @@ class DocumentStructureExtractor:
                     ref_id=ref_id,
                     full_id=normalized_id,
                     caption=caption_text,
-                    source_file=source_file
+                    source_file=source_file,
+                    section=section
                 )
                 section.figures.append(figure)
                 structure.figures[normalized_id] = figure
@@ -600,7 +622,8 @@ class DocumentStructureExtractor:
                     ref_id=ref_id,
                     full_id=normalized_id,
                     caption=caption_text,
-                    source_file=source_file
+                    source_file=source_file,
+                    section=section
                 )
                 section.tables.append(table)
                 structure.tables[normalized_id] = table
@@ -618,7 +641,8 @@ class DocumentStructureExtractor:
                     ref_id=ref_id,
                     full_id=normalized_id,
                     latex=latex_text,
-                    source_file=source_file
+                    source_file=source_file,
+                    section=section
                 )
                 section.equations.append(equation)
                 structure.equations[normalized_id] = equation
@@ -663,7 +687,8 @@ class DocumentStructureExtractor:
                             ref_id=ref_id,
                             full_id=normalized_id,
                             latex=latex_text,
-                            source_file=source_file
+                            source_file=source_file,
+                            section=section
                         )
                         section.equations.append(equation)
                         structure.equations[normalized_id] = equation
@@ -728,7 +753,8 @@ class DocumentStructureExtractor:
                                         target_id=normalized_id,
                                         target_type=target_type,
                                         context=context,
-                                        source_file=source_file
+                                        source_file=source_file,
+                                        section=section
                                     )
                                     section.cross_references.append(crossref)
                                     structure.cross_references.append(crossref)
