@@ -179,10 +179,12 @@ Summary with references to all elements:
 
         # Check if this is a caption or cross-reference paragraph
         # Captions have format: "Figure 1-1:" or "Table 2-3:" not "Subsection 1.1:"
+        # Equations are inline captions in the math paragraph: "... (Eq. 1-1)"
         is_caption = (
-            (para_text.startswith("Figure ") or para_text.startswith("Table ") or para_text.startswith("Equation "))
-            and "-" in para_text
-            and ":" in para_text
+            ((para_text.startswith("Figure ") or para_text.startswith("Table "))
+             and "-" in para_text
+             and ":" in para_text)
+            or ("(Eq." in para_text and "-" in para_text and ")" in para_text)
         )
         is_xref = any(marker in para_text.lower() for marker in ["as shown in", "compare", "relative to", "builds on"])
 
@@ -378,12 +380,15 @@ Summary with references to all elements:
     # REQUIREMENT 1: Every caption must have both STYLEREF and SEQ fields
     fig_captions = [c for c in caption_structures if c["label"] == "Figure"]
     tbl_captions = [c for c in caption_structures if c["label"] == "Table"]
+    eq_captions = [c for c in caption_structures if c["label"] == "Equation"]
 
     assert len(fig_captions) >= 2, f"Expected at least 2 figure captions, found {len(fig_captions)}"
     assert len(tbl_captions) >= 2, f"Expected at least 2 table captions, found {len(tbl_captions)}"
-    print(f"[OK] Found {len(fig_captions)} figure captions and {len(tbl_captions)} table captions")
+    assert len(eq_captions) >= 2, f"Expected at least 2 equation captions, found {len(eq_captions)}"
+    print(f"[OK] Found {len(fig_captions)} figure captions, {len(tbl_captions)} table captions, and {len(eq_captions)} equation captions")
 
     # Verify every caption has BOTH STYLEREF and SEQ fields
+    # Note: Equations have inline captions so they may not have ":" separator
     for cap in fig_captions + tbl_captions:
         assert cap["styleref_field"] is not None, (
             f"Caption at para {cap['para_idx']} MISSING STYLEREF field. "
@@ -397,6 +402,23 @@ Summary with references to all elements:
             f"Caption at para {cap['para_idx']} MISSING hyphen separator. "
             f"Valid Word captions use format 'Label STYLEREF-SEQ: Text'. Caption: {cap['para_text']}"
         )
+
+
+    # Verify equation captions have STYLEREF and SEQ fields (they use inline format)
+    for cap in eq_captions:
+        assert cap["styleref_field"] is not None, (
+            f"Equation caption at para {cap['para_idx']} MISSING STYLEREF field. "
+            f"Valid Word equation captions MUST have STYLEREF for chapter number. Caption: {cap['para_text']}"
+        )
+        assert cap["seq_field"] is not None, (
+            f"Equation caption at para {cap['para_idx']} MISSING SEQ field. "
+            f"Valid Word equation captions MUST have SEQ for numbering. Caption: {cap['para_text']}"
+        )
+        assert cap["has_hyphen"], (
+            f"Equation caption at para {cap['para_idx']} MISSING hyphen separator. "
+            f"Valid Word equation captions use format '(Eq. STYLEREF-SEQ)'. Caption: {cap['para_text']}"
+        )
+
     print("[OK] All captions have required STYLEREF and SEQ fields with hyphen separator")
 
     # REQUIREMENT 2: SEQ fields must have correct structure
@@ -408,7 +430,11 @@ Summary with references to all elements:
         f"Expected at least 2 Table SEQ fields, found {len(tbl_seq_fields)}. "
         "SEQ fields MUST be created in table captions."
     )
-    print(f"[OK] Found {len(fig_seq_fields)} Figure SEQ fields and {len(tbl_seq_fields)} Table SEQ fields")
+    assert len(eq_seq_fields) >= 2, (
+        f"Expected at least 2 Equation SEQ fields, found {len(eq_seq_fields)}. "
+        "SEQ fields MUST be created in equation captions."
+    )
+    print(f"[OK] Found {len(fig_seq_fields)} Figure SEQ fields, {len(tbl_seq_fields)} Table SEQ fields, and {len(eq_seq_fields)} Equation SEQ fields")
 
     # REQUIREMENT 3: SEQ fields must have ARABIC numbering and \s switch for chapter-based numbering
     for sf in seq_fields:
@@ -421,14 +447,14 @@ Summary with references to all elements:
     print("[OK] All SEQ fields have ARABIC numbering and \\s 1 switch for chapter-based numbering")
 
     # REQUIREMENT 4: First SEQ field of each type must have \r 1 to restart numbering
-    # Find first figure and table SEQ fields
+    # Find first figure, table, and equation SEQ fields
     if len(fig_seq_fields) > 0:
         first_fig_seq = min(fig_seq_fields, key=lambda x: x["para_idx"])
         assert "\\r 1" in first_fig_seq["instr"] or "\\r1" in first_fig_seq["instr"], (
             f"First Figure SEQ field MUST have \\r 1 switch to initialize numbering. "
             f"Found: {first_fig_seq['instr']}"
         )
-        print("[OK] First Figure SEQ field has \\r 1 switch to initialize numbering")
+    print(f"[OK] Tested across {len(fig_captions)} figures, {len(tbl_captions)} tables, and {len(eq_captions)} equations in multiple sections")
 
     if len(tbl_seq_fields) > 0:
         first_tbl_seq = min(tbl_seq_fields, key=lambda x: x["para_idx"])

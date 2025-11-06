@@ -188,22 +188,22 @@ class DocXEquationRef:
     actual_bookmark_name: str = None  # Store the actual Word-style bookmark name
 
     def format_equation(self, is_appendix: bool, restart_caption_numbering: bool = False, reference_helper=None):
-        """Format the equation with an inline caption (right-aligned on the same line).
+        """Format the equation by replacing pandoc-crossref's number with proper SEQ field caption.
 
-        This method:
-        1. Removes the old eq: bookmark from the math paragraph
-        2. Adds a right-aligned caption with SEQ fields on the same line as the equation
-        3. Wraps a new bookmark around just the caption portion (excluding whitespace)
+        Pandoc-crossref adds a number like "(1)" to equations. This method:
+        1. Finds and removes the pandoc-crossref number (e.g., "(1)", "(2)")
+        2. Replaces it with proper caption "(Eq. 1-1)" with SEQ fields
+        3. Wraps a bookmark around just the caption for cross-referencing
 
         The result is an equation like:
         E = mc^2                                                (Eq. 1-1)
-        where the caption is right-aligned and has a bookmark for cross-referencing.
 
         Args:
             is_appendix: Whether this equation is in the appendix
             restart_caption_numbering: Whether to restart caption numbering
             reference_helper: Optional ReferenceHelper instance for managing cross-references
         """
+        import re
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
 
@@ -216,6 +216,21 @@ class DocXEquationRef:
         # Get the equation paragraph
         eq_para = self.docx_equation
         p_element = eq_para._p
+
+        # Find and remove pandoc-crossref's equation number (e.g., "(1)", "(2)")
+        # These appear as text runs in the paragraph
+        runs = p_element.findall('.//w:r', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+        pandoc_number_run = None
+
+        for run in runs:
+            t_elements = run.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+            for t_elem in t_elements:
+                if t_elem.text and re.match(r'^\(\d+\)$', t_elem.text.strip()):
+                    # Found pandoc-crossref's equation number
+                    pandoc_number_run = run
+                    break
+            if pandoc_number_run:
+                break
 
         # Remove the old eq: bookmark if it exists
         old_bookmark_name = f"eq:{self.semantic_id}"
@@ -234,44 +249,53 @@ class DocXEquationRef:
                         break
                 break
 
-        # Set up a right-aligned tab stop at the right margin (6 inches from left)
-        # This positions the caption at the right edge of the page
-        pPr = p_element.find('.//w:pPr', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
-        if pPr is None:
-            pPr = OxmlElement('w:pPr')
-            p_element.insert(0, pPr)
-
-        tabs = pPr.find('w:tabs', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
-        if tabs is None:
-            tabs = OxmlElement('w:tabs')
-            pPr.append(tabs)
-
-        # Add right-aligned tab stop at 6 inches
-        tab = OxmlElement('w:tab')
-        tab.set(qn('w:val'), 'right')
-        tab.set(qn('w:pos'), str(int(6 * 1440)))  # 1440 twips per inch
-        tabs.append(tab)
-
-        # Add a tab character to move to the right margin
-        tab_run = eq_para.add_run('\t')
+        # If we found pandoc's number, we'll replace it in place
+        # Otherwise, add at the end of the paragraph
+        insertion_point = pandoc_number_run if pandoc_number_run else None
 
         # Build the caption with SEQ fields
-        # Format: "(Eq. STYLEREF-SEQ)"
-        # Start with opening parenthesis
-        paren_run = eq_para.add_run('(Eq. ')
-
+        # Format: "(Eq. STYLEREF-SEQ)" but bookmark wraps only "Eq. STYLEREF-SEQ" (without parentheses)
         heading_ref = '"Appendix"' if is_appendix else '"Heading 1"'
 
-        # Add STYLEREF field for chapter number
+        # Create runs for the caption
+        # Opening parenthesis (OUTSIDE bookmark)
+        open_paren_run_elem = p_element._new_r()
+        t_elem = OxmlElement('w:t')
+        t_elem.text = '('
+        open_paren_run_elem.append(t_elem)
+
+        # Use ReferenceHelper if provided to get Word-style bookmark
+        if reference_helper:
+            bookmark_name = reference_helper.register_equation(self.semantic_id, eq_para)
+            self.actual_bookmark_name = bookmark_name
+        else:
+            bookmark_name, bookmark_id_str = generate_word_bookmark_name()
+            self.actual_bookmark_name = bookmark_name
+            bookmark_id_str = str(random.randint(1, 999999))
+
+        # Bookmark start
+        bookmark_start = OxmlElement('w:bookmarkStart')
+        bookmark_start.set(qn('w:id'), bookmark_id_str if 'bookmark_id_str' in locals() else str(random.randint(1, 999999)))
+        bookmark_start.set(qn('w:name'), bookmark_name)
+
+        # "Eq. " text
+        eq_label_run_elem = p_element._new_r()
+        t_elem = OxmlElement('w:t')
+        t_elem.set(qn('xml:space'), 'preserve')
+        t_elem.text = 'Eq. '
+        eq_label_run_elem.append(t_elem)
+
+        # STYLEREF field for chapter number
         styleref_run_elem = p_element._new_r()
         add_seq_reference(styleref_run_elem, f"STYLEREF \\s {heading_ref} \\n", eq_para)
-        # Insert before the last run (we'll keep adding runs)
-        p_element.append(styleref_run_elem)
 
-        # Add hyphen separator
-        hyphen_run = eq_para.add_run('-')
+        # Hyphen separator
+        hyphen_run_elem = p_element._new_r()
+        t_elem = OxmlElement('w:t')
+        t_elem.text = '-'
+        hyphen_run_elem.append(t_elem)
 
-        # Add SEQ field for equation number
+        # SEQ field for equation number
         if restart_caption_numbering:
             seq_instruction = f"SEQ Equation \\* ARABIC \\r 1 \\s 1"
         else:
@@ -279,32 +303,38 @@ class DocXEquationRef:
 
         seq_run_elem = p_element._new_r()
         add_seq_reference(seq_run_elem, seq_instruction, eq_para)
-        p_element.append(seq_run_elem)
 
-        # Add closing parenthesis
-        close_paren_run = eq_para.add_run(')')
-
-        # Now wrap a bookmark around the caption portion (from opening paren to closing paren)
-        # Use ReferenceHelper if provided to get Word-style bookmark
-        if reference_helper:
-            bookmark_name = reference_helper.register_equation(self.semantic_id, eq_para)
-            self.actual_bookmark_name = bookmark_name
-        else:
-            bookmark_name, bookmark_id = generate_word_bookmark_name()
-            self.actual_bookmark_name = bookmark_name
-
-        # Create bookmark start - insert right before the opening parenthesis run
-        bookmark_start = OxmlElement('w:bookmarkStart')
-        bookmark_id_str = str(random.randint(1, 999999))
-        bookmark_start.set(qn('w:id'), bookmark_id_str)
-        bookmark_start.set(qn('w:name'), bookmark_name)
-
-        # Find the opening paren run in the XML
-        paren_run_elem = paren_run._element
-        paren_run_elem.addprevious(bookmark_start)
-
-        # Create bookmark end - insert right after the closing parenthesis run
+        # Bookmark end (wraps "Eq. 1-1" without parentheses)
         bookmark_end = OxmlElement('w:bookmarkEnd')
-        bookmark_end.set(qn('w:id'), bookmark_id_str)
-        close_paren_run._element.addnext(bookmark_end)
+        bookmark_end.set(qn('w:id'), bookmark_start.get(qn('w:id')))
+
+        # Closing parenthesis (OUTSIDE bookmark)
+        close_paren_run_elem = p_element._new_r()
+        t_elem = OxmlElement('w:t')
+        t_elem.text = ')'
+        close_paren_run_elem.append(t_elem)
+
+        if insertion_point:
+            # Replace pandoc's number with our caption
+            # Insert all caption elements before the pandoc number run
+            insertion_point.addprevious(open_paren_run_elem)
+            insertion_point.addprevious(bookmark_start)
+            insertion_point.addprevious(eq_label_run_elem)
+            insertion_point.addprevious(styleref_run_elem)
+            insertion_point.addprevious(hyphen_run_elem)
+            insertion_point.addprevious(seq_run_elem)
+            insertion_point.addprevious(bookmark_end)
+            insertion_point.addprevious(close_paren_run_elem)
+            # Remove the old pandoc number
+            insertion_point.getparent().remove(insertion_point)
+        else:
+            # No pandoc number found, append to end
+            p_element.append(open_paren_run_elem)
+            p_element.append(bookmark_start)
+            p_element.append(eq_label_run_elem)
+            p_element.append(styleref_run_elem)
+            p_element.append(hyphen_run_elem)
+            p_element.append(seq_run_elem)
+            p_element.append(bookmark_end)
+            p_element.append(close_paren_run_elem)
 

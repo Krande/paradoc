@@ -177,7 +177,11 @@ def create_ref_field_runs(p_element, bookmark_name: str, label: str = "Figure"):
     r4 = OxmlElement("w:r")
     t = OxmlElement("w:t")
     t.set(qn("xml:space"), "preserve")
-    t.text = f"{label} 1-1"  # Placeholder - will be updated by Word to show actual bookmark content
+    # For equations, add period after "Eq" to match bookmark format "Eq. 1-1"
+    if label == "Eq":
+        t.text = "Eq. 1-1"
+    else:
+        t.text = f"{label} 1-1"  # Placeholder - will be updated by Word to show actual bookmark content
     r4.append(t)
     p_element.append(r4)
 
