@@ -75,7 +75,6 @@ class WordExporter:
         # Step 7: Format all paragraphs
         format_paragraphs_and_headings(composer_main.doc, one.paragraph_style_map)
 
-
         # Step 8: Apply final fixes
         fix_headers_after_compose(composer_main.doc)
         fix_bookmark_ids(composer_main.doc)
@@ -182,9 +181,6 @@ class WordExporter:
 
         ref_helper.update_display_numbers()
 
-        # Print registry for debugging
-        ref_helper.print_registry()
-
         # Convert references using the configured method
         if self.use_hyperlink_references:
             # New method: Extract hyperlink references and convert them
@@ -205,6 +201,8 @@ class WordExporter:
             logger.info("[WordExporter] Converting text references to REF fields using pattern matching")
             ref_helper.convert_all_references(document)
 
+        # Print registry for debugging
+        ref_helper.print_registry()
 
     def _save_document(self, composer, output_name, dest_file, check_open_docs):
         """Save the document and optionally update with COM automation.
@@ -218,7 +216,6 @@ class WordExporter:
         logger.info("Close Existing Word documents")
         if check_open_docs and self.enable_word_com_automation:
             close_word_docs_by_name([output_name, f"{output_name}.docx"])
-
 
         print(f'Saving Composed Document to "{dest_file}"')
         composer.save(dest_file)

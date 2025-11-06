@@ -6,6 +6,7 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import chain
 from typing import Callable, Dict, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
@@ -34,6 +35,9 @@ from .exceptions import LatexNotInstalled
 from .io.ast.exporter import ASTExporter
 from .utils import get_list_of_files
 
+if TYPE_CHECKING:
+    from .io.pdf.exporter import PdfExporter
+    from .io.word.exporter import WordExporter
 
 def _render_plot_worker(args: Tuple) -> Tuple[str, bool, Optional[str]]:
     """
@@ -387,7 +391,7 @@ class OneDoc:
         send_to_frontend=False,
         update_docx_with_com=True,
         **kwargs,
-    ):
+    ) -> WordExporter | PdfExporter | None:
         """
         Compiles a report into the specified format and handles the resultant exported
         file accordingly. Depending on the export format, different specialized exporters
@@ -424,7 +428,7 @@ class OneDoc:
         logger.info(f'Compiling OneDoc report to "{dest_file}"')
         self._prep_compilation(metadata_file=metadata_file)
         self._perform_variable_substitution()
-
+        converter = None
         if export_format == ExportFormats.DOCX:
             import platform
 
@@ -436,7 +440,7 @@ class OneDoc:
                 from paradoc.io.word.com_api.com_utils import docx_update
 
                 docx_update(dest_file)
-
+            converter = wordx
         elif export_format == ExportFormats.PDF:
             from paradoc.io.pdf.exporter import PdfExporter
 
@@ -449,6 +453,7 @@ class OneDoc:
                 )
             pdf = PdfExporter(self)
             pdf.export(dest_file)
+            converter = pdf
         elif export_format == ExportFormats.HTML:
             from paradoc.io.html.exporter import HTMLExporter
 
@@ -463,6 +468,8 @@ class OneDoc:
 
         if auto_open is True:
             os.startfile(dest_file)
+
+        return converter
 
     def add_table(self, name, df: pd.DataFrame, caption: str, tbl_format: TableFormat = TableFormat(), **kwargs):
         if '"' in caption:

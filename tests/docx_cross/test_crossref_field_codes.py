@@ -120,7 +120,12 @@ Summary with references to all elements:
     # Compile the document
     work_dir = tmp_path / "work"
     one = OneDoc(source_dir, work_dir=work_dir)
-    one.compile("test_field_codes", auto_open=False, export_format="docx", update_docx_with_com=False)
+    docx = one.compile("test_field_codes", auto_open=False, export_format="docx", update_docx_with_com=False)
+
+    ref_helper = docx.ref_helper
+    assert len(ref_helper.figures) == 2, "Should find exactly two figures"
+    assert len(ref_helper.tables) == 2, "Should find exactly two tables"
+    assert len(ref_helper.equations) == 2, "Should find exactly two equations"
 
     output_file = work_dir / "_dist" / "test_field_codes.docx"
     assert output_file.exists(), "Output file should be created"

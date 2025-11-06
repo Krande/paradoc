@@ -1340,3 +1340,17 @@ class ReferenceHelper:
         logger.info(f"[ReferenceHelper] Extracted {len(equations)} equations from {'appendix' if is_appendix else 'main'} document")
         return equations
 
+    @property
+    def figures(self):
+        """Return a list of all figures."""
+        return self._figures
+
+    @property
+    def tables(self):
+        """Return a list of all tables."""
+        return self._tables
+
+    @property
+    def equations(self):
+        """Return a list of all equations."""
+        return self._equations

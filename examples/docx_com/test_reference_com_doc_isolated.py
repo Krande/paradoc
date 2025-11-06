@@ -3,13 +3,10 @@
 This demonstrates how to wrap COM operations in an isolated process.
 """
 
-import platform
 from pathlib import Path
 
-import pytest
-
 from paradoc import MY_DOCX_TMPL
-from paradoc.io.word.com_api import run_word_operation_isolated, is_word_com_available
+from paradoc.io.word.com_api import run_word_operation_isolated
 
 
 def _create_reference_document_worker(output_file: str, template: str):
@@ -78,7 +75,6 @@ def _create_reference_document_worker(output_file: str, template: str):
     return output_file
 
 
-@pytest.mark.skipif(not is_word_com_available(), reason="COM automation only if Word COM is available")
 def test_com_api_reference_document_isolated(tmp_path):
     """Create a reference document using COM API in isolated process.
 
@@ -95,7 +91,7 @@ def test_com_api_reference_document_isolated(tmp_path):
         str(output_file),
         str(MY_DOCX_TMPL),
         timeout_s=120.0,
-        redirect_stdout=False  # Set to True to suppress all output
+        redirect_stdout=False,  # Set to True to suppress all output
     )
 
     assert success, f"Document creation failed: {message}"
@@ -113,11 +109,10 @@ if __name__ == "__main__":
         str(tmp / "test_isolated.docx"),
         str(MY_DOCX_TMPL),
         timeout_s=120.0,
-        redirect_stdout=False
+        redirect_stdout=False,
     )
 
     if success:
         print(f"\n✅ Success: {result}")
     else:
         print(f"\n❌ Failed: {message}")
-
