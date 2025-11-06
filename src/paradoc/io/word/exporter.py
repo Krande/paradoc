@@ -75,6 +75,7 @@ class WordExporter:
         # Step 7: Format all paragraphs
         format_paragraphs_and_headings(composer_main.doc, one.paragraph_style_map)
 
+
         # Step 8: Apply final fixes
         fix_headers_after_compose(composer_main.doc)
         fix_bookmark_ids(composer_main.doc)
@@ -190,11 +191,20 @@ class WordExporter:
             logger.info("[WordExporter] Converting hyperlink-based cross-references to REF fields")
             hyperlink_refs = ref_helper.extract_hyperlink_references(document)
             logger.info(f"[WordExporter] Found {len(hyperlink_refs)} hyperlink references")
-            ref_helper.convert_hyperlink_references(hyperlink_refs)
+
+            if len(hyperlink_refs) == 0:
+                # Fallback: No hyperlinks found (pandoc-crossref may have already evaluated references)
+                # Use pattern-based conversion instead
+                logger.warning("[WordExporter] No hyperlinks found - falling back to pattern-based conversion")
+                logger.info("[WordExporter] Converting text references to REF fields using pattern matching")
+                ref_helper.convert_all_references(document)
+            else:
+                ref_helper.convert_hyperlink_references(hyperlink_refs)
         else:
             # Old method: Use pattern-based conversion
             logger.info("[WordExporter] Converting text references to REF fields using pattern matching")
             ref_helper.convert_all_references(document)
+
 
     def _save_document(self, composer, output_name, dest_file, check_open_docs):
         """Save the document and optionally update with COM automation.
@@ -208,6 +218,7 @@ class WordExporter:
         logger.info("Close Existing Word documents")
         if check_open_docs and self.enable_word_com_automation:
             close_word_docs_by_name([output_name, f"{output_name}.docx"])
+
 
         print(f'Saving Composed Document to "{dest_file}"')
         composer.save(dest_file)

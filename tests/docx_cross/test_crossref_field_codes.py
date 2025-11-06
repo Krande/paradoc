@@ -213,44 +213,40 @@ Summary with references to all elements:
             caption_structures.append(caption_info)
 
         # Collect all fields for analysis
-        if is_caption or is_xref:
+        # Changed: Scan ALL paragraphs for REF fields, not just those with specific marker phrases
+        # REF fields can appear in any paragraph that references a figure/table/equation
+        if is_caption:
+            # Only collect SEQ and STYLEREF fields from caption paragraphs
             runs = para.findall(".//w:r", nsmap)
 
-            field_instr = ""
-            in_field = False
-
             for run in runs:
-                fld_char = run.find(".//w:fldChar", nsmap)
-                if fld_char is not None:
-                    fld_type = fld_char.get("{%s}fldCharType" % nsmap["w"])
-                    if fld_type == "begin":
-                        in_field = True
-                        field_instr = ""
-
                 instr_text = run.find(".//w:instrText", nsmap)
                 if instr_text is not None and instr_text.text:
-                    field_instr += instr_text.text
-
                     if " SEQ " in instr_text.text:
                         seq_fields.append({
                             "para_idx": para_idx,
-                            "instr": field_instr.strip(),
+                            "instr": instr_text.text.strip(),
                             "para_text": para_text[:80]
                         })
 
                     if " STYLEREF " in instr_text.text or "STYLEREF " in instr_text.text:
                         styleref_fields.append({
                             "para_idx": para_idx,
-                            "instr": field_instr.strip(),
+                            "instr": instr_text.text.strip(),
                             "para_text": para_text[:80]
                         })
 
-                    if " REF " in instr_text.text:
-                        ref_fields.append({
-                            "para_idx": para_idx,
-                            "instr": field_instr.strip(),
-                            "para_text": para_text[:80]
-                        })
+        # Scan ALL paragraphs for REF fields (cross-references can be anywhere)
+        runs = para.findall(".//w:r", nsmap)
+        for run in runs:
+            instr_text = run.find(".//w:instrText", nsmap)
+            if instr_text is not None and instr_text.text:
+                if " REF " in instr_text.text:
+                    ref_fields.append({
+                        "para_idx": para_idx,
+                        "instr": instr_text.text.strip(),
+                        "para_text": para_text[:80]
+                    })
 
     print("\n" + "=" * 80)
     print("BOOKMARKS FOUND")
