@@ -218,19 +218,74 @@ class DocXEquationRef:
         p_element = eq_para._p
 
         # Find and remove pandoc-crossref's equation number (e.g., "(1)", "(2)")
-        # These appear as text runs in the paragraph
+        # Pandoc-crossref places the number INSIDE the oMath element, typically in m:t elements
+        # We need to find and remove those text elements that contain just a number
+
+        logger.debug(f"[Equation] Searching for pandoc number in equation {self.semantic_id}")
+
+        # Look for the number inside oMath elements
+        # The structure is typically: oMath > ... > m:r > m:t with text like "(1)"
+        # Pandoc-crossref places this at the VERY END of the math element
+        math_elements = p_element.findall('.//m:oMath', namespaces={'m': 'http://schemas.openxmlformats.org/officeDocument/2006/math'})
+
+        for math_elem in math_elements:
+            # Find all m:r (math runs) within this oMath
+            math_runs = math_elem.findall('.//m:r', namespaces={'m': 'http://schemas.openxmlformats.org/officeDocument/2006/math'})
+
+            logger.debug(f"[Equation] Found {len(math_runs)} math runs in oMath element")
+
+            # Pandoc-crossref splits the number across multiple runs at the end: '(', '1', ')'
+            # We need to check if the last 3 runs match this pattern
+            if len(math_runs) >= 3:
+                # Extract text from last 3 runs
+                last_3_texts = []
+                for m_run in math_runs[-3:]:
+                    m_t = m_run.find('.//m:t', namespaces={'m': 'http://schemas.openxmlformats.org/officeDocument/2006/math'})
+                    if m_t is not None and m_t.text:
+                        last_3_texts.append(m_t.text.strip())
+                    else:
+                        last_3_texts.append('')
+
+                logger.debug(f"[Equation] Last 3 math run texts: {last_3_texts}")
+
+                # Check if pattern is: '(', digit, ')'
+                if (len(last_3_texts) == 3 and
+                    last_3_texts[0] == '(' and
+                    last_3_texts[1].isdigit() and
+                    last_3_texts[2] == ')'):
+
+                    logger.debug(f"[Equation] Found pandoc number pattern at end: {last_3_texts} - removing last 3 runs")
+                    # Remove the last 3 math runs
+                    for m_run in math_runs[-3:]:
+                        m_run.getparent().remove(m_run)
+                else:
+                    logger.debug(f"[Equation] No pandoc number pattern found at end")
+            else:
+                logger.debug(f"[Equation] Not enough math runs to contain pandoc number pattern")
+
+        # Also check for numbers in regular text runs outside oMath (fallback)
         runs = p_element.findall('.//w:r', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
         pandoc_number_run = None
 
         for run in runs:
+            # Skip runs that contain math elements (oMath) - we already handled those
+            if run.find('.//m:oMath', namespaces={'m': 'http://schemas.openxmlformats.org/officeDocument/2006/math'}):
+                continue
+
             t_elements = run.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
             for t_elem in t_elements:
-                if t_elem.text and re.match(r'^\(\d+\)$', t_elem.text.strip()):
-                    # Found pandoc-crossref's equation number
-                    pandoc_number_run = run
-                    break
+                if t_elem.text:
+                    text = t_elem.text.strip()
+                    # Match patterns like "(1)", " (1) ", "(2)", etc.
+                    if re.match(r'^\(?\s*\d+\s*\)?$', text):
+                        logger.debug(f"[Equation] Found pandoc number in regular run: '{t_elem.text}' in run")
+                        pandoc_number_run = run
+                        break
             if pandoc_number_run:
                 break
+
+        if not pandoc_number_run:
+            logger.debug(f"[Equation] No pandoc number found in regular runs for equation {self.semantic_id}")
 
         # Remove the old eq: bookmark if it exists
         old_bookmark_name = f"eq:{self.semantic_id}"

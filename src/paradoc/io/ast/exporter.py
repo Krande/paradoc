@@ -11,6 +11,27 @@ if TYPE_CHECKING:
     from paradoc import OneDoc
 
 
+def _reset_kaleido_scope():
+    """
+    Reset the kaleido scope to recover from communication errors.
+
+    This helps recover from choreographer JSONDecodeError issues where
+    the Chrome subprocess pipe has stale data from interrupted processes.
+    """
+    try:
+        import plotly.io as pio
+        if hasattr(pio, '_kaleido') and hasattr(pio._kaleido, 'scope'):
+            if pio._kaleido.scope:
+                logger.debug("Resetting kaleido scope to clear stale subprocess state")
+                try:
+                    pio._kaleido.scope.__exit__(None, None, None)
+                except Exception:
+                    pass
+                pio._kaleido.scope = None
+    except Exception as e:
+        logger.debug(f"Could not reset kaleido scope: {e}")
+
+
 class ASTExporter:
     """
     Exporter that builds a Pandoc JSON AST from the current OneDoc markdown sources
@@ -807,9 +828,45 @@ class ASTExporter:
 
                         # Convert figure to JSON-compatible dict
                         # Use plotly's to_json() then parse to ensure all numpy arrays are converted
+                        #
+                        # Retry logic for transient kaleido/choreographer errors:
+                        # Kaleido (plotly's image export library) uses choreographer to communicate
+                        # with a Chrome subprocess via pipes. Sometimes this communication fails with
+                        # JSONDecodeError when:
+                        # - Previous interrupted runs left stale data in the pipe
+                        # - Chrome subprocess is in a bad state
+                        # - First-time initialization hasn't completed
+                        # Solution: Retry with scope reset to reinitialize the subprocess
                         import plotly
+                        import time
 
-                        fig_json_str = plotly.io.to_json(fig)
+                        max_retries = 2
+                        retry_delay = 0.5
+                        fig_json_str = None
+                        last_error = None
+
+                        for attempt in range(max_retries):
+                            try:
+                                fig_json_str = plotly.io.to_json(fig)
+                                break
+                            except Exception as e:
+                                last_error = e
+                                error_msg = str(e)
+                                # Check if this is a choreographer/kaleido communication error
+                                if "choreographer" in error_msg.lower() or "JSONDecodeError" in str(type(e).__name__):
+                                    if attempt < max_retries - 1:
+                                        logger.warning(
+                                            f"Kaleido communication error for plot {key} (attempt {attempt + 1}/{max_retries}): {e}"
+                                        )
+                                        time.sleep(retry_delay)
+                                        # Reset kaleido scope to clear stale subprocess state
+                                        _reset_kaleido_scope()
+                                        continue
+                                raise
+
+                        if fig_json_str is None:
+                            raise last_error if last_error else Exception("Failed to convert figure to JSON")
+
                         fig_dict = json.loads(fig_json_str)
 
                         plot_data_dict[key] = {
