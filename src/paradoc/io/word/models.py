@@ -161,8 +161,13 @@ class DocXFigureRef:
         if self.figure_ref.reference:
             # Use ReferenceHelper if provided
             if reference_helper:
+                # Strip the "fig:" prefix from the reference if present
+                semantic_id = self.figure_ref.reference
+                if semantic_id.startswith("fig:"):
+                    semantic_id = semantic_id[4:]
+
                 # Register the figure and get Word-style bookmark
-                bookmark_name = reference_helper.register_figure(self.figure_ref.reference, self.docx_caption)
+                bookmark_name = reference_helper.register_figure(semantic_id, self.docx_caption)
                 self.actual_bookmark_name = bookmark_name
                 # Apply the bookmark to the caption paragraph
                 add_bookmark_around_seq_field(self.docx_caption, bookmark_name)
