@@ -222,6 +222,19 @@ class DocXEquationRef:
         eq_para = self.docx_equation
         p_element = eq_para._p
 
+        # Add vertical spacing above and below the equation
+        from docx.shared import Pt, Inches
+        from docx.enum.text import WD_TAB_ALIGNMENT
+
+        # Add spacing before and after the equation paragraph (6pt above and below)
+        eq_para.paragraph_format.space_before = Pt(6)
+        eq_para.paragraph_format.space_after = Pt(6)
+
+        # Set up a right-aligned tab stop for the equation number
+        # Standard Word page width with 1" margins on each side means ~6.5" content width
+        tab_stops = eq_para.paragraph_format.tab_stops
+        tab_stops.add_tab_stop(Inches(6.5), WD_TAB_ALIGNMENT.RIGHT)
+
         # Find and remove pandoc-crossref's equation number (e.g., "(1)", "(2)")
         # Pandoc-crossref places the number INSIDE the oMath element, typically in m:t elements
         # We need to find and remove those text elements that contain just a number
@@ -318,6 +331,11 @@ class DocXEquationRef:
         heading_ref = '"Appendix"' if is_appendix else '"Heading 1"'
 
         # Create runs for the caption
+        # First, add a tab to push the number to the right
+        tab_run_elem = p_element._new_r()
+        tab_elem = OxmlElement('w:tab')
+        tab_run_elem.append(tab_elem)
+
         # Opening parenthesis (OUTSIDE bookmark)
         open_paren_run_elem = p_element._new_r()
         t_elem = OxmlElement('w:t')
@@ -377,6 +395,7 @@ class DocXEquationRef:
         if insertion_point:
             # Replace pandoc's number with our caption
             # Insert all caption elements before the pandoc number run
+            insertion_point.addprevious(tab_run_elem)
             insertion_point.addprevious(open_paren_run_elem)
             insertion_point.addprevious(bookmark_start)
             insertion_point.addprevious(eq_label_run_elem)
@@ -389,6 +408,7 @@ class DocXEquationRef:
             insertion_point.getparent().remove(insertion_point)
         else:
             # No pandoc number found, append to end
+            p_element.append(tab_run_elem)
             p_element.append(open_paren_run_elem)
             p_element.append(bookmark_start)
             p_element.append(eq_label_run_elem)
