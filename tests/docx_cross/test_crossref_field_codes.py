@@ -322,18 +322,57 @@ Summary with references to all elements:
     print("REF FIELDS FOUND (Cross-references)")
     print("=" * 80)
     print(f"Total REF fields: {len(ref_fields)}")
-    print("Note: REF fields are typically created during Word COM field updates")
 
     if len(ref_fields) > 0:
         print("\nREF fields found:")
         for rf in ref_fields:
             print(f"  • Para {rf['para_idx']}: {rf['instr']}")
             print(f"    Context: {rf['para_text']}")
+    else:
+        print("\nWARNING: NO REF FIELDS FOUND!")
+        print("Cross-references are NOT being created as proper Word field codes.")
+        print("\nLet's examine what IS in the cross-reference paragraphs:")
+
+        # Check paragraphs that should have cross-references
+        xref_paragraphs = []
+        for para_idx, para in enumerate(paragraphs):
+            para_text = "".join([t.text for t in para.findall(".//w:t", nsmap) if t.text])
+            if any(marker in para_text.lower() for marker in ["as shown in", "compare", "relative to", "builds on"]):
+                xref_paragraphs.append({"para_idx": para_idx, "text": para_text})
+
+        print(f"\nFound {len(xref_paragraphs)} paragraphs with cross-reference text:")
+        for xref_para in xref_paragraphs[:5]:  # Show first 5
+            print(f"\n  Para {xref_para['para_idx']}: {xref_para['text'][:100]}")
+
+            # Check for hyperlinks
+            para = paragraphs[xref_para['para_idx']]
+            hyperlinks = para.findall(".//w:hyperlink", nsmap)
+            if hyperlinks:
+                print(f"    Contains {len(hyperlinks)} hyperlink(s)")
+                for hl in hyperlinks:
+                    anchor = hl.get("{%s}anchor" % nsmap["w"])
+                    hl_text = "".join([t.text for t in hl.findall(".//w:t", nsmap) if t.text])
+                    print(f"      - Hyperlink to '{anchor}': '{hl_text}'")
+            else:
+                print(f"    No hyperlinks found - likely plain text!")
 
     # STRICT ASSERTIONS FOR VALID WORD CROSS-REFERENCES
     print("\n" + "=" * 80)
     print("STRICT VERIFICATION - VALID WORD CROSS-REFERENCES")
     print("=" * 80)
+
+    # REQUIREMENT 0: Cross-references MUST be REF fields, not hyperlinks or plain text
+    # We have cross-references in the markdown ([@fig:trends], [@tbl:metrics], etc.)
+    # These MUST be converted to proper Word REF fields
+    expected_min_ref_fields = 8  # At minimum: 2 fig refs + 2 tbl refs in conclusions section
+    assert len(ref_fields) >= expected_min_ref_fields, (
+        f"CRITICAL: Expected at least {expected_min_ref_fields} REF fields for cross-references, "
+        f"but found {len(ref_fields)}.\n"
+        "Valid Word cross-references MUST use REF fields, not hyperlinks or plain text.\n"
+        "The document currently has hyperlinks or plain text instead of proper cross-reference fields.\n"
+        "This is NOT a valid Word document with proper cross-references."
+    )
+    print(f"✓ Found {len(ref_fields)} REF fields for cross-references")
 
     # REQUIREMENT 1: Every caption must have both STYLEREF and SEQ fields
     fig_captions = [c for c in caption_structures if c["label"] == "Figure"]

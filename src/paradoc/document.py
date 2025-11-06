@@ -362,7 +362,7 @@ class OneDoc:
 
         self.metadata_file = self.source_dir / "metadata.yaml" if metadata_file is None else pathlib.Path(metadata_file)
 
-        if self.metadata_file.exists() is False:
+        if not self.metadata_file.exists():
             with open(self.metadata_file, "w") as f:
                 # Use correct pandoc-crossref metadata format
                 # figureTitle and tableTitle are the proper settings for pandoc-crossref
