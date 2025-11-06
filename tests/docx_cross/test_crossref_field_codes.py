@@ -373,7 +373,7 @@ Summary with references to all elements:
         "The document currently has hyperlinks or plain text instead of proper cross-reference fields.\n"
         "This is NOT a valid Word document with proper cross-references."
     )
-    print(f"✓ Found {len(ref_fields)} REF fields for cross-references")
+    print(f"[OK] Found {len(ref_fields)} REF fields for cross-references")
 
     # REQUIREMENT 1: Every caption must have both STYLEREF and SEQ fields
     fig_captions = [c for c in caption_structures if c["label"] == "Figure"]
@@ -381,7 +381,7 @@ Summary with references to all elements:
 
     assert len(fig_captions) >= 2, f"Expected at least 2 figure captions, found {len(fig_captions)}"
     assert len(tbl_captions) >= 2, f"Expected at least 2 table captions, found {len(tbl_captions)}"
-    print(f"✓ Found {len(fig_captions)} figure captions and {len(tbl_captions)} table captions")
+    print(f"[OK] Found {len(fig_captions)} figure captions and {len(tbl_captions)} table captions")
 
     # Verify every caption has BOTH STYLEREF and SEQ fields
     for cap in fig_captions + tbl_captions:
@@ -397,7 +397,7 @@ Summary with references to all elements:
             f"Caption at para {cap['para_idx']} MISSING hyphen separator. "
             f"Valid Word captions use format 'Label STYLEREF-SEQ: Text'. Caption: {cap['para_text']}"
         )
-    print("✓ All captions have required STYLEREF and SEQ fields with hyphen separator")
+    print("[OK] All captions have required STYLEREF and SEQ fields with hyphen separator")
 
     # REQUIREMENT 2: SEQ fields must have correct structure
     assert len(fig_seq_fields) >= 2, (
@@ -408,7 +408,7 @@ Summary with references to all elements:
         f"Expected at least 2 Table SEQ fields, found {len(tbl_seq_fields)}. "
         "SEQ fields MUST be created in table captions."
     )
-    print(f"✓ Found {len(fig_seq_fields)} Figure SEQ fields and {len(tbl_seq_fields)} Table SEQ fields")
+    print(f"[OK] Found {len(fig_seq_fields)} Figure SEQ fields and {len(tbl_seq_fields)} Table SEQ fields")
 
     # REQUIREMENT 3: SEQ fields must have ARABIC numbering and \s switch for chapter-based numbering
     for sf in seq_fields:
@@ -418,7 +418,7 @@ Summary with references to all elements:
         assert "\\s 1" in sf["instr"] or "\\s1" in sf["instr"], (
             f"SEQ field MUST have \\s 1 switch for chapter-based numbering. Found: {sf['instr']}"
         )
-    print("✓ All SEQ fields have ARABIC numbering and \\s 1 switch for chapter-based numbering")
+    print("[OK] All SEQ fields have ARABIC numbering and \\s 1 switch for chapter-based numbering")
 
     # REQUIREMENT 4: First SEQ field of each type must have \r 1 to restart numbering
     # Find first figure and table SEQ fields
@@ -428,7 +428,7 @@ Summary with references to all elements:
             f"First Figure SEQ field MUST have \\r 1 switch to initialize numbering. "
             f"Found: {first_fig_seq['instr']}"
         )
-        print("✓ First Figure SEQ field has \\r 1 switch to initialize numbering")
+        print("[OK] First Figure SEQ field has \\r 1 switch to initialize numbering")
 
     if len(tbl_seq_fields) > 0:
         first_tbl_seq = min(tbl_seq_fields, key=lambda x: x["para_idx"])
@@ -436,7 +436,7 @@ Summary with references to all elements:
             f"First Table SEQ field MUST have \\r 1 switch to initialize numbering. "
             f"Found: {first_tbl_seq['instr']}"
         )
-        print("✓ First Table SEQ field has \\r 1 switch to initialize numbering")
+        print("[OK] First Table SEQ field has \\r 1 switch to initialize numbering")
 
     # REQUIREMENT 5: SEQ fields use correct identifiers
     for sf in fig_seq_fields:
@@ -447,7 +447,7 @@ Summary with references to all elements:
         assert "Table" in sf["instr"], (
             f"Table SEQ field MUST use 'Table' identifier. Found: {sf['instr']}"
         )
-    print("✓ SEQ fields use correct identifiers (Figure, Table)")
+    print("[OK] SEQ fields use correct identifiers (Figure, Table)")
 
     # REQUIREMENT 6: STYLEREF fields must reference appropriate heading styles
     for sf in styleref_fields:
@@ -463,15 +463,15 @@ Summary with references to all elements:
         assert "\\s" in sf["instr"], (
             f"STYLEREF field MUST have \\s switch. Found: {sf['instr']}"
         )
-    print(f"✓ All {len(styleref_fields)} STYLEREF fields reference correct heading styles with \\s switch")
+    print(f"[OK] All {len(styleref_fields)} STYLEREF fields reference correct heading styles with \\s switch")
 
     print("\n" + "=" * 80)
     print("TEST PASSED - ALL STRICT REQUIREMENTS MET")
     print("=" * 80)
-    print(f"✓ Valid Word caption structure with STYLEREF and SEQ fields")
-    print(f"✓ Proper field switches (\\s 1 for chapter numbering, \\r 1 for initialization)")
-    print(f"✓ Correct identifiers and heading style references")
-    print(f"✓ Tested across {len(fig_captions)} figures and {len(tbl_captions)} tables in multiple sections")
+    print(f"[OK] Valid Word caption structure with STYLEREF and SEQ fields")
+    print(f"[OK] Proper field switches (\\s 1 for chapter numbering, \\r 1 for initialization)")
+    print(f"[OK] Correct identifiers and heading style references")
+    print(f"[OK] Tested across {len(fig_captions)} figures and {len(tbl_captions)} tables in multiple sections")
 
 
 def extract_docx_xml(docx_path: Path, output_dir: Path):

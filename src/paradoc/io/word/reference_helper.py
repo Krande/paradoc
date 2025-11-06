@@ -1285,8 +1285,9 @@ class ReferenceHelper:
     def extract_all_equations(self, document, is_appendix: bool):
         """Extract all equations from the document and create DocXEquationRef objects.
 
-        This method scans the document for equation bookmarks/captions and creates
-        DocXEquationRef instances.
+        This method scans the document for equation bookmarks and creates
+        DocXEquationRef instances. Equations in Word are math objects (oMath elements)
+        with eq: bookmarks.
 
         Args:
             document: The Word document to scan
@@ -1301,7 +1302,7 @@ class ReferenceHelper:
 
         equations = []
 
-        # Scan for equation bookmarks in captions
+        # Scan for equation bookmarks (eq:* bookmarks on paragraphs containing oMath elements)
         for i, block in enumerate(iter_block_items(document)):
             if not isinstance(block, Paragraph):
                 continue
@@ -1313,29 +1314,29 @@ class ReferenceHelper:
 
             for bm_start in bookmark_starts:
                 bm_name = bm_start.get(qn('w:name'))
-                if not bm_name:
+                if not bm_name or not bm_name.startswith('eq:'):
                     continue
 
-                # Check if this paragraph has a hyperlink with an eq: anchor
-                hyperlinks_in_para = p_element.findall('.//w:hyperlink', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+                # This is an equation bookmark - extract the semantic ID
+                semantic_id = bm_name[3:]  # Remove "eq:" prefix
 
-                for hl in hyperlinks_in_para:
-                    anchor = hl.get(qn('w:anchor'))
-                    if not anchor or not anchor.startswith('eq:'):
-                        continue
+                # Check if this paragraph contains math (oMath element)
+                # Math elements use namespace http://schemas.openxmlformats.org/officeDocument/2006/math
+                math_elements = p_element.findall('.//m:oMath', namespaces={'m': 'http://schemas.openxmlformats.org/officeDocument/2006/math'})
 
-                    semantic_id = anchor[3:]  # Remove "eq:" prefix
-
+                if math_elements:
+                    # This is an equation paragraph
                     current_eq = DocXEquationRef()
                     current_eq.semantic_id = semantic_id
-                    current_eq.docx_caption = block
+                    current_eq.docx_equation = block  # The paragraph containing the math
+                    current_eq.docx_caption = None  # No caption yet - we'll create one
                     current_eq.document_index = i
                     current_eq.is_appendix = is_appendix
                     current_eq.actual_bookmark_name = bm_name
                     equations.append(current_eq)
 
-                    logger.debug(f"[ReferenceHelper]   Found equation: {semantic_id} (bookmark: {bm_name})")
-                    break  # Only one equation per caption paragraph
+                    logger.debug(f"[ReferenceHelper]   Found equation: {semantic_id} (bookmark: {bm_name}) at para {i}")
+                    break  # Only one equation per paragraph
 
         logger.info(f"[ReferenceHelper] Extracted {len(equations)} equations from {'appendix' if is_appendix else 'main'} document")
         return equations
