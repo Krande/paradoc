@@ -3,9 +3,8 @@ from __future__ import annotations
 import os
 import pathlib
 import shutil
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import chain
-from typing import Callable, Dict, Iterable, Optional, Tuple
+from typing import Callable, Dict, Iterable, Optional
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -39,65 +38,6 @@ if TYPE_CHECKING:
     from .io.pdf.exporter import PdfExporter
     from .io.word.exporter import WordExporter
 
-def _render_plot_worker(args: Tuple) -> Tuple[str, bool, Optional[str]]:
-    """
-    Worker function for parallel plot rendering.
-
-    This is a module-level function to ensure it can be pickled for multiprocessing.
-    Fetches plot data from database within the worker to avoid pickling large objects.
-
-    Args:
-        args: Tuple of (cache_key, key_clean, db_path_str, cache_png_str, cache_timestamp_str, width, height, db_timestamp)
-
-    Returns:
-        Tuple of (cache_key, success, error_message)
-    """
-    cache_key, key_clean, db_path_str, cache_png_str, cache_timestamp_str, width, height, db_timestamp = args
-
-    try:
-        from pathlib import Path
-        from .db import DbManager
-        from .db.plot_renderer import PlotRenderer
-
-        # Fetch plot data from database within worker thread
-        db_path = Path(db_path_str)
-        db_manager = DbManager(db_path)
-
-        result = db_manager.get_plot_with_timestamp(key_clean)
-        if result is None:
-            return (cache_key, False, f"Plot {key_clean} not found in database")
-
-        plot_data, _ = result
-
-        # Create renderer
-        renderer = PlotRenderer()
-
-        # Create figure
-        fig = renderer._create_figure(plot_data)
-
-        # Apply size
-        fig.update_layout(width=width, height=height)
-
-        # Convert path strings back to Path objects
-        cache_png = Path(cache_png_str)
-        cache_timestamp = Path(cache_timestamp_str)
-
-        # Write image
-        try:
-            fig.write_image(str(cache_png), format="png")
-        except Exception:
-            # Fallback to ensure chrome is initialized
-            from plotly.io._kaleido import get_chrome
-            get_chrome()
-            fig.write_image(str(cache_png), format="png")
-
-        # Write timestamp
-        cache_timestamp.write_text(str(db_timestamp), encoding="utf-8")
-
-        return (cache_key, True, None)
-    except Exception as e:
-        import traceback
-        return (cache_key, False, f"{str(e)}\n{traceback.format_exc()}")
 
 
 class OneDoc:
@@ -678,17 +618,18 @@ class OneDoc:
 
     def _collect_and_render_plots_parallel(self, max_workers: Optional[int] = None):
         """
-        Collect all plots that need rendering and render them in parallel.
+        Collect all plots that need rendering and render them using batch write_images.
 
-        This pre-renders plots before variable substitution to speed up the process.
+        This pre-renders plots before variable substitution using plotly.io.write_images
+        which batches the processing and is much faster than rendering one at a time.
 
         Args:
-            max_workers: Maximum number of worker processes. If None, uses cpu_count().
+            max_workers: Unused parameter kept for API compatibility
         """
-        logger.info("Collecting plots for parallel rendering")
+        logger.info("Collecting plots for batch rendering")
 
-        # Dictionary to track which plots need rendering: key -> (plot_data, db_timestamp, annotation, width, height)
-        plots_to_render = {}
+        # Lists to collect plot data for batch rendering
+        plots_to_render = []  # List of (cache_key, plot_data, width, height, cache_png, cache_timestamp, db_timestamp, key_clean)
 
         # Cache directory for rendered plots
         cache_dir = self.work_dir / ".paradoc_cache" / "rendered_plots"
@@ -759,47 +700,77 @@ class OneDoc:
                     except Exception:
                         pass
 
-                # Only render if cache is invalid
-                if not cache_valid and cache_key not in plots_to_render:
-                    plots_to_render[cache_key] = (plot_data, db_timestamp, width, height, cache_png, cache_timestamp, key_clean)
+                # Only render if cache is invalid and not already in list
+                if not cache_valid and not any(p[0] == cache_key for p in plots_to_render):
+                    plots_to_render.append((cache_key, plot_data, width, height, cache_png, cache_timestamp, db_timestamp, key_clean))
 
         if not plots_to_render:
             logger.info("No plots need rendering (all cached)")
             return
 
-        logger.info(f"Rendering {len(plots_to_render)} plots in parallel")
+        logger.info(f"Rendering {len(plots_to_render)} plots using batch write_images")
 
-        # Get database path as string for passing to workers
-        db_path_str = str(self.db_manager.db_path)
+        # Prepare lists for batch rendering
+        figures = []
+        file_paths = []
+        cache_keys = []
+        timestamps_to_write = []
 
-        # Prepare arguments for parallel rendering - pass minimal data to avoid pickling overhead
-        render_args = []
-        for cache_key, (plot_data, db_timestamp, width, height, cache_png, cache_timestamp, key_clean) in plots_to_render.items():
-            render_args.append((
-                cache_key,
-                key_clean,  # Worker will fetch plot data from DB using this key
-                db_path_str,
-                str(cache_png),
-                str(cache_timestamp),
-                width,
-                height,
-                db_timestamp
-            ))
+        for cache_key, plot_data, width, height, cache_png, cache_timestamp, db_timestamp, key_clean in plots_to_render:
+            try:
+                # Create figure
+                fig = self.plot_renderer._create_figure(plot_data)
 
-        # Render plots in parallel using threads (better for I/O-bound Kaleido subprocess calls)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(_render_plot_worker, args): args[0] for args in render_args}
+                # Apply size
+                fig.update_layout(width=width, height=height)
 
-            for future in as_completed(futures):
-                cache_key = futures[future]
+                # Add to batch lists
+                figures.append(fig)
+                file_paths.append(str(cache_png))
+                cache_keys.append(cache_key)
+                timestamps_to_write.append((cache_timestamp, db_timestamp))
+
+            except Exception as e:
+                logger.error(f'Failed to create figure for plot "{key_clean}": {e}')
+                continue
+
+        if not figures:
+            logger.warning("No figures could be created for batch rendering")
+            return
+
+        # Batch render all plots using write_images
+        try:
+            import plotly.io as pio
+
+            # Initialize kaleido once before batch processing
+            try:
+                pio.write_images(fig=figures, file=file_paths, format="png")
+            except Exception:
+                # Fallback to ensure chrome is initialized
+                from plotly.io._kaleido import get_chrome
+                get_chrome()
+                pio.write_images(fig=figures, file=file_paths, format="png")
+
+            # Write timestamp files after successful batch rendering
+            for i, (cache_timestamp, db_timestamp) in enumerate(timestamps_to_write):
                 try:
-                    result_key, success, error = future.result()
-                    if success:
-                        logger.info(f'Rendered and cached plot "{result_key}"')
-                    else:
-                        logger.error(f'Failed to render plot "{result_key}": {error}')
+                    cache_timestamp.write_text(str(db_timestamp), encoding="utf-8")
+                    logger.info(f'Rendered and cached plot "{cache_keys[i]}"')
                 except Exception as e:
-                    logger.error(f'Exception rendering plot "{cache_key}": {e}')
+                    logger.error(f'Failed to write timestamp for "{cache_keys[i]}": {e}')
+
+        except Exception as e:
+            logger.error(f'Batch rendering failed: {e}')
+            # Fall back to individual rendering if batch fails
+            logger.info("Falling back to individual plot rendering")
+            for i, fig in enumerate(figures):
+                try:
+                    fig.write_image(file_paths[i], format="png")
+                    cache_timestamp, db_timestamp = timestamps_to_write[i]
+                    cache_timestamp.write_text(str(db_timestamp), encoding="utf-8")
+                    logger.info(f'Rendered and cached plot "{cache_keys[i]}"')
+                except Exception as e_individual:
+                    logger.error(f'Failed to render plot "{cache_keys[i]}": {e_individual}')
 
     def _perform_variable_substitution(self):
         """Perform variable substitution in markdown files.
