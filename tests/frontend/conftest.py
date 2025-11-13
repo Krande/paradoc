@@ -8,22 +8,6 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
 
 
-def pytest_addoption(parser):
-    """Add custom command line options for Playwright tests."""
-    parser.addoption(
-        "--pw-watch",
-        action="store_true",
-        default=False,
-        help="Run Playwright tests with visual feedback (non-headless mode)",
-    )
-    parser.addoption(
-        "--pw-duration",
-        action="store",
-        default="2",
-        help="Duration in seconds to keep browser visible after each test (default: 2)",
-    )
-
-
 @pytest.fixture(scope="session", autouse=True)
 def ensure_playwright_installed():
     """Ensure Playwright browsers are installed before running tests."""
