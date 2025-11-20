@@ -7,7 +7,6 @@ from docx import Document
 
 from paradoc import OneDoc
 
-
 auto_open = os.getenv("AUTO_OPEN", False)
 
 
@@ -208,6 +207,7 @@ And here it is again:
 
     # Add table to database
     import pandas as pd
+
     from paradoc.db import dataframe_to_table_data
 
     df = pd.DataFrame({"Item": ["A", "B", "C"], "Value": [10, 20, 15]})

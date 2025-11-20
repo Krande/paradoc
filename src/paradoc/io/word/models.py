@@ -209,11 +209,12 @@ class DocXEquationRef:
             reference_helper: Optional ReferenceHelper instance for managing cross-references
         """
         import re
+
         from docx.oxml import OxmlElement
         from docx.oxml.ns import qn
 
-        from .fields import add_seq_reference
         from .bookmarks import generate_word_bookmark_name
+        from .fields import add_seq_reference
 
         if not self.docx_equation or not self.semantic_id:
             return
@@ -223,8 +224,8 @@ class DocXEquationRef:
         p_element = eq_para._p
 
         # Add vertical spacing above and below the equation
-        from docx.shared import Pt, Inches
         from docx.enum.text import WD_TAB_ALIGNMENT
+        from docx.shared import Inches, Pt
 
         # Add spacing before and after the equation paragraph (6pt above and below)
         eq_para.paragraph_format.space_before = Pt(6)
@@ -244,11 +245,15 @@ class DocXEquationRef:
         # Look for the number inside oMath elements
         # The structure is typically: oMath > ... > m:r > m:t with text like "(1)"
         # Pandoc-crossref places this at the VERY END of the math element
-        math_elements = p_element.findall('.//m:oMath', namespaces={'m': 'http://schemas.openxmlformats.org/officeDocument/2006/math'})
+        math_elements = p_element.findall(
+            ".//m:oMath", namespaces={"m": "http://schemas.openxmlformats.org/officeDocument/2006/math"}
+        )
 
         for math_elem in math_elements:
             # Find all m:r (math runs) within this oMath
-            math_runs = math_elem.findall('.//m:r', namespaces={'m': 'http://schemas.openxmlformats.org/officeDocument/2006/math'})
+            math_runs = math_elem.findall(
+                ".//m:r", namespaces={"m": "http://schemas.openxmlformats.org/officeDocument/2006/math"}
+            )
 
             logger.debug(f"[Equation] Found {len(math_runs)} math runs in oMath element")
 
@@ -258,44 +263,54 @@ class DocXEquationRef:
                 # Extract text from last 3 runs
                 last_3_texts = []
                 for m_run in math_runs[-3:]:
-                    m_t = m_run.find('.//m:t', namespaces={'m': 'http://schemas.openxmlformats.org/officeDocument/2006/math'})
+                    m_t = m_run.find(
+                        ".//m:t", namespaces={"m": "http://schemas.openxmlformats.org/officeDocument/2006/math"}
+                    )
                     if m_t is not None and m_t.text:
                         last_3_texts.append(m_t.text.strip())
                     else:
-                        last_3_texts.append('')
+                        last_3_texts.append("")
 
                 logger.debug(f"[Equation] Last 3 math run texts: {last_3_texts}")
 
                 # Check if pattern is: '(', digit, ')'
-                if (len(last_3_texts) == 3 and
-                    last_3_texts[0] == '(' and
-                    last_3_texts[1].isdigit() and
-                    last_3_texts[2] == ')'):
+                if (
+                    len(last_3_texts) == 3
+                    and last_3_texts[0] == "("
+                    and last_3_texts[1].isdigit()
+                    and last_3_texts[2] == ")"
+                ):
 
-                    logger.debug(f"[Equation] Found pandoc number pattern at end: {last_3_texts} - removing last 3 runs")
+                    logger.debug(
+                        f"[Equation] Found pandoc number pattern at end: {last_3_texts} - removing last 3 runs"
+                    )
                     # Remove the last 3 math runs
                     for m_run in math_runs[-3:]:
                         m_run.getparent().remove(m_run)
                 else:
-                    logger.debug(f"[Equation] No pandoc number pattern found at end")
+                    logger.debug("[Equation] No pandoc number pattern found at end")
             else:
-                logger.debug(f"[Equation] Not enough math runs to contain pandoc number pattern")
+                logger.debug("[Equation] Not enough math runs to contain pandoc number pattern")
 
         # Also check for numbers in regular text runs outside oMath (fallback)
-        runs = p_element.findall('.//w:r', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+        runs = p_element.findall(
+            ".//w:r", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        )
         pandoc_number_run = None
 
         for run in runs:
             # Skip runs that contain math elements (oMath) - we already handled those
-            if run.find('.//m:oMath', namespaces={'m': 'http://schemas.openxmlformats.org/officeDocument/2006/math'}):
+            if run.find(".//m:oMath", namespaces={"m": "http://schemas.openxmlformats.org/officeDocument/2006/math"}):
                 continue
 
-            t_elements = run.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+            t_elements = run.findall(
+                ".//w:t", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+            )
             for t_elem in t_elements:
                 if t_elem.text:
                     text = t_elem.text.strip()
                     # Match patterns like "(1)", " (1) ", "(2)", etc.
-                    if re.match(r'^\(?\s*\d+\s*\)?$', text):
+                    if re.match(r"^\(?\s*\d+\s*\)?$", text):
                         logger.debug(f"[Equation] Found pandoc number in regular run: '{t_elem.text}' in run")
                         pandoc_number_run = run
                         break
@@ -307,17 +322,21 @@ class DocXEquationRef:
 
         # Remove the old eq: bookmark if it exists
         old_bookmark_name = f"eq:{self.semantic_id}"
-        bookmark_starts = p_element.findall('.//w:bookmarkStart', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
-        bookmark_ends = p_element.findall('.//w:bookmarkEnd', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+        bookmark_starts = p_element.findall(
+            ".//w:bookmarkStart", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        )
+        bookmark_ends = p_element.findall(
+            ".//w:bookmarkEnd", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        )
 
         for bm_start in bookmark_starts:
-            if bm_start.get(qn('w:name')) == old_bookmark_name:
-                bm_id = bm_start.get(qn('w:id'))
+            if bm_start.get(qn("w:name")) == old_bookmark_name:
+                bm_id = bm_start.get(qn("w:id"))
                 # Remove this bookmark start
                 bm_start.getparent().remove(bm_start)
                 # Remove matching bookmark end
                 for bm_end in bookmark_ends:
-                    if bm_end.get(qn('w:id')) == bm_id:
+                    if bm_end.get(qn("w:id")) == bm_id:
                         bm_end.getparent().remove(bm_end)
                         break
                 break
@@ -333,13 +352,13 @@ class DocXEquationRef:
         # Create runs for the caption
         # First, add a tab to push the number to the right
         tab_run_elem = p_element._new_r()
-        tab_elem = OxmlElement('w:tab')
+        tab_elem = OxmlElement("w:tab")
         tab_run_elem.append(tab_elem)
 
         # Opening parenthesis (OUTSIDE bookmark)
         open_paren_run_elem = p_element._new_r()
-        t_elem = OxmlElement('w:t')
-        t_elem.text = '('
+        t_elem = OxmlElement("w:t")
+        t_elem.text = "("
         open_paren_run_elem.append(t_elem)
 
         # Use ReferenceHelper if provided to get Word-style bookmark
@@ -352,15 +371,17 @@ class DocXEquationRef:
             bookmark_id_str = str(random.randint(1, 999999))
 
         # Bookmark start
-        bookmark_start = OxmlElement('w:bookmarkStart')
-        bookmark_start.set(qn('w:id'), bookmark_id_str if 'bookmark_id_str' in locals() else str(random.randint(1, 999999)))
-        bookmark_start.set(qn('w:name'), bookmark_name)
+        bookmark_start = OxmlElement("w:bookmarkStart")
+        bookmark_start.set(
+            qn("w:id"), bookmark_id_str if "bookmark_id_str" in locals() else str(random.randint(1, 999999))
+        )
+        bookmark_start.set(qn("w:name"), bookmark_name)
 
         # "Eq. " text
         eq_label_run_elem = p_element._new_r()
-        t_elem = OxmlElement('w:t')
-        t_elem.set(qn('xml:space'), 'preserve')
-        t_elem.text = 'Eq. '
+        t_elem = OxmlElement("w:t")
+        t_elem.set(qn("xml:space"), "preserve")
+        t_elem.text = "Eq. "
         eq_label_run_elem.append(t_elem)
 
         # STYLEREF field for chapter number
@@ -369,27 +390,27 @@ class DocXEquationRef:
 
         # Hyphen separator
         hyphen_run_elem = p_element._new_r()
-        t_elem = OxmlElement('w:t')
-        t_elem.text = '-'
+        t_elem = OxmlElement("w:t")
+        t_elem.text = "-"
         hyphen_run_elem.append(t_elem)
 
         # SEQ field for equation number
         if restart_caption_numbering:
-            seq_instruction = f"SEQ Equation \\* ARABIC \\r 1 \\s 1"
+            seq_instruction = "SEQ Equation \\* ARABIC \\r 1 \\s 1"
         else:
-            seq_instruction = f"SEQ Equation \\* ARABIC \\s 1"
+            seq_instruction = "SEQ Equation \\* ARABIC \\s 1"
 
         seq_run_elem = p_element._new_r()
         add_seq_reference(seq_run_elem, seq_instruction, eq_para)
 
         # Bookmark end (wraps "Eq. 1-1" without parentheses)
-        bookmark_end = OxmlElement('w:bookmarkEnd')
-        bookmark_end.set(qn('w:id'), bookmark_start.get(qn('w:id')))
+        bookmark_end = OxmlElement("w:bookmarkEnd")
+        bookmark_end.set(qn("w:id"), bookmark_start.get(qn("w:id")))
 
         # Closing parenthesis (OUTSIDE bookmark)
         close_paren_run_elem = p_element._new_r()
-        t_elem = OxmlElement('w:t')
-        t_elem.text = ')'
+        t_elem = OxmlElement("w:t")
+        t_elem.text = ")"
         close_paren_run_elem.append(t_elem)
 
         if insertion_point:
@@ -417,4 +438,3 @@ class DocXEquationRef:
             p_element.append(seq_run_elem)
             p_element.append(bookmark_end)
             p_element.append(close_paren_run_elem)
-

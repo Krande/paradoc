@@ -1,8 +1,10 @@
-from argparse import ArgumentParser
-from docx import Document
-from paradoc.io.word.compose.composer import Composer
 import os.path
 import sys
+from argparse import ArgumentParser
+
+from docx import Document
+
+from paradoc.io.word.compose.composer import Composer
 
 
 def setup_parser():

@@ -122,7 +122,7 @@ def add_ref_field_to_paragraph(paragraph: Paragraph, bookmark_name: str, label: 
     r3.append(fldChar3)
 
     # Create field result (placeholder)
-    run4 = paragraph.add_run(f"{label} 1")
+    paragraph.add_run(f"{label} 1")
 
     # Create field end
     run5 = paragraph.add_run()

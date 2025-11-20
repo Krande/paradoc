@@ -1,5 +1,8 @@
+import re
 from copy import deepcopy
 from datetime import datetime
+from pathlib import Path
+
 from docx.opc.constants import CONTENT_TYPE as CT
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.opc.oxml import serialize_part_xml
@@ -7,16 +10,10 @@ from docx.opc.packuri import PackURI
 from docx.opc.part import Part
 from docx.oxml import parse_xml
 from docx.oxml.coreprops import CT_CoreProperties
-from paradoc.io.word.compose.utils import NS
-from paradoc.io.word.compose.utils import word_to_python_date_format
-from paradoc.io.word.compose.utils import xpath
-from lxml.etree import FunctionNamespace
-from lxml.etree import QName
-from six import binary_type
-from six import text_type
-import re
-from pathlib import Path
+from lxml.etree import FunctionNamespace, QName
+from six import binary_type, text_type
 
+from paradoc.io.word.compose.utils import NS, word_to_python_date_format, xpath
 
 CUSTOM_PROPERTY_FMTID = "{D5CDD505-2E9C-101B-9397-08002B2CF9AE}"
 CUSTOM_PROPERTY_TYPES = {

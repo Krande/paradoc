@@ -1,5 +1,4 @@
 from paradoc import OneDoc
-from paradoc.io.ast.exporter import ASTExporter
 
 
 def test_build_ast_and_slice_sections(files_dir, tmp_path):

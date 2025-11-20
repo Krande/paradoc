@@ -185,7 +185,6 @@ def test_table_toggle_between_static_and_interactive(
 ):
     """Test switching between static and interactive table modes."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.io.ast.exporter import ASTExporter
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)
@@ -422,7 +421,6 @@ def test_table_interactive_sorting(doc_with_table, page, wait_for_frontend, fron
 def test_table_static_mode_shows_html_table(doc_with_table, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that Static mode shows a static HTML table."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.io.ast.exporter import ASTExporter
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_table, host="localhost", port=13579)

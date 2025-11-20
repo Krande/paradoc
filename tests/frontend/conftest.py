@@ -1,11 +1,12 @@
 """Pytest configuration for frontend tests."""
 
-import pytest
-import time
 import subprocess
 import sys
+import time
 from pathlib import Path
-from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
+
+import pytest
+from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -124,9 +125,10 @@ def ws_server():
     Start WebSocket server in a background thread for the test session.
     This approach is more reliable in CI environments than subprocess spawning.
     """
-    import threading
     import logging
-    from paradoc.frontend.ws_server import run_server, ping_ws_server
+    import threading
+
+    from paradoc.frontend.ws_server import ping_ws_server, run_server
 
     logger = logging.getLogger("paradoc.ws_server")
     host = "localhost"

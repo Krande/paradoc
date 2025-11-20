@@ -7,9 +7,10 @@ from docx.table import Table as DocxTable
 from paradoc.common import MY_DOCX_TMPL, MY_DOCX_TMPL_BLANK, ExportFormats
 from paradoc.config import logger
 from paradoc.document import OneDoc
-from paradoc.io.word.com_api.com_utils import docx_update, close_word_docs_by_name
+from paradoc.io.word.com_api.com_utils import close_word_docs_by_name, docx_update
+
 from .formatting import fix_headers_after_compose, format_paragraphs_and_headings
-from .models import DocXFigureRef, DocXTableRef, DocXEquationRef
+from .models import DocXFigureRef, DocXTableRef
 from .reference_helper import ReferenceHelper
 from .utils import (
     add_to_composer,
@@ -98,7 +99,14 @@ class WordExporter:
                 ExportFormats.DOCX,
                 outputfile=str(mdf.new_file),
                 format="markdown",
-                extra_args=["-M2GB", "+RTS", "-K64m", "-RTS", resource_paths, f"--metadata-file={one_doc.metadata_file}"],
+                extra_args=[
+                    "-M2GB",
+                    "+RTS",
+                    "-K64m",
+                    "-RTS",
+                    resource_paths,
+                    f"--metadata-file={one_doc.metadata_file}",
+                ],
                 filters=["pandoc-crossref"],
                 sandbox=False,
             )
@@ -135,32 +143,32 @@ class WordExporter:
         logger.info("[WordExporter] Formatting tables")
         for i, docx_tbl in enumerate(main_tables):
             # No longer need substitute_back_temp_var() - using bookmark-based identification
-            restart_caption_num = (i == 0)  # Restart numbering for first table
+            restart_caption_num = i == 0  # Restart numbering for first table
             docx_tbl.format_table(False, restart_caption_numbering=restart_caption_num, reference_helper=ref_helper)
 
         for i, docx_tbl in enumerate(app_tables):
             # No longer need substitute_back_temp_var() - using bookmark-based identification
-            restart_caption_num = (i == 0)  # Restart numbering for first appendix table
+            restart_caption_num = i == 0  # Restart numbering for first appendix table
             docx_tbl.format_table(True, restart_caption_numbering=restart_caption_num, reference_helper=ref_helper)
 
         # Format figures
         logger.info("[WordExporter] Formatting figures")
         for i, docx_fig in enumerate(main_figures):
-            restart_caption_num = (i == 0)  # Restart numbering for first figure
+            restart_caption_num = i == 0  # Restart numbering for first figure
             docx_fig.format_figure(False, restart_caption_num, reference_helper=ref_helper)
 
         for i, docx_fig in enumerate(app_figures):
-            restart_caption_num = (i == 0)  # Restart numbering for first appendix figure
+            restart_caption_num = i == 0  # Restart numbering for first appendix figure
             docx_fig.format_figure(True, restart_caption_num, reference_helper=ref_helper)
 
         # Format equations
         logger.info("[WordExporter] Formatting equations")
         for i, docx_eq in enumerate(main_equations):
-            restart_caption_num = (i == 0)  # Restart numbering for first equation
+            restart_caption_num = i == 0  # Restart numbering for first equation
             docx_eq.format_equation(False, restart_caption_numbering=restart_caption_num, reference_helper=ref_helper)
 
         for i, docx_eq in enumerate(app_equations):
-            restart_caption_num = (i == 0)  # Restart numbering for first appendix equation
+            restart_caption_num = i == 0  # Restart numbering for first appendix equation
             docx_eq.format_equation(True, restart_caption_numbering=restart_caption_num, reference_helper=ref_helper)
 
         logger.info(

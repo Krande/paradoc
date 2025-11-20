@@ -1,10 +1,11 @@
 """Test frontend rendering of interactive plots using Playwright."""
 
-import pytest
 from pathlib import Path
+from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
-from unittest.mock import patch
+import pytest
 
 from paradoc import OneDoc
 from paradoc.db import dataframe_to_plot_data
@@ -117,7 +118,6 @@ def test_plot_toggle_between_static_and_interactive(
 ):
     """Test switching between static and interactive plot modes."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.io.ast.exporter import ASTExporter
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_plot, host="localhost", port=13579)
@@ -180,7 +180,6 @@ def test_plot_toggle_between_static_and_interactive(
 def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that Interactive mode loads and renders a Plotly plot."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.io.ast.exporter import ASTExporter
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_plot, host="localhost", port=13579)
@@ -232,7 +231,6 @@ def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_fronte
 def test_plot_static_mode_shows_image(doc_with_plot, page, wait_for_frontend, frontend_resources_dir, ws_server):
     """Test that Static mode shows a static image instead of interactive plot."""
     from paradoc.frontend.frontend_handler import FrontendHandler
-    from paradoc.io.ast.exporter import ASTExporter
 
     # Use FrontendHandler to extract frontend without opening browser
     frontend_handler = FrontendHandler(doc_with_plot, host="localhost", port=13579)

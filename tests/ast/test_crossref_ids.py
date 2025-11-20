@@ -1,7 +1,6 @@
 """Test that cross-reference IDs for figures, tables, and equations are properly exported in the AST."""
 
 from paradoc import OneDoc
-from paradoc.io.ast.exporter import ASTExporter
 
 
 def find_blocks_by_type(blocks, block_type):

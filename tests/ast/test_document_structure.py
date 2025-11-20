@@ -1,9 +1,6 @@
 """Test the DocumentStructureExtractor on the doc_lorum example document."""
 
-import pytest
-
 from paradoc import OneDoc
-from paradoc.io.ast.document_structure import DocumentStructureExtractor
 
 
 def test_document_structure_basic(files_dir, tmp_path):
@@ -18,23 +15,24 @@ def test_document_structure_basic(files_dir, tmp_path):
     stats = structure.validate()
 
     # doc_lorum should have multiple sections
-    assert stats['total_sections'] > 0, f"Expected sections, found {stats['total_sections']}"
-    assert stats['root_sections'] > 0, f"Expected root sections, found {stats['root_sections']}"
+    assert stats["total_sections"] > 0, f"Expected sections, found {stats['total_sections']}"
+    assert stats["root_sections"] > 0, f"Expected root sections, found {stats['root_sections']}"
 
     # Should have figures, tables, and equations
-    assert stats['total_figures'] == 16, f"Expected 16 figures, found {stats['total_figures']}"
-    assert stats['total_tables'] == 11, f"Expected 11 tables, found {stats['total_tables']}"
-    assert stats['total_equations'] == 2, f"Expected 2 equations, found {stats['total_equations']}"
+    assert stats["total_figures"] == 16, f"Expected 16 figures, found {stats['total_figures']}"
+    assert stats["total_tables"] == 11, f"Expected 11 tables, found {stats['total_tables']}"
+    assert stats["total_equations"] == 2, f"Expected 2 equations, found {stats['total_equations']}"
 
     # Should have cross-references
-    assert stats['total_cross_references'] == 29, \
-        f"Expected 29 cross-references, found {stats['total_cross_references']}"
+    assert (
+        stats["total_cross_references"] == 29
+    ), f"Expected 29 cross-references, found {stats['total_cross_references']}"
 
     # Should have both main and appendix sections
-    assert stats['main_sections'] > 0, "Expected main sections"
-    assert stats['appendix_sections'] > 0, "Expected appendix sections"
+    assert stats["main_sections"] > 0, "Expected main sections"
+    assert stats["appendix_sections"] > 0, "Expected appendix sections"
 
-    print(f"\n[OK] Basic structure test passed!")
+    print("\n[OK] Basic structure test passed!")
     print(f"  Total sections: {stats['total_sections']}")
     print(f"  Root sections: {stats['root_sections']}")
     print(f"  Figures: {stats['total_figures']}")
@@ -78,16 +76,16 @@ def test_section_hierarchy(files_dir, tmp_path):
             # Main sections should have numeric numbering: 1, 1.1, 1.2, 2, etc.
             assert section.number, f"Section {section.title} should have a number"
             # Check that number contains only digits and dots
-            assert all(c.isdigit() or c == '.' for c in section.number), \
-                f"Main section number {section.number} should contain only digits and dots"
+            assert all(
+                c.isdigit() or c == "." for c in section.number
+            ), f"Main section number {section.number} should contain only digits and dots"
         else:
             # Appendix sections should have letter numbering: A, A.1, B, etc.
             assert section.number, f"Appendix section {section.title} should have a number"
             # First character should be a letter
-            assert section.number[0].isalpha(), \
-                f"Appendix section number {section.number} should start with a letter"
+            assert section.number[0].isalpha(), f"Appendix section number {section.number} should start with a letter"
 
-    print(f"\n[OK] Section hierarchy test passed!")
+    print("\n[OK] Section hierarchy test passed!")
     print(f"  Root sections: {len(structure.root_sections)}")
     for root in structure.root_sections:
         print(f"  Section {root.number}: {root.title} ({len(root.children)} children)")
@@ -112,16 +110,14 @@ def test_section_content(files_dir, tmp_path):
     assert total_paragraphs > 0, "Expected paragraphs in sections"
 
     # Figures, tables, and equations should match the totals
-    assert total_figures_in_sections == 16, \
-        f"Expected 16 figures in sections, found {total_figures_in_sections}"
-    assert total_tables_in_sections == 11, \
-        f"Expected 11 tables in sections, found {total_tables_in_sections}"
-    assert total_equations_in_sections == 2, \
-        f"Expected 2 equations in sections, found {total_equations_in_sections}"
+    assert total_figures_in_sections == 16, f"Expected 16 figures in sections, found {total_figures_in_sections}"
+    assert total_tables_in_sections == 11, f"Expected 11 tables in sections, found {total_tables_in_sections}"
+    assert total_equations_in_sections == 2, f"Expected 2 equations in sections, found {total_equations_in_sections}"
 
     # Cross-references should match the total
-    assert total_crossrefs_in_sections == 29, \
-        f"Expected 29 cross-references in sections, found {total_crossrefs_in_sections}"
+    assert (
+        total_crossrefs_in_sections == 29
+    ), f"Expected 29 cross-references in sections, found {total_crossrefs_in_sections}"
 
     # Find a section with content
     content_section = None
@@ -132,7 +128,7 @@ def test_section_content(files_dir, tmp_path):
 
     assert content_section is not None, "Expected at least one section with content"
 
-    print(f"\n[OK] Section content test passed!")
+    print("\n[OK] Section content test passed!")
     print(f"  Total paragraphs: {total_paragraphs}")
     print(f"  Figures in sections: {total_figures_in_sections}")
     print(f"  Tables in sections: {total_tables_in_sections}")
@@ -156,7 +152,7 @@ def test_section_navigation_methods(files_dir, tmp_path):
         # All descendants should be children or grandchildren etc.
         for descendant in descendants:
             path = descendant.get_path()
-            assert root in path, f"Root should be in descendant's path"
+            assert root in path, "Root should be in descendant's path"
 
     # Test get_path
     if len(structure.sections) > 1:
@@ -181,10 +177,9 @@ def test_section_navigation_methods(files_dir, tmp_path):
             assert depth == 0, f"Root section {section.title} should have depth 0"
         else:
             parent_depth = section.parent.get_depth()
-            assert depth == parent_depth + 1, \
-                f"Section {section.title} depth should be parent depth + 1"
+            assert depth == parent_depth + 1, f"Section {section.title} depth should be parent depth + 1"
 
-    print(f"\n[OK] Section navigation methods test passed!")
+    print("\n[OK] Section navigation methods test passed!")
 
 
 def test_cross_references_in_sections(files_dir, tmp_path):
@@ -203,8 +198,11 @@ def test_cross_references_in_sections(files_dir, tmp_path):
     # Check that cross-references have valid target types
     for section in sections_with_crossrefs:
         for crossref in section.cross_references:
-            assert crossref.target_type in ['fig', 'tbl', 'eq'], \
-                f"Invalid cross-reference target type: {crossref.target_type}"
+            assert crossref.target_type in [
+                "fig",
+                "tbl",
+                "eq",
+            ], f"Invalid cross-reference target type: {crossref.target_type}"
             assert crossref.target_id, "Cross-reference should have a target ID"
 
     # Check that cross-reference targets exist in the structure
@@ -224,7 +222,7 @@ def test_cross_references_in_sections(files_dir, tmp_path):
 
     assert len(dangling_refs) == 0, f"Found dangling cross-references: {dangling_refs}"
 
-    print(f"\n[OK] Cross-references in sections test passed!")
+    print("\n[OK] Cross-references in sections test passed!")
     print(f"  Sections with cross-references: {len(sections_with_crossrefs)}")
 
 
@@ -266,7 +264,7 @@ def test_structure_lookup_methods(files_dir, tmp_path):
     for section in main_sections:
         assert not section.is_appendix, "All returned sections should be main sections"
 
-    print(f"\n[OK] Structure lookup methods test passed!")
+    print("\n[OK] Structure lookup methods test passed!")
     print(f"  Level 1 sections: {len(level_1_sections)}")
     print(f"  Appendix sections: {len(appendix_sections)}")
     print(f"  Main sections: {len(main_sections)}")
@@ -281,28 +279,28 @@ def test_specific_figures_tables_equations(files_dir, tmp_path):
     structure = one.get_document_structure()
 
     # Test specific figures
-    assert 'fig:historical_trends' in structure.figures, "Expected 'historical_trends' figure"
-    assert 'fig:primary_results' in structure.figures, "Expected 'primary_results' figure"
-    assert 'fig:qc-workflow' in structure.figures, "Expected 'qc-workflow' figure (from markdown)"
+    assert "fig:historical_trends" in structure.figures, "Expected 'historical_trends' figure"
+    assert "fig:primary_results" in structure.figures, "Expected 'primary_results' figure"
+    assert "fig:qc-workflow" in structure.figures, "Expected 'qc-workflow' figure (from markdown)"
 
     # Test specific tables
-    assert 'tbl:current_metrics' in structure.tables, "Expected 'current_metrics' table"
-    assert 'tbl:validation-criteria' in structure.tables, \
-        "Expected 'validation-criteria' table (from markdown)"
+    assert "tbl:current_metrics" in structure.tables, "Expected 'current_metrics' table"
+    assert "tbl:validation-criteria" in structure.tables, "Expected 'validation-criteria' table (from markdown)"
 
     # Test specific equations
-    assert 'eq:energy' in structure.equations, "Expected 'energy' equation"
-    assert 'eq:diffusion' in structure.equations, "Expected 'diffusion' equation"
+    assert "eq:energy" in structure.equations, "Expected 'energy' equation"
+    assert "eq:diffusion" in structure.equations, "Expected 'diffusion' equation"
 
     # Test equation content
-    energy_eq = structure.equations.get('eq:energy')
+    energy_eq = structure.equations.get("eq:energy")
     if energy_eq:
         assert energy_eq.latex is not None, "Expected energy equation to have LaTeX content"
-        assert 'mc^2' in energy_eq.latex or 'E' in energy_eq.latex, \
-            f"Expected energy equation LaTeX, got: {energy_eq.latex}"
+        assert (
+            "mc^2" in energy_eq.latex or "E" in energy_eq.latex
+        ), f"Expected energy equation LaTeX, got: {energy_eq.latex}"
 
-    print(f"\n[OK] Specific items test passed!")
-    print(f"  Found specific figures, tables, and equations")
+    print("\n[OK] Specific items test passed!")
+    print("  Found specific figures, tables, and equations")
 
 
 def test_section_source_tracking(files_dir, tmp_path):
@@ -328,9 +326,8 @@ def test_section_source_tracking(files_dir, tmp_path):
     assert len(figures_with_source) > 0, "Expected figures with source file information"
     assert len(tables_with_source) > 0, "Expected tables with source file information"
 
-    print(f"\n[OK] Source tracking test passed!")
+    print("\n[OK] Source tracking test passed!")
     print(f"  Sections with source: {len(sections_with_source)}/{len(structure.sections)}")
     print(f"  Figures with source: {len(figures_with_source)}/{len(structure.figures)}")
     print(f"  Tables with source: {len(tables_with_source)}/{len(structure.tables)}")
     print(f"  Equations with source: {len(equations_with_source)}/{len(structure.equations)}")
-

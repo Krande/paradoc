@@ -11,9 +11,9 @@ for creating and manipulating Word documents with support for:
 The wrapper is only available on Windows platforms.
 """
 
-from .wrapper import WordApplication, WordDocument, FigureLayout, CaptionReference
-from .isolated import run_word_operation_isolated
 from .com_utils import is_word_com_available
+from .isolated import run_word_operation_isolated
+from .wrapper import CaptionReference, FigureLayout, WordApplication, WordDocument
 
 __all__ = [
     "WordApplication",
@@ -21,5 +21,5 @@ __all__ = [
     "FigureLayout",
     "CaptionReference",
     "run_word_operation_isolated",
-    "is_word_com_available"
+    "is_word_com_available",
 ]

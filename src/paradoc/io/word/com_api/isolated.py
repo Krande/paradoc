@@ -37,12 +37,12 @@ def _init_pool_worker() -> None:
 
     try:
         import pythoncom
+
         # COINIT_APARTMENTTHREADED = 2 (STA mode, required for Word COM)
         pythoncom.CoInitializeEx(2)
     except Exception:
         # If initialization fails here, tasks will fail with proper error messages
         pass
-
 
 
 def _isolated_worker(func: Callable, args: tuple, kwargs: dict, redirect_stdout: bool) -> tuple[bool, Any, str, str]:
@@ -70,6 +70,7 @@ def _isolated_worker(func: Callable, args: tuple, kwargs: dict, redirect_stdout:
 
     if redirect_stdout:
         from io import StringIO
+
         old_stdout = sys.stdout
         old_stderr = sys.stderr
         sys.stdout = StringIO()
@@ -83,6 +84,7 @@ def _isolated_worker(func: Callable, args: tuple, kwargs: dict, redirect_stdout:
     try:
         try:
             import pythoncom  # type: ignore
+
             # Explicitly initialize COM in STA mode on this thread
             # COINIT_APARTMENTTHREADED = 2
             pythoncom.CoInitializeEx(2)
@@ -98,6 +100,7 @@ def _isolated_worker(func: Callable, args: tuple, kwargs: dict, redirect_stdout:
         success = False
         message = f"Worker failed: {e!r}"
         import traceback
+
         message += f"\n{traceback.format_exc()}"
     finally:
         try:
@@ -118,6 +121,7 @@ def _isolated_worker(func: Callable, args: tuple, kwargs: dict, redirect_stdout:
         if com_initialized:
             try:
                 import pythoncom
+
                 pythoncom.CoUninitialize()
             except Exception:
                 pass
@@ -126,11 +130,7 @@ def _isolated_worker(func: Callable, args: tuple, kwargs: dict, redirect_stdout:
 
 
 def run_word_operation_isolated(
-    func: Callable,
-    *args,
-    timeout_s: float = 120.0,
-    redirect_stdout: bool = True,
-    **kwargs
+    func: Callable, *args, timeout_s: float = 120.0, redirect_stdout: bool = True, **kwargs
 ) -> tuple[bool, Any, str]:
     """
     Run a Word COM operation in an isolated process.
@@ -172,10 +172,7 @@ def run_word_operation_isolated(
     try:
         # Use a single-process pool with an initializer that sets up COM in the worker
         pool = ctx.Pool(processes=1, initializer=_init_pool_worker)
-        async_res = pool.apply_async(
-            _isolated_worker,
-            (func, args, kwargs, redirect_stdout)
-        )
+        async_res = pool.apply_async(_isolated_worker, (func, args, kwargs, redirect_stdout))
         try:
             success, result, message, output = async_res.get(timeout=timeout_s)
         except mp.TimeoutError:
@@ -204,4 +201,3 @@ def run_word_operation_isolated(
         logger.info(output.rstrip())
 
     return (success, result, message)
-

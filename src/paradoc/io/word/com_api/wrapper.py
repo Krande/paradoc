@@ -10,7 +10,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Literal, Union, Any, Callable
+from typing import Any, Callable, Literal, Optional, Union
 
 from paradoc.config import logger
 
@@ -43,7 +43,8 @@ def _suppress_windows_error_ui() -> None:
     try:
         kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
         kernel32.SetErrorMode(
-            SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX)  # type: ignore[attr-defined]
+            SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX
+        )  # type: ignore[attr-defined]
     except Exception:
         pass
 
@@ -64,6 +65,7 @@ def _word_worker(operation: Callable, args: tuple, kwargs: dict) -> tuple[bool, 
 
     try:
         import pythoncom
+
         pythoncom.CoInitialize()  # STA for this process
     except ImportError:
         return (False, None, "pythoncom not available - pywin32 required")
@@ -78,7 +80,7 @@ def _word_worker(operation: Callable, args: tuple, kwargs: dict) -> tuple[bool, 
         try:
             gc.collect()
             pythoncom.CoUninitialize()
-        except:
+        except Exception:
             pass
 
 
@@ -154,6 +156,7 @@ class WordApplication:
         if not run_isolated:
             try:
                 import win32com.client as com_client
+
                 self._com = com_client
             except ImportError:
                 raise ImportError("pywin32 package is required for Word COM automation")
@@ -201,12 +204,12 @@ class WordApplication:
             for doc in self._documents[:]:
                 try:
                     doc.close(save_changes=False)
-                except:
+                except Exception:
                     pass
 
             try:
                 self._app.Quit()
-            except:
+            except Exception:
                 pass
             finally:
                 self._app = None
@@ -224,6 +227,7 @@ class WordApplication:
         if self._run_isolated:
             # In isolated mode, return a proxy that records operations
             from .isolated_proxy import IsolatedWordDocument
+
             doc = IsolatedWordDocument(template=template, visible=self._visible)
             self._isolated_doc_proxy = doc
             self._documents.append(doc)
@@ -380,14 +384,14 @@ class WordDocument:
         self._app.Selection.InsertBreak(break_constants[break_type])
 
     def add_figure_with_caption(
-            self,
-            caption_text: str,
-            image_path: Optional[Union[str, Path]] = None,
-            width: Optional[float] = None,
-            height: Optional[float] = None,
-            layout: Union[FigureLayout, str] = FigureLayout.INLINE,
-            create_bookmark: bool = True,
-            use_chapter_numbers: bool = True,
+        self,
+        caption_text: str,
+        image_path: Optional[Union[str, Path]] = None,
+        width: Optional[float] = None,
+        height: Optional[float] = None,
+        layout: Union[FigureLayout, str] = FigureLayout.INLINE,
+        create_bookmark: bool = True,
+        use_chapter_numbers: bool = True,
     ) -> Optional[CaptionReference]:
         """Add a figure with a caption.
 
@@ -499,13 +503,13 @@ class WordDocument:
         return caption_ref
 
     def add_table_with_caption(
-            self,
-            caption_text: str,
-            rows: int = 2,
-            cols: int = 2,
-            data: Optional[list[list]] = None,
-            create_bookmark: bool = True,
-            use_chapter_numbers: bool = True,
+        self,
+        caption_text: str,
+        rows: int = 2,
+        cols: int = 2,
+        data: Optional[list[list]] = None,
+        create_bookmark: bool = True,
+        use_chapter_numbers: bool = True,
     ) -> Optional[CaptionReference]:
         """Add a table with a caption.
 
@@ -595,12 +599,12 @@ class WordDocument:
         return caption_ref
 
     def add_cross_reference(
-            self,
-            bookmark_name: Union[CaptionReference, str, int],
-            reference_type: Optional[Literal["figure", "table"]] = None,
-            include_hyperlink: bool = True,
-            prefix_text: str = "",
-            include_caption_text: bool = False,
+        self,
+        bookmark_name: Union[CaptionReference, str, int],
+        reference_type: Optional[Literal["figure", "table"]] = None,
+        include_hyperlink: bool = True,
+        prefix_text: str = "",
+        include_caption_text: bool = False,
     ):
         """Add a cross-reference to a figure or table.
 
@@ -709,7 +713,7 @@ class WordDocument:
         """
         try:
             return [bm.Name for bm in self._doc.Bookmarks]
-        except:
+        except Exception:
             return []
 
     @property

@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 
 class RefType(Enum):
     """Types of cross-referenceable items."""
+
     FIGURE = "fig"
     TABLE = "tbl"
     EQUATION = "eq"
@@ -31,6 +32,7 @@ class RefTarget:
         source_file: The source markdown file this target was defined in
         ast_block: The AST block containing this target (for debugging)
     """
+
     ref_type: RefType
     ref_id: str
     full_id: str
@@ -54,6 +56,7 @@ class RefCitation:
         source_file: The source markdown file this citation appears in
         ast_inline: The AST inline element containing this citation (for debugging)
     """
+
     ref_type: RefType
     ref_id: str
     full_id: str
@@ -78,6 +81,7 @@ class CrossRefData:
         equations: All equation targets by ref_id
         dangling_citations: Citations that reference non-existent targets
     """
+
     targets: Dict[str, RefTarget] = field(default_factory=dict)
     citations: List[RefCitation] = field(default_factory=list)
     figures: Dict[str, RefTarget] = field(default_factory=dict)
@@ -100,31 +104,33 @@ class CrossRefData:
             Dictionary with validation results and statistics
         """
         stats = {
-            'total_targets': len(self.targets),
-            'total_citations': len(self.citations),
-            'figures': len(self.figures),
-            'tables': len(self.tables),
-            'equations': len(self.equations),
-            'dangling_citations': len(self.dangling_citations),
-            'unreferenced_targets': [],
-            'citation_counts': {}
+            "total_targets": len(self.targets),
+            "total_citations": len(self.citations),
+            "figures": len(self.figures),
+            "tables": len(self.tables),
+            "equations": len(self.equations),
+            "dangling_citations": len(self.dangling_citations),
+            "unreferenced_targets": [],
+            "citation_counts": {},
         }
 
         # Find unreferenced targets
         referenced_ids = {c.full_id for c in self.citations}
         for full_id, target in self.targets.items():
             if full_id not in referenced_ids:
-                stats['unreferenced_targets'].append(full_id)
+                stats["unreferenced_targets"].append(full_id)
 
         # Count citations per target
         for citation in self.citations:
-            stats['citation_counts'][citation.full_id] = stats['citation_counts'].get(citation.full_id, 0) + 1
+            stats["citation_counts"][citation.full_id] = stats["citation_counts"].get(citation.full_id, 0) + 1
 
         return stats
 
     def __repr__(self) -> str:
-        return (f"CrossRefData(targets={len(self.targets)}, citations={len(self.citations)}, "
-                f"figures={len(self.figures)}, tables={len(self.tables)}, equations={len(self.equations)})")
+        return (
+            f"CrossRefData(targets={len(self.targets)}, citations={len(self.citations)}, "
+            f"figures={len(self.figures)}, tables={len(self.tables)}, equations={len(self.equations)})"
+        )
 
 
 class CrossRefExtractor:
@@ -166,7 +172,7 @@ class CrossRefExtractor:
         """
         data = CrossRefData()
 
-        blocks = self.ast.get('blocks', [])
+        blocks = self.ast.get("blocks", [])
         self._extract_from_blocks(blocks, data)
 
         # Identify dangling citations
@@ -183,22 +189,22 @@ class CrossRefExtractor:
             if not isinstance(block, dict):
                 continue
 
-            block_type = block.get('t')
+            block_type = block.get("t")
 
             # Check for source file markers
-            if block_type == 'RawBlock':
+            if block_type == "RawBlock":
                 self._check_source_marker(block)
 
             # Extract targets from different block types
-            if block_type == 'Figure':
+            if block_type == "Figure":
                 self._extract_figure_target(block, data)
-            elif block_type == 'Table':
+            elif block_type == "Table":
                 self._extract_table_target(block, data)
-            elif block_type == 'Div':
+            elif block_type == "Div":
                 self._extract_div_target(block, data)
-            elif block_type in ['Para', 'Plain']:
+            elif block_type in ["Para", "Plain"]:
                 # Extract citations from paragraph inlines
-                inlines = block.get('c', [])
+                inlines = block.get("c", [])
                 if isinstance(inlines, list):
                     context_text = self._extract_text_from_inlines(inlines)
                     self._extract_from_inlines(inlines, data, context_text)
@@ -206,39 +212,41 @@ class CrossRefExtractor:
                     self._extract_equation_targets_from_inlines(inlines, data)
 
             # Recursively process nested blocks
-            if 'c' in block:
-                self._process_nested_content(block['c'], data)
+            if "c" in block:
+                self._process_nested_content(block["c"], data)
 
     def _check_source_marker(self, block: Dict[str, Any]):
         """Check if this raw block is a source file marker."""
-        content = block.get('c', [])
+        content = block.get("c", [])
         if len(content) >= 2:
             # RawBlock has format: ["html", "<!-- PARADOC_SOURCE_FILE: path -->"]
             text = content[1] if isinstance(content[1], str) else ""
-            match = re.search(r'PARADOC_SOURCE_FILE:\s*(.+?)\s*-->', text)
+            match = re.search(r"PARADOC_SOURCE_FILE:\s*(.+?)\s*-->", text)
             if match:
                 self.current_source_file = match.group(1)
 
     def _extract_figure_target(self, block: Dict[str, Any], data: CrossRefData):
         """Extract figure target from a Figure block."""
-        content = block.get('c', [])
+        content = block.get("c", [])
         if len(content) >= 1:
             attrs = content[0]
             fig_id = self._extract_id_from_attrs(attrs)
 
-            if fig_id and (fig_id.startswith('fig:') or fig_id.startswith('fig_')):
+            if fig_id and (fig_id.startswith("fig:") or fig_id.startswith("fig_")):
                 # Normalize ID (pandoc converts hyphens to underscores)
-                normalized_id = fig_id.replace('_', ':') if not ':' in fig_id else fig_id
+                normalized_id = fig_id.replace("_", ":") if ":" not in fig_id else fig_id
 
                 # Extract caption if available
                 caption_text = None
                 if len(content) >= 2:
                     caption_content = content[1]
-                    if isinstance(caption_content, dict) and caption_content.get('t') == 'Caption':
-                        caption_blocks = caption_content.get('c', [[]])[1] if len(caption_content.get('c', [])) > 1 else []
+                    if isinstance(caption_content, dict) and caption_content.get("t") == "Caption":
+                        caption_blocks = (
+                            caption_content.get("c", [[]])[1] if len(caption_content.get("c", [])) > 1 else []
+                        )
                         caption_text = self._extract_text_from_blocks(caption_blocks)
 
-                ref_id = normalized_id.split(':', 1)[1] if ':' in normalized_id else normalized_id.split('_', 1)[1]
+                ref_id = normalized_id.split(":", 1)[1] if ":" in normalized_id else normalized_id.split("_", 1)[1]
 
                 target = RefTarget(
                     ref_type=RefType.FIGURE,
@@ -246,7 +254,7 @@ class CrossRefExtractor:
                     full_id=normalized_id,
                     caption_text=caption_text,
                     source_file=self.current_source_file,
-                    ast_block=block
+                    ast_block=block,
                 )
 
                 data.targets[normalized_id] = target
@@ -254,24 +262,26 @@ class CrossRefExtractor:
 
     def _extract_table_target(self, block: Dict[str, Any], data: CrossRefData):
         """Extract table target from a Table block."""
-        content = block.get('c', [])
+        content = block.get("c", [])
         if len(content) >= 1:
             attrs = content[0]
             tbl_id = self._extract_id_from_attrs(attrs)
 
-            if tbl_id and (tbl_id.startswith('tbl:') or tbl_id.startswith('tbl_')):
+            if tbl_id and (tbl_id.startswith("tbl:") or tbl_id.startswith("tbl_")):
                 # Normalize ID
-                normalized_id = tbl_id.replace('_', ':') if not ':' in tbl_id else tbl_id
+                normalized_id = tbl_id.replace("_", ":") if ":" not in tbl_id else tbl_id
 
                 # Extract caption if available
                 caption_text = None
                 if len(content) >= 2:
                     caption_content = content[1]
-                    if isinstance(caption_content, dict) and caption_content.get('t') == 'Caption':
-                        caption_blocks = caption_content.get('c', [[]])[1] if len(caption_content.get('c', [])) > 1 else []
+                    if isinstance(caption_content, dict) and caption_content.get("t") == "Caption":
+                        caption_blocks = (
+                            caption_content.get("c", [[]])[1] if len(caption_content.get("c", [])) > 1 else []
+                        )
                         caption_text = self._extract_text_from_blocks(caption_blocks)
 
-                ref_id = normalized_id.split(':', 1)[1] if ':' in normalized_id else normalized_id.split('_', 1)[1]
+                ref_id = normalized_id.split(":", 1)[1] if ":" in normalized_id else normalized_id.split("_", 1)[1]
 
                 target = RefTarget(
                     ref_type=RefType.TABLE,
@@ -279,7 +289,7 @@ class CrossRefExtractor:
                     full_id=normalized_id,
                     caption_text=caption_text,
                     source_file=self.current_source_file,
-                    ast_block=block
+                    ast_block=block,
                 )
 
                 data.targets[normalized_id] = target
@@ -287,7 +297,7 @@ class CrossRefExtractor:
 
     def _extract_div_target(self, block: Dict[str, Any], data: CrossRefData):
         """Extract targets from Div blocks (pandoc-crossref wraps items in Divs)."""
-        content = block.get('c', [])
+        content = block.get("c", [])
         if len(content) >= 1:
             attrs = content[0]
             div_id = self._extract_id_from_attrs(attrs)
@@ -295,17 +305,17 @@ class CrossRefExtractor:
             # Check if this Div has a figure/table/equation ID
             if div_id:
                 ref_type = None
-                if div_id.startswith('fig:') or div_id.startswith('fig_'):
+                if div_id.startswith("fig:") or div_id.startswith("fig_"):
                     ref_type = RefType.FIGURE
-                elif div_id.startswith('tbl:') or div_id.startswith('tbl_'):
+                elif div_id.startswith("tbl:") or div_id.startswith("tbl_"):
                     ref_type = RefType.TABLE
-                elif div_id.startswith('eq:') or div_id.startswith('eq_'):
+                elif div_id.startswith("eq:") or div_id.startswith("eq_"):
                     ref_type = RefType.EQUATION
 
                 if ref_type:
                     # Normalize ID
-                    normalized_id = div_id.replace('_', ':') if not ':' in div_id else div_id
-                    ref_id = normalized_id.split(':', 1)[1] if ':' in normalized_id else normalized_id.split('_', 1)[1]
+                    normalized_id = div_id.replace("_", ":") if ":" not in div_id else div_id
+                    ref_id = normalized_id.split(":", 1)[1] if ":" in normalized_id else normalized_id.split("_", 1)[1]
 
                     # Extract caption/content text
                     caption_text = None
@@ -319,7 +329,7 @@ class CrossRefExtractor:
                         full_id=normalized_id,
                         caption_text=caption_text,
                         source_file=self.current_source_file,
-                        ast_block=block
+                        ast_block=block,
                     )
 
                     data.targets[normalized_id] = target
@@ -344,27 +354,29 @@ class CrossRefExtractor:
             if not isinstance(inline, dict):
                 continue
 
-            inline_type = inline.get('t')
+            inline_type = inline.get("t")
 
-            if inline_type == 'Span':
-                content = inline.get('c', [])
+            if inline_type == "Span":
+                content = inline.get("c", [])
                 if len(content) >= 2:
                     attrs = content[0]
                     span_id = self._extract_id_from_attrs(attrs)
 
                     # Check if this is an equation ID
-                    if span_id and (span_id.startswith('eq:') or span_id.startswith('eq_')):
+                    if span_id and (span_id.startswith("eq:") or span_id.startswith("eq_")):
                         # Normalize ID
-                        normalized_id = span_id.replace('_', ':') if ':' not in span_id else span_id
-                        ref_id = normalized_id.split(':', 1)[1] if ':' in normalized_id else normalized_id.split('_', 1)[1]
+                        normalized_id = span_id.replace("_", ":") if ":" not in span_id else span_id
+                        ref_id = (
+                            normalized_id.split(":", 1)[1] if ":" in normalized_id else normalized_id.split("_", 1)[1]
+                        )
 
                         # Extract equation content (the Math element contains the LaTeX)
                         equation_content = None
                         nested_inlines = content[1] if isinstance(content[1], list) else []
                         for nested in nested_inlines:
-                            if isinstance(nested, dict) and nested.get('t') == 'Math':
+                            if isinstance(nested, dict) and nested.get("t") == "Math":
                                 # Math element format: {'t': 'Math', 'c': [{'t': 'DisplayMath'}, 'latex_string']}
-                                math_content = nested.get('c', [])
+                                math_content = nested.get("c", [])
                                 if len(math_content) >= 2:
                                     equation_content = math_content[1]  # The LaTeX string
                                 break
@@ -375,15 +387,15 @@ class CrossRefExtractor:
                             full_id=normalized_id,
                             caption_text=equation_content,  # Store the LaTeX as "caption"
                             source_file=self.current_source_file,
-                            ast_block=inline
+                            ast_block=inline,
                         )
 
                         data.targets[normalized_id] = target
                         data.equations[ref_id] = target
 
             # Recursively check nested inlines
-            if 'c' in inline:
-                content = inline['c']
+            if "c" in inline:
+                content = inline["c"]
                 if isinstance(content, list):
                     for item in content:
                         if isinstance(item, list):
@@ -395,19 +407,19 @@ class CrossRefExtractor:
             if not isinstance(inline, dict):
                 continue
 
-            inline_type = inline.get('t')
+            inline_type = inline.get("t")
 
             # Look for Cite elements (cross-references)
-            if inline_type == 'Cite':
+            if inline_type == "Cite":
                 self._extract_citation(inline, data, context_text)
 
             # Look for Link elements with anchors (alternative cross-ref format)
-            elif inline_type == 'Link':
+            elif inline_type == "Link":
                 self._extract_link_citation(inline, data, context_text)
 
             # Recursively process nested inlines
-            if 'c' in inline:
-                content = inline['c']
+            if "c" in inline:
+                content = inline["c"]
                 if isinstance(content, list):
                     for item in content:
                         if isinstance(item, list):
@@ -415,27 +427,31 @@ class CrossRefExtractor:
 
     def _extract_citation(self, inline: Dict[str, Any], data: CrossRefData, context_text: Optional[str] = None):
         """Extract citation from a Cite inline element."""
-        content = inline.get('c', [])
+        content = inline.get("c", [])
         if len(content) >= 1:
             citations = content[0]
             if isinstance(citations, list):
                 for citation in citations:
                     if isinstance(citation, dict):
-                        citation_id = citation.get('citationId', '')
+                        citation_id = citation.get("citationId", "")
 
                         # Check if this is a cross-reference citation
                         ref_type = None
-                        if citation_id.startswith('fig:') or citation_id.startswith('fig_'):
+                        if citation_id.startswith("fig:") or citation_id.startswith("fig_"):
                             ref_type = RefType.FIGURE
-                        elif citation_id.startswith('tbl:') or citation_id.startswith('tbl_'):
+                        elif citation_id.startswith("tbl:") or citation_id.startswith("tbl_"):
                             ref_type = RefType.TABLE
-                        elif citation_id.startswith('eq:') or citation_id.startswith('eq_'):
+                        elif citation_id.startswith("eq:") or citation_id.startswith("eq_"):
                             ref_type = RefType.EQUATION
 
                         if ref_type:
                             # Normalize ID
-                            normalized_id = citation_id.replace('_', ':') if not ':' in citation_id else citation_id
-                            ref_id = normalized_id.split(':', 1)[1] if ':' in normalized_id else normalized_id.split('_', 1)[1]
+                            normalized_id = citation_id.replace("_", ":") if ":" not in citation_id else citation_id
+                            ref_id = (
+                                normalized_id.split(":", 1)[1]
+                                if ":" in normalized_id
+                                else normalized_id.split("_", 1)[1]
+                            )
 
                             cite = RefCitation(
                                 ref_type=ref_type,
@@ -443,14 +459,14 @@ class CrossRefExtractor:
                                 full_id=normalized_id,
                                 context_text=context_text,
                                 source_file=self.current_source_file,
-                                ast_inline=inline
+                                ast_inline=inline,
                             )
 
                             data.citations.append(cite)
 
     def _extract_link_citation(self, inline: Dict[str, Any], data: CrossRefData, context_text: Optional[str] = None):
         """Extract citation from a Link inline element (hyperlink format)."""
-        content = inline.get('c', [])
+        content = inline.get("c", [])
         if len(content) >= 3:
             # Link format: [attrs, [inlines], [url, title]]
             target = content[2]
@@ -458,21 +474,23 @@ class CrossRefExtractor:
                 url = target[0]
 
                 # Check if this is an anchor link to a cross-reference
-                if isinstance(url, str) and url.startswith('#'):
+                if isinstance(url, str) and url.startswith("#"):
                     anchor = url[1:]  # Remove '#'
 
                     ref_type = None
-                    if anchor.startswith('fig:') or anchor.startswith('fig_'):
+                    if anchor.startswith("fig:") or anchor.startswith("fig_"):
                         ref_type = RefType.FIGURE
-                    elif anchor.startswith('tbl:') or anchor.startswith('tbl_'):
+                    elif anchor.startswith("tbl:") or anchor.startswith("tbl_"):
                         ref_type = RefType.TABLE
-                    elif anchor.startswith('eq:') or anchor.startswith('eq_'):
+                    elif anchor.startswith("eq:") or anchor.startswith("eq_"):
                         ref_type = RefType.EQUATION
 
                     if ref_type:
                         # Normalize ID
-                        normalized_id = anchor.replace('_', ':') if not ':' in anchor else anchor
-                        ref_id = normalized_id.split(':', 1)[1] if ':' in normalized_id else normalized_id.split('_', 1)[1]
+                        normalized_id = anchor.replace("_", ":") if ":" not in anchor else anchor
+                        ref_id = (
+                            normalized_id.split(":", 1)[1] if ":" in normalized_id else normalized_id.split("_", 1)[1]
+                        )
 
                         cite = RefCitation(
                             ref_type=ref_type,
@@ -480,7 +498,7 @@ class CrossRefExtractor:
                             full_id=normalized_id,
                             context_text=context_text,
                             source_file=self.current_source_file,
-                            ast_inline=inline
+                            ast_inline=inline,
                         )
 
                         data.citations.append(cite)
@@ -491,10 +509,10 @@ class CrossRefExtractor:
             for item in content:
                 if isinstance(item, dict):
                     # Check if this dict has blocks
-                    if 'blocks' in item:
-                        self._extract_from_blocks(item['blocks'], data)
+                    if "blocks" in item:
+                        self._extract_from_blocks(item["blocks"], data)
                     # Or if it's itself a block
-                    elif 't' in item:
+                    elif "t" in item:
                         self._extract_from_blocks([item], data)
                 elif isinstance(item, list):
                     # Nested list of blocks
@@ -508,47 +526,46 @@ class CrossRefExtractor:
         - A list [id, [classes], {attributes}]
         """
         if isinstance(attrs, dict):
-            return attrs.get('id', '')
+            return attrs.get("id", "")
         elif isinstance(attrs, list) and len(attrs) >= 1:
-            return attrs[0] if isinstance(attrs[0], str) else ''
-        return ''
+            return attrs[0] if isinstance(attrs[0], str) else ""
+        return ""
 
     def _extract_text_from_blocks(self, blocks: List[Any]) -> str:
         """Extract plain text from a list of block elements."""
         text_parts = []
         for block in blocks:
             if isinstance(block, dict):
-                if block.get('t') in ['Para', 'Plain']:
-                    inlines = block.get('c', [])
+                if block.get("t") in ["Para", "Plain"]:
+                    inlines = block.get("c", [])
                     text_parts.append(self._extract_text_from_inlines(inlines))
-                elif block.get('t') == 'Str':
-                    text_parts.append(block.get('c', ''))
-        return ' '.join(text_parts).strip()
+                elif block.get("t") == "Str":
+                    text_parts.append(block.get("c", ""))
+        return " ".join(text_parts).strip()
 
     def _extract_text_from_inlines(self, inlines: List[Any]) -> str:
         """Extract plain text from a list of inline elements."""
         text_parts = []
         for inline in inlines:
             if isinstance(inline, dict):
-                inline_type = inline.get('t')
-                if inline_type == 'Str':
-                    text_parts.append(inline.get('c', ''))
-                elif inline_type == 'Space':
-                    text_parts.append(' ')
-                elif inline_type in ['Emph', 'Strong', 'Strikeout', 'Superscript', 'Subscript', 'SmallCaps']:
-                    nested = inline.get('c', [])
+                inline_type = inline.get("t")
+                if inline_type == "Str":
+                    text_parts.append(inline.get("c", ""))
+                elif inline_type == "Space":
+                    text_parts.append(" ")
+                elif inline_type in ["Emph", "Strong", "Strikeout", "Superscript", "Subscript", "SmallCaps"]:
+                    nested = inline.get("c", [])
                     text_parts.append(self._extract_text_from_inlines(nested))
-                elif inline_type == 'Span':
-                    content = inline.get('c', [])
+                elif inline_type == "Span":
+                    content = inline.get("c", [])
                     if len(content) >= 2:
                         text_parts.append(self._extract_text_from_inlines(content[1]))
-                elif inline_type == 'Link':
-                    content = inline.get('c', [])
+                elif inline_type == "Link":
+                    content = inline.get("c", [])
                     if len(content) >= 2:
                         text_parts.append(self._extract_text_from_inlines(content[1]))
-                elif inline_type == 'Cite':
-                    content = inline.get('c', [])
+                elif inline_type == "Cite":
+                    content = inline.get("c", [])
                     if len(content) >= 2:
                         text_parts.append(self._extract_text_from_inlines(content[1]))
-        return ''.join(text_parts).strip()
-
+        return "".join(text_parts).strip()

@@ -6,15 +6,17 @@ them in an isolated process to suppress C stack error logs.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Union, Literal, Any
+from typing import Any, Literal, Optional, Union
 
 from paradoc.config import logger
+
 from .wrapper import CaptionReference, FigureLayout
 
 
 @dataclass
 class DocumentOperation:
     """Represents a single document operation to be replayed."""
+
     operation: str
     args: tuple = field(default_factory=tuple)
     kwargs: dict = field(default_factory=dict)
@@ -61,12 +63,7 @@ class IsolatedWordDocument:
             result_id = self._next_result_id
             self._next_result_id += 1
 
-        self._operations.append(DocumentOperation(
-            operation=operation,
-            args=args,
-            kwargs=kwargs,
-            result_id=result_id
-        ))
+        self._operations.append(DocumentOperation(operation=operation, args=args, kwargs=kwargs, result_id=result_id))
 
         return return_value
 
@@ -91,14 +88,14 @@ class IsolatedWordDocument:
         self._record_operation("add_section_break", break_type)
 
     def add_figure_with_caption(
-            self,
-            caption_text: str,
-            image_path: Optional[Union[str, Path]] = None,
-            width: Optional[float] = None,
-            height: Optional[float] = None,
-            layout: Union[FigureLayout, str] = FigureLayout.INLINE,
-            create_bookmark: bool = True,
-            use_chapter_numbers: bool = True,
+        self,
+        caption_text: str,
+        image_path: Optional[Union[str, Path]] = None,
+        width: Optional[float] = None,
+        height: Optional[float] = None,
+        layout: Union[FigureLayout, str] = FigureLayout.INLINE,
+        create_bookmark: bool = True,
+        use_chapter_numbers: bool = True,
     ) -> Optional[CaptionReference]:
         """Record add_figure_with_caption operation and return a placeholder reference."""
         # Convert layout to string for serialization
@@ -108,9 +105,7 @@ class IsolatedWordDocument:
         ref = None
         if create_bookmark:
             ref = CaptionReference(
-                bookmark_name=f"_placeholder_fig_{self._figure_count}",
-                id=self._figure_count,
-                reference_type="figure"
+                bookmark_name=f"_placeholder_fig_{self._figure_count}", id=self._figure_count, reference_type="figure"
             )
             self._figure_count += 1
 
@@ -123,28 +118,26 @@ class IsolatedWordDocument:
             layout=layout_str,
             create_bookmark=create_bookmark,
             use_chapter_numbers=use_chapter_numbers,
-            return_value=ref
+            return_value=ref,
         )
 
         return ref
 
     def add_table_with_caption(
-            self,
-            caption_text: str,
-            rows: int = 2,
-            cols: int = 2,
-            data: Optional[list[list]] = None,
-            create_bookmark: bool = True,
-            use_chapter_numbers: bool = True,
+        self,
+        caption_text: str,
+        rows: int = 2,
+        cols: int = 2,
+        data: Optional[list[list]] = None,
+        create_bookmark: bool = True,
+        use_chapter_numbers: bool = True,
     ) -> Optional[CaptionReference]:
         """Record add_table_with_caption operation and return a placeholder reference."""
         # Create a placeholder reference that will be valid when executed
         ref = None
         if create_bookmark:
             ref = CaptionReference(
-                bookmark_name=f"_placeholder_tbl_{self._table_count}",
-                id=self._table_count,
-                reference_type="table"
+                bookmark_name=f"_placeholder_tbl_{self._table_count}", id=self._table_count, reference_type="table"
             )
             self._table_count += 1
 
@@ -156,18 +149,18 @@ class IsolatedWordDocument:
             data=data,
             create_bookmark=create_bookmark,
             use_chapter_numbers=use_chapter_numbers,
-            return_value=ref
+            return_value=ref,
         )
 
         return ref
 
     def add_cross_reference(
-            self,
-            bookmark_name: Union[CaptionReference, str, int],
-            reference_type: Optional[Literal["figure", "table"]] = None,
-            include_hyperlink: bool = True,
-            prefix_text: str = "",
-            include_caption_text: bool = False,
+        self,
+        bookmark_name: Union[CaptionReference, str, int],
+        reference_type: Optional[Literal["figure", "table"]] = None,
+        include_hyperlink: bool = True,
+        prefix_text: str = "",
+        include_caption_text: bool = False,
     ):
         """Record add_cross_reference operation."""
         # Convert CaptionReference to serializable form
@@ -175,18 +168,13 @@ class IsolatedWordDocument:
             bookmark_data = {
                 "bookmark_name": bookmark_name.bookmark_name,
                 "id": bookmark_name.id,
-                "reference_type": bookmark_name.reference_type
+                "reference_type": bookmark_name.reference_type,
             }
         else:
             bookmark_data = bookmark_name
 
         self._record_operation(
-            "add_cross_reference",
-            bookmark_data,
-            reference_type,
-            include_hyperlink,
-            prefix_text,
-            include_caption_text
+            "add_cross_reference", bookmark_data, reference_type, include_hyperlink, prefix_text, include_caption_text
         )
 
     def update_fields(self):
@@ -211,7 +199,7 @@ class IsolatedWordDocument:
             self._operations,
             self._saved_path,
             timeout_s=120.0,
-            redirect_stdout=False
+            redirect_stdout=False,
         )
 
         if not success:
@@ -223,8 +211,9 @@ class IsolatedWordDocument:
 
     def get_bookmark_names(self) -> list[str]:
         """Get bookmark names - returns placeholder names in isolated mode."""
-        return [f"_placeholder_fig_{i}" for i in range(self._figure_count)] + \
-            [f"_placeholder_tbl_{i}" for i in range(self._table_count)]
+        return [f"_placeholder_fig_{i}" for i in range(self._figure_count)] + [
+            f"_placeholder_tbl_{i}" for i in range(self._table_count)
+        ]
 
     @property
     def com_document(self):
@@ -238,10 +227,7 @@ class IsolatedWordDocument:
 
 
 def _execute_document_operations(
-        template: Optional[str],
-        visible: bool,
-        operations: list[DocumentOperation],
-        output_path: str
+    template: Optional[str], visible: bool, operations: list[DocumentOperation], output_path: str
 ) -> str:
     """Worker function that executes recorded operations in isolated process.
 
@@ -255,14 +241,12 @@ def _execute_document_operations(
         The output path
     """
     # Import here since this runs in isolated process
-    from .wrapper import WordApplication, CaptionReference, FigureLayout
-
     from paradoc.io.word.com_api.com_utils import is_word_com_available
 
+    from .wrapper import CaptionReference, FigureLayout, WordApplication
+
     if not is_word_com_available():
-        raise RuntimeError(
-            "Microsoft Word COM server not available. Install desktop Word or skip COM tests."
-        )
+        raise RuntimeError("Microsoft Word COM server not available. Install desktop Word or skip COM tests.")
 
     # Log to stdout (will be captured if redirect_stdout=True)
     logger.info(f"\nExecuting {len(operations)} operations in isolated process...")
@@ -310,11 +294,7 @@ def _execute_document_operations(
                     bookmark_data = op.args[0]
                     if isinstance(bookmark_data, dict):
                         bookmark_ref = CaptionReference(**bookmark_data)
-                        doc.add_cross_reference(
-                            bookmark_ref,
-                            *op.args[1:],
-                            **op.kwargs
-                        )
+                        doc.add_cross_reference(bookmark_ref, *op.args[1:], **op.kwargs)
                     else:
                         doc.add_cross_reference(*op.args, **op.kwargs)
 

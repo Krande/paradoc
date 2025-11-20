@@ -1,6 +1,7 @@
-from docx.oxml.xmlchemy import BaseOxmlElement
-from docx.oxml.ns import nsmap
 import re
+
+from docx.oxml.ns import nsmap
+from docx.oxml.xmlchemy import BaseOxmlElement
 
 NS = {
     "a": "http://schemas.openxmlformats.org/drawingml/2006/main",

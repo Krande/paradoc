@@ -7,7 +7,6 @@ from docx import Document
 
 from paradoc import OneDoc
 
-
 auto_open = os.getenv("AUTO_OPEN", False)
 
 
@@ -56,11 +55,9 @@ Another reference: see [@fig:test_figure] for details.
     print("=" * 80)
 
     # Find caption to get figure number
-    caption_para = None
     figure_number = None
     for para in doc.paragraphs:
         if "Figure" in para.text and "Caption" in para.text:
-            caption_para = para
             # Extract figure number
             match = re.search(r"Figure\s+([\d\-]+)", para.text)
             if match:

@@ -8,8 +8,6 @@ from paradoc.common import TableFormat
 def test_table(files_dir, tmp_path):
     """Test that tables added via add_table() are properly exported to DOCX."""
     import re
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
-    from docx.shared import Pt
 
     report_dir = files_dir / "doc_table"
     one = OneDoc(report_dir, work_dir=tmp_path / "doc_table")
@@ -67,7 +65,9 @@ def test_table(files_dir, tmp_path):
         table_num = int(match.group(2))
 
         # Chapter part should be either a number (main) or letter (appendix)
-        assert chapter_part.isdigit() or chapter_part.isalpha(), f"Chapter identifier should be numeric or alphabetic, got {chapter_part}"
+        assert (
+            chapter_part.isdigit() or chapter_part.isalpha()
+        ), f"Chapter identifier should be numeric or alphabetic, got {chapter_part}"
         assert table_num >= 1, f"Table number should be >= 1, got {table_num}"
 
         # Verify caption has SEQ field (not just static text)
@@ -92,7 +92,9 @@ def test_table(files_dir, tmp_path):
         # Verify data integrity - first cell should contain actual data, not table name
         # This verifies the bookmark-based identification is working
         first_data_cell = table.rows[1].cells[0].text.strip()
-        assert first_data_cell == "0", f"Table {idx}: First data cell should be '0', not table name. Got: '{first_data_cell}'"
+        assert (
+            first_data_cell == "0"
+        ), f"Table {idx}: First data cell should be '0', not table name. Got: '{first_data_cell}'"
 
         # Verify table formatting/style
         # Tables should have a style applied (e.g., "Grid Table 1 Light")
@@ -102,16 +104,16 @@ def test_table(files_dir, tmp_path):
     # Verify table alignment (should be centered)
     # Check the paragraph containing the table or the table's alignment property
     for i, block in enumerate(doc.element.body):
-        if block.tag.endswith('}tbl'):  # This is a table element
+        if block.tag.endswith("}tbl"):  # This is a table element
             # Find the table properties
-            tbl_pr = block.find('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tblPr')
+            tbl_pr = block.find(".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tblPr")
             if tbl_pr is not None:
                 # Check for table justification (jc element)
-                jc = tbl_pr.find('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}jc')
+                jc = tbl_pr.find(".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}jc")
                 if jc is not None:
-                    alignment = jc.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val')
+                    alignment = jc.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val")
                     # Table should be centered
-                    assert alignment == 'center', f"Table should be centered, got alignment: {alignment}"
+                    assert alignment == "center", f"Table should be centered, got alignment: {alignment}"
 
 
 def test_regular_table(files_dir, tmp_path):
@@ -194,16 +196,17 @@ def test_regular_table(files_dir, tmp_path):
     if table.style is not None:
         assert table.style.name is not None, "Table should have a style applied"
         # Should be "Grid Table 1 Light" or similar grid style
-        assert "Grid" in table.style.name or "Table" in table.style.name, \
-            f"Table should use a grid/table style, got: {table.style.name}"
+        assert (
+            "Grid" in table.style.name or "Table" in table.style.name
+        ), f"Table should use a grid/table style, got: {table.style.name}"
 
     # Verify table alignment (should be centered)
     for i, block in enumerate(doc.element.body):
-        if block.tag.endswith('}tbl'):  # This is a table element
-            tbl_pr = block.find('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tblPr')
+        if block.tag.endswith("}tbl"):  # This is a table element
+            tbl_pr = block.find(".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tblPr")
             if tbl_pr is not None:
-                jc = tbl_pr.find('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}jc')
+                jc = tbl_pr.find(".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}jc")
                 if jc is not None:
-                    alignment = jc.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val')
-                    assert alignment == 'center', f"Table should be centered, got alignment: {alignment}"
+                    alignment = jc.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val")
+                    assert alignment == "center", f"Table should be centered, got alignment: {alignment}"
                     break

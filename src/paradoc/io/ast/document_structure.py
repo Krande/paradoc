@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ContentType(Enum):
     """Types of content elements in the document."""
+
     PARAGRAPH = "paragraph"
     FIGURE = "figure"
     TABLE = "table"
@@ -37,6 +38,7 @@ class Paragraph(BaseModel):
         source_file: Source markdown file this paragraph came from
         section: Back-reference to the Section this paragraph belongs to
     """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     text: str
@@ -55,6 +57,7 @@ class FigureRef(BaseModel):
         source_file: Source markdown file
         section: Back-reference to the Section this figure belongs to
     """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     ref_id: str
@@ -74,6 +77,7 @@ class TableRef(BaseModel):
         source_file: Source markdown file
         section: Back-reference to the Section this table belongs to
     """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     ref_id: str
@@ -93,6 +97,7 @@ class EquationRef(BaseModel):
         source_file: Source markdown file
         section: Back-reference to the Section this equation belongs to
     """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     ref_id: str
@@ -112,6 +117,7 @@ class CrossReferenceUsage(BaseModel):
         source_file: Source markdown file
         section: Back-reference to the Section where this cross-reference occurs
     """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     target_id: str
@@ -142,6 +148,7 @@ class Section(BaseModel):
         is_appendix: Whether this section is in the appendix
         ast_block: The original AST Header block
     """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     id: str
@@ -200,6 +207,7 @@ class DocumentStructure(BaseModel):
         cross_references: All cross-reference usages in the document
         metadata: Document metadata from AST
     """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     sections: List[Section] = Field(default_factory=list)
@@ -243,22 +251,22 @@ class DocumentStructure(BaseModel):
             Dictionary with validation results and statistics
         """
         stats = {
-            'total_sections': len(self.sections),
-            'root_sections': len(self.root_sections),
-            'total_figures': len(self.figures),
-            'total_tables': len(self.tables),
-            'total_equations': len(self.equations),
-            'total_cross_references': len(self.cross_references),
-            'sections_by_level': {},
-            'appendix_sections': len(self.get_appendix_sections()),
-            'main_sections': len(self.get_main_sections()),
+            "total_sections": len(self.sections),
+            "root_sections": len(self.root_sections),
+            "total_figures": len(self.figures),
+            "total_tables": len(self.tables),
+            "total_equations": len(self.equations),
+            "total_cross_references": len(self.cross_references),
+            "sections_by_level": {},
+            "appendix_sections": len(self.get_appendix_sections()),
+            "main_sections": len(self.get_main_sections()),
         }
 
         # Count sections by level
         for level in range(1, 7):
             count = len(self.get_sections_by_level(level))
             if count > 0:
-                stats['sections_by_level'][level] = count
+                stats["sections_by_level"][level] = count
 
         return stats
 
@@ -306,10 +314,10 @@ class DocumentStructureExtractor:
         structure = DocumentStructure()
 
         # Extract metadata
-        structure.metadata = self.ast.get('meta', {})
+        structure.metadata = self.ast.get("meta", {})
 
         # Extract sections and content
-        blocks = self.ast.get('blocks', [])
+        blocks = self.ast.get("blocks", [])
         self._extract_structure(blocks, structure)
 
         # Build section hierarchy
@@ -329,20 +337,20 @@ class DocumentStructureExtractor:
             if not isinstance(block, dict):
                 continue
 
-            block_type = block.get('t')
+            block_type = block.get("t")
 
             # Check for source file markers
-            if block_type == 'RawBlock':
+            if block_type == "RawBlock":
                 self._check_source_marker(block)
                 # Check for appendix marker
-                content = block.get('c', [])
+                content = block.get("c", [])
                 if len(content) >= 2 and isinstance(content[1], str):
-                    if '\\appendix' in content[1]:
+                    if "\\appendix" in content[1]:
                         self.in_appendix = True
                 continue
 
             # Extract header/section
-            if block_type == 'Header':
+            if block_type == "Header":
                 section = self._extract_section(block)
                 if section:
                     structure.sections.append(section)
@@ -357,7 +365,7 @@ class DocumentStructureExtractor:
 
             # Extract content within current section
             if current_section:
-                if block_type in ['Para', 'Plain']:
+                if block_type in ["Para", "Plain"]:
                     paragraph = self._extract_paragraph(block)
                     if paragraph:
                         paragraph.section = current_section
@@ -365,21 +373,21 @@ class DocumentStructureExtractor:
                         # Extract cross-references from paragraph
                         self._extract_crossrefs_from_block(block, current_section, structure)
 
-                elif block_type == 'Figure':
+                elif block_type == "Figure":
                     figure = self._extract_figure(block)
                     if figure:
                         figure.section = current_section
                         current_section.figures.append(figure)
                         structure.figures[figure.full_id] = figure
 
-                elif block_type == 'Table':
+                elif block_type == "Table":
                     table = self._extract_table(block)
                     if table:
                         table.section = current_section
                         current_section.tables.append(table)
                         structure.tables[table.full_id] = table
 
-                elif block_type == 'Div':
+                elif block_type == "Div":
                     # Div blocks can contain figures/tables/equations
                     self._extract_from_div(block, current_section, structure)
 
@@ -388,16 +396,16 @@ class DocumentStructureExtractor:
 
     def _check_source_marker(self, block: Dict[str, Any]):
         """Check if this raw block is a source file marker."""
-        content = block.get('c', [])
+        content = block.get("c", [])
         if len(content) >= 2:
             text = content[1] if isinstance(content[1], str) else ""
-            match = re.search(r'PARADOC_SOURCE_FILE:\s*(.+?)\s*-->', text)
+            match = re.search(r"PARADOC_SOURCE_FILE:\s*(.+?)\s*-->", text)
             if match:
                 self.current_source_file = match.group(1)
 
     def _extract_section(self, block: Dict[str, Any]) -> Optional[Section]:
         """Extract a section from a Header block."""
-        content = block.get('c', [])
+        content = block.get("c", [])
         if len(content) < 3:
             return None
 
@@ -418,10 +426,10 @@ class DocumentStructureExtractor:
 
         # Get source file from either current_source_file or from AST metadata
         source_file = self.current_source_file
-        if not source_file and '_paradoc_source' in block:
-            paradoc_source = block['_paradoc_source']
+        if not source_file and "_paradoc_source" in block:
+            paradoc_source = block["_paradoc_source"]
             if isinstance(paradoc_source, dict):
-                source_file = paradoc_source.get('source_file')
+                source_file = paradoc_source.get("source_file")
 
         section = Section(
             id=section_id,
@@ -430,7 +438,7 @@ class DocumentStructureExtractor:
             number=number,
             source_file=source_file,
             is_appendix=self.in_appendix,
-            ast_block=block
+            ast_block=block,
         )
 
         return section
@@ -452,7 +460,7 @@ class DocumentStructureExtractor:
                 parts = [chr(self.appendix_letter)]
                 for l in range(2, level + 1):
                     parts.append(str(self.appendix_counters[l]))
-                return '.'.join(parts)
+                return ".".join(parts)
         else:
             # Main numbering: 1, 1.1, 1.2, 2, 2.1, etc.
             self.section_counters[level] += 1
@@ -463,19 +471,19 @@ class DocumentStructureExtractor:
             parts = []
             for l in range(1, level + 1):
                 parts.append(str(self.section_counters[l]))
-            return '.'.join(parts)
+            return ".".join(parts)
 
     def _title_to_id(self, title: str) -> str:
         """Convert title to a valid ID."""
         # Convert to lowercase, replace spaces with hyphens
         id_str = title.lower()
-        id_str = re.sub(r'[^\w\s-]', '', id_str)
-        id_str = re.sub(r'[\s_]+', '-', id_str)
+        id_str = re.sub(r"[^\w\s-]", "", id_str)
+        id_str = re.sub(r"[\s_]+", "-", id_str)
         return id_str
 
     def _extract_paragraph(self, block: Dict[str, Any]) -> Optional[Paragraph]:
         """Extract a paragraph from a Para or Plain block."""
-        inlines = block.get('c', [])
+        inlines = block.get("c", [])
         if not isinstance(inlines, list):
             return None
 
@@ -485,96 +493,82 @@ class DocumentStructureExtractor:
 
         # Get source file from either current_source_file or from AST metadata
         source_file = self.current_source_file
-        if not source_file and '_paradoc_source' in block:
-            paradoc_source = block['_paradoc_source']
+        if not source_file and "_paradoc_source" in block:
+            paradoc_source = block["_paradoc_source"]
             if isinstance(paradoc_source, dict):
-                source_file = paradoc_source.get('source_file')
+                source_file = paradoc_source.get("source_file")
 
-        return Paragraph(
-            text=text,
-            ast_block=block,
-            source_file=source_file
-        )
+        return Paragraph(text=text, ast_block=block, source_file=source_file)
 
     def _extract_figure(self, block: Dict[str, Any]) -> Optional[FigureRef]:
         """Extract a figure reference from a Figure block."""
-        content = block.get('c', [])
+        content = block.get("c", [])
         if len(content) < 1:
             return None
 
         attrs = content[0]
         fig_id = self._extract_id_from_attrs(attrs)
 
-        if not fig_id or not (fig_id.startswith('fig:') or fig_id.startswith('fig_')):
+        if not fig_id or not (fig_id.startswith("fig:") or fig_id.startswith("fig_")):
             return None
 
         # Normalize ID
-        normalized_id = fig_id.replace('_', ':') if ':' not in fig_id else fig_id
-        ref_id = normalized_id.split(':', 1)[1] if ':' in normalized_id else normalized_id.split('_', 1)[1]
+        normalized_id = fig_id.replace("_", ":") if ":" not in fig_id else fig_id
+        ref_id = normalized_id.split(":", 1)[1] if ":" in normalized_id else normalized_id.split("_", 1)[1]
 
         # Extract caption
         caption = None
         if len(content) >= 2:
             caption_content = content[1]
-            if isinstance(caption_content, dict) and caption_content.get('t') == 'Caption':
-                caption_blocks = caption_content.get('c', [[]])[1] if len(caption_content.get('c', [])) > 1 else []
+            if isinstance(caption_content, dict) and caption_content.get("t") == "Caption":
+                caption_blocks = caption_content.get("c", [[]])[1] if len(caption_content.get("c", [])) > 1 else []
                 caption = self._extract_text_from_blocks(caption_blocks)
 
         # Get source file from either current_source_file or from AST metadata
         source_file = self.current_source_file
-        if not source_file and '_paradoc_source' in block:
-            paradoc_source = block['_paradoc_source']
+        if not source_file and "_paradoc_source" in block:
+            paradoc_source = block["_paradoc_source"]
             if isinstance(paradoc_source, dict):
-                source_file = paradoc_source.get('source_file')
+                source_file = paradoc_source.get("source_file")
 
-        return FigureRef(
-            ref_id=ref_id,
-            full_id=normalized_id,
-            caption=caption,
-            source_file=source_file
-        )
+        return FigureRef(ref_id=ref_id, full_id=normalized_id, caption=caption, source_file=source_file)
 
     def _extract_table(self, block: Dict[str, Any]) -> Optional[TableRef]:
         """Extract a table reference from a Table block."""
-        content = block.get('c', [])
+        content = block.get("c", [])
         if len(content) < 1:
             return None
 
         attrs = content[0]
         tbl_id = self._extract_id_from_attrs(attrs)
 
-        if not tbl_id or not (tbl_id.startswith('tbl:') or tbl_id.startswith('tbl_')):
+        if not tbl_id or not (tbl_id.startswith("tbl:") or tbl_id.startswith("tbl_")):
             return None
 
         # Normalize ID
-        normalized_id = tbl_id.replace('_', ':') if ':' not in tbl_id else tbl_id
-        ref_id = normalized_id.split(':', 1)[1] if ':' in normalized_id else normalized_id.split('_', 1)[1]
+        normalized_id = tbl_id.replace("_", ":") if ":" not in tbl_id else tbl_id
+        ref_id = normalized_id.split(":", 1)[1] if ":" in normalized_id else normalized_id.split("_", 1)[1]
 
         # Extract caption
         caption = None
         if len(content) >= 2:
             caption_content = content[1]
-            if isinstance(caption_content, dict) and caption_content.get('t') == 'Caption':
-                caption_blocks = caption_content.get('c', [[]])[1] if len(caption_content.get('c', [])) > 1 else []
+            if isinstance(caption_content, dict) and caption_content.get("t") == "Caption":
+                caption_blocks = caption_content.get("c", [[]])[1] if len(caption_content.get("c", [])) > 1 else []
                 caption = self._extract_text_from_blocks(caption_blocks)
 
         # Get source file from either current_source_file or from AST metadata
         source_file = self.current_source_file
-        if not source_file and '_paradoc_source' in block:
-            paradoc_source = block['_paradoc_source']
+        if not source_file and "_paradoc_source" in block:
+            paradoc_source = block["_paradoc_source"]
             if isinstance(paradoc_source, dict):
-                source_file = paradoc_source.get('source_file')
+                source_file = paradoc_source.get("source_file")
 
-        return TableRef(
-            ref_id=ref_id,
-            full_id=normalized_id,
-            caption=caption,
-            source_file=source_file
-        )
+        return TableRef(ref_id=ref_id, full_id=normalized_id, caption=caption, source_file=source_file)
 
     def _extract_from_div(self, block: Dict[str, Any], section: Section, structure: DocumentStructure):
         """Extract content from Div blocks."""
-        content = block.get('c', [])
+        content = block.get("c", [])
         if len(content) < 1:
             return
 
@@ -583,16 +577,16 @@ class DocumentStructureExtractor:
 
         # Get source file from either current_source_file or from AST metadata
         source_file = self.current_source_file
-        if not source_file and '_paradoc_source' in block:
-            paradoc_source = block['_paradoc_source']
+        if not source_file and "_paradoc_source" in block:
+            paradoc_source = block["_paradoc_source"]
             if isinstance(paradoc_source, dict):
-                source_file = paradoc_source.get('source_file')
+                source_file = paradoc_source.get("source_file")
 
         # Check if this Div has a figure/table/equation ID
         if div_id:
-            if div_id.startswith('fig:') or div_id.startswith('fig_'):
-                normalized_id = div_id.replace('_', ':') if ':' not in div_id else div_id
-                ref_id = normalized_id.split(':', 1)[1] if ':' in normalized_id else normalized_id.split('_', 1)[1]
+            if div_id.startswith("fig:") or div_id.startswith("fig_"):
+                normalized_id = div_id.replace("_", ":") if ":" not in div_id else div_id
+                ref_id = normalized_id.split(":", 1)[1] if ":" in normalized_id else normalized_id.split("_", 1)[1]
 
                 caption_text = None
                 if len(content) >= 2:
@@ -600,18 +594,14 @@ class DocumentStructureExtractor:
                     caption_text = self._extract_text_from_blocks(nested_blocks)
 
                 figure = FigureRef(
-                    ref_id=ref_id,
-                    full_id=normalized_id,
-                    caption=caption_text,
-                    source_file=source_file,
-                    section=section
+                    ref_id=ref_id, full_id=normalized_id, caption=caption_text, source_file=source_file, section=section
                 )
                 section.figures.append(figure)
                 structure.figures[normalized_id] = figure
 
-            elif div_id.startswith('tbl:') or div_id.startswith('tbl_'):
-                normalized_id = div_id.replace('_', ':') if ':' not in div_id else div_id
-                ref_id = normalized_id.split(':', 1)[1] if ':' in normalized_id else normalized_id.split('_', 1)[1]
+            elif div_id.startswith("tbl:") or div_id.startswith("tbl_"):
+                normalized_id = div_id.replace("_", ":") if ":" not in div_id else div_id
+                ref_id = normalized_id.split(":", 1)[1] if ":" in normalized_id else normalized_id.split("_", 1)[1]
 
                 caption_text = None
                 if len(content) >= 2:
@@ -619,18 +609,14 @@ class DocumentStructureExtractor:
                     caption_text = self._extract_text_from_blocks(nested_blocks)
 
                 table = TableRef(
-                    ref_id=ref_id,
-                    full_id=normalized_id,
-                    caption=caption_text,
-                    source_file=source_file,
-                    section=section
+                    ref_id=ref_id, full_id=normalized_id, caption=caption_text, source_file=source_file, section=section
                 )
                 section.tables.append(table)
                 structure.tables[normalized_id] = table
 
-            elif div_id.startswith('eq:') or div_id.startswith('eq_'):
-                normalized_id = div_id.replace('_', ':') if ':' not in div_id else div_id
-                ref_id = normalized_id.split(':', 1)[1] if ':' in normalized_id else normalized_id.split('_', 1)[1]
+            elif div_id.startswith("eq:") or div_id.startswith("eq_"):
+                normalized_id = div_id.replace("_", ":") if ":" not in div_id else div_id
+                ref_id = normalized_id.split(":", 1)[1] if ":" in normalized_id else normalized_id.split("_", 1)[1]
 
                 latex_text = None
                 if len(content) >= 2:
@@ -638,11 +624,7 @@ class DocumentStructureExtractor:
                     latex_text = self._extract_text_from_blocks(nested_blocks)
 
                 equation = EquationRef(
-                    ref_id=ref_id,
-                    full_id=normalized_id,
-                    latex=latex_text,
-                    source_file=source_file,
-                    section=section
+                    ref_id=ref_id, full_id=normalized_id, latex=latex_text, source_file=source_file, section=section
                 )
                 section.equations.append(equation)
                 structure.equations[normalized_id] = equation
@@ -653,42 +635,46 @@ class DocumentStructureExtractor:
         # Pass the block to access its _paradoc_source metadata
         self._find_equation_spans(block, section, structure, block)
 
-    def _find_equation_spans(self, node: Any, section: Section, structure: DocumentStructure, parent_block: Optional[Dict[str, Any]] = None):
+    def _find_equation_spans(
+        self, node: Any, section: Section, structure: DocumentStructure, parent_block: Optional[Dict[str, Any]] = None
+    ):
         """Recursively find and extract equation Span elements."""
         if isinstance(node, dict):
-            if node.get('t') == 'Span':
-                content = node.get('c', [])
+            if node.get("t") == "Span":
+                content = node.get("c", [])
                 if len(content) >= 2:
                     attrs = content[0]
                     span_id = self._extract_id_from_attrs(attrs)
 
-                    if span_id and (span_id.startswith('eq:') or span_id.startswith('eq_')):
-                        normalized_id = span_id.replace('_', ':') if ':' not in span_id else span_id
-                        ref_id = normalized_id.split(':', 1)[1] if ':' in normalized_id else normalized_id.split('_', 1)[1]
+                    if span_id and (span_id.startswith("eq:") or span_id.startswith("eq_")):
+                        normalized_id = span_id.replace("_", ":") if ":" not in span_id else span_id
+                        ref_id = (
+                            normalized_id.split(":", 1)[1] if ":" in normalized_id else normalized_id.split("_", 1)[1]
+                        )
 
                         # Extract equation content
                         latex_text = None
                         nested_inlines = content[1] if isinstance(content[1], list) else []
                         for nested in nested_inlines:
-                            if isinstance(nested, dict) and nested.get('t') == 'Math':
-                                math_content = nested.get('c', [])
+                            if isinstance(nested, dict) and nested.get("t") == "Math":
+                                math_content = nested.get("c", [])
                                 if len(math_content) >= 2:
                                     latex_text = math_content[1]
                                 break
 
                         # Get source file from current_source_file or parent block's metadata
                         source_file = self.current_source_file
-                        if not source_file and parent_block and '_paradoc_source' in parent_block:
-                            paradoc_source = parent_block['_paradoc_source']
+                        if not source_file and parent_block and "_paradoc_source" in parent_block:
+                            paradoc_source = parent_block["_paradoc_source"]
                             if isinstance(paradoc_source, dict):
-                                source_file = paradoc_source.get('source_file')
+                                source_file = paradoc_source.get("source_file")
 
                         equation = EquationRef(
                             ref_id=ref_id,
                             full_id=normalized_id,
                             latex=latex_text,
                             source_file=source_file,
-                            section=section
+                            section=section,
                         )
                         section.equations.append(equation)
                         structure.equations[normalized_id] = equation
@@ -703,20 +689,27 @@ class DocumentStructureExtractor:
 
     def _extract_crossrefs_from_block(self, block: Dict[str, Any], section: Section, structure: DocumentStructure):
         """Extract cross-references from a block."""
-        inlines = block.get('c', [])
+        inlines = block.get("c", [])
         if isinstance(inlines, list):
             context_text = self._extract_text_from_inlines(inlines)
 
             # Get source file from block metadata if available
             source_file = self.current_source_file
-            if not source_file and '_paradoc_source' in block:
-                paradoc_source = block['_paradoc_source']
+            if not source_file and "_paradoc_source" in block:
+                paradoc_source = block["_paradoc_source"]
                 if isinstance(paradoc_source, dict):
-                    source_file = paradoc_source.get('source_file')
+                    source_file = paradoc_source.get("source_file")
 
             self._find_citations(inlines, section, structure, context_text, source_file)
 
-    def _find_citations(self, inlines: List[Any], section: Section, structure: DocumentStructure, context: Optional[str], source_file: Optional[str] = None):
+    def _find_citations(
+        self,
+        inlines: List[Any],
+        section: Section,
+        structure: DocumentStructure,
+        context: Optional[str],
+        source_file: Optional[str] = None,
+    ):
         """Recursively find citation elements in inlines."""
         # Use provided source_file or fall back to current_source_file
         if source_file is None:
@@ -726,71 +719,73 @@ class DocumentStructureExtractor:
             if not isinstance(inline, dict):
                 continue
 
-            inline_type = inline.get('t')
+            inline_type = inline.get("t")
 
-            if inline_type == 'Cite':
-                content = inline.get('c', [])
+            if inline_type == "Cite":
+                content = inline.get("c", [])
                 if len(content) >= 1:
                     citations = content[0]
                     if isinstance(citations, list):
                         for citation in citations:
                             if isinstance(citation, dict):
-                                citation_id = citation.get('citationId', '')
+                                citation_id = citation.get("citationId", "")
 
                                 # Check if this is a cross-reference
                                 target_type = None
-                                if citation_id.startswith('fig:') or citation_id.startswith('fig_'):
-                                    target_type = 'fig'
-                                elif citation_id.startswith('tbl:') or citation_id.startswith('tbl_'):
-                                    target_type = 'tbl'
-                                elif citation_id.startswith('eq:') or citation_id.startswith('eq_'):
-                                    target_type = 'eq'
+                                if citation_id.startswith("fig:") or citation_id.startswith("fig_"):
+                                    target_type = "fig"
+                                elif citation_id.startswith("tbl:") or citation_id.startswith("tbl_"):
+                                    target_type = "tbl"
+                                elif citation_id.startswith("eq:") or citation_id.startswith("eq_"):
+                                    target_type = "eq"
 
                                 if target_type:
-                                    normalized_id = citation_id.replace('_', ':') if ':' not in citation_id else citation_id
+                                    normalized_id = (
+                                        citation_id.replace("_", ":") if ":" not in citation_id else citation_id
+                                    )
 
                                     crossref = CrossReferenceUsage(
                                         target_id=normalized_id,
                                         target_type=target_type,
                                         context=context,
                                         source_file=source_file,
-                                        section=section
+                                        section=section,
                                     )
                                     section.cross_references.append(crossref)
                                     structure.cross_references.append(crossref)
 
-            elif inline_type == 'Link':
-                content = inline.get('c', [])
+            elif inline_type == "Link":
+                content = inline.get("c", [])
                 if len(content) >= 3:
                     target = content[2]
                     if isinstance(target, list) and len(target) >= 1:
                         url = target[0]
-                        if isinstance(url, str) and url.startswith('#'):
+                        if isinstance(url, str) and url.startswith("#"):
                             anchor = url[1:]
 
                             target_type = None
-                            if anchor.startswith('fig:') or anchor.startswith('fig_'):
-                                target_type = 'fig'
-                            elif anchor.startswith('tbl:') or anchor.startswith('tbl_'):
-                                target_type = 'tbl'
-                            elif anchor.startswith('eq:') or anchor.startswith('eq_'):
-                                target_type = 'eq'
+                            if anchor.startswith("fig:") or anchor.startswith("fig_"):
+                                target_type = "fig"
+                            elif anchor.startswith("tbl:") or anchor.startswith("tbl_"):
+                                target_type = "tbl"
+                            elif anchor.startswith("eq:") or anchor.startswith("eq_"):
+                                target_type = "eq"
 
                             if target_type:
-                                normalized_id = anchor.replace('_', ':') if ':' not in anchor else anchor
+                                normalized_id = anchor.replace("_", ":") if ":" not in anchor else anchor
 
                                 crossref = CrossReferenceUsage(
                                     target_id=normalized_id,
                                     target_type=target_type,
                                     context=context,
-                                    source_file=source_file
+                                    source_file=source_file,
                                 )
                                 section.cross_references.append(crossref)
                                 structure.cross_references.append(crossref)
 
             # Recurse into nested inlines
-            if 'c' in inline:
-                content = inline['c']
+            if "c" in inline:
+                content = inline["c"]
                 if isinstance(content, list):
                     for item in content:
                         if isinstance(item, list):
@@ -837,47 +832,46 @@ class DocumentStructureExtractor:
     def _extract_id_from_attrs(self, attrs: Any) -> str:
         """Extract ID from Pandoc Attr structure."""
         if isinstance(attrs, dict):
-            return attrs.get('id', '')
+            return attrs.get("id", "")
         elif isinstance(attrs, list) and len(attrs) >= 1:
-            return attrs[0] if isinstance(attrs[0], str) else ''
-        return ''
+            return attrs[0] if isinstance(attrs[0], str) else ""
+        return ""
 
     def _extract_text_from_blocks(self, blocks: List[Any]) -> str:
         """Extract plain text from a list of block elements."""
         text_parts = []
         for block in blocks:
             if isinstance(block, dict):
-                if block.get('t') in ['Para', 'Plain']:
-                    inlines = block.get('c', [])
+                if block.get("t") in ["Para", "Plain"]:
+                    inlines = block.get("c", [])
                     text_parts.append(self._extract_text_from_inlines(inlines))
-                elif block.get('t') == 'Str':
-                    text_parts.append(block.get('c', ''))
-        return ' '.join(text_parts).strip()
+                elif block.get("t") == "Str":
+                    text_parts.append(block.get("c", ""))
+        return " ".join(text_parts).strip()
 
     def _extract_text_from_inlines(self, inlines: List[Any]) -> str:
         """Extract plain text from a list of inline elements."""
         text_parts = []
         for inline in inlines:
             if isinstance(inline, dict):
-                inline_type = inline.get('t')
-                if inline_type == 'Str':
-                    text_parts.append(inline.get('c', ''))
-                elif inline_type == 'Space':
-                    text_parts.append(' ')
-                elif inline_type in ['Emph', 'Strong', 'Strikeout', 'Superscript', 'Subscript', 'SmallCaps']:
-                    nested = inline.get('c', [])
+                inline_type = inline.get("t")
+                if inline_type == "Str":
+                    text_parts.append(inline.get("c", ""))
+                elif inline_type == "Space":
+                    text_parts.append(" ")
+                elif inline_type in ["Emph", "Strong", "Strikeout", "Superscript", "Subscript", "SmallCaps"]:
+                    nested = inline.get("c", [])
                     text_parts.append(self._extract_text_from_inlines(nested))
-                elif inline_type == 'Span':
-                    content = inline.get('c', [])
+                elif inline_type == "Span":
+                    content = inline.get("c", [])
                     if len(content) >= 2:
                         text_parts.append(self._extract_text_from_inlines(content[1]))
-                elif inline_type == 'Link':
-                    content = inline.get('c', [])
+                elif inline_type == "Link":
+                    content = inline.get("c", [])
                     if len(content) >= 2:
                         text_parts.append(self._extract_text_from_inlines(content[1]))
-                elif inline_type == 'Cite':
-                    content = inline.get('c', [])
+                elif inline_type == "Cite":
+                    content = inline.get("c", [])
                     if len(content) >= 2:
                         text_parts.append(self._extract_text_from_inlines(content[1]))
-        return ''.join(text_parts).strip()
-
+        return "".join(text_parts).strip()

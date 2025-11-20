@@ -47,9 +47,7 @@ def test_reverse_engineer_word_crossref(tmp_path):
         # Add a figure with caption using the high-level API
         print("  Creating caption with Word's SEQ field...")
         fig_ref = doc.add_figure_with_caption(
-            caption_text="Test Caption Created by Word",
-            create_bookmark=True,
-            use_chapter_numbers=False
+            caption_text="Test Caption Created by Word", create_bookmark=True, use_chapter_numbers=False
         )
 
         print(f"  [OK] Caption created with bookmark: {fig_ref.bookmark_name}")

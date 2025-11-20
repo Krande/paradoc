@@ -12,7 +12,6 @@ from docx import Document
 
 from paradoc import OneDoc
 
-
 auto_open = os.getenv("AUTO_OPEN", False)
 
 

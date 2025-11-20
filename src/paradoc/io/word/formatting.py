@@ -104,6 +104,7 @@ def format_paragraph(pg, document: Document, paragraph_style_map: dict, index):
 
 def fix_headers_after_compose(doc: Document):
     from copy import deepcopy
+
     from paradoc import OneDoc
     from paradoc.io.word.utils import delete_paragraph, iter_block_items
 

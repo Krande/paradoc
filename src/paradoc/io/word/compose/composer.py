@@ -1,5 +1,9 @@
+import os.path
+import random
+import re
 from collections import OrderedDict
 from copy import deepcopy
+
 from docx.opc.constants import CONTENT_TYPE as CT
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.opc.oxml import serialize_part_xml
@@ -8,13 +12,10 @@ from docx.opc.part import Part
 from docx.oxml import parse_xml
 from docx.oxml.section import CT_SectPr
 from docx.parts.numbering import NumberingPart
+
 from paradoc.io.word.compose.image import ImageWrapper
 from paradoc.io.word.compose.properties import CustomProperties
-from paradoc.io.word.compose.utils import NS
-from paradoc.io.word.compose.utils import xpath
-import os.path
-import random
-import re
+from paradoc.io.word.compose.utils import NS, xpath
 
 FILENAME_IDX_RE = re.compile("([a-zA-Z/_-]+)([1-9][0-9]*)?")
 RID_IDX_RE = re.compile("rId([0-9]*)")
@@ -579,8 +580,6 @@ class Composer(object):
             bookmark.set("{%s}id" % NS["w"], bookmark_name_to_id[name])
 
         # Now update bookmarkEnd elements to match their corresponding starts
-        bookmarks_end = xpath(self.doc.element.body, ".//w:bookmarkEnd")
-
         # We need to match ends to starts by tracking them in document order
         # Create a list of (element, name, id) for all starts
         starts_in_order = []
@@ -588,9 +587,6 @@ class Composer(object):
             name = bookmark.get("{%s}name" % NS["w"])
             bm_id = bookmark.get("{%s}id" % NS["w"])
             starts_in_order.append((bookmark, name, bm_id))
-
-        # Track which bookmarks are currently open as we traverse the document
-        open_bookmarks = {}  # old_id -> (name, new_id)
 
         # We need to traverse in document order to properly match starts and ends
         # Get all bookmark elements (both starts and ends) in order
@@ -614,7 +610,6 @@ class Composer(object):
             elif elem_type == "end":
                 # Find which bookmark this end belongs to
                 # Ends don't have names, so we need to match by ID or by last-opened
-                old_id = elem.get("{%s}id" % NS["w"])
 
                 # Try to find the matching start by checking if any open bookmark has this old_id
                 matched = False

@@ -15,7 +15,7 @@ import random
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
@@ -100,20 +100,22 @@ class HyperlinkReference:
         """
         try:
             # Normalize number
-            ref_num = (self.hyperlink_text or "").strip().rstrip('.')
-            label = self.ref_type.value if getattr(self, 'ref_type', None) else (self.label or "")
+            ref_num = (self.hyperlink_text or "").strip().rstrip(".")
+            label = self.ref_type.value if getattr(self, "ref_type", None) else (self.label or "")
 
             # Attempt to extract two words before and after around our hyperlink element
             before_words: List[str] = []
             after_words: List[str] = []
 
-            p_element = getattr(self.paragraph, '_p', None)
+            p_element = getattr(self.paragraph, "_p", None)
             target_elem = self.hyperlink_element
 
             def _text_from_element(elem: Any) -> str:
                 # Gather all w:t text under element
                 parts: List[str] = []
-                for t in elem.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                for t in elem.findall(
+                    ".//w:t", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+                ):
                     if t.text:
                         parts.append(t.text)
                     else:
@@ -142,7 +144,7 @@ class HyperlinkReference:
                 if idx is not None:
                     # Build text before and after by concatenating siblings' text
                     before_text = "".join(_text_from_element(e) for e in children[:idx])
-                    after_text = "".join(_text_from_element(e) for e in children[idx+1:])
+                    after_text = "".join(_text_from_element(e) for e in children[idx + 1 :])
 
                     # Remove known prefix abbreviation from the boundary of before_text
                     if self.prefix_text:
@@ -172,11 +174,11 @@ class HyperlinkReference:
             # Anchor formatted as in example: anchor="tbl:'semantic'"
             anchor_repr = self.anchor
             # Ensure quotes around semantic id part if present
-            if ':' in anchor_repr:
-                kind, sem = anchor_repr.split(':', 1)
+            if ":" in anchor_repr:
+                kind, sem = anchor_repr.split(":", 1)
                 anchor_repr = f"{kind}:'{sem}'"
 
-            return f"HyperLink(refType={label}, refNum={ref_num}, anchor=\"{anchor_repr}\", pg=\"{pg}\")"
+            return f'HyperLink(refType={label}, refNum={ref_num}, anchor="{anchor_repr}", pg="{pg}")'
         except Exception:
             # Fallback simple representation
             return f"HyperLink(refType={getattr(self.ref_type, 'value', self.label)}, refNum={self.hyperlink_text}, anchor=\"{self.anchor}\")"
@@ -353,7 +355,7 @@ class ReferenceHelper:
         # Build mapping from pandoc-crossref anchors to Word bookmarks using the registry
         # This is more reliable than scanning the document
         anchor_to_bookmark = {}  # Maps anchor (e.g., "fig:test_figure") to Word bookmark name
-        anchor_to_info = {}      # Maps anchor to metadata (type, label, etc.)
+        anchor_to_info = {}  # Maps anchor to metadata (type, label, etc.)
 
         logger.debug("[ReferenceHelper] Building anchor-to-bookmark mapping from registry...")
 
@@ -362,10 +364,10 @@ class ReferenceHelper:
             anchor = f"fig:{semantic_id}"
             anchor_to_bookmark[anchor] = item.word_bookmark
             anchor_to_info[anchor] = {
-                'ref_type': item.ref_type,
-                'semantic_id': semantic_id,
-                'label': "Figure",
-                'word_bookmark': item.word_bookmark
+                "ref_type": item.ref_type,
+                "semantic_id": semantic_id,
+                "label": "Figure",
+                "word_bookmark": item.word_bookmark,
             }
             logger.debug(f"[ReferenceHelper]   Registered figure: {anchor} -> {item.word_bookmark}")
 
@@ -374,10 +376,10 @@ class ReferenceHelper:
             anchor = f"tbl:{semantic_id}"
             anchor_to_bookmark[anchor] = item.word_bookmark
             anchor_to_info[anchor] = {
-                'ref_type': item.ref_type,
-                'semantic_id': semantic_id,
-                'label': "Table",
-                'word_bookmark': item.word_bookmark
+                "ref_type": item.ref_type,
+                "semantic_id": semantic_id,
+                "label": "Table",
+                "word_bookmark": item.word_bookmark,
             }
             logger.debug(f"[ReferenceHelper]   Registered table: {anchor} -> {item.word_bookmark}")
 
@@ -386,10 +388,10 @@ class ReferenceHelper:
             anchor = f"eq:{semantic_id}"
             anchor_to_bookmark[anchor] = item.word_bookmark
             anchor_to_info[anchor] = {
-                'ref_type': item.ref_type,
-                'semantic_id': semantic_id,
-                'label': "Eq",
-                'word_bookmark': item.word_bookmark
+                "ref_type": item.ref_type,
+                "semantic_id": semantic_id,
+                "label": "Eq",
+                "word_bookmark": item.word_bookmark,
             }
             logger.debug(f"[ReferenceHelper]   Registered equation: {anchor} -> {item.word_bookmark}")
 
@@ -414,7 +416,9 @@ class ReferenceHelper:
             p_element = block._p
 
             # Find ALL hyperlinks in the paragraph using xpath (not just direct children)
-            hyperlinks = p_element.findall('.//w:hyperlink', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+            hyperlinks = p_element.findall(
+                ".//w:hyperlink", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+            )
 
             if not hyperlinks:
                 continue
@@ -438,17 +442,19 @@ class ReferenceHelper:
                 if hyperlink_elem.tag != qn("w:hyperlink"):
                     continue
 
-                anchor = hyperlink_elem.get(qn('w:anchor'))
+                anchor = hyperlink_elem.get(qn("w:anchor"))
                 if not anchor:
                     continue
 
                 # Check if this looks like a pandoc-crossref anchor
-                if not (anchor.startswith('fig:') or anchor.startswith('tbl:') or anchor.startswith('eq:')):
+                if not (anchor.startswith("fig:") or anchor.startswith("tbl:") or anchor.startswith("eq:")):
                     continue
 
                 # Extract the text inside the hyperlink
                 hyperlink_text = ""
-                for text_elem in hyperlink_elem.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                for text_elem in hyperlink_elem.findall(
+                    ".//w:t", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+                ):
                     hyperlink_text += text_elem.text or ""
 
                 # Try to find the target bookmark for this anchor
@@ -457,19 +463,21 @@ class ReferenceHelper:
                 if not info:
                     # This hyperlink references something that doesn't have a caption/bookmark yet
                     # Infer the type and label from the anchor prefix, and create a bookmark
-                    logger.warning(f"[ReferenceHelper]   Hyperlink {anchor} has no caption bookmark - will auto-register")
+                    logger.warning(
+                        f"[ReferenceHelper]   Hyperlink {anchor} has no caption bookmark - will auto-register"
+                    )
 
-                    if anchor.startswith('fig:'):
+                    if anchor.startswith("fig:"):
                         ref_type = ReferenceType.FIGURE
                         semantic_id = anchor[4:]
                         label = "Figure"
                         word_bookmark = self.register_figure(semantic_id)
-                    elif anchor.startswith('tbl:'):
+                    elif anchor.startswith("tbl:"):
                         ref_type = ReferenceType.TABLE
                         semantic_id = anchor[4:]
                         label = "Table"
                         word_bookmark = self.register_table(semantic_id)
-                    elif anchor.startswith('eq:'):
+                    elif anchor.startswith("eq:"):
                         ref_type = ReferenceType.EQUATION
                         semantic_id = anchor[3:]
                         label = "Eq"
@@ -478,10 +486,10 @@ class ReferenceHelper:
                         continue
                 else:
                     # Use info from the caption we found
-                    ref_type = info['ref_type']
-                    semantic_id = info['semantic_id']
-                    word_bookmark = info['word_bookmark']
-                    label = info['label']
+                    ref_type = info["ref_type"]
+                    semantic_id = info["semantic_id"]
+                    word_bookmark = info["word_bookmark"]
+                    label = info["label"]
 
                 # Look for prefix text in the previous run
                 prefix_text = None
@@ -492,11 +500,13 @@ class ReferenceHelper:
                     if prev_child.tag == qn("w:r"):
                         # Extract text from the run
                         prev_text = ""
-                        for text_elem in prev_child.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                        for text_elem in prev_child.findall(
+                            ".//w:t", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+                        ):
                             prev_text += text_elem.text or ""
 
                         # Check if it ends with a prefix pattern (with optional trailing whitespace)
-                        prefix_pattern = r'(fig\.|tbl\.|eq\.)\s*$'
+                        prefix_pattern = r"(fig\.|tbl\.|eq\.)\s*$"
                         match = re.search(prefix_pattern, prev_text, re.IGNORECASE)
                         if match:
                             prefix_text = match.group()
@@ -514,7 +524,7 @@ class ReferenceHelper:
                     label=label,
                     prefix_text=prefix_text,
                     prefix_run_element=prefix_run_element,
-                    element_index=elem_index
+                    element_index=elem_index,
                 )
 
                 hyperlink_refs.append(hyperlink_ref)
@@ -767,10 +777,14 @@ class ReferenceHelper:
             bookmark_idx = None
             if num_str in display_to_idx:
                 bookmark_idx = display_to_idx[num_str]
-                logger.debug(f"[ReferenceHelper]     {label} '{num_str}' matched display number -> index {bookmark_idx}")
+                logger.debug(
+                    f"[ReferenceHelper]     {label} '{num_str}' matched display number -> index {bookmark_idx}"
+                )
             elif num_str in sequential_to_idx:
                 bookmark_idx = sequential_to_idx[num_str]
-                logger.debug(f"[ReferenceHelper]     {label} '{num_str}' matched sequential number -> index {bookmark_idx}")
+                logger.debug(
+                    f"[ReferenceHelper]     {label} '{num_str}' matched sequential number -> index {bookmark_idx}"
+                )
             else:
                 logger.warning(f"[ReferenceHelper]     WARNING: No mapping for {label} '{num_str}', skipping")
                 continue
@@ -779,7 +793,9 @@ class ReferenceHelper:
             if 0 <= bookmark_idx < len(bookmarks):
                 bookmark_name = bookmarks[bookmark_idx]
             else:
-                logger.warning(f"[ReferenceHelper]     WARNING: Index {bookmark_idx} out of range (max {len(bookmarks) - 1})")
+                logger.warning(
+                    f"[ReferenceHelper]     WARNING: Index {bookmark_idx} out of range (max {len(bookmarks) - 1})"
+                )
                 continue
 
             # Add text before the reference
@@ -866,7 +882,9 @@ class ReferenceHelper:
             p_element = block._p
 
             # Look for hyperlink elements with anchors
-            hyperlinks = p_element.findall('.//w:hyperlink', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+            hyperlinks = p_element.findall(
+                ".//w:hyperlink", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+            )
 
             if not hyperlinks:
                 continue
@@ -874,7 +892,7 @@ class ReferenceHelper:
             # Check if any hyperlinks point to our registered references
             has_matching_refs = False
             for hyperlink in hyperlinks:
-                anchor = hyperlink.get(qn('w:anchor'))
+                anchor = hyperlink.get(qn("w:anchor"))
                 if anchor and anchor in semantic_to_word_bookmark:
                     has_matching_refs = True
                     break
@@ -889,9 +907,13 @@ class ReferenceHelper:
                 processed_count += 1
                 hyperlink_count += refs_converted
 
-        logger.info(f"[ReferenceHelper] Conversion complete: {processed_count} paragraphs processed, {hyperlink_count} hyperlinks converted")
+        logger.info(
+            f"[ReferenceHelper] Conversion complete: {processed_count} paragraphs processed, {hyperlink_count} hyperlinks converted"
+        )
 
-    def _process_paragraph_hyperlinks(self, paragraph: Paragraph, semantic_to_word_bookmark: Dict[str, str], semantic_to_label: Dict[str, str]) -> int:
+    def _process_paragraph_hyperlinks(
+        self, paragraph: Paragraph, semantic_to_word_bookmark: Dict[str, str], semantic_to_label: Dict[str, str]
+    ) -> int:
         """Process a paragraph to replace hyperlinks with REF fields.
 
         Args:
@@ -910,46 +932,37 @@ class ReferenceHelper:
 
         for child in p_element:
             if child.tag == qn("w:hyperlink"):
-                anchor = child.get(qn('w:anchor'))
+                anchor = child.get(qn("w:anchor"))
                 if anchor and anchor in semantic_to_word_bookmark:
                     # This is a reference hyperlink we need to convert
                     # Extract the text from the hyperlink
                     hyperlink_text = ""
-                    for text_elem in child.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                    for text_elem in child.findall(
+                        ".//w:t", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+                    ):
                         hyperlink_text += text_elem.text or ""
 
-                    elements_info.append({
-                        'type': 'ref_hyperlink',
-                        'element': child,
-                        'anchor': anchor,
-                        'text': hyperlink_text
-                    })
+                    elements_info.append(
+                        {"type": "ref_hyperlink", "element": child, "anchor": anchor, "text": hyperlink_text}
+                    )
                 else:
                     # Regular hyperlink, keep as-is
-                    elements_info.append({
-                        'type': 'hyperlink',
-                        'element': child
-                    })
+                    elements_info.append({"type": "hyperlink", "element": child})
             elif child.tag == qn("w:r"):
                 # Regular run with text
                 text_content = ""
-                for text_elem in child.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                for text_elem in child.findall(
+                    ".//w:t", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+                ):
                     text_content += text_elem.text or ""
 
-                elements_info.append({
-                    'type': 'run',
-                    'element': child,
-                    'text': text_content
-                })
+                elements_info.append({"type": "run", "element": child, "text": text_content})
             else:
                 # Other element (bookmarkStart, bookmarkEnd, etc.), keep as-is
-                elements_info.append({
-                    'type': 'other',
-                    'element': child
-                })
+                elements_info.append({"type": "other", "element": child})
 
         # Check if there are any ref_hyperlinks to convert
-        has_refs = any(elem['type'] == 'ref_hyperlink' for elem in elements_info)
+        has_refs = any(elem["type"] == "ref_hyperlink" for elem in elements_info)
         if not has_refs:
             return 0
 
@@ -963,51 +976,53 @@ class ReferenceHelper:
 
         # Pre-process to mark runs that need prefix removal
         for i, elem_info in enumerate(elements_info):
-            if elem_info['type'] == 'ref_hyperlink':
+            if elem_info["type"] == "ref_hyperlink":
                 # Check if the previous element is a run with prefix text
                 # Pandoc-crossref creates text like "fig." or "tbl." or "eq." before the hyperlink
-                if i > 0 and elements_info[i-1]['type'] == 'run':
-                    prev_text = elements_info[i-1].get('text', '')
+                if i > 0 and elements_info[i - 1]["type"] == "run":
+                    prev_text = elements_info[i - 1].get("text", "")
                     # Remove prefix patterns like "fig.", "tbl.", "eq." at the end of the previous run
                     # Note: pandoc-crossref uses lowercase abbreviations
-                    prefix_pattern = r'(fig\.|tbl\.|eq\.)$'
+                    prefix_pattern = r"(fig\.|tbl\.|eq\.)$"
                     match = re.search(prefix_pattern, prev_text, re.IGNORECASE)
                     if match:
                         # Mark this run as having its suffix removed
-                        new_text = re.sub(prefix_pattern, '', prev_text, flags=re.IGNORECASE)
-                        elements_info[i-1]['text'] = new_text
-                        elements_info[i-1]['prefix_removed'] = True
+                        new_text = re.sub(prefix_pattern, "", prev_text, flags=re.IGNORECASE)
+                        elements_info[i - 1]["text"] = new_text
+                        elements_info[i - 1]["prefix_removed"] = True
 
         # Now rebuild the paragraph
         for i, elem_info in enumerate(elements_info):
-            if elem_info['type'] == 'ref_hyperlink':
+            if elem_info["type"] == "ref_hyperlink":
                 # Convert to REF field
-                anchor = elem_info['anchor']
+                anchor = elem_info["anchor"]
                 word_bookmark = semantic_to_word_bookmark[anchor]
                 label = semantic_to_label[anchor]
 
                 create_ref_field_runs(p_element, word_bookmark, label=label)
                 refs_converted += 1
-                logger.debug(f"[ReferenceHelper]     Converted hyperlink '{anchor}' -> REF field '{word_bookmark}' ({label})")
+                logger.debug(
+                    f"[ReferenceHelper]     Converted hyperlink '{anchor}' -> REF field '{word_bookmark}' ({label})"
+                )
 
-            elif elem_info['type'] == 'hyperlink':
+            elif elem_info["type"] == "hyperlink":
                 # Keep regular hyperlink as-is
-                p_element.append(elem_info['element'])
+                p_element.append(elem_info["element"])
 
-            elif elem_info['type'] == 'run':
+            elif elem_info["type"] == "run":
                 # Check if we modified the text
-                if elem_info.get('prefix_removed'):
+                if elem_info.get("prefix_removed"):
                     # Create a new run with the modified text
-                    new_text = elem_info['text']
+                    new_text = elem_info["text"]
                     if new_text:  # Only add if there's still text left
                         create_text_run(p_element, new_text)
                 else:
                     # Keep run as-is
-                    p_element.append(elem_info['element'])
+                    p_element.append(elem_info["element"])
 
             else:
                 # Keep other elements as-is
-                p_element.append(elem_info['element'])
+                p_element.append(elem_info["element"])
 
         return refs_converted
 
@@ -1025,6 +1040,7 @@ class ReferenceHelper:
 
         # Group references by paragraph to process them efficiently
         from collections import defaultdict
+
         refs_by_paragraph = defaultdict(list)
 
         for ref in hyperlink_refs:
@@ -1042,7 +1058,9 @@ class ReferenceHelper:
             paragraph = para_refs[0].paragraph
             p_element = paragraph._p
 
-            logger.debug(f"[ReferenceHelper] Processing paragraph with {len(para_refs)} reference(s): {paragraph.text[:80]}")
+            logger.debug(
+                f"[ReferenceHelper] Processing paragraph with {len(para_refs)} reference(s): {paragraph.text[:80]}"
+            )
 
             # Build a list of all child elements
             children = list(p_element)
@@ -1078,18 +1096,18 @@ class ReferenceHelper:
 
                 if ref_for_this:
                     # This hyperlink needs to be converted to a REF field
-                    reconstruction_plan.append({
-                        'type': 'ref_field',
-                        'word_bookmark': ref_for_this.word_bookmark,
-                        'label': ref_for_this.label
-                    })
+                    reconstruction_plan.append(
+                        {"type": "ref_field", "word_bookmark": ref_for_this.word_bookmark, "label": ref_for_this.label}
+                    )
                 elif child_id in elements_to_remove:
                     # This is a prefix run that should be removed
                     # But we need to check if there's any text after the prefix
                     if child.tag == qn("w:r"):
                         # Extract text from the run
                         run_text = ""
-                        for text_elem in child.findall('.//w:t', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}):
+                        for text_elem in child.findall(
+                            ".//w:t", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+                        ):
                             run_text += text_elem.text or ""
 
                         # Remove the prefix pattern
@@ -1097,19 +1115,13 @@ class ReferenceHelper:
                             if ref.prefix_run_element is not None and id(ref.prefix_run_element) == child_id:
                                 if ref.prefix_text:
                                     # Remove the prefix text from the run
-                                    remaining_text = run_text[:-len(ref.prefix_text)]
+                                    remaining_text = run_text[: -len(ref.prefix_text)]
                                     if remaining_text:
-                                        reconstruction_plan.append({
-                                            'type': 'text',
-                                            'text': remaining_text
-                                        })
+                                        reconstruction_plan.append({"type": "text", "text": remaining_text})
                                 break
                 else:
                     # Keep this element as-is
-                    reconstruction_plan.append({
-                        'type': 'element',
-                        'element': child
-                    })
+                    reconstruction_plan.append({"type": "element", "element": child})
 
             # Clear the paragraph
             for child in list(p_element):
@@ -1118,20 +1130,23 @@ class ReferenceHelper:
             # Rebuild the paragraph according to the plan
             refs_converted = 0
             for item in reconstruction_plan:
-                if item['type'] == 'ref_field':
-                    create_ref_field_runs(p_element, item['word_bookmark'], label=item['label'])
+                if item["type"] == "ref_field":
+                    create_ref_field_runs(p_element, item["word_bookmark"], label=item["label"])
                     refs_converted += 1
-                    logger.debug(f"[ReferenceHelper]     Added REF field: {item['label']} -> bookmark '{item['word_bookmark']}'")
-                elif item['type'] == 'text':
-                    create_text_run(p_element, item['text'])
-                elif item['type'] == 'element':
-                    p_element.append(item['element'])
+                    logger.debug(
+                        f"[ReferenceHelper]     Added REF field: {item['label']} -> bookmark '{item['word_bookmark']}'"
+                    )
+                elif item["type"] == "text":
+                    create_text_run(p_element, item["text"])
+                elif item["type"] == "element":
+                    p_element.append(item["element"])
 
             processed_count += 1
             total_converted += refs_converted
 
-
-        logger.info(f"[ReferenceHelper] Conversion complete: {processed_count} paragraphs processed, {total_converted} references converted")
+        logger.info(
+            f"[ReferenceHelper] Conversion complete: {processed_count} paragraphs processed, {total_converted} references converted"
+        )
 
     def print_registry(self):
         """Print the complete registry for debugging."""
@@ -1164,8 +1179,8 @@ class ReferenceHelper:
         caption_text = caption_para.text
         # Caption format: "Table X: Caption text" or "Table X-Y: Caption text"
         # Extract the text after the colon
-        if ':' in caption_text:
-            return caption_text.split(':', 1)[1].strip()
+        if ":" in caption_text:
+            return caption_text.split(":", 1)[1].strip()
 
         return None
 
@@ -1187,8 +1202,9 @@ class ReferenceHelper:
             List of DocXTableRef objects
         """
         from docx.table import Table as DocxTable
+
         from .models import DocXTableRef
-        from .utils import iter_block_items, get_from_doc_by_index
+        from .utils import get_from_doc_by_index, iter_block_items
 
         logger.info(f"[ReferenceHelper] Extracting tables from {'appendix' if is_appendix else 'main'} document")
 
@@ -1225,7 +1241,9 @@ class ReferenceHelper:
                         break
 
                 if tbl is None:
-                    logger.warning(f"[ReferenceHelper]   Unable to find table with caption '{caption_text}' in OneDoc.tables")
+                    logger.warning(
+                        f"[ReferenceHelper]   Unable to find table with caption '{caption_text}' in OneDoc.tables"
+                    )
                     continue
 
                 current_table.table_ref = tbl
@@ -1233,7 +1251,9 @@ class ReferenceHelper:
 
                 logger.debug(f"[ReferenceHelper]   Found table: {table_id} (caption: {caption_text})")
 
-        logger.info(f"[ReferenceHelper] Extracted {len(tables)} tables from {'appendix' if is_appendix else 'main'} document")
+        logger.info(
+            f"[ReferenceHelper] Extracted {len(tables)} tables from {'appendix' if is_appendix else 'main'} document"
+        )
         return tables
 
     def extract_all_figures(self, document, one_doc, is_appendix: bool):
@@ -1251,7 +1271,7 @@ class ReferenceHelper:
             List of DocXFigureRef objects
         """
         from .models import DocXFigureRef
-        from .utils import iter_block_items, get_from_doc_by_index
+        from .utils import get_from_doc_by_index, iter_block_items
 
         logger.info(f"[ReferenceHelper] Extracting figures from {'appendix' if is_appendix else 'main'} document")
 
@@ -1279,7 +1299,9 @@ class ReferenceHelper:
 
                 logger.debug(f"[ReferenceHelper]   Found figure: {caption_str}")
 
-        logger.info(f"[ReferenceHelper] Extracted {len(figures)} figures from {'appendix' if is_appendix else 'main'} document")
+        logger.info(
+            f"[ReferenceHelper] Extracted {len(figures)} figures from {'appendix' if is_appendix else 'main'} document"
+        )
         return figures
 
     def extract_all_equations(self, document, is_appendix: bool):
@@ -1310,11 +1332,13 @@ class ReferenceHelper:
             p_element = block._p
 
             # Look for bookmarkStart elements in the paragraph
-            bookmark_starts = p_element.findall('.//w:bookmarkStart', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+            bookmark_starts = p_element.findall(
+                ".//w:bookmarkStart", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+            )
 
             for bm_start in bookmark_starts:
-                bm_name = bm_start.get(qn('w:name'))
-                if not bm_name or not bm_name.startswith('eq:'):
+                bm_name = bm_start.get(qn("w:name"))
+                if not bm_name or not bm_name.startswith("eq:"):
                     continue
 
                 # This is an equation bookmark - extract the semantic ID
@@ -1322,7 +1346,9 @@ class ReferenceHelper:
 
                 # Check if this paragraph contains math (oMath element)
                 # Math elements use namespace http://schemas.openxmlformats.org/officeDocument/2006/math
-                math_elements = p_element.findall('.//m:oMath', namespaces={'m': 'http://schemas.openxmlformats.org/officeDocument/2006/math'})
+                math_elements = p_element.findall(
+                    ".//m:oMath", namespaces={"m": "http://schemas.openxmlformats.org/officeDocument/2006/math"}
+                )
 
                 if math_elements:
                     # This is an equation paragraph
@@ -1338,7 +1364,9 @@ class ReferenceHelper:
                     logger.debug(f"[ReferenceHelper]   Found equation: {semantic_id} (bookmark: {bm_name}) at para {i}")
                     break  # Only one equation per paragraph
 
-        logger.info(f"[ReferenceHelper] Extracted {len(equations)} equations from {'appendix' if is_appendix else 'main'} document")
+        logger.info(
+            f"[ReferenceHelper] Extracted {len(equations)} equations from {'appendix' if is_appendix else 'main'} document"
+        )
         return equations
 
     @property

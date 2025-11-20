@@ -12,7 +12,6 @@ from docx import Document
 
 from paradoc import OneDoc
 
-
 auto_open = os.getenv("AUTO_OPEN", False)
 
 
@@ -103,11 +102,6 @@ The reference should display as "Figure 1-1" or similar.
     assert reference_para is not None, "Reference paragraph not found"
 
     # Check that reference contains a REF field or hyperlink
-    ref_xml = (
-        reference_para._element.xml.decode("utf-8")
-        if isinstance(reference_para._element.xml, bytes)
-        else reference_para._element.xml
-    )
     # The reference should point to a bookmark or use a REF field
     # For now, just verify the paragraph exists and contains figure reference
     assert "figure" in reference_para.text.lower(), "Reference paragraph should mention the figure"

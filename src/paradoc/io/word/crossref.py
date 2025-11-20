@@ -22,7 +22,9 @@ def convert_figure_references_to_ref_fields(document, figures):
         figures: List of DocXFigureRef objects containing figure information
     """
     bookmarks_in_order = _extract_bookmarks_from_figures(figures)
-    logger.debug(f"[DEBUG convert_figure_references] Found {len(bookmarks_in_order)} figure bookmarks: {bookmarks_in_order}")
+    logger.debug(
+        f"[DEBUG convert_figure_references] Found {len(bookmarks_in_order)} figure bookmarks: {bookmarks_in_order}"
+    )
     if not bookmarks_in_order:
         logger.debug("[DEBUG convert_figure_references] No bookmarks found, returning early")
         return  # No figures to process
@@ -48,7 +50,9 @@ def convert_table_references_to_ref_fields(document, tables):
         tables: List of DocXTableRef objects containing table information
     """
     bookmarks_in_order = _extract_bookmarks_from_tables(tables)
-    logger.debug(f"[DEBUG convert_table_references] Found {len(bookmarks_in_order)} table bookmarks: {bookmarks_in_order}")
+    logger.debug(
+        f"[DEBUG convert_table_references] Found {len(bookmarks_in_order)} table bookmarks: {bookmarks_in_order}"
+    )
     if not bookmarks_in_order:
         logger.debug("[DEBUG convert_table_references] No bookmarks found, returning early")
         return  # No tables to process
@@ -172,7 +176,9 @@ def _convert_references(document, bookmarks_in_order: list[str], pattern: re.Pat
                 seen_numbers.append(ref_num)
                 # Map this reference number to its sequential position
                 reference_to_index[ref_num] = caption_count
-                logger.debug(f"[DEBUG _convert_references]   Caption #{caption_count}: {label} {ref_num} (text: {text[:50]})")
+                logger.debug(
+                    f"[DEBUG _convert_references]   Caption #{caption_count}: {label} {ref_num} (text: {text[:50]})"
+                )
                 caption_count += 1
 
     # If all captions have the same number (e.g., all show "1-1" as placeholder),

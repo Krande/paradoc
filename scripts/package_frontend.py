@@ -3,9 +3,9 @@ Package the frontend build into frontend.zip for the backend to serve.
 Run this after building the frontend with `npm run build`.
 """
 
+import hashlib
 import pathlib
 import zipfile
-import hashlib
 
 # Paths
 project_root = pathlib.Path(__file__).parent.parent

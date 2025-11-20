@@ -125,6 +125,7 @@ Also reference the first figure from section 1: [@fig:first_figure].
         f"\n✓ All {len(all_refs)} cross-references have correct format with 'Figure' label and chapter-section numbering"
     )
 
+
 @pytest.mark.skipif(not is_word_com_available(), reason="COM automation only if Word COM is available")
 def test_multiple_figures_in_same_section(tmp_path):
     """Test that multiple figures in the same section get sequential numbering."""

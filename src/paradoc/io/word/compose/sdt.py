@@ -1,6 +1,6 @@
+from lxml.etree import Element, QName
+
 from paradoc.io.word.compose.utils import xpath
-from lxml.etree import Element
-from lxml.etree import QName
 
 
 class StructuredDocumentTags(object):

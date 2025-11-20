@@ -13,15 +13,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import pathlib
 import re
 import zipfile
-import pathlib
 from dataclasses import dataclass
-from xml.etree import ElementTree as ET
 from typing import Sequence
+from xml.etree import ElementTree as ET
 
 from paradoc.config import logger
-
 
 # OOXML namespaces
 NS = {

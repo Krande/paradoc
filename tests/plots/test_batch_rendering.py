@@ -1,11 +1,6 @@
 """Test batch plot rendering using write_images."""
 
-import shutil
-import tempfile
-from pathlib import Path
-
 import pandas as pd
-import pytest
 
 from paradoc import OneDoc
 from paradoc.db import DbManager, dataframe_to_plot_data
@@ -27,17 +22,9 @@ def test_batch_plot_rendering(tmp_path):
 
     # Create 3 different plots
     for i in range(3):
-        df = pd.DataFrame({
-            'x': [1, 2, 3, 4, 5],
-            'y': [i+1, i+2, i+3, i+4, i+5]
-        })
+        df = pd.DataFrame({"x": [1, 2, 3, 4, 5], "y": [i + 1, i + 2, i + 3, i + 4, i + 5]})
         plot_data = dataframe_to_plot_data(
-            df=df,
-            key=f"test_plot_{i}",
-            plot_type="line",
-            caption=f"Test Plot {i}",
-            x_column="x",
-            y_columns=["y"]
+            df=df, key=f"test_plot_{i}", plot_type="line", caption=f"Test Plot {i}", x_column="x", y_columns=["y"]
         )
         db_manager.add_plot(plot_data)
 
@@ -64,7 +51,7 @@ Here are three plots:
     one = OneDoc(source_dir=source_dir)
 
     # Get AST to trigger variable substitution and batch rendering
-    ast_exporter = one.get_ast()
+    one.get_ast()
 
     # Close database connections
     if one.db_manager.connection:
@@ -113,14 +100,9 @@ def test_batch_rendering_with_cache(tmp_path):
     db_path = source_dir / "data.db"
     db_manager = DbManager(db_path)
 
-    df = pd.DataFrame({'x': [1, 2, 3], 'y': [1, 2, 3]})
+    df = pd.DataFrame({"x": [1, 2, 3], "y": [1, 2, 3]})
     plot_data = dataframe_to_plot_data(
-        df=df,
-        key="cached_plot",
-        plot_type="line",
-        caption="Cached Plot",
-        x_column="x",
-        y_columns=["y"]
+        df=df, key="cached_plot", plot_type="line", caption="Cached Plot", x_column="x", y_columns=["y"]
     )
     db_manager.add_plot(plot_data)
 
@@ -134,7 +116,7 @@ def test_batch_rendering_with_cache(tmp_path):
 
     # First compilation
     one = OneDoc(source_dir=source_dir)
-    ast_exporter1 = one.get_ast()
+    one.get_ast()
 
     cache_dir = one.work_dir / ".paradoc_cache" / "rendered_plots"
     cache_png = cache_dir / "cached_plot_800x600.png"
@@ -148,7 +130,7 @@ def test_batch_rendering_with_cache(tmp_path):
 
     # Second compilation (should use cache)
     one2 = OneDoc(source_dir=source_dir)
-    ast_exporter2 = one2.get_ast()
+    one2.get_ast()
 
     # The cache file should not have been modified
     second_mtime = cache_png.stat().st_mtime
@@ -165,4 +147,3 @@ def test_batch_rendering_with_cache(tmp_path):
 if __name__ == "__main__":
     test_batch_plot_rendering()
     test_batch_rendering_with_cache()
-

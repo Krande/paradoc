@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Iterable
 from paradoc.io.word.utils import logger
 
 if TYPE_CHECKING:
-    from .com_handler import WordSession, _update_docx_worker
+    from .com_handler import WordSession
+
 
 @functools.lru_cache(maxsize=1)
 def is_word_com_available() -> bool:
@@ -27,9 +28,10 @@ def is_word_com_available() -> bool:
 
     try:
         import pythoncom
+
         # Fast, non‑intrusive: consult registry
         # Note: CLSIDFromProgID might not exist in all pythoncom versions
-        if hasattr(pythoncom, 'CLSIDFromProgID'):
+        if hasattr(pythoncom, "CLSIDFromProgID"):
             pythoncom.CLSIDFromProgID("Word.Application")
             return True
     except Exception:
@@ -38,8 +40,8 @@ def is_word_com_available() -> bool:
     # Fallback: try a minimal Dispatch to confirm availability.
     # This may briefly instantiate a COM proxy, but we avoid touching the UI.
     try:
-        import win32com.client
         import pythoncom
+        import win32com.client
 
         # Initialize COM if not already initialized
         # We don't uninitialize because:

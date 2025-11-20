@@ -20,7 +20,8 @@ def _reset_kaleido_scope():
     """
     try:
         import plotly.io as pio
-        if hasattr(pio, '_kaleido') and hasattr(pio._kaleido, 'scope'):
+
+        if hasattr(pio, "_kaleido") and hasattr(pio._kaleido, "scope"):
             if pio._kaleido.scope:
                 logger.debug("Resetting kaleido scope to clear stale subprocess state")
                 try:
@@ -837,8 +838,9 @@ class ASTExporter:
                         # - Chrome subprocess is in a bad state
                         # - First-time initialization hasn't completed
                         # Solution: Retry with scope reset to reinitialize the subprocess
-                        import plotly
                         import time
+
+                        import plotly
 
                         max_retries = 2
                         retry_delay = 0.5

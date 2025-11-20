@@ -1,7 +1,6 @@
 """Test that source file tracking enables proper image resolution from nested directories."""
 
 from paradoc import OneDoc
-from paradoc.io.ast.exporter import ASTExporter
 
 
 def test_source_tracking_in_ast(files_dir, tmp_path):

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import (
     Any as _Any,  # fallback for type hints; avoid hard dependency on internals
 )
-from typing import Set, Dict
+from typing import Dict, Set
 
 import websockets
 

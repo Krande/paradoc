@@ -159,7 +159,7 @@ Summary with references to all elements:
         # Find which paragraph this bookmark is in
         para = bm
         while para is not None and para.tag != "{%s}p" % nsmap["w"]:
-            para = para.getparent() if hasattr(para, 'getparent') else None
+            para = para.getparent() if hasattr(para, "getparent") else None
         if para is not None:
             para_text = "".join([t.text for t in para.findall(".//w:t", nsmap) if t.text])
             para_idx = list(root.findall(".//w:p", nsmap)).index(para)
@@ -181,12 +181,10 @@ Summary with references to all elements:
         # Captions have format: "Figure 1-1:" or "Table 2-3:" not "Subsection 1.1:"
         # Equations are inline captions in the math paragraph: "... (Eq. 1-1)"
         is_caption = (
-            ((para_text.startswith("Figure ") or para_text.startswith("Table "))
-             and "-" in para_text
-             and ":" in para_text)
-            or ("(Eq." in para_text and "-" in para_text and ")" in para_text)
-        )
-        is_xref = any(marker in para_text.lower() for marker in ["as shown in", "compare", "relative to", "builds on"])
+            (para_text.startswith("Figure ") or para_text.startswith("Table "))
+            and "-" in para_text
+            and ":" in para_text
+        ) or ("(Eq." in para_text and "-" in para_text and ")" in para_text)
 
         if is_caption:
             # Analyze caption structure in detail
@@ -196,7 +194,7 @@ Summary with references to all elements:
                 "seq_field": None,
                 "styleref_field": None,
                 "has_hyphen": "-" in para_text,
-                "label": None
+                "label": None,
             }
 
             runs = para.findall(".//w:r", nsmap)
@@ -230,18 +228,14 @@ Summary with references to all elements:
                 instr_text = run.find(".//w:instrText", nsmap)
                 if instr_text is not None and instr_text.text:
                     if " SEQ " in instr_text.text:
-                        seq_fields.append({
-                            "para_idx": para_idx,
-                            "instr": instr_text.text.strip(),
-                            "para_text": para_text[:80]
-                        })
+                        seq_fields.append(
+                            {"para_idx": para_idx, "instr": instr_text.text.strip(), "para_text": para_text[:80]}
+                        )
 
                     if " STYLEREF " in instr_text.text or "STYLEREF " in instr_text.text:
-                        styleref_fields.append({
-                            "para_idx": para_idx,
-                            "instr": instr_text.text.strip(),
-                            "para_text": para_text[:80]
-                        })
+                        styleref_fields.append(
+                            {"para_idx": para_idx, "instr": instr_text.text.strip(), "para_text": para_text[:80]}
+                        )
 
         # Scan ALL paragraphs for REF fields (cross-references can be anywhere)
         runs = para.findall(".//w:r", nsmap)
@@ -249,11 +243,9 @@ Summary with references to all elements:
             instr_text = run.find(".//w:instrText", nsmap)
             if instr_text is not None and instr_text.text:
                 if " REF " in instr_text.text:
-                    ref_fields.append({
-                        "para_idx": para_idx,
-                        "instr": instr_text.text.strip(),
-                        "para_text": para_text[:80]
-                    })
+                    ref_fields.append(
+                        {"para_idx": para_idx, "instr": instr_text.text.strip(), "para_text": para_text[:80]}
+                    )
 
     print("\n" + "=" * 80)
     print("BOOKMARKS FOUND")
@@ -348,7 +340,7 @@ Summary with references to all elements:
             print(f"\n  Para {xref_para['para_idx']}: {xref_para['text'][:100]}")
 
             # Check for hyperlinks
-            para = paragraphs[xref_para['para_idx']]
+            para = paragraphs[xref_para["para_idx"]]
             hyperlinks = para.findall(".//w:hyperlink", nsmap)
             if hyperlinks:
                 print(f"    Contains {len(hyperlinks)} hyperlink(s)")
@@ -357,7 +349,7 @@ Summary with references to all elements:
                     hl_text = "".join([t.text for t in hl.findall(".//w:t", nsmap) if t.text])
                     print(f"      - Hyperlink to '{anchor}': '{hl_text}'")
             else:
-                print(f"    No hyperlinks found - likely plain text!")
+                print("    No hyperlinks found - likely plain text!")
 
     # STRICT ASSERTIONS FOR VALID WORD CROSS-REFERENCES
     print("\n" + "=" * 80)
@@ -385,7 +377,9 @@ Summary with references to all elements:
     assert len(fig_captions) >= 2, f"Expected at least 2 figure captions, found {len(fig_captions)}"
     assert len(tbl_captions) >= 2, f"Expected at least 2 table captions, found {len(tbl_captions)}"
     assert len(eq_captions) >= 2, f"Expected at least 2 equation captions, found {len(eq_captions)}"
-    print(f"[OK] Found {len(fig_captions)} figure captions, {len(tbl_captions)} table captions, and {len(eq_captions)} equation captions")
+    print(
+        f"[OK] Found {len(fig_captions)} figure captions, {len(tbl_captions)} table captions, and {len(eq_captions)} equation captions"
+    )
 
     # Verify every caption has BOTH STYLEREF and SEQ fields
     # Note: Equations have inline captions so they may not have ":" separator
@@ -402,7 +396,6 @@ Summary with references to all elements:
             f"Caption at para {cap['para_idx']} MISSING hyphen separator. "
             f"Valid Word captions use format 'Label STYLEREF-SEQ: Text'. Caption: {cap['para_text']}"
         )
-
 
     # Verify equation captions have STYLEREF and SEQ fields (they use inline format)
     for cap in eq_captions:
@@ -434,16 +427,16 @@ Summary with references to all elements:
         f"Expected at least 2 Equation SEQ fields, found {len(eq_seq_fields)}. "
         "SEQ fields MUST be created in equation captions."
     )
-    print(f"[OK] Found {len(fig_seq_fields)} Figure SEQ fields, {len(tbl_seq_fields)} Table SEQ fields, and {len(eq_seq_fields)} Equation SEQ fields")
+    print(
+        f"[OK] Found {len(fig_seq_fields)} Figure SEQ fields, {len(tbl_seq_fields)} Table SEQ fields, and {len(eq_seq_fields)} Equation SEQ fields"
+    )
 
     # REQUIREMENT 3: SEQ fields must have ARABIC numbering and \s switch for chapter-based numbering
     for sf in seq_fields:
-        assert "ARABIC" in sf["instr"], (
-            f"SEQ field MUST use ARABIC numbering format. Found: {sf['instr']}"
-        )
-        assert "\\s 1" in sf["instr"] or "\\s1" in sf["instr"], (
-            f"SEQ field MUST have \\s 1 switch for chapter-based numbering. Found: {sf['instr']}"
-        )
+        assert "ARABIC" in sf["instr"], f"SEQ field MUST use ARABIC numbering format. Found: {sf['instr']}"
+        assert (
+            "\\s 1" in sf["instr"] or "\\s1" in sf["instr"]
+        ), f"SEQ field MUST have \\s 1 switch for chapter-based numbering. Found: {sf['instr']}"
     print("[OK] All SEQ fields have ARABIC numbering and \\s 1 switch for chapter-based numbering")
 
     # REQUIREMENT 4: First SEQ field of each type must have \r 1 to restart numbering
@@ -454,49 +447,44 @@ Summary with references to all elements:
             f"First Figure SEQ field MUST have \\r 1 switch to initialize numbering. "
             f"Found: {first_fig_seq['instr']}"
         )
-    print(f"[OK] Tested across {len(fig_captions)} figures, {len(tbl_captions)} tables, and {len(eq_captions)} equations in multiple sections")
+    print(
+        f"[OK] Tested across {len(fig_captions)} figures, {len(tbl_captions)} tables, and {len(eq_captions)} equations in multiple sections"
+    )
 
     if len(tbl_seq_fields) > 0:
         first_tbl_seq = min(tbl_seq_fields, key=lambda x: x["para_idx"])
         assert "\\r 1" in first_tbl_seq["instr"] or "\\r1" in first_tbl_seq["instr"], (
-            f"First Table SEQ field MUST have \\r 1 switch to initialize numbering. "
-            f"Found: {first_tbl_seq['instr']}"
+            f"First Table SEQ field MUST have \\r 1 switch to initialize numbering. " f"Found: {first_tbl_seq['instr']}"
         )
         print("[OK] First Table SEQ field has \\r 1 switch to initialize numbering")
 
     # REQUIREMENT 5: SEQ fields use correct identifiers
     for sf in fig_seq_fields:
-        assert "Figure" in sf["instr"], (
-            f"Figure SEQ field MUST use 'Figure' identifier. Found: {sf['instr']}"
-        )
+        assert "Figure" in sf["instr"], f"Figure SEQ field MUST use 'Figure' identifier. Found: {sf['instr']}"
     for sf in tbl_seq_fields:
-        assert "Table" in sf["instr"], (
-            f"Table SEQ field MUST use 'Table' identifier. Found: {sf['instr']}"
-        )
+        assert "Table" in sf["instr"], f"Table SEQ field MUST use 'Table' identifier. Found: {sf['instr']}"
     print("[OK] SEQ fields use correct identifiers (Figure, Table)")
 
     # REQUIREMENT 6: STYLEREF fields must reference appropriate heading styles
     for sf in styleref_fields:
         # STYLEREF should reference either "Heading 1" or "Appendix"
-        has_valid_ref = ('"Heading 1"' in sf["instr"] or
-                        '"Appendix"' in sf["instr"] or
-                        "'Heading 1'" in sf["instr"] or
-                        "'Appendix'" in sf["instr"])
-        assert has_valid_ref, (
-            f"STYLEREF field MUST reference 'Heading 1' or 'Appendix'. Found: {sf['instr']}"
+        has_valid_ref = (
+            '"Heading 1"' in sf["instr"]
+            or '"Appendix"' in sf["instr"]
+            or "'Heading 1'" in sf["instr"]
+            or "'Appendix'" in sf["instr"]
         )
+        assert has_valid_ref, f"STYLEREF field MUST reference 'Heading 1' or 'Appendix'. Found: {sf['instr']}"
         # Should have \s switch for suppress extra text
-        assert "\\s" in sf["instr"], (
-            f"STYLEREF field MUST have \\s switch. Found: {sf['instr']}"
-        )
+        assert "\\s" in sf["instr"], f"STYLEREF field MUST have \\s switch. Found: {sf['instr']}"
     print(f"[OK] All {len(styleref_fields)} STYLEREF fields reference correct heading styles with \\s switch")
 
     print("\n" + "=" * 80)
     print("TEST PASSED - ALL STRICT REQUIREMENTS MET")
     print("=" * 80)
-    print(f"[OK] Valid Word caption structure with STYLEREF and SEQ fields")
-    print(f"[OK] Proper field switches (\\s 1 for chapter numbering, \\r 1 for initialization)")
-    print(f"[OK] Correct identifiers and heading style references")
+    print("[OK] Valid Word caption structure with STYLEREF and SEQ fields")
+    print("[OK] Proper field switches (\\s 1 for chapter numbering, \\r 1 for initialization)")
+    print("[OK] Correct identifiers and heading style references")
     print(f"[OK] Tested across {len(fig_captions)} figures and {len(tbl_captions)} tables in multiple sections")
 
 
@@ -506,4 +494,3 @@ def extract_docx_xml(docx_path: Path, output_dir: Path):
 
     with zipfile.ZipFile(docx_path, "r") as zip_ref:
         zip_ref.extractall(output_dir)
-

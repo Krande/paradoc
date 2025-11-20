@@ -83,7 +83,6 @@ def fix_bookmark_ids(document):
                     # that hasn't been closed yet
                     if len(open_bookmarks) == 1:
                         # Only one open bookmark, this end must be for it
-                        old_end_id = end_id
                         start_id, bm_name = list(open_bookmarks.values())[0]
                         # Update the end ID to match the start
                         elem.set(qn("w:id"), start_id)
@@ -136,6 +135,7 @@ def convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_do
     :return:
     """
     from docx import Document
+
     from paradoc.io.word.compose.composer import Composer
 
     build_dir = source / "_build"

@@ -63,10 +63,10 @@ def test_register_mixed_items():
     helper = ReferenceHelper()
 
     # Register in specific order
-    fig1 = helper.register_figure("fig1")
-    tbl1 = helper.register_table("tbl1")
-    fig2 = helper.register_figure("fig2")
-    tbl2 = helper.register_table("tbl2")
+    helper.register_figure("fig1")
+    helper.register_table("tbl1")
+    helper.register_figure("fig2")
+    helper.register_table("tbl2")
 
     stats = helper.get_statistics()
     assert stats["figures"] == 2
@@ -176,42 +176,42 @@ def test_extract_and_convert_hyperlink_references():
     p_element = para._p
 
     # Add text "See "
-    run1_xml = f'''
+    run1_xml = """
     <w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
         <w:t>See fig.</w:t>
     </w:r>
-    '''
+    """
     run1 = parse_xml(run1_xml)
     p_element.append(run1)
 
     # Add hyperlink for figure
-    hyperlink1_xml = f'''
+    hyperlink1_xml = """
     <w:hyperlink xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:anchor="fig:test_figure">
         <w:r>
             <w:t>1</w:t>
         </w:r>
     </w:hyperlink>
-    '''
+    """
     hyperlink1 = parse_xml(hyperlink1_xml)
     p_element.append(hyperlink1)
 
     # Add text " and tbl."
-    run2_xml = f'''
+    run2_xml = """
     <w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
         <w:t> and tbl.</w:t>
     </w:r>
-    '''
+    """
     run2 = parse_xml(run2_xml)
     p_element.append(run2)
 
     # Add hyperlink for table
-    hyperlink2_xml = f'''
+    hyperlink2_xml = """
     <w:hyperlink xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:anchor="tbl:results_table">
         <w:r>
             <w:t>1</w:t>
         </w:r>
     </w:hyperlink>
-    '''
+    """
     hyperlink2 = parse_xml(hyperlink2_xml)
     p_element.append(hyperlink2)
 
@@ -244,22 +244,25 @@ def test_extract_and_convert_hyperlink_references():
     # The hyperlinks should be replaced with REF fields
     # And the prefix text should be removed
     from lxml import etree
-    paragraph_xml = etree.tostring(para._p, encoding='unicode')
+
+    paragraph_xml = etree.tostring(para._p, encoding="unicode")
 
     # Should contain REF field instructions
-    assert 'REF' in paragraph_xml
+    assert "REF" in paragraph_xml
     assert fig1_bookmark in paragraph_xml
     assert tbl1_bookmark in paragraph_xml
 
     # Should contain the labels
-    assert 'Figure' in paragraph_xml or 'Figure' in para.text
-    assert 'Table' in paragraph_xml or 'Table' in para.text
+    assert "Figure" in paragraph_xml or "Figure" in para.text
+    assert "Table" in paragraph_xml or "Table" in para.text
 
     # The hyperlinks should be gone
-    hyperlinks = p_element.findall('.//w:hyperlink', namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+    hyperlinks = p_element.findall(
+        ".//w:hyperlink", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    )
     # Should have no hyperlinks with our specific anchors
     for hyperlink in hyperlinks:
-        anchor = hyperlink.get(qn('w:anchor'))
+        anchor = hyperlink.get(qn("w:anchor"))
         assert anchor not in ["fig:test_figure", "tbl:results_table"]
 
 

@@ -1,7 +1,5 @@
 """Test the CrossRefExtractor on the doc_lorum example document."""
 
-import pytest
-
 from paradoc import OneDoc
 from paradoc.io.ast.crossref_extractor import CrossRefExtractor
 
@@ -32,14 +30,14 @@ def test_crossref_extractor_doc_lorum(files_dir, tmp_path):
     # performance_benchmarks, time_series, computational_results, correlation_matrix,
     # distributions, surface_plot, box_plots
     # Plus one additional figure defined directly in markdown: qc-workflow
-    assert stats['figures'] == 16, f"Expected 16 figures, found {stats['figures']}"
+    assert stats["figures"] == 16, f"Expected 16 figures, found {stats['figures']}"
 
     # doc_lorum has 10 tables (from populate_database.py)
     # Tables: current_metrics, measurement_specs, validation_results, quantitative_metrics,
     # comparison_data, implementation_guide, component_specs, raw_data_set1, raw_data_set2,
     # algorithm_performance
     # Plus one additional table defined directly in markdown: validation-criteria
-    assert stats['tables'] == 11, f"Expected 11 tables, found {stats['tables']}"
+    assert stats["tables"] == 11, f"Expected 11 tables, found {stats['tables']}"
 
     # Note: Equations (eq:energy, eq:diffusion) are cited in the document but not currently
     # extracted as targets by the CrossRefExtractor. This is a known limitation.
@@ -64,39 +62,42 @@ def test_crossref_extractor_doc_lorum(files_dir, tmp_path):
     # Total equation citations: 2
 
     total_expected_citations = 17 + 10 + 2  # 29 total
-    assert stats['total_citations'] == total_expected_citations, \
-        f"Expected {total_expected_citations} citations, found {stats['total_citations']}"
+    assert (
+        stats["total_citations"] == total_expected_citations
+    ), f"Expected {total_expected_citations} citations, found {stats['total_citations']}"
 
     # All citations should now have corresponding targets
-    assert stats['dangling_citations'] == 0, \
-        f"Expected 0 dangling citations, found {stats['dangling_citations']}: {data.dangling_citations}"
-
+    assert (
+        stats["dangling_citations"] == 0
+    ), f"Expected 0 dangling citations, found {stats['dangling_citations']}: {data.dangling_citations}"
 
     # Verify specific figures exist
-    assert 'historical_trends' in data.figures, "Expected 'historical_trends' figure"
-    assert 'primary_results' in data.figures, "Expected 'primary_results' figure"
-    assert 'qc-workflow' in data.figures, "Expected 'qc-workflow' figure (from markdown)"
+    assert "historical_trends" in data.figures, "Expected 'historical_trends' figure"
+    assert "primary_results" in data.figures, "Expected 'primary_results' figure"
+    assert "qc-workflow" in data.figures, "Expected 'qc-workflow' figure (from markdown)"
 
     # Verify specific tables exist
-    assert 'current_metrics' in data.tables, "Expected 'current_metrics' table"
-    assert 'validation-criteria' in data.tables, "Expected 'validation-criteria' table (from markdown)"
+    assert "current_metrics" in data.tables, "Expected 'current_metrics' table"
+    assert "validation-criteria" in data.tables, "Expected 'validation-criteria' table (from markdown)"
 
     # Verify specific equations exist (now properly extracted from Span elements)
-    assert 'energy' in data.equations, "Expected 'energy' equation"
-    assert 'diffusion' in data.equations, "Expected 'diffusion' equation"
+    assert "energy" in data.equations, "Expected 'energy' equation"
+    assert "diffusion" in data.equations, "Expected 'diffusion' equation"
 
     # Verify equation content was extracted
-    energy_eq = data.equations.get('energy')
+    energy_eq = data.equations.get("energy")
     if energy_eq:
         assert energy_eq.caption_text is not None, "Expected energy equation to have LaTeX content"
-        assert 'mc^2' in energy_eq.caption_text or 'E' in energy_eq.caption_text, \
-            f"Expected energy equation LaTeX, got: {energy_eq.caption_text}"
+        assert (
+            "mc^2" in energy_eq.caption_text or "E" in energy_eq.caption_text
+        ), f"Expected energy equation LaTeX, got: {energy_eq.caption_text}"
 
     # Verify that primary_results is referenced twice
-    primary_results_citations = data.get_citations_for_target('fig:primary_results')
-    assert len(primary_results_citations) == 2, \
-        f"Expected 2 citations for 'fig:primary_results', found {len(primary_results_citations)}"
-    print(f"\n[OK] CrossRefExtractor test passed!")
+    primary_results_citations = data.get_citations_for_target("fig:primary_results")
+    assert (
+        len(primary_results_citations) == 2
+    ), f"Expected 2 citations for 'fig:primary_results', found {len(primary_results_citations)}"
+    print("\n[OK] CrossRefExtractor test passed!")
     print(f"  Figures: {stats['figures']}")
     print(f"  Tables: {stats['tables']}")
     print(f"  Equations: {stats['equations']}")
@@ -124,28 +125,33 @@ def test_crossref_extractor_detailed_analysis(files_dir, tmp_path):
     stats = data.validate()
 
     # Check citation counts for specific targets
-    citation_counts = stats['citation_counts']
+    citation_counts = stats["citation_counts"]
 
     # primary_results should be cited twice
-    assert citation_counts.get('fig:primary_results', 0) == 2, \
-        f"Expected 2 citations for fig:primary_results, found {citation_counts.get('fig:primary_results', 0)}"
+    assert (
+        citation_counts.get("fig:primary_results", 0) == 2
+    ), f"Expected 2 citations for fig:primary_results, found {citation_counts.get('fig:primary_results', 0)}"
 
     # raw_data_set1 and raw_data_set2 are referenced in the same line
     # so they should each have 1 citation
-    assert citation_counts.get('tbl:raw_data_set1', 0) == 1, \
-        f"Expected 1 citation for tbl:raw_data_set1, found {citation_counts.get('tbl:raw_data_set1', 0)}"
-    assert citation_counts.get('tbl:raw_data_set2', 0) == 1, \
-        f"Expected 1 citation for tbl:raw_data_set2, found {citation_counts.get('tbl:raw_data_set2', 0)}"
+    assert (
+        citation_counts.get("tbl:raw_data_set1", 0) == 1
+    ), f"Expected 1 citation for tbl:raw_data_set1, found {citation_counts.get('tbl:raw_data_set1', 0)}"
+    assert (
+        citation_counts.get("tbl:raw_data_set2", 0) == 1
+    ), f"Expected 1 citation for tbl:raw_data_set2, found {citation_counts.get('tbl:raw_data_set2', 0)}"
 
     # energy and diffusion equations are referenced in the same line
-    assert citation_counts.get('eq:energy', 0) == 1, \
-        f"Expected 1 citation for eq:energy, found {citation_counts.get('eq:energy', 0)}"
-    assert citation_counts.get('eq:diffusion', 0) == 1, \
-        f"Expected 1 citation for eq:diffusion, found {citation_counts.get('eq:diffusion', 0)}"
+    assert (
+        citation_counts.get("eq:energy", 0) == 1
+    ), f"Expected 1 citation for eq:energy, found {citation_counts.get('eq:energy', 0)}"
+    assert (
+        citation_counts.get("eq:diffusion", 0) == 1
+    ), f"Expected 1 citation for eq:diffusion, found {citation_counts.get('eq:diffusion', 0)}"
 
     # Check for unreferenced targets (should be none if document is well-written)
-    unreferenced = stats['unreferenced_targets']
-    print(f"\n[OK] Detailed analysis passed!")
+    unreferenced = stats["unreferenced_targets"]
+    print("\n[OK] Detailed analysis passed!")
     print(f"  Citation counts: {len(citation_counts)} unique targets cited")
     print(f"  Unreferenced targets: {len(unreferenced)}")
     if unreferenced:
@@ -178,7 +184,7 @@ def test_crossref_extractor_caption_extraction(files_dir, tmp_path):
     targets_with_captions = [t for t in data.targets.values() if t.caption_text]
     targets_without_captions = [t for t in data.targets.values() if not t.caption_text]
 
-    print(f"\n[OK] Caption extraction test passed!")
+    print("\n[OK] Caption extraction test passed!")
     print(f"  Targets with captions: {len(targets_with_captions)}/{len(data.targets)}")
     print(f"  Targets without captions: {len(targets_without_captions)}/{len(data.targets)}")
 
@@ -187,12 +193,11 @@ def test_crossref_extractor_caption_extraction(files_dir, tmp_path):
     # For now, we just document this behavior
 
     # The qc-workflow figure is defined in markdown with an image, it might have caption info
-    qc_workflow = data.figures.get('qc-workflow')
+    qc_workflow = data.figures.get("qc-workflow")
     if qc_workflow:
         print(f"  qc-workflow caption: {qc_workflow.caption_text}")
 
     # validation-criteria table is defined in markdown, it might have a caption
-    validation_criteria = data.tables.get('validation-criteria')
+    validation_criteria = data.tables.get("validation-criteria")
     if validation_criteria:
         print(f"  validation-criteria caption: {validation_criteria.caption_text}")
-

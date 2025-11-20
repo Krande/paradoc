@@ -1,5 +1,4 @@
 from paradoc import OneDoc
-from paradoc.io.ast.exporter import ASTExporter
 
 
 def test_doc1_subsection_in_manifest(files_dir, tmp_path):

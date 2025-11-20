@@ -4,21 +4,20 @@ import os
 import pathlib
 import shutil
 from itertools import chain
-from typing import Callable, Dict, Iterable, Optional
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, Optional
 
 import pandas as pd
 
 from .common import (
     MY_DEFAULT_HTML_CSS,
+    MY_DOCX_TMPL,
+    MY_DOCX_TMPL_BLANK,
     DocXFormat,
     ExportFormats,
     Figure,
     MarkDownFile,
     Table,
     TableFormat,
-    MY_DOCX_TMPL,
-    MY_DOCX_TMPL_BLANK,
 )
 from .config import logger
 from .db import (
@@ -37,7 +36,6 @@ from .utils import get_list_of_files
 if TYPE_CHECKING:
     from .io.pdf.exporter import PdfExporter
     from .io.word.exporter import WordExporter
-
 
 
 class OneDoc:
@@ -525,7 +523,7 @@ class OneDoc:
         # Determine size for cache key
         width = annotation.width if annotation and annotation.width else plot_data.width or 800
         height = annotation.height if annotation and annotation.height else plot_data.height or 600
-        
+
         # Cache directory for rendered plots
         cache_dir = self.work_dir / ".paradoc_cache" / "rendered_plots"
         cache_dir.mkdir(parents=True, exist_ok=True)
@@ -629,7 +627,9 @@ class OneDoc:
         logger.info("Collecting plots for batch rendering")
 
         # Lists to collect plot data for batch rendering
-        plots_to_render = []  # List of (cache_key, plot_data, width, height, cache_png, cache_timestamp, db_timestamp, key_clean)
+        plots_to_render = (
+            []
+        )  # List of (cache_key, plot_data, width, height, cache_png, cache_timestamp, db_timestamp, key_clean)
 
         # Cache directory for rendered plots
         cache_dir = self.work_dir / ".paradoc_cache" / "rendered_plots"
@@ -702,7 +702,9 @@ class OneDoc:
 
                 # Only render if cache is invalid and not already in list
                 if not cache_valid and not any(p[0] == cache_key for p in plots_to_render):
-                    plots_to_render.append((cache_key, plot_data, width, height, cache_png, cache_timestamp, db_timestamp, key_clean))
+                    plots_to_render.append(
+                        (cache_key, plot_data, width, height, cache_png, cache_timestamp, db_timestamp, key_clean)
+                    )
 
         if not plots_to_render:
             logger.info("No plots need rendering (all cached)")
@@ -748,6 +750,7 @@ class OneDoc:
             except Exception:
                 # Fallback to ensure chrome is initialized
                 from plotly.io._kaleido import get_chrome
+
                 get_chrome()
                 pio.write_images(fig=figures, file=file_paths, format="png")
 
@@ -760,7 +763,7 @@ class OneDoc:
                     logger.error(f'Failed to write timestamp for "{cache_keys[i]}": {e}')
 
         except Exception as e:
-            logger.error(f'Batch rendering failed: {e}')
+            logger.error(f"Batch rendering failed: {e}")
             # Fall back to individual rendering if batch fails
             logger.info("Falling back to individual plot rendering")
             for i, fig in enumerate(figures):
