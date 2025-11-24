@@ -2,6 +2,19 @@
 
 
 
+## v0.4.0 (2025-11-24)
+
+### Chore
+
+* chore: Minor Update to README.md ([`576538b`](https://github.com/Krande/paradoc/commit/576538b717aa8130b9d7434ddbfba684e292769a))
+
+* chore: Update README.md (#23) ([`e1598ed`](https://github.com/Krande/paradoc/commit/e1598edf89bbd04837563f27414e0113658d88db))
+
+### Feature
+
+* feat: New frontend stack (#24) ([`aea5eb0`](https://github.com/Krande/paradoc/commit/aea5eb00c80c13605b7462a84b11373b1bd1e6a2))
+
+
 ## v0.3.3 (2024-01-18)
 
 ### Fix
