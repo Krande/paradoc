@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -17,7 +16,7 @@ except ImportError:
 
 import pandas as pd
 
-from .models import PlotAnnotation, PlotData
+from .models import PlotData
 
 logger = logging.getLogger(__name__)
 
@@ -46,82 +45,6 @@ class PlotRenderer:
         """
         self._custom_functions[name] = func
 
-    def render_to_image(
-        self,
-        plot_data: PlotData,
-        annotation: Optional[PlotAnnotation] = None,
-        output_path: Optional[Path] = None,
-        format: str = "png",
-    ) -> str:
-        """
-        Render plot to an image and return markdown image reference.
-
-        Args:
-            plot_data: PlotData instance
-            annotation: Optional annotation overrides
-            output_path: Optional path to save image
-            format: Image format ('png', 'svg', 'jpeg')
-            include_interactive_marker: If True, add data attribute for interactive rendering (processed later in AST)
-
-        Returns:
-            Markdown image string
-        """
-        if not PLOTLY_AVAILABLE:
-            raise ImportError("plotly is required for plot rendering. Install with: pip install plotly")
-
-        # Get figure from plot data
-        fig = self._create_figure(plot_data)
-
-        # Apply size overrides from annotation or plot_data
-        width = annotation.width if annotation and annotation.width else plot_data.width or 800
-        height = annotation.height if annotation and annotation.height else plot_data.height or 600
-
-        fig.update_layout(width=width, height=height)
-
-        # Determine format
-        img_format = annotation.format if annotation and annotation.format else format
-
-        # Export to image
-        if output_path:
-            # Save to file
-            # get_chrome()
-            if img_format == "svg":
-                fig.write_image(str(output_path), format="svg")
-            elif img_format == "jpeg":
-                fig.write_image(str(output_path), format="jpeg")
-            else:
-                fig.write_image(str(output_path), format="png")
-
-            # Return markdown reference with proper pandoc-crossref syntax
-            # The correct syntax is: ![caption](path){#fig:key}
-            caption = "" if (annotation and annotation.no_caption) else plot_data.caption
-
-            # Build the figure ID
-            fig_id = f"fig:{plot_data.key}"
-
-            if caption and not (annotation and annotation.no_caption):
-                md_str = f"![{caption}]({output_path.name}){{#{fig_id}}}"
-            else:
-                md_str = f"![]({output_path.name}){{#{fig_id}}}"
-
-            return md_str
-        else:
-            # Return base64 embedded image
-            img_bytes = fig.to_image(format=img_format)
-            img_b64 = base64.b64encode(img_bytes).decode()
-
-            caption = "" if (annotation and annotation.no_caption) else plot_data.caption
-
-            # Build the figure ID
-            fig_id = f"fig:{plot_data.key}"
-
-            if caption and not (annotation and annotation.no_caption):
-                md_str = f"![{caption}](data:image/{img_format};base64,{img_b64}){{#{fig_id}}}"
-            else:
-                md_str = f"![](data:image/{img_format};base64,{img_b64}){{#{fig_id}}}"
-
-            return md_str
-
     def _create_figure(self, plot_data: PlotData) -> Any:
         """
         Create a plotly figure from PlotData with timestamp-based caching.
@@ -148,6 +71,9 @@ class PlotRenderer:
             fig = func(plot_data.data)
 
         elif plot_data.plot_type == "plotly":
+            if not PLOTLY_AVAILABLE:
+                raise ImportError("plotly is required for plot rendering. Install with: pip install plotly")
+
             # Reconstruct plotly figure from dict
             fig = go.Figure(plot_data.data)
 

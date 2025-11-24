@@ -95,8 +95,6 @@ plotly = "*"
 python-kaleido = "*"
 pydantic = ">=2.0"
 playwright = "*"
-
-[tool.pixi.feature.test-core.pypi-dependencies]
 pytest-playwright = "*"
 
 [tool.pixi.feature.prod.target.win-64.dependencies]
