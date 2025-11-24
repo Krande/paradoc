@@ -1,13 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, RefObject } from 'react'
 
 interface WebsocketStatusMenuProps {
     connected: boolean
     frontendId: string
-    onKillServer: () => void
-    onRequestProcessInfo: () => void
-    onRequestConnectedFrontends: () => void
-    onRequestLogFilePath: () => void
-    onSetFrontendId: (newId: string) => void
+    workerRef: RefObject<Worker | null>
     processInfo: { pid: number; thread_id: number } | null
     connectedFrontends: string[]
     logFilePath: string
@@ -16,11 +12,7 @@ interface WebsocketStatusMenuProps {
 export function WebsocketStatusMenu({
     connected,
     frontendId,
-    onKillServer,
-    onRequestProcessInfo,
-    onRequestConnectedFrontends,
-    onRequestLogFilePath,
-    onSetFrontendId,
+    workerRef,
     processInfo,
     connectedFrontends,
     logFilePath
@@ -29,6 +21,36 @@ export function WebsocketStatusMenu({
     const [editingId, setEditingId] = useState(false)
     const [tempId, setTempId] = useState('')
     const [showFrontendsList, setShowFrontendsList] = useState(false)
+
+    const onRequestProcessInfo = () => {
+        if (workerRef.current && connected) {
+            workerRef.current.postMessage({ type: 'get_process_info' })
+        }
+    }
+
+    const onRequestConnectedFrontends = () => {
+        if (workerRef.current && connected) {
+            workerRef.current.postMessage({ type: 'get_connected_frontends' })
+        }
+    }
+
+    const onRequestLogFilePath = () => {
+        if (workerRef.current && connected) {
+            workerRef.current.postMessage({ type: 'get_log_file_path' })
+        }
+    }
+
+    const onKillServer = () => {
+        if (workerRef.current && connected) {
+            workerRef.current.postMessage({ type: 'shutdown' })
+        }
+    }
+
+    const onSetFrontendId = (newId: string) => {
+        if (workerRef.current) {
+            workerRef.current.postMessage({ type: 'set_frontend_id', frontendId: newId })
+        }
+    }
 
     const handleInfoClick = () => {
         if (!menuOpen && connected) {

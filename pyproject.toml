@@ -76,7 +76,6 @@ lint = { features = ["lint"], no-default-feature = true }
 frontend = { features = ["frontend"], no-default-feature = true }
 docs = { features = ["docs", "test-core"], no-default-feature = true }
 
-
 [tool.pixi.feature.prod.dependencies]
 pandoc = "==3.8.2"
 pandoc-crossref = "==0.3.22"

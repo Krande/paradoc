@@ -7,27 +7,19 @@ export function Topbar({
                            frontendId,
                            onSendMock,
                            onToggleSidebar,
-                           onRequestProcessInfo,
-                           onRequestConnectedFrontends,
-                           onRequestLogFilePath,
-                           onKillServer,
-                           onSetFrontendId,
                            processInfo,
                            connectedFrontends,
-                           logFilePath
+                           logFilePath,
+                           workerRef
                        }: {
     connected: boolean
     frontendId: string
     onSendMock: () => void
     onToggleSidebar: () => void
-    onRequestProcessInfo: () => void
-    onRequestConnectedFrontends: () => void
-    onRequestLogFilePath: () => void
-    onKillServer: () => void
-    onSetFrontendId: (newId: string) => void
     processInfo: { pid: number; thread_id: number } | null
     connectedFrontends: string[]
     logFilePath: string
+    workerRef: React.RefObject<Worker | null>
 }) {
     const { enabled: sourceDisplayEnabled, toggleEnabled: toggleSourceDisplay } = useSourceDisplayStore()
 
@@ -49,14 +41,10 @@ export function Topbar({
                     <WebsocketStatusMenu
                         connected={connected}
                         frontendId={frontendId}
-                        onKillServer={onKillServer}
-                        onRequestProcessInfo={onRequestProcessInfo}
-                        onRequestConnectedFrontends={onRequestConnectedFrontends}
-                        onRequestLogFilePath={onRequestLogFilePath}
-                        onSetFrontendId={onSetFrontendId}
                         processInfo={processInfo}
                         connectedFrontends={connectedFrontends}
                         logFilePath={logFilePath}
+                        workerRef={workerRef}
                     />
 
                 </div>

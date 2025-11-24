@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef } from 'react'
+import { useAppStore } from './store/appStore'
 import { Topbar } from './components/Topbar'
 import { Navbar, TocItem } from './components/Navbar'
 import { SearchBar } from './components/SearchBar'
@@ -13,20 +14,21 @@ import { calculateHeadingNumbers } from './ast/headingNumbers'
 import { SourceDisplayProvider } from './store/sourceDisplayStore'
 
 function AppContent() {
-  const [connected, setConnected] = useState<boolean>(false)
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
-  const [searchBarOpen, setSearchBarOpen] = useState<boolean>(false)
-  const [processInfo, setProcessInfo] = useState<{ pid: number; thread_id: number } | null>(null)
-  const [frontendId, setFrontendId] = useState<string>('')
-  const [connectedFrontends, setConnectedFrontends] = useState<string[]>([])
-  const [logFilePath, setLogFilePath] = useState<string>('')
+  const {
+    connected, setConnected,
+    sidebarOpen, setSidebarOpen, toggleSidebar,
+    searchBarOpen, setSearchBarOpen,
+    processInfo, setProcessInfo,
+    frontendId, setFrontendId,
+    connectedFrontends, setConnectedFrontends,
+    logFilePath, setLogFilePath,
+    docId, setDocId,
+    toc, setToc
+  } = useAppStore()
   const workerRef = useRef<Worker | null>(null)
 
   // AST/Sections store
   const { state, setManifest, upsertSection } = useSectionStore()
-  const [docId, setDocId] = useState<string>('demo')
-
-  const [toc, setToc] = useState<TocItem[]>([])
 
   useEffect(() => {
     if (state.manifest) {
@@ -190,41 +192,6 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  const handleRequestProcessInfo = () => {
-    const worker = workerRef.current
-    if (worker && connected) {
-      worker.postMessage({ type: 'get_process_info' })
-    }
-  }
-
-  const handleKillServer = () => {
-    const worker = workerRef.current
-    if (worker && connected) {
-      worker.postMessage({ type: 'shutdown' })
-    }
-  }
-
-  const handleSetFrontendId = (newId: string) => {
-    const worker = workerRef.current
-    if (worker) {
-      worker.postMessage({ type: 'set_frontend_id', frontendId: newId })
-    }
-  }
-
-  const handleRequestConnectedFrontends = () => {
-    const worker = workerRef.current
-    if (worker && connected) {
-      worker.postMessage({ type: 'get_connected_frontends' })
-    }
-  }
-
-  const handleRequestLogFilePath = () => {
-    const worker = workerRef.current
-    if (worker && connected) {
-      worker.postMessage({ type: 'get_log_file_path' })
-    }
-  }
-
   return (
     <div className="flex min-h-screen">
       <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -235,11 +202,7 @@ function AppContent() {
           connectedFrontends={connectedFrontends}
           processInfo={processInfo}
           logFilePath={logFilePath}
-          onRequestProcessInfo={handleRequestProcessInfo}
-          onRequestConnectedFrontends={handleRequestConnectedFrontends}
-          onRequestLogFilePath={handleRequestLogFilePath}
-          onKillServer={handleKillServer}
-          onSetFrontendId={handleSetFrontendId}
+          workerRef={workerRef}
           onSendMock={() => {
           // Build and broadcast a minimal AST manifest + section over WS for demo purposes
           const manifest = {
@@ -285,7 +248,7 @@ function AppContent() {
               w.postMessage({ type: 'send', html: JSON.stringify({ kind: 'ast_section', section: section.section, doc: section.doc }) })
             }
           } catch {}
-        }} onToggleSidebar={() => setSidebarOpen((v) => !v)} />
+        }} onToggleSidebar={toggleSidebar} />
         {state.manifest ? (
           <VirtualReader docId={docId} manifest={state.manifest} sections={state.sections} />
         ) : (
