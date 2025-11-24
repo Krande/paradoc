@@ -2,6 +2,11 @@
 enabled = true
 pre_release_tag = "dev"
 
+[tool.python.lint]
+black_version = "24.4.2"
+ruff_version = "0.12.8"
+isort_version = "5.13.2"
+
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
 

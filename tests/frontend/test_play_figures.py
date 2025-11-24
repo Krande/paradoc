@@ -160,6 +160,9 @@ def test_plot_toggle_between_static_and_interactive(
     # Wait for the mode to change
     page.wait_for_timeout(500)
 
+    # Ensure hover is maintained/restored after layout change
+    figure_container.hover()
+
     # Now Interactive should be active
     interactive_classes = interactive_button.get_attribute("class")
     assert "bg-blue-600" in interactive_classes, "Interactive button should be active after clicking"
@@ -171,6 +174,9 @@ def test_plot_toggle_between_static_and_interactive(
     # Click back to Static
     static_button.click()
     page.wait_for_timeout(500)
+    
+    # Ensure hover is maintained/restored
+    figure_container.hover()
 
     # Verify Static is active again
     static_classes = static_button.get_attribute("class")
