@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import pathlib
 import re
@@ -8,14 +9,13 @@ from typing import TYPE_CHECKING
 
 import pypandoc
 
-from paradoc.config import create_logger
+from paradoc.config import logger
 
 from .common import MarkDownFile, Table
 from .equations import Equation
 
 if TYPE_CHECKING:
     from paradoc import OneDoc
-logger = create_logger()
 
 
 def copy_figures_to_dist(one: OneDoc, dest_dir: pathlib.Path):
@@ -73,7 +73,7 @@ def convert_markdown(
         extra_args += [f"--reference-doc={style_doc}"]
 
     extra_args += [f"--resource-path={source.parent}"]
-    print(f"Converting {source}")
+    logger.info(f"Converting {source}")
     if source.is_dir():
         convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_doc=style_doc)
     else:
@@ -178,6 +178,21 @@ def sub_table(tbl: Table, flags) -> str:
 
 def sub_equation(eq: Equation, flags) -> str:
     return eq.to_latex(flags=flags)
+
+
+def get_md5_hash_for_file(file_path: pathlib.Path):
+    """
+    Calculate MD5 hash for a file.
+
+    :param file_path: Path to the file
+    :return: MD5 hash object
+    """
+    md5_hash = hashlib.md5()
+    with open(file_path, "rb") as f:
+        # Read file in chunks to handle large files efficiently
+        for chunk in iter(lambda: f.read(4096), b""):
+            md5_hash.update(chunk)
+    return md5_hash
 
 
 def convert_variable(value, flags) -> str:

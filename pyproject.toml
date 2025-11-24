@@ -41,11 +41,121 @@ line-length = 120
 
 [tool.ruff]
 line-length = 120
+exclude = ["examples/", ".pixi/", "temp/"]
+# Tell Ruff where your source root is so it can classify first-party imports
+src = ["src"]
+
+[tool.ruff.lint]
 ignore = ["E741"]
 
 [tool.isort]
 profile = "black"
+skip = [".pixi", "node_modules", "temp", "examples"]
+skip_glob = ["**/node_modules/**", "**/temp/**", "**/_build/**"]
 
 [tool.flake8]
 max-line-length = 120
 ignore = ["E24", "E121", "E123", "E126", "E203", "E226", "E704", "E741", "W503", "W504"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "--basetemp=temp"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64"]
+
+[tool.pixi.environments]
+prod = { features = ["prod"], solve-group = "prod", no-default-feature = true }
+test-core = { features = ["test-core"], solve-group = "prod", no-default-feature = true }
+test = { features = ["test", "test-core", "prod"], solve-group = "prod", no-default-feature = true }
+profile = { features = ["profile", "prod","test-core", "frontend"], solve-group = "prod", no-default-feature = true }
+
+lint = { features = ["lint"], no-default-feature = true }
+frontend = { features = ["frontend"], no-default-feature = true }
+docs = { features = ["docs", "test-core"], no-default-feature = true }
+
+[tool.pixi.feature.prod.dependencies]
+pandoc = "==3.8.2"
+pandoc-crossref = "==0.3.22"
+pypandoc = "==1.15"
+python-docx = "*"
+typer = "*"
+numpy = "*"
+pandas = "*"
+openpyxl = "*"
+tabulate = "*"
+svgwrite = "*"
+pytexit = "*"
+nomkl = "*"
+websocket-client = "*"
+websockets = "*"
+plotly = "*"
+python-kaleido = "*"
+pydantic = ">=2.0"
+playwright = "*"
+
+[tool.pixi.feature.test-core.pypi-dependencies]
+pytest-playwright = "*"
+
+[tool.pixi.feature.prod.target.win-64.dependencies]
+pywin32 = "*"
+types-pywin32 = "*"
+
+[tool.pixi.feature.test-core.dependencies]
+pytest = "*"
+
+[tool.pixi.feature.frontend.dependencies]
+nodejs = "*"
+
+[tool.pixi.feature.frontend.tasks]
+npm = { cmd = "npm", cwd = "./frontend" }
+winstall = { cmd = "npm install", cwd = "./frontend", outputs = ["$PIXI_PROJECT_ROOT/frontend/node_modules"] }
+wdev = { cmd = "npm run dev --prefix frontend", depends-on = ["winstall"] }
+wbuild = { cmd = "npm run build:standalone", cwd = "./frontend", depends-on = ["winstall"], outputs = ["$PIXI_PROJECT_ROOT/src/paradoc/resources/frontend.zip"] }
+
+[tool.pixi.feature.lint.dependencies]
+black = "==24.4.2"
+isort = "==5.13.2"
+ruff = "==0.12.8"
+
+[tool.pixi.feature.profile.dependencies]
+pytest = "*"
+pytest-benchmark = "*"
+pytest-asyncio = "*"
+pyinstrument = "*"
+
+[tool.pixi.feature.docs.dependencies]
+mkdocs = "==1.6.1"
+mkdocstrings = "*"
+mkdocstrings-python = "*"
+mkdocs-material = "*"
+mkdocs-jupyter = "*"
+mkdocs-glightbox = "*"
+
+[tool.pixi.feature.test.tasks]
+pre-install = { cmd = "python -c \"from plotly.io._kaleido import plotly_get_chrome; plotly_get_chrome()\"", outputs = ["$PIXI_HOME/envs/test/Lib/site-packages/choreographer/cli/browser_exe/chrome-win64/chrome.exe"] }
+test = { cmd = "pytest tests --durations=0" }
+test-doc = { cmd = "python cli_document_tester.py", cwd = "examples" }
+
+[tool.pixi.feature.profile.tasks]
+test-doc-profile = { cmd = ["pyinstrument", "-r", "html", "-o", "profile_doc.html", "$PIXI_PROJECT_ROOT/examples/cli_document_tester.py"], cwd= "examples" }
+test-profile = { cmd = "pyinstrument -r html -o profile_tests.html -m pytest tests" }
+test-profile-json = { cmd = "pyinstrument -r json -o profile_tests.json -m pytest tests" }
+
+[tool.pixi.feature.lint.tasks]
+lint = "black . --config pyproject.toml && ruff check . --fix && isort ."
+
+[tool.pixi.feature.docs.tasks]
+build = { cmd = "mkdocs build", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
+serve = { cmd = "mkdocs serve -a localhost:8080", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
+
+[tool.pixi.feature.prod.target.win-64.activation.env]
+PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
+
+[tool.pixi.feature.test.target.win-64.activation.env]
+PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
+
+[tool.pixi.feature.profile.target.win-64.activation.env]
+PYTHONPATH="%PIXI_PROJECT_ROOT%/src"

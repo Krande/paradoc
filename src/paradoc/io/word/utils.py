@@ -1,6 +1,5 @@
 import os
 import pathlib
-import traceback
 from typing import List
 
 import pypandoc
@@ -9,86 +8,95 @@ from docx.oxml.table import CT_Tbl
 from docx.oxml.text.paragraph import CT_P
 from docx.table import Table, _Cell
 from docx.text.paragraph import Paragraph
-from docxcompose.composer import Composer
 
 from paradoc.common import MY_DOCX_TMPL, MarkDownFile
-from paradoc.config import create_logger
+from paradoc.config import logger
+from paradoc.io.word.compose.composer import Composer
 from paradoc.utils import get_list_of_files
 
-logger = create_logger()
+
+def fix_bookmark_ids(document):
+    """Fix bookmark ID mismatches that occur during docxcompose merging.
+
+    docxcompose renumbers bookmarkStart IDs to avoid conflicts when merging documents,
+    but it doesn't update the corresponding bookmarkEnd IDs, causing Word to treat
+    them as invalid bookmarks and show "Error! Not a valid bookmark self-reference".
+
+    This function finds all bookmarkStart elements and ensures their corresponding
+    bookmarkEnd elements have matching IDs.
+
+    Args:
+        document: The Word document to fix
+    """
+    from docx.oxml.ns import qn
+
+    # Get the document body element
+    body = document._element.body
+
+    # Find all bookmarkStart elements and build a mapping of name -> ID
+    bookmark_name_to_id = {}
+
+    for elem in body.iter():
+        if elem.tag == qn("w:bookmarkStart"):
+            bm_id = elem.get(qn("w:id"))
+            bm_name = elem.get(qn("w:name"))
+            if bm_id and bm_name:
+                bookmark_name_to_id[bm_name] = bm_id
+
+    # Now find all bookmarkEnd elements and update their IDs to match
+    # Note: bookmarkEnd doesn't have a name attribute, so we need to track
+    # the order and match them up
+
+    # Alternative approach: Track bookmark starts and ends by name using a different strategy
+    # Build a mapping by finding start/end pairs in order
+    bookmark_starts = {}
+
+    for elem in body.iter():
+        if elem.tag == qn("w:bookmarkStart"):
+            bm_id = elem.get(qn("w:id"))
+            bm_name = elem.get(qn("w:name"))
+            if bm_id and bm_name:
+                bookmark_starts[bm_id] = bm_name
+
+    # Now update bookmarkEnd elements to match their corresponding start IDs
+    # We need to track which starts have been closed
+    open_bookmarks = {}  # Maps old_id -> new_id for currently open bookmarks
+
+    for paragraph in body.iter(qn("w:p")):
+        for elem in paragraph:
+            if elem.tag == qn("w:bookmarkStart"):
+                old_id = elem.get(qn("w:id"))
+                bm_name = elem.get(qn("w:name"))
+                if old_id and bm_name:
+                    # Track this bookmark as open
+                    open_bookmarks[old_id] = (old_id, bm_name)
+
+            elif elem.tag == qn("w:bookmarkEnd"):
+                end_id = elem.get(qn("w:id"))
+                if end_id and end_id in open_bookmarks:
+                    # This end matches a start we've seen
+                    start_id, bm_name = open_bookmarks[end_id]
+                    # ID is already correct, just close it
+                    del open_bookmarks[end_id]
+                else:
+                    # Try to find the matching start by looking for an open bookmark
+                    # that hasn't been closed yet
+                    if len(open_bookmarks) == 1:
+                        # Only one open bookmark, this end must be for it
+                        start_id, bm_name = list(open_bookmarks.values())[0]
+                        # Update the end ID to match the start
+                        elem.set(qn("w:id"), start_id)
+                        # Remove from open bookmarks (use the old key)
+                        for k, v in list(open_bookmarks.items()):
+                            if v == (start_id, bm_name):
+                                del open_bookmarks[k]
+                                break
 
 
 def delete_paragraph(paragraph):
     p = paragraph._element
     p.getparent().remove(p)
     paragraph._p = paragraph._element = None
-
-
-def open_word_win32():
-    import sys
-
-    if sys.platform != "win32":
-        return
-
-    try:
-        import win32com.client
-
-        word = win32com.client.DispatchEx("Word.Application")
-    except (ModuleNotFoundError, ImportError):
-        logger.error(
-            "Ensure you have you have win32com installed. "
-            'Use "conda install -c conda-forge pywin32" to install. '
-            f"{traceback.format_exc()}"
-        )
-        return None
-    except BaseException as e:
-        logger.error(
-            "Probably unable to find COM connection to Word application. "
-            f"Is Word installed? {traceback.format_exc()}, {e}"
-        )
-        return None
-    return word
-
-
-def docx_update(docx_file):
-    word = open_word_win32()
-    if word is None:
-        return
-    doc = word.Documents.Open(docx_file)
-    try:
-        # update all figure / table numbers
-        word.ActiveDocument.Fields.Update()
-
-        # update Table of content / figure / table
-        if len(word.ActiveDocument.TablesOfContents) > 0:
-            word.ActiveDocument.TablesOfContents(1).Update()
-        else:
-            logger.error("No table of contents is found")
-        # word.ActiveDocument.TablesOfFigures(1).Update()
-        # word.ActiveDocument.TablesOfFigures(2).Update()
-    except Exception as e:
-        raise Exception(e)
-    finally:
-        doc.Close(SaveChanges=True)
-
-        word.Quit()
-
-
-def close_word_docs_by_name(names: list) -> None:
-    word = open_word_win32()
-    if word is None:
-        return
-
-    if len(word.Documents) > 0:
-        for doc in word.Documents:
-            doc_name = doc.Name
-            if doc_name in names:
-                print(f'Closing "{doc}"')
-                doc.Close()
-    else:
-        print(f"No Word docs named {names} found to be open. Ending Word Application COM session")
-
-    word.Quit()
 
 
 def iter_block_items(parent):
@@ -127,7 +135,8 @@ def convert_markdown_dir_to_docx(source, dest, dest_format, extra_args, style_do
     :return:
     """
     from docx import Document
-    from docxcompose.composer import Composer
+
+    from paradoc.io.word.compose.composer import Composer
 
     build_dir = source / "_build"
     if style_doc is not None:

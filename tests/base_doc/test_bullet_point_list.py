@@ -1,5 +1,3 @@
-import os
-
 from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -7,15 +5,15 @@ from docx.oxml.ns import qn
 from paradoc import OneDoc
 
 
-def test_bullet_point_list(files_dir, test_dir):
+def test_bullet_point_list(files_dir, tmp_path):
     source_dir = files_dir / "doc_bullet_points"
-    dest = test_dir / "bullet_points/bullet_points.docx"
+    dest = tmp_path / "bullet_points/bullet_points.docx"
 
     one = OneDoc(source_dir, work_dir=dest.parent)
     one.compile(dest.stem)
 
 
-def test_bullet_point_list_from_scratch():
+def test_bullet_point_list_from_scratch(tmp_path):
     def create_list(paragraph, list_type):
         p = paragraph._p  # access to xml paragraph element
         pPr = p.get_or_add_pPr()  # access paragraph properties
@@ -48,5 +46,4 @@ def test_bullet_point_list_from_scratch():
     paragraph = document.add_paragraph("Goodbye", "List Paragraph")
     create_list(paragraph, ordered)
 
-    os.makedirs("temp", exist_ok=True)
-    document.save("temp/bullet_list_demo.docx")
+    document.save(tmp_path / "bullet_list_demo.docx")

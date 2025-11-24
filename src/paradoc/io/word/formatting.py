@@ -3,7 +3,6 @@ from docx.text.paragraph import Paragraph
 
 from paradoc.config import create_logger
 
-from .references import insert_caption_into_runs
 from .utils import iter_block_items
 
 logger = create_logger()
@@ -104,25 +103,26 @@ def format_paragraph(pg, document: Document, paragraph_style_map: dict, index):
 
 
 def fix_headers_after_compose(doc: Document):
+    from copy import deepcopy
+
     from paradoc import OneDoc
     from paradoc.io.word.utils import delete_paragraph, iter_block_items
 
     pg_rem = []
+
     for pg in iter_block_items(doc):
         if isinstance(pg, Paragraph):
             if pg.style.name in ("Image Caption", "Table Caption"):
                 continue
             else:
                 if pg.style.name in list(OneDoc.default_app_map.values())[1:]:
-                    pg.insert_paragraph_before(pg.text, style=pg.style.name)
+                    # Clone the entire paragraph element to preserve field codes (REF, SEQ, etc.)
+                    # Using pg.text would only copy plain text and lose all field structures
+                    new_p_element = deepcopy(pg._element)
+                    # Insert the cloned element before the current paragraph
+                    pg._element.addprevious(new_p_element)
+                    # Mark original for deletion
                     pg_rem.append(pg)
 
     for pg in pg_rem:
         delete_paragraph(pg)
-
-
-def format_image_captions(doc: Document, is_appendix):
-    for block in iter_block_items(doc):
-        if type(block) == Paragraph:
-            if block.style.name in ("Image Caption",):
-                insert_caption_into_runs(block, "Figure", is_appendix)

@@ -3,6 +3,7 @@ include README.md
 include src/paradoc/resources/default_style.css
 include src/paradoc/resources/template.docx
 include src/paradoc/resources/template_blank.docx
+include src/paradoc/io/ast/resources/frontend.zip
 include src/paradoc/io/html/js/*.js
 include src/paradoc/svg/templates/*.svg
 include src/paradoc/svg/templates/titleblocks/*.svg

@@ -1,0 +1,208 @@
+"""Word field operations (SEQ, REF, STYLEREF)."""
+
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.text.paragraph import Paragraph
+from docx.text.run import Run
+
+
+def add_seq_reference(run_in, seq: str, parent):
+    """Add a SEQ field to a run.
+
+    Args:
+        run_in: The run element to add the field to
+        seq: The SEQ field instruction (e.g., "SEQ Figure \\* ARABIC \\s 1")
+        parent: The parent element
+
+    Returns:
+        The new run with the SEQ field
+    """
+    new_run = Run(run_in, parent)
+    r = new_run._r
+
+    # Field begin
+    fldChar = OxmlElement("w:fldChar")
+    fldChar.set(qn("w:fldCharType"), "begin")
+    r.append(fldChar)
+
+    # Field instruction
+    instrText = OxmlElement("w:instrText")
+    instrText.set(qn("xml:space"), "preserve")
+    instrText.text = " " + seq + " "
+    r.append(instrText)
+
+    # Field separator (CRITICAL - without this, fields don't display correctly)
+    fldChar2 = OxmlElement("w:fldChar")
+    fldChar2.set(qn("w:fldCharType"), "separate")
+    r.append(fldChar2)
+
+    # Field result placeholder
+    t = OxmlElement("w:t")
+    t.text = "1"  # Placeholder that will be updated by Word
+    r.append(t)
+
+    # Field end
+    fldChar3 = OxmlElement("w:fldChar")
+    fldChar3.set(qn("w:fldCharType"), "end")
+    r.append(fldChar3)
+
+    return new_run
+
+
+def add_table_reference(paragraph: Paragraph, seq: str = " SEQ Table \\* ARABIC \\s 1"):
+    """Add a table reference SEQ field to a paragraph.
+
+    Args:
+        paragraph: The paragraph to add the field to
+        seq: The SEQ field instruction
+
+    Returns:
+        The run containing the SEQ field
+    """
+    run = paragraph.add_run()
+    r = run._r
+
+    # Field begin
+    fldChar = OxmlElement("w:fldChar")
+    fldChar.set(qn("w:fldCharType"), "begin")
+    r.append(fldChar)
+
+    # Field instruction
+    instrText = OxmlElement("w:instrText")
+    instrText.set(qn("xml:space"), "preserve")
+    instrText.text = seq
+    r.append(instrText)
+
+    # Field separator
+    fldChar2 = OxmlElement("w:fldChar")
+    fldChar2.set(qn("w:fldCharType"), "separate")
+    r.append(fldChar2)
+
+    # Field result placeholder
+    t = OxmlElement("w:t")
+    t.text = "1"
+    r.append(t)
+
+    # Field end
+    fldChar3 = OxmlElement("w:fldChar")
+    fldChar3.set(qn("w:fldCharType"), "end")
+    r.append(fldChar3)
+
+    return run
+
+
+def add_ref_field_to_paragraph(paragraph: Paragraph, bookmark_name: str, label: str = "Figure"):
+    """Add a REF field to a paragraph using the add_run API.
+
+    Args:
+        paragraph: The paragraph to add the REF field to
+        bookmark_name: The name of the bookmark to reference
+        label: The label text to show (e.g., "Figure", "Table")
+    """
+    # Create field begin
+    run1 = paragraph.add_run()
+    r1 = run1._r
+    fldChar1 = OxmlElement("w:fldChar")
+    fldChar1.set(qn("w:fldCharType"), "begin")
+    r1.append(fldChar1)
+
+    # Create field instruction
+    run2 = paragraph.add_run()
+    r2 = run2._r
+    instrText = OxmlElement("w:instrText")
+    instrText.set(qn("xml:space"), "preserve")
+    instrText.text = f" REF {bookmark_name} \\h "
+    r2.append(instrText)
+
+    # Create field separator
+    run3 = paragraph.add_run()
+    r3 = run3._r
+    fldChar3 = OxmlElement("w:fldChar")
+    fldChar3.set(qn("w:fldCharType"), "separate")
+    r3.append(fldChar3)
+
+    # Create field result (placeholder)
+    paragraph.add_run(f"{label} 1")
+
+    # Create field end
+    run5 = paragraph.add_run()
+    r5 = run5._r
+    fldChar5 = OxmlElement("w:fldChar")
+    fldChar5.set(qn("w:fldCharType"), "end")
+    r5.append(fldChar5)
+
+
+def create_ref_field_runs(p_element, bookmark_name: str, label: str = "Figure"):
+    """Create REF field runs and append them to a paragraph element.
+
+    This creates the complete REF field structure with begin, instruction,
+    separator, result, and end by directly manipulating XML.
+
+    IMPORTANT: The label (e.g., "Figure") should NOT be added as a separate text run
+    because the REF field will be updated by Word to show the complete bookmark text
+    which already includes the label. Adding it separately causes duplication like
+    "Figure Figure 1-1".
+
+    Args:
+        p_element: The paragraph XML element (w:p)
+        bookmark_name: The name of the bookmark to reference
+        label: The label prefix for the placeholder (e.g., "Figure", "Table", "Eq")
+    """
+    # Run 1: Field begin
+    r1 = OxmlElement("w:r")
+    fldChar1 = OxmlElement("w:fldChar")
+    fldChar1.set(qn("w:fldCharType"), "begin")
+    r1.append(fldChar1)
+    p_element.append(r1)
+
+    # Run 2: Field instruction
+    r2 = OxmlElement("w:r")
+    instrText = OxmlElement("w:instrText")
+    instrText.set(qn("xml:space"), "preserve")
+    # Use Word's cross-reference format: REF bookmark \h
+    # \h creates a hyperlink to the bookmark
+    instrText.text = f" REF {bookmark_name} \\h "
+    r2.append(instrText)
+    p_element.append(r2)
+
+    # Run 3: Field separator
+    r3 = OxmlElement("w:r")
+    fldChar3 = OxmlElement("w:fldChar")
+    fldChar3.set(qn("w:fldCharType"), "separate")
+    r3.append(fldChar3)
+    p_element.append(r3)
+
+    # Run 4: Field result (placeholder text that will be replaced when field is updated)
+    # The bookmark contains the full caption text including label, so we use that as placeholder
+    r4 = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.set(qn("xml:space"), "preserve")
+    # For equations, add period after "Eq" to match bookmark format "Eq. 1-1"
+    if label == "Eq":
+        t.text = "Eq. 1-1"
+    else:
+        t.text = f"{label} 1-1"  # Placeholder - will be updated by Word to show actual bookmark content
+    r4.append(t)
+    p_element.append(r4)
+
+    # Run 5: Field end
+    r5 = OxmlElement("w:r")
+    fldChar5 = OxmlElement("w:fldChar")
+    fldChar5.set(qn("w:fldCharType"), "end")
+    r5.append(fldChar5)
+    p_element.append(r5)
+
+
+def create_text_run(p_element, text: str):
+    """Create a text run and append it to a paragraph element.
+
+    Args:
+        p_element: The paragraph XML element (w:p)
+        text: The text content for the run
+    """
+    r = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.set(qn("xml:space"), "preserve")
+    t.text = text
+    r.append(t)
+    p_element.append(r)

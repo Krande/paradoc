@@ -22,8 +22,8 @@ def my_calc_example_2(a, b):
     return V_x
 
 
-@pytest.fixture
-def test_doc(files_dir, test_dir):
+@pytest.fixture(scope="function")
+def test_doc(files_dir, tmp_path):
     logging.getLogger().setLevel(logging.INFO)
     report_dir = files_dir / "doc_math"
 
@@ -31,7 +31,7 @@ def test_doc(files_dir, test_dir):
     df1 = make_df(inputs, ("a", "b", "V_x"), my_calc_example_1)
     df2 = make_df(inputs, ("a", "b", "V_x"), my_calc_example_2)
 
-    one = OneDoc(report_dir, work_dir=test_dir / "doc_math")
+    one = OneDoc(report_dir, work_dir=tmp_path / "doc_math")
 
     one.add_equation("my_equation_1", my_calc_example_1, include_python_code=True)
     one.add_equation("my_equation_2", my_calc_example_2)

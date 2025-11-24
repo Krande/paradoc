@@ -13,15 +13,11 @@ class HTMLExporter:
     def __init__(self, one_doc: OneDoc):
         self.one_doc = one_doc
 
-    def export(self, dest_file, include_navbar=True):
+    def _build_styled_html(self, include_navbar: bool = True) -> str:
         one = self.one_doc
 
         md_main_str = "\n\n".join([md.read_built_file() for md in one.md_files_main])
-
-        copy_figures_to_dist(one, dest_file.parent)
-
         app_str = """\n\n\\appendix\n\n"""
-
         md_app_str = "\n\n".join([md.read_built_file() for md in one.md_files_app])
         combined_str = md_main_str + app_str + md_app_str
 
@@ -53,21 +49,28 @@ class HTMLExporter:
 
         styled_html = f"""<html>
         <head>
-        <meta name="data-appendix-start" content="{app_head_text}">
-        <link rel="stylesheet" type="text/css" href="style.css">
-        <script type="text/javascript" async
-            src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js">
+        <meta name=\"data-appendix-start\" content=\"{app_head_text}\">
+        <link rel=\"stylesheet\" type=\"text/css\" href=\"style.css\">
+        <script type=\"text/javascript\" async
+            src=\"https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.js\">
         </script>
         {js_script}
         </head>
         <body>
-        <div class="content">
+        <div class=\"content\">
         {html_str}
         </div>
         </body>
         </html>"""
+        return styled_html
 
-        # styled_html.format(__custom_js_navbar__=js_script)
+    def export(self, dest_file, include_navbar=True):
+        one = self.one_doc
+
+        # Ensure figures are copied
+        copy_figures_to_dist(one, dest_file.parent)
+
+        styled_html = self._build_styled_html(include_navbar=include_navbar)
 
         with open(dest_file, "w", encoding="utf-8") as f:
             f.write(styled_html)
