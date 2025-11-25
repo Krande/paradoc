@@ -68,7 +68,7 @@ Reference to figure: [@fig:test_figure]
         xml_str = para._element.xml.decode("utf-8") if isinstance(para._element.xml, bytes) else para._element.xml
 
         if "bookmarkStart" in xml_str:
-            print("  ✓ Contains bookmarkStart")
+            print("  OK Contains bookmarkStart")
             # Extract bookmark name
             import re
 
@@ -77,21 +77,21 @@ Reference to figure: [@fig:test_figure]
                 print(f"    Bookmark names: {bookmark_matches}")
 
         if "SEQ" in xml_str:
-            print("  ✓ Contains SEQ field")
+            print("  OK Contains SEQ field")
             # Extract SEQ field content
             seq_matches = re.findall(r"SEQ\s+([^<]+)", xml_str)
             if seq_matches:
                 print(f"    SEQ content: {seq_matches}")
 
         if "REF" in xml_str and "STYLEREF" not in xml_str:
-            print("  ✓ Contains REF field")
+            print("  OK Contains REF field")
             # Extract REF field content
             ref_matches = re.findall(r"REF\s+([^<]+)", xml_str)
             if ref_matches:
                 print(f"    REF content: {ref_matches}")
 
         if "HYPERLINK" in xml_str:
-            print("  ✓ Contains HYPERLINK")
+            print("  OK Contains HYPERLINK")
 
         if "Test Figure Caption" in para.text or "Reference to figure" in para.text:
             print(f"\n  Full XML:\n{xml_str[:500]}")
@@ -162,6 +162,6 @@ Reference: [@fig:test_figure]
     # This is the key check - figures need bookmarks for proper cross-referencing
     # Currently this might fail, which is the bug we're fixing
     if not has_bookmark:
-        print("\n⚠️  WARNING: Figure caption is missing bookmark!")
+        print("\nWARNING: Figure caption is missing bookmark!")
         print("This means cross-references won't work properly in Word.")
         print("The SEQ field needs to be wrapped in a bookmark for REF fields to reference it.")

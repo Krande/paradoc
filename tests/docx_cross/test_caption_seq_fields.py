@@ -101,7 +101,7 @@ Second section with another figure.
                         seq_fields.append({"para_idx": para_idx, "instr": instr_text.text.strip()})
 
             if not has_fields:
-                print("  ⚠ NO FIELD CODES FOUND - Caption is static text!")
+                print("  WARNING NO FIELD CODES FOUND - Caption is static text!")
                 # Print the raw XML for this paragraph
                 print(f"  Raw XML preview: {ET.tostring(para, encoding='unicode')[:200]}...")
 
@@ -111,7 +111,7 @@ Second section with another figure.
     print(f"Total SEQ fields found: {len(seq_fields)}")
 
     for sf in seq_fields:
-        print(f"  • Para {sf['para_idx']}: {sf['instr']}")
+        print(f"  - Para {sf['para_idx']}: {sf['instr']}")
 
     # ASSERTION: We should have at least 2 SEQ fields (one per figure)
     assert len(seq_fields) >= 2, (
@@ -119,7 +119,7 @@ Second section with another figure.
         "This indicates that rebuild_caption is not creating proper SEQ fields."
     )
 
-    print("\n✓ TEST PASSED - SEQ fields are being created correctly")
+    print("\nOK TEST PASSED - SEQ fields are being created correctly")
 
 
 def extract_docx_xml(docx_path: Path, output_dir: Path):

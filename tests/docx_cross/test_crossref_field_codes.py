@@ -259,15 +259,15 @@ Summary with references to all elements:
 
     print(f"Figure bookmarks ({len(fig_bookmarks)}):")
     for bm in fig_bookmarks:
-        print(f"  • {bm['name']} (ID: {bm['id']}) - Para {bm['para_idx']}: {bm['para_text']}")
+        print(f"  - {bm['name']} (ID: {bm['id']}) - Para {bm['para_idx']}: {bm['para_text']}")
 
     print(f"\nTable bookmarks ({len(tbl_bookmarks)}):")
     for bm in tbl_bookmarks:
-        print(f"  • {bm['name']} (ID: {bm['id']}) - Para {bm['para_idx']}: {bm['para_text']}")
+        print(f"  - {bm['name']} (ID: {bm['id']}) - Para {bm['para_idx']}: {bm['para_text']}")
 
     print(f"\nEquation bookmarks ({len(eq_bookmarks)}):")
     for bm in eq_bookmarks:
-        print(f"  • {bm['name']} (ID: {bm['id']}) - Para {bm['para_idx']}: {bm['para_text']}")
+        print(f"  - {bm['name']} (ID: {bm['id']}) - Para {bm['para_idx']}: {bm['para_text']}")
 
     print("\n" + "=" * 80)
     print("CAPTION STRUCTURES (Detailed Analysis)")
@@ -278,8 +278,8 @@ Summary with references to all elements:
         print(f"Caption at Para {cap['para_idx']}: {cap['label'] or 'Unknown'}")
         print(f"  Text: {cap['para_text']}")
         print(f"  Has hyphen separator: {cap['has_hyphen']}")
-        print(f"  STYLEREF field: {cap['styleref_field'] or 'NOT FOUND ❌'}")
-        print(f"  SEQ field: {cap['seq_field'] or 'NOT FOUND ❌'}")
+        print(f"  STYLEREF field: {cap['styleref_field'] or 'NOT FOUND'}")
+        print(f"  SEQ field: {cap['seq_field'] or 'NOT FOUND'}")
         print()
 
     print("\n" + "=" * 80)
@@ -294,15 +294,15 @@ Summary with references to all elements:
 
     print(f"Figure SEQ fields ({len(fig_seq_fields)}):")
     for sf in fig_seq_fields:
-        print(f"  • Para {sf['para_idx']}: {sf['instr']}")
+        print(f"  - Para {sf['para_idx']}: {sf['instr']}")
 
     print(f"\nTable SEQ fields ({len(tbl_seq_fields)}):")
     for sf in tbl_seq_fields:
-        print(f"  • Para {sf['para_idx']}: {sf['instr']}")
+        print(f"  - Para {sf['para_idx']}: {sf['instr']}")
 
     print(f"\nEquation SEQ fields ({len(eq_seq_fields)}):")
     for sf in eq_seq_fields:
-        print(f"  • Para {sf['para_idx']}: {sf['instr']}")
+        print(f"  - Para {sf['para_idx']}: {sf['instr']}")
 
     print("\n" + "=" * 80)
     print("STYLEREF FIELDS FOUND")
@@ -310,7 +310,7 @@ Summary with references to all elements:
     print(f"Total STYLEREF fields: {len(styleref_fields)}\n")
 
     for sf in styleref_fields:
-        print(f"  • Para {sf['para_idx']}: {sf['instr']}")
+        print(f"  - Para {sf['para_idx']}: {sf['instr']}")
         print(f"    Context: {sf['para_text']}")
 
     print("\n" + "=" * 80)
@@ -321,7 +321,7 @@ Summary with references to all elements:
     if len(ref_fields) > 0:
         print("\nREF fields found:")
         for rf in ref_fields:
-            print(f"  • Para {rf['para_idx']}: {rf['instr']}")
+            print(f"  - Para {rf['para_idx']}: {rf['instr']}")
             print(f"    Context: {rf['para_text']}")
     else:
         print("\nWARNING: NO REF FIELDS FOUND!")

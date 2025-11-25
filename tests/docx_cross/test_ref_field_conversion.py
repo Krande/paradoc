@@ -69,7 +69,7 @@ Another reference: see [@fig:test_figure] for details.
             xml_str = para._element.xml.decode("utf-8") if isinstance(para._element.xml, bytes) else para._element.xml
             if "bookmarkStart" in xml_str:
                 bookmark_matches = re.findall(r'w:name="([^"]+)"', xml_str)
-                print(f"  ✓ Has bookmark: {bookmark_matches}")
+                print(f"  OK Has bookmark: {bookmark_matches}")
             break
 
     # Find reference paragraphs
@@ -86,16 +86,16 @@ Another reference: see [@fig:test_figure] for details.
             if "REF" in xml_str and "STYLEREF" not in xml_str:
                 ref_matches = re.findall(r"<w:instrText[^>]*>([^<]*REF[^<]*)</w:instrText>", xml_str)
                 if ref_matches:
-                    print(f"  ✓ Has REF field: {ref_matches}")
+                    print(f"  OK Has REF field: {ref_matches}")
                     ref_field_count += 1
                 else:
-                    print("  ⚠ Contains 'REF' in XML but couldn't extract field")
+                    print("  WARNING Contains 'REF' in XML but couldn't extract field")
             else:
-                print("  ✗ No REF field found")
+                print("  NO No REF field found")
 
                 # Check if it has the plain text reference
                 if figure_number and figure_number in para.text:
-                    print(f"  ⚠ Contains plain text reference to figure {figure_number}")
+                    print(f"  WARNING Contains plain text reference to figure {figure_number}")
 
             ref_count += 1
 
@@ -104,7 +104,7 @@ Another reference: see [@fig:test_figure] for details.
     print(f"  References with REF fields: {ref_field_count}")
 
     if ref_count > 0 and ref_field_count == 0:
-        print("\n⚠️  WARNING: References found but none converted to REF fields!")
+        print("\nWARNING: References found but none converted to REF fields!")
         print("This indicates the reference conversion function is not working.")
 
     print("=" * 80)

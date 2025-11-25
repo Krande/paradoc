@@ -96,7 +96,7 @@ Another reference: see [@fig:test_figure] for details.
         # Check if this reference has full numbering
         if "-" in number:
             found_full_numbering = True
-            print(f"  ✓ Full numbering found: {number}")
+            print(f"  OK Full numbering found: {number}")
 
     # At least one reference should have full chapter-figure numbering
     assert found_full_numbering, "At least one figure reference should include chapter number (e.g., '1-1')"
@@ -180,7 +180,7 @@ Another reference: see [@tbl:test_table] for details.
         # Check if this reference has full numbering
         if "-" in number:
             found_full_numbering = True
-            print(f"  ✓ Full numbering found: {number}")
+            print(f"  OK Full numbering found: {number}")
 
     # At least one reference should have full chapter-table numbering
     assert found_full_numbering, "At least one table reference should include chapter number (e.g., '1-1')"
@@ -240,7 +240,7 @@ Another reference: see [@eq:test_equation] for details.
         # pandoc-crossref generates "eq." (lowercase with period)
         if "Eq" in text or "Equation" in text or "eq." in text:
             found_eq_label = True
-            print("  ✓ Found equation label")
+            print("  OK Found equation label")
 
         # For now, equations from pandoc-crossref show as "eq.1" without full numbering
         # This test documents current behavior; full equation support would require
@@ -259,7 +259,7 @@ Another reference: see [@eq:test_equation] for details.
 
                 if "-" in number:
                     found_full_numbering = True
-                    print(f"  ✓ Full numbering found: {number}")
+                    print(f"  OK Full numbering found: {number}")
 
     # At least equation label should be present
     assert found_eq_label, "At least one equation reference should include equation label (Eq, Equation, or eq.)"

@@ -69,19 +69,19 @@ Reference to figure: [@fig:test_figure]
         xml_str = para._element.xml.decode("utf-8") if isinstance(para._element.xml, bytes) else para._element.xml
 
         if "bookmarkStart" in xml_str:
-            print("  ✓ Contains bookmarkStart")
+            print("  OK Contains bookmarkStart")
             bookmark_matches = re.findall(r'w:name="([^"]+)"', xml_str)
             if bookmark_matches:
                 print(f"    Bookmark names: {bookmark_matches}")
 
         if "SEQ" in xml_str:
-            print("  ✓ Contains SEQ field")
+            print("  OK Contains SEQ field")
             seq_matches = re.findall(r"<w:instrText[^>]*>([^<]*SEQ[^<]*)</w:instrText>", xml_str)
             if seq_matches:
                 print(f"    SEQ instruction: {seq_matches}")
 
         if "REF" in xml_str and "STYLEREF" not in xml_str:
-            print("  ✓ Contains REF field")
+            print("  OK Contains REF field")
             ref_matches = re.findall(r"<w:instrText[^>]*>([^<]*REF[^<]*)</w:instrText>", xml_str)
             if ref_matches:
                 print(f"    REF instruction: {ref_matches}")

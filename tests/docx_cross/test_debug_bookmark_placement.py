@@ -149,19 +149,19 @@ This is a reference to [@fig:test_figure] in the text.
                 if instr.text:
                     if "STYLEREF" in instr.text:
                         has_styleref = True
-                        print(f"  ✓ STYLEREF field at run {idx}")
+                        print(f"  OK STYLEREF field at run {idx}")
                     if "SEQ" in instr.text and "STYLEREF" not in instr.text:
                         has_seq = True
-                        print(f"  ✓ SEQ field at run {idx}")
+                        print(f"  OK SEQ field at run {idx}")
 
         if has_styleref and has_seq:
-            print("\n✅ Bookmark correctly covers BOTH STYLEREF and SEQ fields")
+            print("\nOK Bookmark correctly covers BOTH STYLEREF and SEQ fields")
         elif has_seq and not has_styleref:
-            print("\n❌ Bookmark only covers SEQ field - missing STYLEREF!")
+            print("\nERROR Bookmark only covers SEQ field - missing STYLEREF!")
         else:
-            print(f"\n⚠️  Unexpected bookmark coverage: STYLEREF={has_styleref}, SEQ={has_seq}")
+            print(f"\nWARNING Unexpected bookmark coverage: STYLEREF={has_styleref}, SEQ={has_seq}")
     else:
-        print("❌ No bookmark found in caption!")
+        print("ERROR No bookmark found in caption!")
 
     # Now check the reference
     print(f"\n{'='*80}")

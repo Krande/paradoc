@@ -106,8 +106,8 @@ The reference should display as "Figure 1-1" or similar.
     # For now, just verify the paragraph exists and contains figure reference
     assert "figure" in reference_para.text.lower(), "Reference paragraph should mention the figure"
 
-    print(f"\n✓ Test passed - Figure caption found: {figure_caption.text}")
-    print(f"✓ Reference paragraph found: {reference_para.text}")
+    print(f"\nOK Test passed - Figure caption found: {figure_caption.text}")
+    print(f"OK Reference paragraph found: {reference_para.text}")
 
     if auto_open:
         os.startfile(output_file)
@@ -179,7 +179,7 @@ References: [@fig:first], [@fig:second], and [@fig:third]
 
     assert figure_count >= 3, f"Expected at least 3 figures, found {figure_count}"
 
-    print(f"\n✓ Test passed - Found {figure_count} figures")
+    print(f"\nOK Test passed - Found {figure_count} figures")
 
     if auto_open:
         os.startfile(output_file)

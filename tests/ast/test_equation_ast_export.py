@@ -92,7 +92,7 @@ def test_equation_ast_structure(doc_with_equations):
         assert isinstance(latex_str, str), f"LaTeX should be string, got {type(latex_str)}"
         assert len(latex_str) > 0, "LaTeX string should not be empty"
 
-    print(f"\n✓ Found {len(math_elements)} Math elements in AST")
+    print(f"\nOK Found {len(math_elements)} Math elements in AST")
     for i, math_elem in enumerate(math_elements[:5]):  # Print first 5
         math_type = math_elem["c"][0]["t"]
         latex = math_elem["c"][1][:50]  # First 50 chars
@@ -159,7 +159,7 @@ def test_equation_with_crossref_id(doc_with_equations):
     assert "eq:energy" in equation_ids, f"Expected 'eq:energy' in equation IDs, found: {equation_ids}"
     assert "eq:diffusion" in equation_ids, f"Expected 'eq:diffusion' in equation IDs, found: {equation_ids}"
 
-    print(f"\n✓ Found {len(equation_spans)} equations with crossref IDs:")
+    print(f"\nOK Found {len(equation_spans)} equations with crossref IDs:")
     for eq in equation_spans:
         print(f"  - {eq['id']}")
 
@@ -216,7 +216,7 @@ def test_display_vs_inline_math(doc_with_equations):
     # doc_lorum should have both display and potentially inline math
     assert len(display_math) > 0, "Expected to find display math ($$) in doc_lorum"
 
-    print(f"\n✓ Found {len(display_math)} display math and {len(inline_math)} inline math elements")
+    print(f"\nOK Found {len(display_math)} display math and {len(inline_math)} inline math elements")
     if display_math:
         print(f"  Display math example: {display_math[0][:50]}")
     if inline_math:

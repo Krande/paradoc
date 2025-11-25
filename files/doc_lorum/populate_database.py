@@ -32,7 +32,7 @@ def create_plots(one: OneDoc):
         key="historical_trends", fig=fig1, caption="Historical trends visualization", width=800, height=500
     )
     one.db_manager.add_plot(plot1)
-    print(f"  ✓ Added plot: {plot1.key}")
+    print(f"  OK Added plot: {plot1.key}")
 
     # Plot 2: Data framework
     categories = ["Collection", "Processing", "Analysis", "Validation", "Storage"]
@@ -45,7 +45,7 @@ def create_plots(one: OneDoc):
         key="data_framework", fig=fig2, caption="Data collection framework architecture", width=800, height=500
     )
     one.db_manager.add_plot(plot2)
-    print(f"  ✓ Added plot: {plot2.key}")
+    print(f"  OK Added plot: {plot2.key}")
 
     # Plot 3: Statistical workflow
     steps = ["Raw Data", "Preprocessing", "Statistical\nTests", "Model\nFitting", "Validation", "Results"]
@@ -58,7 +58,7 @@ def create_plots(one: OneDoc):
         key="statistical_workflow", fig=fig3, caption="Statistical analysis workflow", width=800, height=500
     )
     one.db_manager.add_plot(plot3)
-    print(f"  ✓ Added plot: {plot3.key}")
+    print(f"  OK Added plot: {plot3.key}")
 
     # Plot 4: Primary results
     np.random.seed(42)
@@ -81,7 +81,7 @@ def create_plots(one: OneDoc):
         key="primary_results", fig=fig4, caption="Primary experimental results and trends", width=800, height=500
     )
     one.db_manager.add_plot(plot4)
-    print(f"  ✓ Added plot: {plot4.key}")
+    print(f"  OK Added plot: {plot4.key}")
 
     # Plot 5: Comparative analysis
     conditions = ["Cond 1", "Cond 2", "Cond 3", "Cond 4", "Cond 5"]
@@ -108,7 +108,7 @@ def create_plots(one: OneDoc):
         height=500,
     )
     one.db_manager.add_plot(plot5)
-    print(f"  ✓ Added plot: {plot5.key}")
+    print(f"  OK Added plot: {plot5.key}")
 
     # Plot 6: Error analysis
     np.random.seed(123)
@@ -121,7 +121,7 @@ def create_plots(one: OneDoc):
         key="error_analysis", fig=fig6, caption="Error distribution and uncertainty analysis", width=800, height=500
     )
     one.db_manager.add_plot(plot6)
-    print(f"  ✓ Added plot: {plot6.key}")
+    print(f"  OK Added plot: {plot6.key}")
 
     # Plot 7: Theory comparison
     x = np.linspace(0, 10, 100)
@@ -163,7 +163,7 @@ def create_plots(one: OneDoc):
         height=500,
     )
     one.db_manager.add_plot(plot7)
-    print(f"  ✓ Added plot: {plot7.key}")
+    print(f"  OK Added plot: {plot7.key}")
 
     # Appendix plots
     # Plot 8: System architecture (placeholder)
@@ -178,7 +178,7 @@ def create_plots(one: OneDoc):
         key="system_architecture", fig=fig8, caption="Detailed system architecture diagram", width=800, height=500
     )
     one.db_manager.add_plot(plot8)
-    print(f"  ✓ Added plot: {plot8.key}")
+    print(f"  OK Added plot: {plot8.key}")
 
     # Plot 9: Performance benchmarks
     configs = ["Config A", "Config B", "Config C", "Config D"]
@@ -206,7 +206,7 @@ def create_plots(one: OneDoc):
         height=500,
     )
     one.db_manager.add_plot(plot9)
-    print(f"  ✓ Added plot: {plot9.key}")
+    print(f"  OK Added plot: {plot9.key}")
 
     # Plot 10: Time series
     dates = pd.date_range("2024-01-01", periods=100)
@@ -219,7 +219,7 @@ def create_plots(one: OneDoc):
         key="time_series", fig=fig10, caption="Time series analysis of key parameters", width=800, height=500
     )
     one.db_manager.add_plot(plot10)
-    print(f"  ✓ Added plot: {plot10.key}")
+    print(f"  OK Added plot: {plot10.key}")
 
     # Plot 11: Computational results
     x = np.linspace(-5, 5, 50)
@@ -233,7 +233,7 @@ def create_plots(one: OneDoc):
         key="computational_results", fig=fig11, caption="Computational simulation results", width=800, height=500
     )
     one.db_manager.add_plot(plot11)
-    print(f"  ✓ Added plot: {plot11.key}")
+    print(f"  OK Added plot: {plot11.key}")
 
     # Plot 12: Correlation matrix
     np.random.seed(789)
@@ -248,7 +248,7 @@ def create_plots(one: OneDoc):
         key="correlation_matrix", fig=fig12, caption="Correlation matrix heatmap", width=700, height=600
     )
     one.db_manager.add_plot(plot12)
-    print(f"  ✓ Added plot: {plot12.key}")
+    print(f"  OK Added plot: {plot12.key}")
 
     # Plot 13: Distributions
     np.random.seed(101)
@@ -262,7 +262,7 @@ def create_plots(one: OneDoc):
         key="distributions", fig=fig13, caption="Distribution plots for all parameters", width=800, height=500
     )
     one.db_manager.add_plot(plot13)
-    print(f"  ✓ Added plot: {plot13.key}")
+    print(f"  OK Added plot: {plot13.key}")
 
     # Plot 14: 3D surface
     x = np.linspace(-5, 5, 30)
@@ -276,7 +276,7 @@ def create_plots(one: OneDoc):
         key="surface_plot", fig=fig14, caption="3D surface plot of interaction effects", width=800, height=600
     )
     one.db_manager.add_plot(plot14)
-    print(f"  ✓ Added plot: {plot14.key}")
+    print(f"  OK Added plot: {plot14.key}")
 
     # Plot 15: Box plots
     np.random.seed(202)
@@ -296,7 +296,7 @@ def create_plots(one: OneDoc):
         key="box_plots", fig=fig15, caption="Statistical distributions by condition and group", width=800, height=500
     )
     one.db_manager.add_plot(plot15)
-    print(f"  ✓ Added plot: {plot15.key}")
+    print(f"  OK Added plot: {plot15.key}")
 
 
 def create_tables(one: OneDoc):
@@ -323,7 +323,7 @@ def create_tables(one: OneDoc):
         key="current_metrics", df=df1, caption="Current performance metrics summary", show_index=False
     )
     one.db_manager.add_table(table1)
-    print(f"  ✓ Added table: {table1.key}")
+    print(f"  OK Added table: {table1.key}")
 
     # Table 2: Measurement specs
     df2 = pd.DataFrame(
@@ -339,7 +339,7 @@ def create_tables(one: OneDoc):
         key="measurement_specs", df=df2, caption="Measurement specifications and protocols", show_index=False
     )
     one.db_manager.add_table(table2)
-    print(f"  ✓ Added table: {table2.key}")
+    print(f"  OK Added table: {table2.key}")
 
     # Table 3: Validation results
     df3 = pd.DataFrame(
@@ -355,7 +355,7 @@ def create_tables(one: OneDoc):
         key="validation_results", df=df3, caption="Validation test results summary", show_index=False
     )
     one.db_manager.add_table(table3)
-    print(f"  ✓ Added table: {table3.key}")
+    print(f"  OK Added table: {table3.key}")
 
     # Table 4: Quantitative metrics
     df4 = pd.DataFrame(
@@ -372,7 +372,7 @@ def create_tables(one: OneDoc):
         key="quantitative_metrics", df=df4, caption="Quantitative analysis metrics", show_index=False
     )
     one.db_manager.add_table(table4)
-    print(f"  ✓ Added table: {table4.key}")
+    print(f"  OK Added table: {table4.key}")
 
     # Table 5: Comparison data
     df5 = pd.DataFrame(
@@ -389,7 +389,7 @@ def create_tables(one: OneDoc):
         key="comparison_data", df=df5, caption="Comparative analysis data across scenarios", show_index=False
     )
     one.db_manager.add_table(table5)
-    print(f"  ✓ Added table: {table5.key}")
+    print(f"  OK Added table: {table5.key}")
 
     # Table 6: Implementation guide
     df6 = pd.DataFrame(
@@ -405,7 +405,7 @@ def create_tables(one: OneDoc):
         key="implementation_guide", df=df6, caption="Implementation phase guidelines", show_index=False
     )
     one.db_manager.add_table(table6)
-    print(f"  ✓ Added table: {table6.key}")
+    print(f"  OK Added table: {table6.key}")
 
     # Appendix tables
     # Table 7: Component specs
@@ -423,7 +423,7 @@ def create_tables(one: OneDoc):
         key="component_specs", df=df7, caption="Component specifications and characteristics", show_index=False
     )
     one.db_manager.add_table(table7)
-    print(f"  ✓ Added table: {table7.key}")
+    print(f"  OK Added table: {table7.key}")
 
     # Table 8: Raw data set 1
     df8 = pd.DataFrame(
@@ -440,7 +440,7 @@ def create_tables(one: OneDoc):
         key="raw_data_set1", df=df8, caption="Raw experimental data - Set 1", show_index=False
     )
     one.db_manager.add_table(table8)
-    print(f"  ✓ Added table: {table8.key}")
+    print(f"  OK Added table: {table8.key}")
 
     # Table 9: Raw data set 2
     df9 = pd.DataFrame(
@@ -457,7 +457,7 @@ def create_tables(one: OneDoc):
         key="raw_data_set2", df=df9, caption="Raw experimental data - Set 2", show_index=False
     )
     one.db_manager.add_table(table9)
-    print(f"  ✓ Added table: {table9.key}")
+    print(f"  OK Added table: {table9.key}")
 
     # Table 10: Algorithm performance
     df10 = pd.DataFrame(
@@ -474,7 +474,7 @@ def create_tables(one: OneDoc):
         key="algorithm_performance", df=df10, caption="Algorithm performance comparison", show_index=False
     )
     one.db_manager.add_table(table10)
-    print(f"  ✓ Added table: {table10.key}")
+    print(f"  OK Added table: {table10.key}")
 
 
 def main():

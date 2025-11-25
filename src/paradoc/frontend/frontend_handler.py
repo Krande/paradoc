@@ -142,7 +142,7 @@ class FrontendHandler:
         try:
             url = self.index_html.resolve().as_uri()
             webbrowser.open(url)
-            logger.info(f"✓ Opened frontend in browser: {url}")
+            logger.info(f"OK Opened frontend in browser: {url}")
             return True
         except Exception as e:
             logger.error(f"Failed to open frontend in browser: {e}")
@@ -228,11 +228,11 @@ class FrontendHandler:
             embed_images: Whether images are embedded or served via HTTP
         """
         if embed_images:
-            print("✓ Sent document to Reader with embedded images.")
-            print("✓ Images stored in browser IndexedDB - no HTTP server needed!")
-            print("✓ You can close this script now - the document is fully cached in the browser.")
+            print("OK Sent document to Reader with embedded images.")
+            print("OK Images stored in browser IndexedDB - no HTTP server needed!")
+            print("OK You can close this script now - the document is fully cached in the browser.")
         else:
             http_port = self.port + 1
-            print("✓ Sent document to Reader.")
+            print("OK Sent document to Reader.")
             print(f"Serving JSON and assets via HTTP server at http://{self.host}:{http_port}/")
             print("The browser is open. Press Ctrl+C here to stop the servers.")

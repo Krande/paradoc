@@ -84,7 +84,7 @@ Here are three plots:
     assert "![Test Plot 1](images/test_plot_1.png)" in built_md
     assert "![Test Plot 2](images/test_plot_2.png)" in built_md
 
-    print("✓ Batch plot rendering test passed!")
+    print("OK Batch plot rendering test passed!")
 
 
 def test_batch_rendering_with_cache(tmp_path):
@@ -141,7 +141,7 @@ def test_batch_rendering_with_cache(tmp_path):
 
     assert first_mtime == second_mtime, "Cache file should not be re-rendered"
 
-    print("✓ Batch rendering with cache test passed!")
+    print("OK Batch rendering with cache test passed!")
 
 
 if __name__ == "__main__":
