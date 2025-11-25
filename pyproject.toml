@@ -36,6 +36,17 @@ paradoc = "paradoc.cli_app:app"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+paradoc = [
+    "frontend/resources/frontend.zip",
+    "io/html/js/navbar.js",
+    "io/word/compose/templates/*.xml",
+    "resources/default_style.css",
+    "resources/template.docx",
+    "resources/template_blank.docx"
+]
+
+
 [tool.black]
 line-length = 120
 
