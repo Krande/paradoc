@@ -30,6 +30,5 @@ def test_run_pypandoc_directly(files_dir, tmp_path):
         format="markdown",
         extra_args=[f"--resource-path={md_file.parent.absolute()}"],
         filters=["pandoc-crossref"],
-        encoding="utf8",
         sandbox=False,
     )

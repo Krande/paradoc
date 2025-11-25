@@ -47,7 +47,6 @@ Reference to figure: [@fig:test_figure]
         format="markdown",
         extra_args=[f"--resource-path={main_dir.absolute()}"],
         filters=["pandoc-crossref"],
-        encoding="utf8",
         sandbox=False,
     )
 
