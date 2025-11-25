@@ -8,6 +8,7 @@ import pytest
 
 from paradoc import OneDoc
 from paradoc.db import dataframe_to_table_data
+from paradoc.frontend.frontend_handler import FrontendHandler
 
 
 @pytest.fixture
@@ -57,7 +58,7 @@ The table above should show sample data with multiple columns.
 @pytest.fixture
 def frontend_resources_dir():
     """Get the frontend resources directory path."""
-    return Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
+    return FrontendHandler.get_resources_dir()
 
 
 def test_table_static_interactive_buttons_exist(

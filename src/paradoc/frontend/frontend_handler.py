@@ -30,14 +30,20 @@ class FrontendHandler:
         self.one_doc = one_doc
         self.host = host
         self.port = port
-        self.resources_dir = self._get_resources_dir()
-        self.zip_path = self.resources_dir / "frontend.zip"
+        self.resources_dir = self.get_resources_dir()
+        self.zip_path = self.get_frontend_zip_path()
         self.hash_file = self.zip_path.with_suffix(".hash")
         self.index_html = self.resources_dir / "index.html"
 
-    def _get_resources_dir(self) -> pathlib.Path:
+    @staticmethod
+    def get_resources_dir() -> pathlib.Path:
         """Get the resources directory path."""
         return pathlib.Path(__file__).parent / "resources"
+
+    @staticmethod
+    def get_frontend_zip_path() -> pathlib.Path:
+        """Get the frontend.zip path."""
+        return FrontendHandler.get_resources_dir() / "frontend.zip"
 
     def has_active_frontends(self) -> bool:
         """
