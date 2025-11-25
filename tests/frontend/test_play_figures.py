@@ -1,6 +1,5 @@
 """Test frontend rendering of interactive plots using Playwright."""
 
-from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
