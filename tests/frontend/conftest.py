@@ -99,22 +99,39 @@ def frontend_url(tmp_path):
 
 
 @pytest.fixture
-def wait_for_frontend():
-    """Wait for frontend to load and initialize."""
+def wait_for_frontend(ws_server):
+    """Wait for frontend to load and initialize, including WebSocket connection."""
 
     def _wait(page: Page, timeout: int = 10000):
         """
-        Wait for the frontend to be ready.
+        Wait for the frontend to be ready, including WebSocket registration.
 
         Args:
             page: Playwright page object
             timeout: Maximum time to wait in milliseconds
         """
+        from paradoc.frontend.ws_server import has_active_frontends
+
         # Wait for the main app container to be visible
         page.wait_for_selector('[data-testid="app"], .app, #root', timeout=timeout)
 
         # Give React time to hydrate and render
         page.wait_for_timeout(1000)
+
+        # Wait for the frontend to register with the WebSocket server via heartbeat
+        # This is crucial for tests that call send_to_frontend with auto_open_frontend=False
+        host = ws_server["host"]
+        port = ws_server["port"]
+        max_wait_seconds = timeout / 1000
+        start_time = time.time()
+
+        while time.time() - start_time < max_wait_seconds:
+            if has_active_frontends(host=host, port=port):
+                return  # Frontend is registered, we're good
+            time.sleep(0.2)
+
+        # If we get here, frontend didn't register in time - this might cause test failures
+        # but we don't fail here, let the test handle it
 
     return _wait
 
