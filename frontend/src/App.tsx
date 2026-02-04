@@ -7,7 +7,7 @@ import { SearchBar } from './components/SearchBar'
 // Inline the worker so it's embedded in the bundle
 import InlineWorker from './ws/worker.ts?worker&inline'
 
-import { useSectionStore, storeEmbeddedImage, storePlotData, storeTableData } from './sections/store'
+import { useSectionStore, storeEmbeddedImage, storePlotData, storeTableData, isStaticMode, detectStaticMode, loadStaticData } from './sections/store'
 import type { DocManifest, SectionBundle } from './ast/types'
 import { VirtualReader } from './components/VirtualReader'
 import { calculateHeadingNumbers } from './ast/headingNumbers'
@@ -164,19 +164,65 @@ function AppContent() {
     }
   }, [])
 
-  // Fetch manifest on first load if not received via WS
-  // DISABLED: Only using WebSocket communication, not HTTP/file fetching
-  // useEffect(() => {
-  //   if (!docId) return
-  //   if (state.manifest) return
-  //   fetchManifest(docId).then((m) => {
-  //     setManifest(m)
-  //     // Align our docId with the manifest to avoid mixing ids in URLs
-  //     try { if ((m as any).docId) setDocId((m as any).docId) } catch {}
-  //     // Eagerly load first section
-  //     if (m.sections.length > 0) void fetchSection((m as any).docId || docId, m.sections[0].id, m.sections[0].index).then(upsertSection).catch(() => {})
-  //   }).catch(() => {})
-  // }, [docId, state.manifest])
+  // Static mode: Load data from static JSON files if available
+  // This enables hosting the paradoc frontend on static web servers without WebSocket
+  useEffect(() => {
+    // Skip if we already have a manifest (e.g., from WebSocket)
+    if (state.manifest) return
+
+    // Check if we're in explicit static mode or auto-detect it
+    const tryStaticLoad = async () => {
+      const isStatic = isStaticMode()
+      const detected = !isStatic ? await detectStaticMode() : false
+
+      if (!isStatic && !detected) {
+        // Not in static mode, let WebSocket handle data loading
+        return
+      }
+
+      console.log('Paradoc: Loading document from static files...')
+      try {
+        const data = await loadStaticData()
+        const currentDocId = (data.manifest as any).docId || 'static-doc'
+
+        // Set manifest
+        setManifest(data.manifest)
+        setDocId(currentDocId)
+
+        // Load all sections
+        for (const bundle of data.sections) {
+          upsertSection(bundle)
+        }
+
+        // Store images in IndexedDB
+        for (const [path, imgData] of Object.entries(data.images)) {
+          await storeEmbeddedImage(currentDocId, path, imgData.data, imgData.mimeType).catch(err => {
+            console.warn(`Failed to store embedded image ${path}:`, err)
+          })
+        }
+
+        // Store plots in IndexedDB
+        for (const [plotKey, plotData] of Object.entries(data.plots)) {
+          await storePlotData(currentDocId, plotKey, plotData).catch(err => {
+            console.warn(`Failed to store plot data ${plotKey}:`, err)
+          })
+        }
+
+        // Store tables in IndexedDB
+        for (const [tableKey, tableData] of Object.entries(data.tables)) {
+          await storeTableData(currentDocId, tableKey, tableData).catch(err => {
+            console.warn(`Failed to store table data ${tableKey}:`, err)
+          })
+        }
+
+        console.log('Paradoc: Successfully loaded static document')
+      } catch (err) {
+        console.log('Paradoc: Static mode not available, waiting for WebSocket data', err)
+      }
+    }
+
+    tryStaticLoad()
+  }, [state.manifest])
 
   // Handle global keyboard shortcuts
   useEffect(() => {

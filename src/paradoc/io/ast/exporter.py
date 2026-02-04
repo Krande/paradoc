@@ -950,3 +950,133 @@ class ASTExporter:
         except Exception as e:
             logger.error(f"Failed to extract table data from database: {e}")
             return {}
+
+    # -------------------------------
+    # Static file export
+    # -------------------------------
+    def export_to_static_files(
+        self,
+        output_dir: pathlib.Path,
+        embed_images: bool = True,
+        include_frontend: bool = True,
+    ) -> bool:
+        """
+        Export document to static JSON files for static web hosting.
+
+        This method generates all the data files needed to render the document
+        in a static web environment without requiring a WebSocket server.
+
+        Args:
+            output_dir: Directory to write the static files to
+            embed_images: If True, embed images as base64 in the data files
+            include_frontend: If True, copy the frontend HTML/JS files to output_dir
+
+        Returns:
+            True if successful, False otherwise
+
+        Output structure:
+            output_dir/
+            ├── index.html          # Frontend (if include_frontend=True)
+            ├── manifest.json       # Document manifest with section metadata
+            ├── sections/
+            │   ├── 0.json         # Section bundles (by index)
+            │   ├── 1.json
+            │   └── ...
+            ├── images.json         # Embedded images (if embed_images=True)
+            ├── plots.json          # Plot data for Plotly.js
+            └── tables.json         # Table data
+        """
+        import shutil
+
+        try:
+            output_dir = pathlib.Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Build AST and slice into sections
+            logger.info("Building AST for static export...")
+            ast = self.build_ast()
+            manifest, sections = self.slice_sections(ast)
+            doc_id = manifest.get("docId") or self._infer_doc_id()
+
+            # Create sections directory
+            sections_dir = output_dir / "sections"
+            sections_dir.mkdir(exist_ok=True)
+
+            # Write manifest
+            manifest_path = output_dir / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            logger.info(f"Wrote manifest to {manifest_path}")
+
+            # Write sections and collect images
+            all_embedded_images: Dict[str, Dict[str, str]] = {}
+            for bundle in sections:
+                sec = bundle["section"]
+                idx = sec.get("index", 0)
+
+                # Embed images for this section if requested
+                if embed_images:
+                    section_images = self._embed_images_in_bundle(bundle)
+                    all_embedded_images.update(section_images)
+
+                # Write section file
+                section_path = sections_dir / f"{idx}.json"
+                section_path.write_text(json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")
+                logger.debug(f"Wrote section {idx} to {section_path}")
+
+            logger.info(f"Wrote {len(sections)} sections to {sections_dir}")
+
+            # Write embedded images
+            if embed_images and all_embedded_images:
+                images_path = output_dir / "images.json"
+                images_path.write_text(json.dumps(all_embedded_images, ensure_ascii=False), encoding="utf-8")
+                logger.info(f"Wrote {len(all_embedded_images)} embedded images to {images_path}")
+
+            # Extract and write plot data
+            plot_data_dict = self._extract_plot_data_from_db()
+            if plot_data_dict:
+                plots_path = output_dir / "plots.json"
+                plots_path.write_text(json.dumps(plot_data_dict, ensure_ascii=False, indent=2), encoding="utf-8")
+                logger.info(f"Wrote {len(plot_data_dict)} plots to {plots_path}")
+
+            # Extract and write table data
+            table_data_dict = self._extract_table_data_from_db()
+            if table_data_dict:
+                tables_path = output_dir / "tables.json"
+                tables_path.write_text(json.dumps(table_data_dict, ensure_ascii=False, indent=2), encoding="utf-8")
+                logger.info(f"Wrote {len(table_data_dict)} tables to {tables_path}")
+
+            # Copy frontend files if requested
+            if include_frontend:
+                self._copy_frontend_for_static(output_dir)
+
+            logger.info(f"Successfully exported static files to {output_dir}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to export static files: {e}", exc_info=True)
+            return False
+
+    def _copy_frontend_for_static(self, output_dir: pathlib.Path):
+        """
+        Copy frontend files for static hosting.
+
+        Args:
+            output_dir: Directory to copy frontend files to
+        """
+        import shutil
+        import zipfile
+
+        # Get the frontend.zip from paradoc resources
+        frontend_zip = pathlib.Path(__file__).parent.parent.parent / "frontend" / "resources" / "frontend.zip"
+
+        if not frontend_zip.exists():
+            logger.warning(f"Frontend zip not found at {frontend_zip}, skipping frontend copy")
+            return
+
+        try:
+            # Extract frontend.zip to output directory
+            with zipfile.ZipFile(frontend_zip) as archive:
+                archive.extractall(output_dir)
+            logger.info(f"Extracted frontend to {output_dir}")
+        except Exception as e:
+            logger.warning(f"Failed to extract frontend: {e}")
