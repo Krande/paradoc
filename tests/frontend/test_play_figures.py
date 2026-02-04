@@ -174,7 +174,7 @@ def test_plot_toggle_between_static_and_interactive(
     # Click back to Static
     static_button.click()
     page.wait_for_timeout(500)
-    
+
     # Ensure hover is maintained/restored
     figure_container.hover()
 

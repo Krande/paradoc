@@ -196,3 +196,109 @@ export async function getTableData(docId: string, tableKey: string): Promise<Tab
   const key = `${docId}:${tableKey}`
   return await dbGet<TableData>('tables', key)
 }
+
+// ========================================
+// Static data loading for static web hosting
+// ========================================
+
+/**
+ * Check if we're in static mode (data files served alongside the HTML)
+ */
+export function isStaticMode(): boolean {
+  const w = window as any
+  return !!w.__PARADOC_STATIC_MODE__ || !!w.__PARADOC_STATIC_BASE_PATH__
+}
+
+/**
+ * Get the base path for static data files.
+ * Defaults to './' (same directory as the HTML file)
+ */
+export function getStaticBasePath(): string {
+  const w = window as any
+  if (w.__PARADOC_STATIC_BASE_PATH__) {
+    return String(w.__PARADOC_STATIC_BASE_PATH__).replace(/\/?$/, '/')
+  }
+  // Default to current directory
+  return './'
+}
+
+/**
+ * Load all static data files and return the loaded data.
+ * This is the main entry point for static mode.
+ */
+export async function loadStaticData(): Promise<{
+  manifest: DocManifest
+  sections: SectionBundle[]
+  images: Record<string, { data: string; mimeType: string }>
+  plots: Record<string, PlotData>
+  tables: Record<string, TableData>
+}> {
+  const basePath = getStaticBasePath()
+
+  // Load manifest
+  const manifestRes = await fetch(`${basePath}manifest.json`, { cache: 'no-store' })
+  if (!manifestRes.ok) {
+    throw new Error(`Failed to load manifest: ${manifestRes.status} ${manifestRes.statusText}`)
+  }
+  const manifest = await manifestRes.json() as DocManifest
+
+  // Load all sections
+  const sections: SectionBundle[] = []
+  for (const sectionMeta of manifest.sections) {
+    const idx = sectionMeta.index
+    const sectionRes = await fetch(`${basePath}sections/${idx}.json`, { cache: 'no-store' })
+    if (sectionRes.ok) {
+      const bundle = await sectionRes.json() as SectionBundle
+      sections.push(bundle)
+    } else {
+      console.warn(`Failed to load section ${idx}: ${sectionRes.status}`)
+    }
+  }
+
+  // Load images (optional)
+  let images: Record<string, { data: string; mimeType: string }> = {}
+  try {
+    const imagesRes = await fetch(`${basePath}images.json`, { cache: 'no-store' })
+    if (imagesRes.ok) {
+      images = await imagesRes.json()
+    }
+  } catch {
+    // images.json is optional
+  }
+
+  // Load plots (optional)
+  let plots: Record<string, PlotData> = {}
+  try {
+    const plotsRes = await fetch(`${basePath}plots.json`, { cache: 'no-store' })
+    if (plotsRes.ok) {
+      plots = await plotsRes.json()
+    }
+  } catch {
+    // plots.json is optional
+  }
+
+  // Load tables (optional)
+  let tables: Record<string, TableData> = {}
+  try {
+    const tablesRes = await fetch(`${basePath}tables.json`, { cache: 'no-store' })
+    if (tablesRes.ok) {
+      tables = await tablesRes.json()
+    }
+  } catch {
+    // tables.json is optional
+  }
+
+  return { manifest, sections, images, plots, tables }
+}
+
+/**
+ * Try to detect static mode by checking if manifest.json exists at the default path.
+ */
+export async function detectStaticMode(): Promise<boolean> {
+  try {
+    const res = await fetch('./manifest.json', { method: 'HEAD', cache: 'no-store' })
+    return res.ok
+  } catch {
+    return false
+  }
+}
