@@ -56,6 +56,13 @@ function AppContent() {
     }
   }, [])
 
+  // Set initial sidebar state based on screen size
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false)
+    }
+  }, [])
+
   useEffect(() => {
     // Use inline worker for single-file builds that work from filesystem
     const worker = new InlineWorker()

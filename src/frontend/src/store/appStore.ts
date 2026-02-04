@@ -31,7 +31,7 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
   connected: false,
-  sidebarOpen: false,
+  sidebarOpen: true,
   searchBarOpen: false,
   processInfo: null,
   frontendId: '',

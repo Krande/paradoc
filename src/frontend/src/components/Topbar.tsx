@@ -28,9 +28,10 @@ export function Topbar({
             <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <button
-                        className="cursor-pointer -ml-2 md:hidden inline-flex items-center justify-center rounded p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                        className="cursor-pointer -ml-2 inline-flex items-center justify-center rounded p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                         onClick={onToggleSidebar}
                         aria-label="Toggle contents"
+                        title="Toggle Outline"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5"
                              stroke="currentColor" className="w-6 h-6">
