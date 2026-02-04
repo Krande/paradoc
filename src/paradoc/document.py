@@ -267,6 +267,48 @@ class OneDoc:
         html = self.get_ast(metadata_file=metadata_file)
         html.send_to_frontend(embed_images=embed_images, use_static_html=use_static_html, frontend_id=frontend_id)
 
+    def export_static(
+        self,
+        output_dir: pathlib.Path | str,
+        metadata_file=None,
+        embed_images: bool = True,
+        include_frontend: bool = True,
+    ) -> bool:
+        """
+        Export document to static files for web hosting without a WebSocket server.
+
+        This method generates all the data files (JSON) needed to render the document
+        in a static web environment. The output can be served by any static file server.
+
+        Args:
+            output_dir: Directory to write the static files to
+            metadata_file: Optional metadata file path
+            embed_images: If True, embed images as base64 in the data files
+            include_frontend: If True, copy the frontend HTML/JS files to output_dir
+
+        Returns:
+            True if successful, False otherwise
+
+        Example:
+            >>> one = OneDoc("my_report")
+            >>> one.add_table("results", df, "Results Table")
+            >>> one.export_static("./static_output")
+            # Output: ./static_output/index.html, manifest.json, sections/, etc.
+        """
+        output_dir = pathlib.Path(output_dir)
+
+        # Prepare compilation (variable substitution, etc.)
+        self._prep_compilation(metadata_file=metadata_file)
+        self._perform_variable_substitution()
+
+        # Get AST exporter and export to static files
+        ast_exporter = self.get_ast(metadata_file=metadata_file)
+        return ast_exporter.export_to_static_files(
+            output_dir=output_dir,
+            embed_images=embed_images,
+            include_frontend=include_frontend,
+        )
+
     def _prep_compilation(self, metadata_file=None):
         self.build_dir.mkdir(exist_ok=True, parents=True)
         self.dist_dir.mkdir(exist_ok=True, parents=True)

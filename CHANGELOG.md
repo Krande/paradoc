@@ -2,6 +2,20 @@
 
 
 
+## v0.5.0 (2026-02-04)
+
+### Chore
+
+* chore: Bump the dependencies group with 2 updates (#25)
+
+Signed-off-by: dependabot[bot] &lt;support@github.com&gt;
+Co-authored-by: dependabot[bot] &lt;49699333+dependabot[bot]@users.noreply.github.com&gt; ([`9dfedd7`](https://github.com/Krande/paradoc/commit/9dfedd7150b575adf62ca45782321a8c0cf369d6))
+
+### Feature
+
+* feat: static embedded mode (#28) ([`2765cc1`](https://github.com/Krande/paradoc/commit/2765cc13e6c54bd0256fd5748fe7c0ca83bed339))
+
+
 ## v0.4.0 (2025-11-24)
 
 ### Chore
