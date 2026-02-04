@@ -1,0 +1,97 @@
+[workspace]
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64"]
+
+[environments]
+prod = { features = ["prod"], solve-group = "prod", no-default-feature = true }
+test-core = { features = ["test-core"], solve-group = "prod", no-default-feature = true }
+test = { features = ["test", "test-core", "prod"], solve-group = "prod", no-default-feature = true }
+profile = { features = ["profile", "prod","test-core", "frontend"], solve-group = "prod", no-default-feature = true }
+
+lint = { features = ["lint"], no-default-feature = true }
+frontend = { features = ["frontend"], no-default-feature = true }
+docs = { features = ["docs", "test-core"], no-default-feature = true }
+
+[feature.prod.dependencies]
+pandoc = "==3.8.2"
+pandoc-crossref = "==0.3.22"
+pypandoc = "==1.15"
+python-docx = "*"
+typer = "*"
+numpy = "*"
+pandas = "*"
+openpyxl = "*"
+tabulate = "*"
+svgwrite = "*"
+pytexit = "*"
+nomkl = "*"
+websocket-client = "*"
+websockets = "*"
+plotly = "*"
+python-kaleido = "*"
+pydantic = ">=2.0"
+playwright = "*"
+
+[feature.test-core.pypi-dependencies]
+pytest-playwright = "*"
+
+[feature.prod.target.win-64.dependencies]
+pywin32 = "*"
+types-pywin32 = "*"
+
+[feature.test-core.dependencies]
+pytest = "*"
+
+[feature.frontend.dependencies]
+nodejs = "*"
+
+[feature.frontend.tasks]
+npm = { cmd = "npm", cwd = "./frontend" }
+winstall = { cmd = "npm install", cwd = "./frontend", outputs = ["$PIXI_PROJECT_ROOT/frontend/node_modules"] }
+wdev = { cmd = "npm run dev --prefix frontend", depends-on = ["winstall"] }
+wbuild = { cmd = "npm run build:standalone", cwd = "./frontend", depends-on = ["winstall"], outputs = ["$PIXI_PROJECT_ROOT/src/paradoc/resources/frontend.zip"] }
+
+[feature.lint.dependencies]
+black = "==24.4.2"
+isort = "==5.13.2"
+ruff = "==0.12.8"
+
+[feature.profile.dependencies]
+pytest = "*"
+pytest-benchmark = "*"
+pytest-asyncio = "*"
+pyinstrument = "*"
+
+[feature.docs.dependencies]
+mkdocs = "==1.6.1"
+mkdocstrings = "*"
+mkdocstrings-python = "*"
+mkdocs-material = "*"
+mkdocs-jupyter = "*"
+mkdocs-glightbox = "*"
+
+[feature.test.tasks]
+pre-install = { cmd = "python -c \"from plotly.io._kaleido import plotly_get_chrome; plotly_get_chrome()\"", outputs = ["$PIXI_HOME/envs/test/Lib/site-packages/choreographer/cli/browser_exe/chrome-win64/chrome.exe"] }
+test = { cmd = "pytest tests --durations=0" }
+test-doc = { cmd = "python cli_document_tester.py", cwd = "examples" }
+
+[feature.profile.tasks]
+test-doc-profile = { cmd = ["pyinstrument", "-r", "html", "-o", "profile_doc.html", "$PIXI_PROJECT_ROOT/examples/cli_document_tester.py"], cwd= "examples" }
+test-profile = { cmd = "pyinstrument -r html -o profile_tests.html -m pytest tests" }
+test-profile-json = { cmd = "pyinstrument -r json -o profile_tests.json -m pytest tests" }
+
+[feature.lint.tasks]
+lint = "black . --config pyproject.toml && ruff check . --fix && isort ."
+
+[feature.docs.tasks]
+build = { cmd = "mkdocs build", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
+serve = { cmd = "mkdocs serve -a localhost:8080", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
+
+[feature.prod.target.win-64.activation.env]
+PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
+
+[feature.test.target.win-64.activation.env]
+PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
+
+[feature.profile.target.win-64.activation.env]
+PYTHONPATH="%PIXI_PROJECT_ROOT%/src"

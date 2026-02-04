@@ -17,15 +17,16 @@ def main():
         print(f"   Type: {type(spec).__name__}")
         print(f"   Camera: {spec.camera_pos}")
 
-        if hasattr(spec, 'fea_format'):
+        if hasattr(spec, "fea_format"):
             print(f"   FEA Format: {spec.fea_format}")
-        if hasattr(spec, 'output_file'):
+        if hasattr(spec, "output_file"):
             print(f"   Output File: {spec.output_file}")
-        if hasattr(spec, 'field'):
+        if hasattr(spec, "field"):
             print(f"   Field: {spec.field}")
 
         print(f"   Source Input: {spec.source_inp}")
         print()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

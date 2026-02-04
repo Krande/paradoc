@@ -10,6 +10,7 @@ from typing import Literal, Union
 
 from pydantic import BaseModel, Field
 
+
 # This should ideally be gathered from sqlite
 class CameraPosition(str, Enum):
     """Standard camera position presets."""
@@ -94,4 +95,3 @@ def create_figure_source(data: dict) -> FigureSourceSpec:
         return FEAModelResults(**data)
     else:
         raise ValueError(f"Unknown figure_source type: {figure_source_type}")
-

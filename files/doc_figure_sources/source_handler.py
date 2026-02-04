@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import List, Tuple
 
 from .source_models import (
-    FigureSourceSpec,
     CADModelFile,
     FEAModel,
     FEAModelResults,
+    FigureSourceSpec,
     create_figure_source,
 )
 
@@ -28,7 +28,7 @@ def extract_figure_sources(markdown_content: str) -> List[Tuple[int, int, str]]:
     Returns:
         List of tuples containing (start_pos, end_pos, spec_content)
     """
-    pattern = r'<--\s*\n(.*?)\n-->'
+    pattern = r"<--\s*\n(.*?)\n-->"
     matches = re.finditer(pattern, markdown_content, re.DOTALL)
 
     results = []
@@ -53,14 +53,14 @@ def parse_spec_content(spec_content: str) -> dict:
     data = {}
 
     # Split by lines and parse key: value pairs
-    for line in spec_content.split('\n'):
+    for line in spec_content.split("\n"):
         line = line.strip()
         if not line:
             continue
 
         # Split on first colon only
-        if ':' in line:
-            key, value = line.split(':', 1)
+        if ":" in line:
+            key, value = line.split(":", 1)
             key = key.strip()
             value = value.strip()
             data[key] = value
@@ -89,9 +89,7 @@ def parse_figure_sources_from_markdown(markdown_content: str) -> List[FigureSour
             figure_source = create_figure_source(data)
             figure_sources.append(figure_source)
         except Exception as e:
-            raise ValueError(
-                f"Failed to parse figure source at position {start_pos}-{end_pos}: {e}"
-            ) from e
+            raise ValueError(f"Failed to parse figure source at position {start_pos}-{end_pos}: {e}") from e
 
     return figure_sources
 
@@ -105,11 +103,12 @@ def parse_figure_sources_from_file(markdown_path: Path) -> List[FigureSourceSpec
     Returns:
         List of validated FigureSourceSpec instances
     """
-    content = markdown_path.read_text(encoding='utf-8')
+    content = markdown_path.read_text(encoding="utf-8")
     return parse_figure_sources_from_markdown(content)
 
 
 # Template generator functions - to be implemented
+
 
 def generate_cad_model_figure(spec: CADModelFile, output_path: Path) -> None:
     """Generate a rasterized PNG figure from a CAD model specification.
@@ -183,9 +182,7 @@ def generate_figure(spec: FigureSourceSpec, output_path: Path) -> None:
 
 
 def process_markdown_file(
-    markdown_path: Path,
-    output_dir: Path,
-    filename_template: str = "{index:03d}_{title}.png"
+    markdown_path: Path, output_dir: Path, filename_template: str = "{index:03d}_{title}.png"
 ) -> List[Tuple[FigureSourceSpec, Path]]:
     """Process a markdown file and generate all specified figures.
 
@@ -207,7 +204,7 @@ def process_markdown_file(
 
     for index, spec in enumerate(figure_sources, start=1):
         # Create filename from template
-        title_slug = spec.figure_title.lower().replace(' ', '_')
+        title_slug = spec.figure_title.lower().replace(" ", "_")
         filename = filename_template.format(index=index, title=title_slug)
         output_path = output_dir / filename
 
@@ -216,4 +213,3 @@ def process_markdown_file(
         results.append((spec, output_path))
 
     return results
-
