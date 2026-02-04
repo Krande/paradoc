@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import json
 import mimetypes
 import pathlib
@@ -987,7 +988,6 @@ class ASTExporter:
             ├── plots.json          # Plot data for Plotly.js
             └── tables.json         # Table data
         """
-        import shutil
 
         try:
             output_dir = pathlib.Path(output_dir)
@@ -997,7 +997,7 @@ class ASTExporter:
             logger.info("Building AST for static export...")
             ast = self.build_ast()
             manifest, sections = self.slice_sections(ast)
-            doc_id = manifest.get("docId") or self._infer_doc_id()
+            _doc_id = manifest.get("docId") or self._infer_doc_id()
 
             # Create sections directory
             sections_dir = output_dir / "sections"
@@ -1064,7 +1064,6 @@ class ASTExporter:
         Args:
             output_dir: Directory to copy frontend files to
         """
-        import shutil
         import zipfile
 
         # Get the frontend.zip from paradoc resources
