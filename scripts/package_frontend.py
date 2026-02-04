@@ -9,7 +9,7 @@ import zipfile
 
 # Paths
 project_root = pathlib.Path(__file__).parent.parent
-frontend_dist = project_root / "frontend" / "dist"
+frontend_dist = project_root / "src" / "frontend" / "dist"
 resources_dir = project_root / "src" / "paradoc" / "frontend" / "resources"
 zip_path = resources_dir / "frontend.zip"
 hash_path = resources_dir / "frontend.hash"

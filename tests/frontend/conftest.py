@@ -87,7 +87,7 @@ def frontend_url(tmp_path):
         # Find the extracted index.html
         exporter = ASTExporter(one_doc)
         resources_dir = Path(exporter.__class__.__module__.replace(".", "/")).parent / "io" / "ast" / "resources"
-        resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "io" / "ast" / "resources"
+        resources_dir = Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
         index_html = resources_dir / "index.html"
 
         if index_html.exists():
