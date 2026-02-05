@@ -1,8 +1,3 @@
-# Figure Sources for FEA Models
-
-This document provides examples of figure source specifications for different FEA software formats.
-The specifications include details such as the source file paths, output file paths, fields to visualize, and camera positions.
-
 ## Source Types
 
 ### 3D camera plots
@@ -52,10 +47,3 @@ output_file: c:\mymodel.sin
 field: S
 camera_pos: iso_3
 -->
-
-### Table data
-
-<!---
-figure_source: fea_model_results
-figure_title: Eigenvalue Table Example
-fea_format: sesam

@@ -2,12 +2,13 @@
 
 from pathlib import Path
 
+from files.doc_figure_sources import CADModelFile
 from files.doc_figure_sources.source_handler import parse_figure_sources_from_file
 
 
 def main():
     # Parse the markdown file
-    markdown_path = Path(__file__).parent / "00-main/main.md"
+    markdown_path = Path(__file__).parent / "00-main/source_3d.md"
     figure_sources = parse_figure_sources_from_file(markdown_path)
 
     print(f"Found {len(figure_sources)} figure source specifications:\n")
@@ -16,7 +17,9 @@ def main():
         print(f"{i}. {spec.figure_source}: {spec.figure_title}")
         print(f"   Type: {type(spec).__name__}")
         print(f"   Camera: {spec.camera_pos}")
-
+        if isinstance(spec, CADModelFile):
+            fp = spec.source_inp
+            if fp.exists():
         if hasattr(spec, "fea_format"):
             print(f"   FEA Format: {spec.fea_format}")
         if hasattr(spec, "output_file"):
