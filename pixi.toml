@@ -30,6 +30,7 @@ prod = { features = ["prod"], solve-group = "prod", no-default-feature = true }
 test-core = { features = ["test-core"], solve-group = "prod", no-default-feature = true }
 test = { features = ["test", "test-core", "prod"], solve-group = "prod", no-default-feature = true }
 profile = { features = ["profile", "prod","test-core"], solve-group = "prod", no-default-feature = true }
+dev = { features = ["dev", "test-core", "prod"], solve-group = "dev", no-default-feature = true }
 
 lint = { features = ["lint"], no-default-feature = true }
 frontend = { features = ["frontend"], no-default-feature = true }
@@ -64,6 +65,9 @@ types-pywin32 = "*"
 
 [feature.test-core.dependencies]
 pytest = "*"
+
+[feature.dev.dependencies]
+ada-py = "*"
 
 [feature.frontend.dependencies]
 nodejs = "*"
