@@ -19,12 +19,10 @@ RUN npm run build
 
 FROM python:3.12-slim AS runtime
 
-# pandoc is needed for compile mode but not strictly for serve mode;
-# include it so the image can also run `paradoc compile` if desired.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends pandoc ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
+# This image is read-only over pre-built bundles. The build pipeline
+# that produces bundles (which needs pandoc + adapy) lives elsewhere.
+# `ca-certificates` is already present in the slim base, so we install
+# nothing here and avoid hitting the OS package mirror at build time.
 WORKDIR /app
 
 COPY pyproject.toml README.md /app/
