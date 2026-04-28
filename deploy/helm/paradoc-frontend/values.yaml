@@ -1,0 +1,46 @@
+enabled: false
+
+image:
+  repository: ghcr.io/krande/paradoc
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Where to read compiled bundles from. Either an s3:// URL (requires the
+# `serve` extras pulled into the image) or an in-pod path that a
+# PersistentVolume / configMap mounts.
+bundle:
+  source: "s3"             # s3 | local
+  s3Url: ""                # e.g. s3://my-bucket/reports
+  localPath: "/data/bundle"
+
+# Auth posture. The default IngressTrustPolicy reads X-Auth-Request-User
+# from the upstream ingress (oauth2-proxy / istio AuthService). Enable
+# requireAuth to reject anonymous requests at the app layer too.
+auth:
+  requireAuth: false
+
+# Read-only credentials for S3 access. Set these via a Kubernetes Secret
+# referenced as `existingSecret` rather than inline.
+s3:
+  existingSecret: ""        # name of a Secret holding AWS_* env vars
+  region: ""
+  endpoint: ""              # leave blank for AWS S3 proper
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []

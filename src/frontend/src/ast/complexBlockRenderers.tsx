@@ -2,6 +2,7 @@ import React from 'react'
 import type { Attr, PandocBlock, Table } from './types'
 import { attrs } from './utils'
 import { renderInlines } from './inlineRenderers'
+import { Interactive3DFigure } from '../components/Interactive3DFigure'
 import { InteractiveFigure } from '../components/InteractiveFigure'
 import { InteractiveTable } from '../components/InteractiveTable'
 import { useDocId } from './context'
@@ -111,6 +112,23 @@ export function renderFigure(b: any, renderBlock: (b: any, k?: React.Key, hn?: H
       docId: docId,
       hasDocId: !!docId
     })
+  }
+
+  // 3D figures get routed to the lazy-loading Interactive3DFigure first.
+  const threeDKey = figAttrs['data-3d-key']
+  if (threeDKey && docId) {
+    const caption = captionInlines && captionInlines.length > 0 ? renderInlines(captionInlines as any) : undefined
+    return (
+      <Interactive3DFigure
+        key={key}
+        figureId={figAttrs.id}
+        className={className}
+        threeDKey={threeDKey}
+        docId={docId}
+        content={content}
+        caption={caption}
+      />
+    )
   }
 
   if (plotKey && docId) {

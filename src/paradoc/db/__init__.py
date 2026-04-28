@@ -10,6 +10,7 @@ from .models import (
     TableData,
     TableFilterConfig,
     TableSortConfig,
+    ThreeDData,
 )
 from .utils import (
     apply_table_annotation,
@@ -32,6 +33,7 @@ __all__ = [
     "TableAnnotation",
     "PlotData",
     "PlotAnnotation",
+    "ThreeDData",
     "dataframe_to_table_data",
     "table_data_to_dataframe",
     "parse_table_reference",

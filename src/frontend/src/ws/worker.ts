@@ -13,6 +13,20 @@ let reconnectAttempts = 0
 let heartbeatTimer: number | null = null
 let frontendHeartbeatTimer: number | null = null
 
+// In-flight binary fetch state (one at a time per WS — server enforces this).
+interface BinaryFetchState {
+  requestId: string
+  totalSize: number
+  sha256: string
+  format: string
+  cameraPos: string
+  caption: string
+  bytesReceived: number
+  chunks: ArrayBuffer[]
+}
+
+let activeFetch: BinaryFetchState | null = null
+
 // Generate or retrieve frontend ID from localStorage
 function getFrontendId(): string {
   let frontendId = ''
@@ -123,6 +137,13 @@ function connect() {
 
   ws.addEventListener('message', (event: MessageEvent) => {
     const raw = event.data
+
+    // Binary frame → either a chunk for the active fetch, or unsolicited (ignore).
+    if (raw instanceof ArrayBuffer || raw instanceof Blob) {
+      handleBinaryFrame(raw)
+      return
+    }
+
     if (typeof raw !== 'string') return
     const data = raw.trim()
     if (!data) return
@@ -184,12 +205,94 @@ function connect() {
           ctx.postMessage({ type: 'log_file_path', path: obj.path })
           return
         }
+
+        // Binary asset fetch protocol (control messages — chunks come as binary frames).
+        if (obj && obj.kind === 'binary_fetch_meta') {
+          activeFetch = {
+            requestId: obj.request_id,
+            totalSize: obj.total_size || 0,
+            sha256: obj.sha256 || '',
+            format: obj.format || 'glb',
+            cameraPos: obj.camera_pos || 'iso_3',
+            caption: obj.caption || '',
+            bytesReceived: 0,
+            chunks: [],
+          }
+          ctx.postMessage({
+            type: 'binary_fetch_meta',
+            requestId: activeFetch.requestId,
+            totalSize: activeFetch.totalSize,
+            sha256: activeFetch.sha256,
+            nChunks: obj.n_chunks || 0,
+            format: activeFetch.format,
+            cameraPos: activeFetch.cameraPos,
+            caption: activeFetch.caption,
+          })
+          return
+        }
+        if (obj && obj.kind === 'binary_fetch_cached') {
+          activeFetch = null
+          ctx.postMessage({ type: 'binary_fetch_cached', requestId: obj.request_id })
+          return
+        }
+        if (obj && obj.kind === 'binary_fetch_done') {
+          finalizeActiveFetch()
+          return
+        }
+        if (obj && obj.kind === 'binary_fetch_error') {
+          activeFetch = null
+          ctx.postMessage({ type: 'binary_fetch_error', requestId: obj.request_id, error: obj.error })
+          return
+        }
       } catch {
         // fall through to plain html
       }
     }
     ctx.postMessage({ type: 'html', html: data })
   })
+}
+
+function handleBinaryFrame(raw: ArrayBuffer | Blob) {
+  if (!activeFetch) return
+  const append = (buf: ArrayBuffer) => {
+    activeFetch!.chunks.push(buf)
+    activeFetch!.bytesReceived += buf.byteLength
+    ctx.postMessage({
+      type: 'binary_fetch_progress',
+      requestId: activeFetch!.requestId,
+      bytesReceived: activeFetch!.bytesReceived,
+      totalSize: activeFetch!.totalSize,
+    })
+  }
+  if (raw instanceof ArrayBuffer) {
+    append(raw)
+  } else {
+    raw.arrayBuffer().then(append)
+  }
+}
+
+function finalizeActiveFetch() {
+  if (!activeFetch) return
+  const total = activeFetch.bytesReceived
+  const out = new Uint8Array(total)
+  let offset = 0
+  for (const ch of activeFetch.chunks) {
+    out.set(new Uint8Array(ch), offset)
+    offset += ch.byteLength
+  }
+  ctx.postMessage(
+    {
+      type: 'binary_fetch_done',
+      requestId: activeFetch.requestId,
+      sha256: activeFetch.sha256,
+      format: activeFetch.format,
+      cameraPos: activeFetch.cameraPos,
+      caption: activeFetch.caption,
+      bytes: out.buffer,
+    },
+    [out.buffer],
+  )
+  activeFetch = null
 }
 
 // Allow main thread to forward HTML back to the server if needed
@@ -252,6 +355,37 @@ ctx.addEventListener('message', (event: MessageEvent) => {
         ws.send(JSON.stringify({ kind: 'get_connected_frontends' }))
       }
     } catch {}
+  }
+  // New: Binary asset fetch request (3D glb, etc.).
+  if (msg.type === 'binary_fetch_request') {
+    try {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        // Hint the WS to deliver binary frames as ArrayBuffer (faster than Blob).
+        ws.binaryType = 'arraybuffer'
+        ws.send(
+          JSON.stringify({
+            kind: 'binary_fetch_request',
+            request_id: msg.requestId,
+            doc_id: msg.docId,
+            key: msg.key,
+            sha256: msg.sha256,
+            chunk_size: msg.chunkSize,
+          }),
+        )
+      } else {
+        ctx.postMessage({
+          type: 'binary_fetch_error',
+          requestId: msg.requestId,
+          error: 'websocket is not connected',
+        })
+      }
+    } catch (e: any) {
+      ctx.postMessage({
+        type: 'binary_fetch_error',
+        requestId: msg.requestId,
+        error: String(e?.message || e),
+      })
+    }
   }
 })
 

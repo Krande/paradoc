@@ -1,10 +1,19 @@
 import { useState } from 'react'
 import type { DocManifest, SectionBundle } from '../ast/types'
 
-// Very small IndexedDB helper
+// Very small IndexedDB helper. Bump the version when adding stores.
+type StoreName =
+  | 'sections'
+  | 'manifests'
+  | 'images'
+  | 'plots'
+  | 'tables'
+  | 'three_d_meta'   // map ${docId}:${key} -> ThreeDMeta
+  | 'three_d_blob'   // map sha256 -> ArrayBuffer (deduped by content hash)
+
 function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('paradoc-cache', 3) // Increment version for new stores
+    const req = indexedDB.open('paradoc-cache', 4)
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains('sections')) db.createObjectStore('sections')
@@ -12,6 +21,8 @@ function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
       if (!db.objectStoreNames.contains('images')) db.createObjectStore('images')
       if (!db.objectStoreNames.contains('plots')) db.createObjectStore('plots')
       if (!db.objectStoreNames.contains('tables')) db.createObjectStore('tables')
+      if (!db.objectStoreNames.contains('three_d_meta')) db.createObjectStore('three_d_meta')
+      if (!db.objectStoreNames.contains('three_d_blob')) db.createObjectStore('three_d_blob')
     }
     req.onerror = () => reject(req.error)
     req.onsuccess = () => {
@@ -21,7 +32,7 @@ function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
   })
 }
 
-export async function dbPut(store: 'sections' | 'manifests' | 'images' | 'plots' | 'tables', key: string, value: unknown): Promise<void> {
+export async function dbPut(store: StoreName, key: string, value: unknown): Promise<void> {
   return withDb<void>((db) => new Promise((resolve, reject) => {
     const tx = db.transaction(store, 'readwrite')
     const os = tx.objectStore(store)
@@ -31,7 +42,7 @@ export async function dbPut(store: 'sections' | 'manifests' | 'images' | 'plots'
   }))
 }
 
-export async function dbGet<T>(store: 'sections' | 'manifests' | 'images' | 'plots' | 'tables', key: string): Promise<T | undefined> {
+export async function dbGet<T>(store: StoreName, key: string): Promise<T | undefined> {
   return withDb<T | undefined>((db) => new Promise((resolve, reject) => {
     const tx = db.transaction(store, 'readonly')
     const os = tx.objectStore(store)

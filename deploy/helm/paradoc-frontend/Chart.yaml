@@ -1,0 +1,9 @@
+apiVersion: v2
+name: paradoc-frontend
+description: |
+  Paradoc REST server + static frontend, intended as an optional sub-chart
+  of the adapy helm chart. Serves compiled paradoc bundles from S3 (via
+  obstore) or a mounted PVC.
+type: application
+version: 0.1.0
+appVersion: "0.5.0"

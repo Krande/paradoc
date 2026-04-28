@@ -38,6 +38,65 @@ if TYPE_CHECKING:
     from .io.word.exporter import WordExporter
 
 
+def _kwargs_to_table_anno_str(kwargs: dict) -> str:
+    """Inverse of `TableAnnotation.from_annotation_string`.
+
+    Converts the parsed-substitution kwargs back into a `{tbl:...}` annotation
+    so the legacy `_get_table_markdown_from_db` path can pick them up.
+    """
+    parts: list[str] = []
+    if kwargs.get("show_index") is False:
+        parts.append("index:no")
+    elif kwargs.get("show_index") is True:
+        parts.append("index:yes")
+    if "sort_by" in kwargs:
+        spec = f"sortby:{kwargs['sort_by']}"
+        if kwargs.get("sort_ascending") is False:
+            spec += ":desc"
+        parts.append(spec)
+    if "filter_pattern" in kwargs:
+        spec = f"filter:{kwargs['filter_pattern']}"
+        if "filter_column" in kwargs:
+            spec += f":{kwargs['filter_column']}"
+        parts.append(spec)
+    if kwargs.get("no_caption") is True:
+        parts.append("nocaption")
+    if not parts:
+        return ""
+    return "{tbl:" + ";".join(parts) + "}"
+
+
+def _kwargs_to_plot_anno_str(kwargs: dict) -> str:
+    """Inverse of `PlotAnnotation.from_annotation_string`."""
+    parts: list[str] = []
+    if "width" in kwargs:
+        parts.append(f"width:{kwargs['width']}")
+    if "height" in kwargs:
+        parts.append(f"height:{kwargs['height']}")
+    if kwargs.get("no_caption") is True:
+        parts.append("nocaption")
+    if "format" in kwargs:
+        parts.append(f"format:{kwargs['format']}")
+    if not parts:
+        return ""
+    return "{plt:" + ";".join(parts) + "}"
+
+
+def _find_matching_brace(text: str, start: int) -> int:
+    """Index of the `}` that closes the `{` at `text[start]`, or -1."""
+    if start >= len(text) or text[start] != "{":
+        return -1
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return i
+    return -1
+
+
 class OneDoc:
     """
 
@@ -117,6 +176,11 @@ class OneDoc:
         # Initialize plot renderer with caching
         cache_dir = self.work_dir / ".paradoc_cache"
         self.plot_renderer = PlotRenderer(cache_dir=cache_dir)
+
+        # Filter registry — discovers `<source_dir>/filters.py` lazily during compile.
+        from paradoc.filters import FilterRegistry
+        self._filter_registry = FilterRegistry()
+        self._filters_discovered = False
 
         # Track table key usage to ensure unique keys when tables are reused with different filters/sorts
         self._table_key_usage_count: Dict[str, int] = {}
@@ -408,6 +472,7 @@ class OneDoc:
         logger.info(f'Compiling OneDoc report to "{dest_file}"')
         self._prep_compilation(metadata_file=metadata_file)
         self._perform_variable_substitution()
+        self._write_bundle_artifacts(doc_id=output_name)
         converter = None
         if export_format == ExportFormats.DOCX:
             import platform
@@ -677,9 +742,11 @@ class OneDoc:
         cache_dir = self.work_dir / ".paradoc_cache" / "rendered_plots"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Scan all markdown files to find plot references
+        # Scan all markdown files to find plot references. Use the desugared
+        # cache when available so `${...}` plot refs are picked up too.
+        cache = getattr(self, "_desugared_md_cache", {})
         for mdf in self.md_files_main + self.md_files_app:
-            md_str = mdf.read_original_file()
+            md_str = cache.get(mdf.path) or mdf.read_original_file()
 
             for m in mdf.get_variables():
                 res = m.group(1)
@@ -820,9 +887,14 @@ class OneDoc:
     def _perform_variable_substitution(self):
         """Perform variable substitution in markdown files.
 
-        This replaces placeholders like {{table_name}} with actual content.
-        Table identification in DOCX now uses bookmark/hyperlink anchors,
-        so we no longer inject table names into cells.
+        Runs in two passes:
+          1) Desugar `${...}` references to the legacy `{{__key__}}{plt|tbl:...}`
+             form (or substitute scalars directly). The result is cached per
+             markdown file so the plot-prerender scan and the main substitution
+             loop see the same desugared content.
+          2) Run the legacy `{{...}}` parser (table/plot/equation/variable),
+             emitting a deprecation warning whenever a legacy `{{__key__}}`
+             match is encountered.
         """
         logger.info("Performing variable substitution")
 
@@ -830,16 +902,31 @@ class OneDoc:
         self._table_key_usage_count.clear()
         self._plot_key_usage_count.clear()
 
+        # Discover filter instances from <source_dir>/filters.py once per build.
+        self._discover_filters_once()
+
+        # Reset per-build figure-source key counters.
+        self._fig_source_key_counter: Dict[str, int] = {}
+
+        # Phase 1: desugar ${...} → legacy form (in-memory, never written to disk)
+        self._desugared_md_cache = {}
+        for mdf in self.md_files_main + self.md_files_app:
+            original = mdf.read_original_file()
+            after_figsrc = self._preprocess_figure_sources(original, mdf)
+            self._desugared_md_cache[mdf.path] = self._desugar_new_syntax(after_figsrc, mdf)
+
         # Pre-render all plots in parallel before substitution
         self._collect_and_render_plots_parallel()
 
         for mdf in self.md_files_main + self.md_files_app:
             md_file = mdf.path
             os.makedirs(mdf.new_file.parent, exist_ok=True)
-            md_str = mdf.read_original_file()
+            md_str = self._desugared_md_cache[mdf.path]
             md_str_original = md_str
 
-            for m in mdf.get_variables():
+            import re as _re
+            _legacy_re = _re.compile(r"{{(.*)}}")
+            for m in _legacy_re.finditer(md_str_original):
                 res = m.group(1)
                 key = res.split("|")[0] if "|" in res else res
                 list_of_flags = res.split("|")[1:] if "|" in res else None
@@ -847,6 +934,7 @@ class OneDoc:
 
                 # Check database first for table/plot keys (keys with __ markers)
                 if key.startswith("__") and key.endswith("__"):
+                    self._warn_legacy_syntax(m.group(0), md_str_original, mdf)
                     # Get full reference including any annotation that follows
                     full_reference = m.group(0)
 
@@ -913,6 +1001,269 @@ class OneDoc:
 
             with open(mdf.build_file, "w", encoding="utf-8") as f:
                 f.write(md_str)
+
+    def _desugar_new_syntax(self, md_str: str, mdf: MarkDownFile) -> str:
+        """Translate `${...}` substitutions to legacy `{{...}}` form.
+
+        Probes db tables, db plots, in-memory tables, equations, and variables
+        in that order. Scalar variables with a `:fmt` spec are substituted
+        directly (with format applied). Substitutions whose name resolves to
+        nothing are left as-is so the legacy linter can surface them.
+
+        This is a Phase 1 bridge: Phase 2 replaces it with a filter-aware
+        resolver that handles `name.attr(args)` natively.
+        """
+        from paradoc.substitution import find_substitutions
+
+        out: list[str] = []
+        last = 0
+        for sub in find_substitutions(md_str):
+            out.append(md_str[last:sub.span[0]])
+            replacement = self._desugar_one_substitution(sub, mdf)
+            if replacement is None:
+                logger.warning(
+                    f'Unresolved substitution ${{ {sub.reference} }} in {mdf.path}'
+                )
+                out.append(sub.raw)
+            else:
+                out.append(replacement)
+            last = sub.span[1]
+        out.append(md_str[last:])
+        return "".join(out)
+
+    def _desugar_one_substitution(self, sub, mdf: MarkDownFile) -> Optional[str]:
+        from paradoc.substitution import SubstitutionError, apply_fmtspec
+
+        # Filter-attribute call: ${ name.attr(args) }
+        if sub.attr is not None:
+            return self._resolve_filter_call(sub, mdf)
+
+        name = sub.name
+
+        if self.db_manager.get_table(name) is not None:
+            anno = _kwargs_to_table_anno_str(sub.kwargs)
+            return f"{{{{__{name}__}}}}{anno}"
+
+        if self.db_manager.get_plot(name) is not None:
+            anno = _kwargs_to_plot_anno_str(sub.kwargs)
+            return f"{{{{__{name}__}}}}{anno}"
+
+        if name in self.tables:
+            return f"{{{{__{name}__}}}}"
+
+        if name in self.equations:
+            return f"{{{{__{name}__}}}}"
+
+        if name in self.variables:
+            value = self.variables[name]
+            try:
+                return apply_fmtspec(value, sub.fmtspec)
+            except SubstitutionError as exc:
+                logger.error(f'{exc} for ${{ {name} }} in {mdf.path}')
+                return None
+
+        return None
+
+    def _preprocess_figure_sources(self, md_text: str, mdf: MarkDownFile) -> str:
+        """Replace `<!-- paradoc:figure ... -->` blocks with image references.
+
+        Each block runs its registered filter, which writes a glb + PNG to
+        the bundle and returns the metadata. We register a `ThreeDData` row
+        and rewrite the block as `![title](png){#fig:KEY data-3d-key=KEY}`.
+        """
+        from paradoc.db.models import ThreeDData
+        from paradoc.figure_sources.filters import get_filter_for
+        from paradoc.figure_sources.preprocessor import preprocess_markdown
+
+        bundle_root = self.build_dir
+        md_dir = mdf.build_file.parent
+
+        def _render_block(spec) -> str:
+            key = self._allocate_figure_source_key(spec.figure_source)
+            try:
+                filter_cls = get_filter_for(spec.figure_source)
+                filter_inst = filter_cls(bundle_root=bundle_root)
+                result = filter_inst.render(spec, key=key)
+            except Exception as exc:
+                logger.error(f'figure-source filter failed for key {key!r}: {exc}')
+                return f"<!-- paradoc:figure ERROR: {exc} -->"
+
+            self.db_manager.add_three_d(
+                ThreeDData(
+                    key=key,
+                    glb_path=result.glb_path,
+                    format="glb",
+                    camera_pos=result.camera_pos,
+                    caption=result.caption,
+                    sha256=result.glb_sha256,
+                    size=result.glb_size,
+                    source_type=result.source_type,
+                    metadata=result.metadata,
+                )
+            )
+
+            # Compute the relative path from the markdown file to the PNG so
+            # pandoc resolves it correctly for both Word/PDF and HTML.
+            png_full = bundle_root / result.png_path
+            try:
+                rel_png = os.path.relpath(png_full, md_dir)
+            except ValueError:
+                rel_png = result.png_path
+
+            # Forward slashes for portability (pandoc + S3).
+            rel_png = rel_png.replace(os.sep, "/")
+            fig_id = f"fig:{key}"
+            cap = result.caption
+            return f"![{cap}]({rel_png}){{#{fig_id} data-3d-key={key}}}"
+
+        return preprocess_markdown(md_text, render_block=_render_block)
+
+    def _allocate_figure_source_key(self, source_type: str) -> str:
+        """Assign a unique key per (source_type, occurrence) within a build."""
+        idx = self._fig_source_key_counter.get(source_type, 0) + 1
+        self._fig_source_key_counter[source_type] = idx
+        return f"{source_type}_{idx}"
+
+    def _write_bundle_artifacts(self, *, doc_id: str) -> None:
+        """Write `manifest.json`, `presets.json`, and `paradoc.sqlite` into the bundle.
+
+        Together with the figure-source assets already written under
+        `assets/3d/`, this leaves `<build_dir>/` as a portable, S3-uploadable
+        directory tree that the future REST DocStore can serve as-is.
+        """
+        from paradoc.camera.presets import export_presets_json, load_camera_presets
+        from paradoc.docstore import write_manifest
+
+        bundle_root = self.build_dir
+        bundle_root.mkdir(parents=True, exist_ok=True)
+
+        try:
+            write_manifest(bundle_root, doc_id=doc_id)
+        except Exception as exc:
+            logger.error(f"failed to write manifest.json: {exc}")
+
+        try:
+            paradoc_toml = self.source_dir / "paradoc.toml"
+            presets = load_camera_presets(paradoc_toml if paradoc_toml.exists() else None)
+            export_presets_json(presets, bundle_root / "assets" / "presets.json")
+        except Exception as exc:
+            logger.error(f"failed to write presets.json: {exc}")
+
+        try:
+            db_src = self.db_manager.db_path
+            db_dst = bundle_root / "paradoc.sqlite"
+            if db_src.exists():
+                shutil.copy(db_src, db_dst)
+        except Exception as exc:
+            logger.error(f"failed to copy paradoc.sqlite into bundle: {exc}")
+
+    def _discover_filters_once(self) -> None:
+        if self._filters_discovered:
+            return
+        from paradoc.filters import discover_filters
+
+        try:
+            discover_filters(doc_root=self.source_dir, registry=self._filter_registry)
+        except Exception as exc:  # discovery failure should not crash the build
+            logger.error(f"filter discovery failed: {exc}")
+        self._filters_discovered = True
+
+    def _resolve_filter_call(self, sub, mdf: MarkDownFile) -> Optional[str]:
+        """Run a `${ name.attr(args) }` reference through the filter registry."""
+        instance = self._filter_registry.get(sub.name)
+        if instance is None:
+            return None  # unresolved → linter
+
+        try:
+            result = self._filter_registry.call_attr(sub.name, sub.attr, sub.kwargs)
+        except (KeyError, TypeError) as exc:
+            logger.error(
+                f'Failed to resolve ${{ {sub.reference} }} in {mdf.path}: {exc}'
+            )
+            return None
+
+        return self._render_view(result, sub, mdf)
+
+    def _render_view(self, result, sub, mdf: MarkDownFile) -> Optional[str]:
+        """Translate a filter `@attr` return value into markdown.
+
+        TableView / FigureView / ThreeDView desugar to legacy markdown forms;
+        scalars are formatted with the substitution's fmtspec.
+        """
+        from paradoc.filters import FigureView, ScalarValue, TableView, ThreeDView
+        from paradoc.substitution import SubstitutionError, apply_fmtspec
+
+        if isinstance(result, TableView):
+            anno = _kwargs_to_table_anno_str(result.display_kwargs)
+            return f"{{{{__{result.table_key}__}}}}{anno}"
+
+        if isinstance(result, FigureView):
+            if result.plot_key is not None:
+                anno = _kwargs_to_plot_anno_str(result.display_kwargs)
+                return f"{{{{__{result.plot_key}__}}}}{anno}"
+            if result.image_path is not None:
+                fig_id = result.figure_id or f"fig:{sub.name}_{sub.attr}"
+                cap = result.caption
+                return f"![{cap}]({result.image_path}){{#{fig_id}}}"
+            logger.error(
+                f'FigureView from ${{ {sub.reference} }} has neither plot_key nor image_path'
+            )
+            return None
+
+        if isinstance(result, ThreeDView):
+            # Phase 4 wires the 3D pipeline; for Phase 2 we emit a static-figure
+            # markdown line with a `data-3d-key` attribute that the frontend
+            # will pick up once Phase 6 lands.
+            fig_id = result.figure_id or f"fig:{sub.name}_{sub.attr}"
+            cap = result.caption
+            img_path = result.image_path or "MISSING_3D_IMAGE.png"
+            return f"![{cap}]({img_path}){{#{fig_id} data-3d-key={result.glb_key}}}"
+
+        if isinstance(result, ScalarValue):
+            try:
+                return apply_fmtspec(result.value, sub.fmtspec)
+            except SubstitutionError as exc:
+                logger.error(f'{exc} for ${{ {sub.reference} }} in {mdf.path}')
+                return None
+
+        # Plain scalar return
+        try:
+            return apply_fmtspec(result, sub.fmtspec)
+        except SubstitutionError as exc:
+            logger.error(f'{exc} for ${{ {sub.reference} }} in {mdf.path}')
+            return None
+
+    def _warn_legacy_syntax(self, raw_match: str, full_md: str, mdf: MarkDownFile) -> None:
+        """Emit a deprecation warning for legacy `{{__key__}}` references.
+
+        We only warn once per unique legacy match per file, to keep the build
+        log readable on docs with hundreds of references.
+        """
+        if not hasattr(self, "_warned_legacy"):
+            self._warned_legacy = set()
+        warn_key = (mdf.path, raw_match)
+        if warn_key in self._warned_legacy:
+            return
+        self._warned_legacy.add(warn_key)
+
+        # Determine if there's a trailing annotation so we can suggest a precise replacement
+        idx = full_md.find(raw_match)
+        suggestion = raw_match
+        if idx >= 0:
+            after = full_md[idx + len(raw_match):]
+            if after.startswith("{tbl:") or after.startswith("{plt:"):
+                close = _find_matching_brace(after, 0)
+                if close != -1:
+                    suggestion = raw_match + after[: close + 1]
+
+        from paradoc.substitution.migrator import migrate_text
+
+        new_form, _, _ = migrate_text(suggestion)
+        logger.warning(
+            f'Deprecated legacy substitution {suggestion!r} in {mdf.path}; '
+            f'replace with {new_form!r}. Run `paradoc-migrate-syntax` to '
+            f'rewrite all legacy syntax in this doc tree.'
+        )
 
     def _uniqueness_check(self, name):
         error_msg = 'Table name "{name}" must be unique. This name is already used by {cont_type}="{container}"'

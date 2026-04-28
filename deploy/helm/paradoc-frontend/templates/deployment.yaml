@@ -1,0 +1,64 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "paradoc-frontend.fullname" . }}
+  labels:
+    {{- include "paradoc-frontend.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "paradoc-frontend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "paradoc-frontend.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: paradoc
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: PARADOC_HOST
+              value: "0.0.0.0"
+            - name: PARADOC_PORT
+              value: "{{ .Values.service.port }}"
+            - name: PARADOC_BUNDLE
+              {{- if eq .Values.bundle.source "s3" }}
+              value: {{ .Values.bundle.s3Url | quote }}
+              {{- else }}
+              value: {{ .Values.bundle.localPath | quote }}
+              {{- end }}
+            {{- if and (eq .Values.bundle.source "s3") .Values.s3.region }}
+            - name: AWS_REGION
+              value: {{ .Values.s3.region | quote }}
+            {{- end }}
+            {{- if and (eq .Values.bundle.source "s3") .Values.s3.endpoint }}
+            - name: AWS_ENDPOINT_URL
+              value: {{ .Values.s3.endpoint | quote }}
+            {{- end }}
+          {{- if and (eq .Values.bundle.source "s3") .Values.s3.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.s3.existingSecret }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          args:
+            {{- if .Values.auth.requireAuth }}
+            - "--require-auth"
+            {{- end }}
+{{- end }}

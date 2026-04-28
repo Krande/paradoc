@@ -28,6 +28,15 @@ classifiers = [
 ]
 [project.scripts]
 paradoc = "paradoc.cli_app:app"
+paradoc-migrate-syntax = "paradoc.cli.migrate_syntax:app"
+paradoc-serve = "paradoc.serve.cli:app"
+
+[project.optional-dependencies]
+serve = [
+    "fastapi >= 0.115",
+    "uvicorn >= 0.30",
+    "obstore >= 0.3",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/Krande/paradoc"

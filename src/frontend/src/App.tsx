@@ -8,6 +8,7 @@ import { SearchBar } from './components/SearchBar'
 import InlineWorker from './ws/worker.ts?worker&inline'
 
 import { useSectionStore, storeEmbeddedImage, storePlotData, storeTableData, isStaticMode, detectStaticMode, loadStaticData } from './sections/store'
+import { initTransport } from './transport'
 import type { DocManifest, SectionBundle } from './ast/types'
 import { VirtualReader } from './components/VirtualReader'
 import { calculateHeadingNumbers } from './ast/headingNumbers'
@@ -67,6 +68,10 @@ function AppContent() {
     // Use inline worker for single-file builds that work from filesystem
     const worker = new InlineWorker()
     workerRef.current = worker
+    // Initialize the AssetTransport so 3D figures can fetch glb bytes.
+    initTransport(worker).catch((err) => {
+      console.warn('[App] failed to init AssetTransport:', err)
+    })
 
     // Track the current docId from manifest
     let currentDocId = 'demo'

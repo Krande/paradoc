@@ -1,18 +1,15 @@
-# Figure Sources for FEA Models
+# Figure sources
 
-This document provides a description of the paradoc markdown figure source specifications. 
+This document demonstrates paradoc's figure-source / filter system.
 
-The specification is defined in the markdown like so
+The substitution syntax is `${ name(.attr)?(args)?(:fmt)? }`. There are
+three families of references it covers:
 
-```markdown
+1. **DB-backed tables / plots** — `${ my_table }`, `${ my_plot(width=800) }`
+2. **Filter attributes** — `${ eig_main.first_freq:.2f }`
+3. **3D figure sources** — declared via `<!-- paradoc:figure ... -->` blocks
+   that desugar to filter calls.
 
-<--
-
-
--->
-```
-
-
-
- different FEA software formats.
-The specifications include details such as the source file paths, output file paths, fields to visualize, and camera positions.
+The legacy `{{__key__}}{tbl|plt:...}` syntax still works with a
+deprecation warning at compile time. Run `paradoc-migrate-syntax
+<doc_root>` to rewrite legacy markdown in place.
