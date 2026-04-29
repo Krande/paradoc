@@ -75,7 +75,16 @@ playwright = "*"
 obstore = ">=0.3"
 
 [feature.examples.tasks]
-compile-examples = { cmd = "python scripts/compile_examples.py", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" } }
+# Pull headless Chrome before compiling. Plotly's `fig.write_image` calls
+# kaleido, which launches Chrome via choreographer; without this prefetch
+# the first plot render fails inside the Docker build and lands as the
+# `[Error rendering plot: KEY]` placeholder in the markdown — which then
+# strips the `{#fig:KEY}` anchor and breaks every downstream `[@fig:KEY]`
+# crossref. We call `get_chrome()` (the API) rather than the
+# `plotly_get_chrome` CLI wrapper because the wrapper prompts on stdin
+# and CI builds run non-interactively. Idempotent.
+chrome-prefetch = { cmd = "python -c \"from plotly.io import get_chrome; get_chrome()\"" }
+compile-examples = { cmd = "python scripts/compile_examples.py", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }, depends-on = ["chrome-prefetch"] }
 upload-examples = { cmd = "python scripts/upload_examples.py", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }, depends-on = ["compile-examples"] }
 
 [feature.examples-figs.dependencies]
@@ -120,7 +129,8 @@ ada-py = { git = "https://github.com/Krande/adapy.git", rev = "62a1ee5da30fe0d19
 # `compile-examples` task above bakes the lightweight set; this task
 # bakes the figure-sources example. Both write into the same
 # dist/examples/ tree so `upload-examples` picks them up together.
-compile-examples-figs = { cmd = "python scripts/compile_examples.py doc_figure_sources", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" } }
+# Same chrome-prefetch dependency as the lightweight compile.
+compile-examples-figs = { cmd = "python scripts/compile_examples.py doc_figure_sources", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }, depends-on = ["chrome-prefetch"] }
 
 [feature.serve.dependencies]
 # Runtime deps for `paradoc-serve` — kept to a minimum so the container
