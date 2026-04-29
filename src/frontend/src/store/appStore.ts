@@ -37,7 +37,10 @@ export const useAppStore = create<AppState>((set) => ({
   frontendId: '',
   connectedFrontends: [],
   logFilePath: '',
-  docId: 'demo',
+  // Default to empty string so REST mode can route to <DocList> when no
+  // doc is selected. The legacy WS path receives a docId from the
+  // manifest message and overwrites this on first arrival.
+  docId: '',
   toc: [],
 
   setConnected: (connected) => set({ connected }),

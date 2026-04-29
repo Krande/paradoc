@@ -35,7 +35,9 @@ export async function initTransport(worker: Worker | null): Promise<AssetTranspo
   const kind: TransportKind = config.transport === 'rest' ? 'rest' : 'ws'
 
   if (kind === 'rest') {
-    if (!config.apiBase) {
+    // Empty apiBase ('') is valid — same-host serving uses current
+    // origin via relative URLs. Only `undefined` means missing.
+    if (config.apiBase === undefined) {
       console.warn('[paradoc] REST transport requested but apiBase is missing; falling back to WS.')
     } else {
       const { RESTTransport } = await import('./rest')

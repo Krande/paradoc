@@ -55,7 +55,17 @@ def main(argv: list[str] | None = None) -> int:
     region = os.environ.get("AWS_REGION", "us-east-1")
     prefix = os.environ.get("S3_PREFIX", "").strip("/")
 
-    store = S3Store(bucket=bucket, endpoint=endpoint, region=region)
+    # `allow_http=True` so plain-HTTP endpoints (e.g. cluster-internal
+    # Garage at http://...:3900) aren't rejected by reqwest with
+    # BadScheme. `virtual_hosted_style_request=False` because Garage and
+    # most non-AWS S3 servers only support path-style addressing.
+    store = S3Store(
+        bucket=bucket,
+        endpoint=endpoint,
+        region=region,
+        allow_http=True,
+        virtual_hosted_style_request=False,
+    )
 
     bundles = sorted(p for p in EXAMPLES_DIR.iterdir() if (p / "_build" / "manifest.json").is_file())
     if not bundles:
