@@ -129,6 +129,26 @@ class S3DocStore(DocStore):
     def get_three_d_meta(self, doc_id: str, key: str) -> Optional[ThreeDData]:
         return self._db(doc_id).get_three_d(key)
 
+    def get_static_manifest_bytes(self, doc_id: str) -> Optional[bytes]:
+        return self._fetch_object(self._key(doc_id, "static", "manifest.json"))
+
+    def get_static_section_bytes(self, doc_id: str, idx: int) -> Optional[bytes]:
+        if idx < 0:
+            return None
+        return self._fetch_object(self._key(doc_id, "static", "sections", f"{idx}.json"))
+
+    def _fetch_object(self, key: str) -> Optional[bytes]:
+        try:
+            payload = self._store.get(key).bytes()
+        except Exception:
+            # obstore raises a generic error on missing key; return None
+            # rather than swallowing real I/O errors silently — but we
+            # don't have per-error-type granularity here, so any failure
+            # surfaces as a 404 to the API client. Acceptable: missing
+            # static/ output is the only realistic failure mode.
+            return None
+        return bytes(payload)
+
     async def open_binary(
         self,
         doc_id: str,

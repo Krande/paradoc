@@ -8,9 +8,11 @@ import { SearchBar } from './components/SearchBar'
 import InlineWorker from './ws/worker.ts?worker&inline'
 
 import { useSectionStore, storeEmbeddedImage, storePlotData, storeTableData, isStaticMode, detectStaticMode, loadStaticData } from './sections/store'
-import { initTransport } from './transport'
+import { initTransport, getRuntimeConfig } from './transport'
+import { loadRestData } from './transport/loadRestData'
 import type { DocManifest, SectionBundle } from './ast/types'
 import { VirtualReader } from './components/VirtualReader'
+import { DocList } from './components/DocList'
 import { calculateHeadingNumbers } from './ast/headingNumbers'
 import { SourceDisplayProvider } from './store/sourceDisplayStore'
 
@@ -236,6 +238,40 @@ function AppContent() {
     tryStaticLoad()
   }, [state.manifest])
 
+  // REST mode: when paradoc-serve is hosting the SPA, /config.js sets
+  // window.__PARADOC_CONFIG__.transport = 'rest'. With a docId in hand
+  // we fetch manifest + sections from the REST endpoints; without one
+  // we render <DocList> below until the user picks one.
+  useEffect(() => {
+    if (state.manifest) return
+    const cfg = getRuntimeConfig()
+    if (cfg.transport !== 'rest' || !docId) return
+
+    let canceled = false
+    ;(async () => {
+      try {
+        const data = await loadRestData(cfg.apiBase || '', docId)
+        if (canceled) return
+        setManifest(data.manifest)
+        for (const bundle of data.sections) upsertSection(bundle)
+      } catch (err) {
+        console.warn('[paradoc] REST load failed', err)
+      }
+    })()
+    return () => {
+      canceled = true
+    }
+  }, [docId, state.manifest])
+
+  const handleSelectDoc = (id: string) => {
+    setDocId(id)
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('doc', id)
+      window.history.pushState({}, '', url.toString())
+    } catch {}
+  }
+
   // Handle global keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -309,11 +345,17 @@ function AppContent() {
         }} onToggleSidebar={toggleSidebar} />
         {state.manifest ? (
           <VirtualReader docId={docId} manifest={state.manifest} sections={state.sections} />
-        ) : (
-          <div className="flex-1 overflow-auto p-6">
-            <div className="text-sm text-gray-500">Waiting for document manifest…</div>
-          </div>
-        )}
+        ) : (() => {
+          const cfg = getRuntimeConfig()
+          if (cfg.transport === 'rest' && !docId) {
+            return <DocList onSelect={handleSelectDoc} />
+          }
+          return (
+            <div className="flex-1 overflow-auto p-6">
+              <div className="text-sm text-gray-500">Waiting for document manifest…</div>
+            </div>
+          )
+        })()}
       </div>
       <SearchBar isOpen={searchBarOpen} onClose={() => setSearchBarOpen(false)} />
     </div>

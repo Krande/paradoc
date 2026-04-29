@@ -8,6 +8,12 @@
   </head>
   <body class="min-h-screen bg-gray-50 text-gray-900">
     <div id="root"></div>
+    <!--
+      Hosted REST mode injects window.__PARADOC_CONFIG__ via /config.js.
+      In Vite dev or static builds this 404s and onerror removes the tag
+      so the comms picker falls back to ws / static autodetect.
+    -->
+    <script src="/config.js" onerror="this.remove()"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

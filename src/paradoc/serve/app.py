@@ -3,9 +3,14 @@
 Endpoints mirror `paradoc.docstore.DocStore`. The binary endpoint
 supports HTTP Range so chunked clients (and the browser viewer) stream
 glbs efficiently from S3-backed deployments.
-"""
 
-from __future__ import annotations
+NOTE: `from __future__ import annotations` is intentionally absent —
+FastAPI introspects function annotations at create_app() time and would
+fail to resolve `Request` (imported inside the function body for the
+optional-fastapi-dep contract) against module globals if annotations
+were lazy strings, causing every `request: Request` route to 422 with
+"missing query param 'request'".
+"""
 
 import json
 from pathlib import Path
@@ -54,6 +59,32 @@ def create_app(
     @app.get("/api/docs")
     async def list_docs() -> dict[str, Any]:
         return {"docs": doc_store.list_doc_ids()}
+
+    @app.get("/api/docs/{doc_id}/manifest")
+    async def get_manifest(doc_id: str, request: Request):
+        _authorize(doc_id, request)
+        data = doc_store.get_static_manifest_bytes(doc_id)
+        if data is None:
+            raise HTTPException(status_code=404, detail="manifest not found")
+        return Response(content=data, media_type="application/json")
+
+    @app.get("/api/docs/{doc_id}/sections/{idx}")
+    async def get_section(doc_id: str, idx: int, request: Request):
+        _authorize(doc_id, request)
+        data = doc_store.get_static_section_bytes(doc_id, idx)
+        if data is None:
+            raise HTTPException(status_code=404, detail=f"section {idx} not found")
+        return Response(content=data, media_type="application/json")
+
+    # Runtime config injected at the SPA's <script src="/config.js">. Same-host
+    # serving (paradoc.<host>/ and /api/*), so apiBase is empty.
+    @app.get("/config.js")
+    async def config_js():
+        body = (
+            "window.__PARADOC_CONFIG__ = "
+            "{\"transport\": \"rest\", \"apiBase\": \"\"};\n"
+        )
+        return Response(content=body, media_type="application/javascript")
 
     @app.get("/api/docs/{doc_id}/tables/{key}")
     async def get_table(doc_id: str, key: str, request: Request):

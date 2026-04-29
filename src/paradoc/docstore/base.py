@@ -42,3 +42,17 @@ class DocStore(ABC):
         chunk_size: int = 256 * 1024,
     ) -> AsyncIterator[bytes]:
         """Yield binary payload (currently glb) in `chunk_size` chunks."""
+
+    def get_static_manifest_bytes(self, doc_id: str) -> Optional[bytes]:
+        """Return the raw bytes of the doc's static manifest.json.
+
+        That's the DocManifest the frontend's static-mode loader expects
+        (sections list, doc metadata) — distinct from the BundleManifest
+        at the bundle root, which is paradoc-serve discovery metadata.
+        Default implementation returns None; backends override.
+        """
+        return None
+
+    def get_static_section_bytes(self, doc_id: str, idx: int) -> Optional[bytes]:
+        """Return the raw bytes of a section JSON (export_static layout)."""
+        return None

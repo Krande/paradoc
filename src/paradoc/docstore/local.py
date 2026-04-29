@@ -82,6 +82,23 @@ class LocalDocStore(DocStore):
     def get_three_d_meta(self, doc_id: str, key: str) -> Optional[ThreeDData]:
         return self._db(doc_id).get_three_d(key)
 
+    def get_static_manifest_bytes(self, doc_id: str) -> Optional[bytes]:
+        return self._read_static(doc_id, "manifest.json")
+
+    def get_static_section_bytes(self, doc_id: str, idx: int) -> Optional[bytes]:
+        if idx < 0:
+            return None
+        return self._read_static(doc_id, f"sections/{idx}.json")
+
+    def _read_static(self, doc_id: str, rel: str) -> Optional[bytes]:
+        bundle = self._bundle_dir(doc_id)
+        path = (bundle / "static" / rel).resolve()
+        if not path.is_relative_to(bundle):
+            raise PermissionError(f"static path escapes bundle: {rel!r}")
+        if not path.is_file():
+            return None
+        return path.read_bytes()
+
     async def open_binary(
         self,
         doc_id: str,

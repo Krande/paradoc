@@ -53,6 +53,16 @@ def compile_doc(doc_id: str, *, clean: bool) -> Path:
     bundle = work / "_build"
     if not (bundle / "manifest.json").exists():
         raise RuntimeError(f"compile produced no manifest at {bundle}")
+
+    # Also emit the export_static layout (DocManifest + sections JSON) into
+    # bundle/static/, so paradoc-serve can hand it back to the frontend's
+    # REST loader. include_frontend=False — the SPA HTML+JS lives in the
+    # paradoc-serve container (/app/static), not per-doc.
+    static_dir = bundle / "static"
+    od_static = pa.OneDoc(src, work_dir=work / "_static-work")
+    od_static.export_static(static_dir, embed_images=True, include_frontend=False)
+    if not (static_dir / "manifest.json").exists():
+        raise RuntimeError(f"export_static produced no manifest at {static_dir}")
     return bundle
 
 
