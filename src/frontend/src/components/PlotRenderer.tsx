@@ -1,17 +1,52 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { getPlotData } from '../sections/store'
-import Plotly from 'plotly.js-dist-min'
 
 interface PlotRendererProps {
   plotKey: string
   docId?: string
 }
 
+// plotly.js-dist-min is ~4.8 MiB raw / ~1.5 MiB gzipped. Pages without a
+// plot block (the home DocList, doc bodies that are pure text/tables/3D)
+// shouldn't pay that on first load. Dynamic-import the module here so
+// Vite emits the pinned `plotly` chunk lazily — modulepreload only kicks
+// in when this component actually mounts. Module-level cache so multiple
+// PlotRenderers share one fetch.
+let _plotlyPromise: Promise<any> | null = null
+function loadPlotly(): Promise<any> {
+  if (!_plotlyPromise) {
+    _plotlyPromise = import('plotly.js-dist-min').then((m) => (m as any).default || m)
+  }
+  return _plotlyPromise
+}
+
 export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
   const plotRef = useRef<HTMLDivElement>(null)
+  const plotlyRef = useRef<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [plotData, setPlotData] = useState<any>(null)
+  const [plotly, setPlotly] = useState<any>(null)
+
+  // Kick off the plotly fetch as soon as the component mounts; runs in
+  // parallel with the IndexedDB plotData fetch.
+  useEffect(() => {
+    let canceled = false
+    loadPlotly()
+      .then((mod) => {
+        if (!canceled) {
+          plotlyRef.current = mod
+          setPlotly(mod)
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load plotly bundle:', err)
+        if (!canceled) setError('Failed to load plotting engine')
+      })
+    return () => {
+      canceled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!docId) return
@@ -35,9 +70,8 @@ export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
   }, [plotKey, docId])
 
   useEffect(() => {
-    if (!plotRef.current || !plotData || !plotData.figure) return
+    if (!plotRef.current || !plotData || !plotData.figure || !plotly) return
 
-    // Render the plot using statically imported Plotly
     try {
       const figure = plotData.figure
       const width = plotData.width || 800
@@ -62,7 +96,7 @@ export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
       }
 
       // Create the plot
-      Plotly.newPlot(plotRef.current, figure.data, layout, config)
+      plotly.newPlot(plotRef.current, figure.data, layout, config)
         .then(() => {
           console.log('Plot rendered successfully:', plotData.key)
         })
@@ -75,17 +109,19 @@ export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
       setError('Failed to render plot')
     }
 
-    // Cleanup
+    // Cleanup. plotlyRef survives unmount so we don't read a stale
+    // closure-captured plotly that may have been collected.
     return () => {
-      if (plotRef.current && Plotly) {
+      const p = plotlyRef.current
+      if (plotRef.current && p) {
         try {
-          Plotly.purge(plotRef.current)
+          p.purge(plotRef.current)
         } catch (err) {
           // Ignore cleanup errors
         }
       }
     }
-  }, [plotData])
+  }, [plotData, plotly])
 
   if (loading) {
     return (

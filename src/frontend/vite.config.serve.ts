@@ -8,12 +8,15 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    // Split per-route chunks so the heavy libs (plotly.js, katex) load
-    // separately and cache independently of app code.
+    // Split per-route chunks so heavy libs load separately and cache
+    // independently of app code. plotly is intentionally NOT pinned —
+    // PlotRenderer dynamic-imports it, and a manualChunks pin forces
+    // it into the entry's modulepreload hints, defeating the
+    // lazy-load. Letting Rollup chunk it via the dynamic import keeps
+    // ~1.5 MiB gz off the critical path.
     rollupOptions: {
       output: {
         manualChunks: {
-          plotly: ['plotly.js-dist-min'],
           katex: ['katex'],
           react: ['react', 'react-dom'],
         },
