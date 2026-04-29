@@ -5,8 +5,12 @@ name: Build & upload example bundles
 # infrastructure detail (endpoint, bucket, credentials) comes from
 # Forgejo secrets so the workflow file itself reveals nothing.
 #
-# Skipped cleanly when the upload secrets aren't configured, so this can
-# also be used to just exercise the compile step on PRs.
+# The act-driven self-hosted runner image is minimal (no curl/pixi),
+# but it does have docker. Run pixi inside its official image and bind
+# the workspace; same approach build-paradoc uses for `docker build`.
+#
+# Skipped cleanly when the upload secrets aren't configured, so this
+# can also be used to just exercise the compile step on PRs.
 
 on:
   workflow_dispatch:
@@ -25,24 +29,17 @@ on:
 jobs:
   build-and-upload:
     runs-on: docker-build
+    env:
+      PIXI_IMAGE: ghcr.io/prefix-dev/pixi:0.67.0
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install pixi
-        run: |
-          # The docker-build runner ships node (for actions/checkout) +
-          # docker but not pixi; pull the same pinned version the local
-          # dev env uses so the lockfile resolves identically here.
-          export PIXI_VERSION=0.67.0
-          export PIXI_HOME="$HOME/.pixi"
-          curl -fsSL https://pixi.sh/install.sh | bash
-          echo "$PIXI_HOME/bin" >> "$GITHUB_PATH"
-
-      - name: Solve `examples` env from pixi.lock
-        run: pixi install --environment examples --locked
-
       - name: Compile example bundles
-        run: pixi run --environment examples compile-examples
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" -w /work \
+            "$PIXI_IMAGE" \
+            sh -c "pixi install --environment examples --locked && pixi run --environment examples compile-examples"
 
       - name: Upload bundles to object store
         env:
@@ -63,6 +60,13 @@ jobs:
             echo "Missing upload secrets:$MISSING — skipping upload (compile artifacts kept locally)."
             exit 0
           fi
-          # Bypass the depends-on (compile already ran) — calling the
-          # task directly would re-run compile and waste ~2 minutes.
-          pixi run --environment examples python scripts/upload_examples.py
+          # The compile step already populated dist/examples; reuse the
+          # same env materialised in /work/.pixi (volume-shared with the
+          # previous step). Calling upload-examples directly via the
+          # task would re-run compile because of depends-on.
+          docker run --rm \
+            -v "$PWD:/work" -w /work \
+            -e S3_ENDPOINT_URL -e S3_BUCKET -e S3_PREFIX \
+            -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION \
+            "$PIXI_IMAGE" \
+            pixi run --environment examples python scripts/upload_examples.py
