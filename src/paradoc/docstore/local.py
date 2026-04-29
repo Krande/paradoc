@@ -90,6 +90,15 @@ class LocalDocStore(DocStore):
             return None
         return self._read_static(doc_id, f"sections/{idx}.json")
 
+    def get_static_plots_bytes(self, doc_id: str) -> Optional[bytes]:
+        return self._read_static(doc_id, "plots.json")
+
+    def get_static_tables_bytes(self, doc_id: str) -> Optional[bytes]:
+        return self._read_static(doc_id, "tables.json")
+
+    def get_static_images_bytes(self, doc_id: str) -> Optional[bytes]:
+        return self._read_static(doc_id, "images.json")
+
     def _read_static(self, doc_id: str, rel: str) -> Optional[bytes]:
         bundle = self._bundle_dir(doc_id)
         path = (bundle / "static" / rel).resolve()

@@ -96,6 +96,36 @@ def create_app(
         )
         return Response(content=body, media_type="application/javascript")
 
+    @app.get("/api/docs/{doc_id}/plots")
+    async def get_all_plots(doc_id: str, request: Request):
+        # Bulk endpoint that mirrors static-mode's `plots.json`: a dict of
+        # `{key: <pre-rendered Plotly figure payload>}`. The frontend's
+        # `loadRestData` seeds IndexedDB from this so InteractiveFigure can
+        # detect that data exists and offer the static/interactive toggle.
+        # Returns `{}` rather than 404 when the doc has no plots so the
+        # frontend can treat the response uniformly.
+        _authorize(doc_id, request)
+        data = doc_store.get_static_plots_bytes(doc_id)
+        if data is None:
+            return JSONResponse(content={})
+        return Response(content=data, media_type="application/json")
+
+    @app.get("/api/docs/{doc_id}/tables")
+    async def get_all_tables(doc_id: str, request: Request):
+        _authorize(doc_id, request)
+        data = doc_store.get_static_tables_bytes(doc_id)
+        if data is None:
+            return JSONResponse(content={})
+        return Response(content=data, media_type="application/json")
+
+    @app.get("/api/docs/{doc_id}/images")
+    async def get_all_images(doc_id: str, request: Request):
+        _authorize(doc_id, request)
+        data = doc_store.get_static_images_bytes(doc_id)
+        if data is None:
+            return JSONResponse(content={})
+        return Response(content=data, media_type="application/json")
+
     @app.get("/api/docs/{doc_id}/tables/{key}")
     async def get_table(doc_id: str, key: str, request: Request):
         _authorize(doc_id, request)

@@ -88,3 +88,19 @@ class DocStore(ABC):
     def get_static_section_bytes(self, doc_id: str, idx: int) -> Optional[bytes]:
         """Return the raw bytes of a section JSON (export_static layout)."""
         return None
+
+    def get_static_plots_bytes(self, doc_id: str) -> Optional[bytes]:
+        """Return the raw bytes of `static/plots.json` (pre-rendered Plotly
+        figures keyed by plot key) — what the static-mode loader fetches as
+        `plots.json` and the REST loader now consumes via the bulk endpoint.
+        """
+        return None
+
+    def get_static_tables_bytes(self, doc_id: str) -> Optional[bytes]:
+        """Return the raw bytes of `static/tables.json`."""
+        return None
+
+    def get_static_images_bytes(self, doc_id: str) -> Optional[bytes]:
+        """Return the raw bytes of `static/images.json` (embedded base64 image
+        payloads keyed by image path)."""
+        return None

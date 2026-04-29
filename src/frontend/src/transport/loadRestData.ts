@@ -1,8 +1,9 @@
 // REST-backed analogue of `loadStaticData()`. Hits the paradoc-serve
-// endpoints `/api/docs/{id}/manifest` and `/api/docs/{id}/sections/{idx}`
-// to assemble the same structure the static loader returns. Tables /
-// plots / 3D blobs continue to flow through `RESTTransport` lazily —
-// not pre-loaded here.
+// endpoints `/api/docs/{id}/manifest`, `/api/docs/{id}/sections/{idx}`,
+// and the bulk `/plots` `/tables` `/images` endpoints (same shape as
+// the static-mode `plots.json` / `tables.json` / `images.json` dumps)
+// to assemble the same structure the static loader returns. 3D blobs
+// continue to flow through `RESTTransport` lazily.
 
 import type { DocManifest, SectionBundle } from '../ast/types'
 import type { PlotData, TableData } from '../sections/store'
@@ -19,8 +20,23 @@ function joinUrl(base: string, path: string): string {
   return base.replace(/\/?$/, '') + path
 }
 
+async function fetchOptionalJson<T>(url: string, fallback: T): Promise<T> {
+  // Bulk plots/tables/images endpoints return `{}` when the bundle has
+  // none, but a deployment with an older paradoc-serve will 404. Treat
+  // any non-2xx as the empty fallback rather than failing the doc load.
+  try {
+    const res = await fetch(url, { cache: 'no-store' })
+    if (!res.ok) return fallback
+    return (await res.json()) as T
+  } catch {
+    return fallback
+  }
+}
+
 export async function loadRestData(apiBase: string, docId: string): Promise<LoadRestResult> {
-  const manifestRes = await fetch(joinUrl(apiBase, `/api/docs/${encodeURIComponent(docId)}/manifest`), {
+  const docPath = `/api/docs/${encodeURIComponent(docId)}`
+
+  const manifestRes = await fetch(joinUrl(apiBase, `${docPath}/manifest`), {
     cache: 'no-store',
   })
   if (!manifestRes.ok) {
@@ -31,7 +47,7 @@ export async function loadRestData(apiBase: string, docId: string): Promise<Load
   const sections: SectionBundle[] = []
   for (const sectionMeta of manifest.sections) {
     const idx = sectionMeta.index
-    const res = await fetch(joinUrl(apiBase, `/api/docs/${encodeURIComponent(docId)}/sections/${idx}`), {
+    const res = await fetch(joinUrl(apiBase, `${docPath}/sections/${idx}`), {
       cache: 'no-store',
     })
     if (!res.ok) {
@@ -41,8 +57,18 @@ export async function loadRestData(apiBase: string, docId: string): Promise<Load
     sections.push((await res.json()) as SectionBundle)
   }
 
-  // tables/plots/images stay lazy; the static-mode store helpers populate
-  // them as renderers fetch — same pattern static mode uses for plots
-  // when the bundle ships referenced (not embedded) plot data.
-  return { manifest, sections, images: {}, plots: {}, tables: {} }
+  // Pull plots/tables/images as bulk dicts in parallel — same shape as
+  // static mode's plots.json/tables.json/images.json. Without this seed,
+  // InteractiveFigure/InteractiveTable look for IndexedDB entries that
+  // never get written and silently fall back to non-interactive renders.
+  const [plots, tables, images] = await Promise.all([
+    fetchOptionalJson<Record<string, PlotData>>(joinUrl(apiBase, `${docPath}/plots`), {}),
+    fetchOptionalJson<Record<string, TableData>>(joinUrl(apiBase, `${docPath}/tables`), {}),
+    fetchOptionalJson<Record<string, { data: string; mimeType: string }>>(
+      joinUrl(apiBase, `${docPath}/images`),
+      {},
+    ),
+  ])
+
+  return { manifest, sections, images, plots, tables }
 }

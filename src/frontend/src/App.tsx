@@ -254,6 +254,27 @@ function AppContent() {
         if (canceled) return
         setManifest(data.manifest)
         for (const bundle of data.sections) upsertSection(bundle)
+
+        // Seed IndexedDB with bulk plots/tables/images so InteractiveFigure
+        // and InteractiveTable can detect available data and offer the
+        // static/interactive toggle — same flow the static-mode block above
+        // uses. Without this, the toggle stays hidden because the IndexedDB
+        // probe in those components misses on every island.
+        for (const [path, imgData] of Object.entries(data.images)) {
+          await storeEmbeddedImage(docId, path, imgData.data, imgData.mimeType).catch((err) => {
+            console.warn(`[paradoc] failed to store image ${path}:`, err)
+          })
+        }
+        for (const [plotKey, plotData] of Object.entries(data.plots)) {
+          await storePlotData(docId, plotKey, plotData).catch((err) => {
+            console.warn(`[paradoc] failed to store plot ${plotKey}:`, err)
+          })
+        }
+        for (const [tableKey, tableData] of Object.entries(data.tables)) {
+          await storeTableData(docId, tableKey, tableData).catch((err) => {
+            console.warn(`[paradoc] failed to store table ${tableKey}:`, err)
+          })
+        }
       } catch (err) {
         console.warn('[paradoc] REST load failed', err)
       }

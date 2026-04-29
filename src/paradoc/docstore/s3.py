@@ -207,6 +207,15 @@ class S3DocStore(DocStore):
             return None
         return self._fetch_object(self._key(doc_id, "static", "sections", f"{idx}.json"))
 
+    def get_static_plots_bytes(self, doc_id: str) -> Optional[bytes]:
+        return self._fetch_object(self._key(doc_id, "static", "plots.json"))
+
+    def get_static_tables_bytes(self, doc_id: str) -> Optional[bytes]:
+        return self._fetch_object(self._key(doc_id, "static", "tables.json"))
+
+    def get_static_images_bytes(self, doc_id: str) -> Optional[bytes]:
+        return self._fetch_object(self._key(doc_id, "static", "images.json"))
+
     def _fetch_object(self, key: str) -> Optional[bytes]:
         try:
             payload = self._store.get(key).bytes()
