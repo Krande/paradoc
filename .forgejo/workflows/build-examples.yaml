@@ -5,12 +5,11 @@ name: Build & upload example bundles
 # infrastructure detail (endpoint, bucket, credentials) comes from
 # Forgejo secrets so the workflow file itself reveals nothing.
 #
-# The act-driven self-hosted runner image is minimal (no curl/pixi),
-# but it does have docker. Run pixi inside its official image and bind
-# the workspace; same approach build-paradoc uses for `docker build`.
-#
-# Skipped cleanly when the upload secrets aren't configured, so this
-# can also be used to just exercise the compile step on PRs.
+# The act-style runner is minimal (no curl, no host bind-mounts that
+# the outer docker daemon can see), but it does have docker. Compile
+# inside an image built from Dockerfile.examples; upload by `docker run`
+# of that same image with the secrets passed as env. Skipped cleanly
+# when the upload secrets aren't configured.
 
 on:
   workflow_dispatch:
@@ -24,22 +23,17 @@ on:
       - 'pixi.toml'
       - 'pixi.lock'
       - 'pyproject.toml'
+      - 'Dockerfile.examples'
       - '.forgejo/workflows/build-examples.yaml'
 
 jobs:
   build-and-upload:
     runs-on: docker-build
-    env:
-      PIXI_IMAGE: ghcr.io/prefix-dev/pixi:0.67.0
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile example bundles
-        run: |
-          docker run --rm \
-            -v "$PWD:/work" -w /work \
-            "$PIXI_IMAGE" \
-            sh -c "pixi install --environment examples --locked && pixi run --environment examples compile-examples"
+      - name: Build examples image (compiles bundles in-layer)
+        run: docker build -f Dockerfile.examples -t paradoc-examples:ci .
 
       - name: Upload bundles to object store
         env:
@@ -50,23 +44,20 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.EXAMPLES_AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.EXAMPLES_AWS_REGION }}
         run: |
-          # Skip cleanly when upload isn't configured — useful on PRs.
           MISSING=""
           for v in S3_ENDPOINT_URL S3_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
             eval "val=\$$v"
             [ -z "$val" ] && MISSING="$MISSING $v"
           done
           if [ -n "$MISSING" ]; then
-            echo "Missing upload secrets:$MISSING — skipping upload (compile artifacts kept locally)."
+            echo "Missing upload secrets:$MISSING — skipping upload (compile artifacts kept in image)."
             exit 0
           fi
-          # The compile step already populated dist/examples; reuse the
-          # same env materialised in /work/.pixi (volume-shared with the
-          # previous step). Calling upload-examples directly via the
-          # task would re-run compile because of depends-on.
           docker run --rm \
-            -v "$PWD:/work" -w /work \
             -e S3_ENDPOINT_URL -e S3_BUCKET -e S3_PREFIX \
             -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION \
-            "$PIXI_IMAGE" \
-            pixi run --environment examples python scripts/upload_examples.py
+            paradoc-examples:ci
+
+      - name: Clean up image
+        if: always()
+        run: docker rmi paradoc-examples:ci || true

@@ -1,0 +1,31 @@
+# CI-only image: compiles the curated example docs into a baked layer.
+#
+# Built by .forgejo/workflows/build-examples.yaml. Avoids the docker-out
+# -of-docker volume problem that plagues the act-style runner — `docker
+# build` ships the workspace as a tarball, so we don't need a host path
+# the outer daemon can see.
+#
+# After build, `docker run` the image with the upload env vars and it
+# pushes dist/examples/<doc_id>/ to the configured object store.
+
+ARG PIXI_VERSION=0.67.0
+
+FROM ghcr.io/prefix-dev/pixi:${PIXI_VERSION}
+WORKDIR /work
+
+# Solve env first so source-only edits don't bust the heavy layer cache.
+COPY pixi.toml pixi.lock pyproject.toml ./
+RUN pixi install --environment examples --locked
+
+# Source + scripts + the source-of-truth examples.
+COPY src ./src
+COPY scripts ./scripts
+COPY files ./files
+
+# Compile bundles at build time so the image already contains
+# dist/examples/<doc_id>/_build when `docker run` lands.
+RUN pixi run --environment examples compile-examples
+
+# Default command uploads. Override on `docker run` if you want to drop
+# into a shell to inspect the baked bundles instead.
+CMD ["pixi", "run", "--environment", "examples", "python", "scripts/upload_examples.py"]
