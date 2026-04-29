@@ -52,7 +52,16 @@ def main(argv: list[str] | None = None) -> int:
     endpoint = env_required("S3_ENDPOINT_URL")
     env_required("AWS_ACCESS_KEY_ID")  # consumed by obstore via env
     env_required("AWS_SECRET_ACCESS_KEY")
-    region = os.environ.get("AWS_REGION", "us-east-1")
+    # `.get(name, default)` only falls back when the key is missing — an
+    # empty value (e.g. an unset Forgejo secret expanded to "") still
+    # returns "". Treat empty as missing so the SigV4 scope doesn't end
+    # up as `<date>//s3/aws4_request`, which Garage rejects with
+    # AuthorizationHeaderMalformed. Also write the resolved value back
+    # to the env so any obstore-internal env reads see the same string
+    # as our explicit `region=` kwarg.
+    region = os.environ.get("AWS_REGION", "").strip() or "us-east-1"
+    os.environ["AWS_REGION"] = region
+    os.environ["AWS_DEFAULT_REGION"] = region
     prefix = os.environ.get("S3_PREFIX", "").strip("/")
 
     # `allow_http=True` so plain-HTTP endpoints (e.g. cluster-internal
