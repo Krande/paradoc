@@ -21,6 +21,7 @@ import argparse
 import shutil
 import sys
 from pathlib import Path
+from typing import Callable
 
 import paradoc as pa
 
@@ -38,6 +39,31 @@ DEFAULT_DOCS = [
 ]
 
 
+def _setup_doc_table(od: "pa.OneDoc") -> None:
+    """`files/doc_table/` references {{__my_table__}} … {{__my_table_5__}};
+    register sample tables so the substitution actually fires. Mirrors the
+    pytest fixture in tests/tables/test_tables.py."""
+    import pandas as pd
+
+    from paradoc.common import TableFormat
+
+    df = pd.DataFrame([(0, 0), (1, 2)], columns=["a", "b"])
+    od.add_table("my_table", df, "A basic table")
+    od.add_table("my_table_2", df, "A slightly smaller table", TableFormat(font_size=8))
+    od.add_table("my_table_3", df, "No Space 1")
+    od.add_table("my_table_4", df, "No Space 2")
+    od.add_table("my_table_5", df, "No Space 3")
+
+
+# Per-doc setup hooks. Examples that need build-time inputs (tables,
+# plots, equations) register a callback here. Examples whose markdown is
+# self-contained — doc_math, doc_regular_table, doc_bullet_points — are
+# omitted and compile straight through.
+SETUP_HOOKS: dict[str, Callable[["pa.OneDoc"], None]] = {
+    "doc_table": _setup_doc_table,
+}
+
+
 def compile_doc(doc_id: str, *, clean: bool) -> Path:
     src = FILES_DIR / doc_id
     if not src.is_dir():
@@ -48,6 +74,9 @@ def compile_doc(doc_id: str, *, clean: bool) -> Path:
     work.mkdir(parents=True, exist_ok=True)
 
     od = pa.OneDoc(src, work_dir=work)
+    setup = SETUP_HOOKS.get(doc_id)
+    if setup is not None:
+        setup(od)
     od.compile(doc_id, export_format="html")
 
     bundle = work / "_build"
@@ -60,6 +89,12 @@ def compile_doc(doc_id: str, *, clean: bool) -> Path:
     # paradoc-serve container (/app/static), not per-doc.
     static_dir = bundle / "static"
     od_static = pa.OneDoc(src, work_dir=work / "_static-work")
+    if setup is not None:
+        # `export_static` re-runs prep + variable substitution from a
+        # fresh OneDoc, so re-register the inputs here too — otherwise
+        # the static-served sections would still contain the literal
+        # `{{__my_table__}}` markers.
+        setup(od_static)
     od_static.export_static(static_dir, embed_images=True, include_frontend=False)
     if not (static_dir / "manifest.json").exists():
         raise RuntimeError(f"export_static produced no manifest at {static_dir}")

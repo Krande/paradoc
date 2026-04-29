@@ -58,7 +58,17 @@ def create_app(
 
     @app.get("/api/docs")
     async def list_docs() -> dict[str, Any]:
-        return {"docs": doc_store.list_doc_ids()}
+        # `docs` is the flat backwards-compat list. `groups` is the
+        # partition the doc-switcher renders as <optgroup>s; older
+        # frontends ignore the extra field.
+        groups = doc_store.list_doc_groups()
+        return {
+            "docs": doc_store.list_doc_ids(),
+            "groups": [
+                {"key": g.key, "label": g.label, "docs": list(g.doc_ids)}
+                for g in groups
+            ],
+        }
 
     @app.get("/api/docs/{doc_id}/manifest")
     async def get_manifest(doc_id: str, request: Request):
