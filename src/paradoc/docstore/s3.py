@@ -15,6 +15,7 @@ S3 via obstore range reads.
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 from pathlib import Path
 from typing import AsyncIterator, Optional
@@ -24,6 +25,15 @@ from paradoc.db import DbManager
 from paradoc.db.models import PlotData, TableData, ThreeDData
 
 from .base import DocStore
+
+
+def _env_first(*names: str) -> Optional[str]:
+    """Return the first non-empty value among the given env var names, else None."""
+    for name in names:
+        val = os.environ.get(name, "")
+        if val and val.strip():
+            return val.strip()
+    return None
 
 
 class S3DocStore(DocStore):
@@ -45,8 +55,14 @@ class S3DocStore(DocStore):
     ) -> None:
         self.bucket = bucket
         self.prefix = prefix.rstrip("/")
-        self.endpoint = endpoint
-        self.region = region
+        # Resolve endpoint/region from env so the helm chart's
+        # AWS_ENDPOINT_URL / AWS_REGION env vars actually flow through to
+        # the obstore client config — otherwise `_build_store` couldn't
+        # tell whether to apply the path-style + plain-HTTP defaults that
+        # non-AWS S3 (Garage, MinIO) require. Empty strings are treated as
+        # missing because Forgejo expands unset secrets that way.
+        self.endpoint = endpoint or _env_first("AWS_ENDPOINT_URL", "AWS_ENDPOINT")
+        self.region = region or _env_first("AWS_REGION", "AWS_DEFAULT_REGION")
         self.db_filename = db_filename
         self.cache_dir = Path(cache_dir or Path(tempfile.gettempdir()) / "paradoc-s3-cache")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -75,6 +91,15 @@ class S3DocStore(DocStore):
             kwargs["region"] = self.region
         if self.endpoint:
             kwargs["endpoint"] = self.endpoint
+            # Match upload_examples.py: a custom endpoint nearly always
+            # means a non-AWS S3 (Garage, MinIO, LocalStack) which only
+            # supports path-style and frequently runs over plain HTTP
+            # inside a cluster. Without these the obstore client either
+            # rejects the http:// scheme outright (BadScheme) or builds a
+            # virtual-hosted URL the backend can't route, and every
+            # list/get silently fails.
+            kwargs["allow_http"] = True
+            kwargs["virtual_hosted_style_request"] = False
         return S3Store(**kwargs)
 
     # ---------------- key helpers ----------------
