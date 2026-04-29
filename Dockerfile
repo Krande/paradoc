@@ -1,42 +1,43 @@
 # Multi-stage build for `paradoc-serve` cloud deployments.
 #
-# Stage 1: build the frontend static bundle.
-# Stage 2: install paradoc + serve extras and copy the built frontend in.
-#
-# The resulting image is read-only over compiled bundles. It does *not*
-# include adapy or OCC — the build pipeline that produces bundles uses
-# adapy elsewhere (CI of the project that ships the doc).
+# Stage 1: build the frontend SPA bundle.
+# Stage 2: solve the `serve` pixi environment from pixi.lock so the runtime
+#          deps in this image are 1:1 with the local pixi env (no pip, no
+#          PyPI extras, just conda-forge via the lockfile).
+
+ARG PIXI_VERSION=0.67.0
 
 FROM node:20-alpine AS frontend-build
-
 WORKDIR /frontend
 COPY src/frontend/package.json src/frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
-
 COPY src/frontend/ ./
 RUN npm run build
 
 
-FROM python:3.12-slim AS runtime
-
-# This image is read-only over pre-built bundles. The build pipeline
-# that produces bundles (which needs pandoc + adapy) lives elsewhere.
-# `ca-certificates` is already present in the slim base, so we install
-# nothing here and avoid hitting the OS package mirror at build time.
+FROM ghcr.io/prefix-dev/pixi:${PIXI_VERSION} AS runtime
 WORKDIR /app
 
-COPY pyproject.toml README.md /app/
-COPY src /app/src
-RUN pip install --no-cache-dir ".[serve]"
+# Solve and materialise the pinned `serve` env first so source-only edits
+# don't bust the heavy conda layer cache.
+COPY pixi.toml pixi.lock pyproject.toml ./
+RUN pixi install --environment serve --locked
 
-# Static frontend bundle ready to be served alongside the API by an
-# upstream proxy / ingress.
+# Source last for cache friendliness. PYTHONPATH points at src/ so the
+# package is importable without a separate editable install.
+COPY src/paradoc /app/src/paradoc
+
+# Static SPA bundle from stage 1, served alongside the API by Traefik.
 COPY --from=frontend-build /frontend/dist /app/static
 
-ENV PARADOC_BUNDLE=/data/bundle
-ENV PARADOC_HOST=0.0.0.0
-ENV PARADOC_PORT=8000
+ENV PYTHONPATH=/app/src \
+    PARADOC_BUNDLE=/data/bundle \
+    PARADOC_HOST=0.0.0.0 \
+    PARADOC_PORT=8000
 
 EXPOSE 8000
 
-ENTRYPOINT ["sh", "-c", "paradoc-serve \"$PARADOC_BUNDLE\" --host \"$PARADOC_HOST\" --port \"$PARADOC_PORT\""]
+# `pixi run` activates the serve env and exec's python so PID 1 handles
+# SIGTERM correctly under Kubernetes. Args are passed through the shell
+# so the env-var defaults above can be overridden per-deploy.
+ENTRYPOINT ["sh", "-c", "exec pixi run --environment serve python -m paradoc.serve.cli \"$PARADOC_BUNDLE\" --host \"$PARADOC_HOST\" --port \"$PARADOC_PORT\" \"$@\"", "--"]

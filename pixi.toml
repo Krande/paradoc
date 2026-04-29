@@ -27,6 +27,11 @@ serve = { cmd = "mkdocs serve -a localhost:8080", env = { "PYTHONPATH" = "$PIXI_
 
 [environments]
 prod = { features = ["prod"], solve-group = "prod", no-default-feature = true }
+# `serve` is the runtime env baked into the paradoc-serve container image
+# (see Dockerfile). Shares solve-group "prod" so overlapping deps (pydantic,
+# typer, …) resolve to the same versions that local `prod` uses — i.e. the
+# pixi.lock is the single source of truth for both local and image.
+serve = { features = ["serve"], solve-group = "prod", no-default-feature = true }
 test-core = { features = ["test-core"], solve-group = "prod", no-default-feature = true }
 test = { features = ["test", "test-core", "prod"], solve-group = "prod", no-default-feature = true }
 profile = { features = ["profile", "prod","test-core"], solve-group = "prod", no-default-feature = true }
@@ -55,6 +60,17 @@ plotly = "*"
 python-kaleido = "*"
 pydantic = ">=2.0"
 playwright = "*"
+
+[feature.serve.dependencies]
+# Runtime deps for `paradoc-serve` — kept to a minimum so the container
+# image stays slim. typer + pydantic are explicit (don't lean on transitive
+# pulls from fastapi). obstore is what handles s3:// bundle URLs.
+python = "3.12.*"
+fastapi = ">=0.115"
+uvicorn = ">=0.30"
+typer = "*"
+pydantic = ">=2.0"
+obstore = ">=0.3"
 
 [feature.test-core.pypi-dependencies]
 pytest-playwright = "*"
