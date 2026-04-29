@@ -1,0 +1,58 @@
+name: Build & upload example bundles
+
+# Compiles the curated paradoc example docs and uploads each bundle to
+# the configured object store. Mirrors build-paradoc.yaml — every
+# infrastructure detail (endpoint, bucket, credentials) comes from
+# Forgejo secrets so the workflow file itself reveals nothing.
+#
+# Skipped cleanly when the upload secrets aren't configured, so this can
+# also be used to just exercise the compile step on PRs.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/figure-sources]
+    paths:
+      - 'files/**'
+      - 'scripts/compile_examples.py'
+      - 'scripts/upload_examples.py'
+      - 'src/paradoc/**'
+      - 'pixi.toml'
+      - 'pixi.lock'
+      - 'pyproject.toml'
+      - '.forgejo/workflows/build-examples.yaml'
+
+jobs:
+  build-and-upload:
+    runs-on: docker-build
+    container:
+      image: ghcr.io/prefix-dev/pixi:0.67.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Solve `examples` env from pixi.lock
+        run: pixi install --environment examples --locked
+
+      - name: Compile example bundles
+        run: pixi run --environment examples compile-examples
+
+      - name: Upload bundles to object store
+        env:
+          S3_ENDPOINT_URL: ${{ secrets.EXAMPLES_S3_ENDPOINT_URL }}
+          S3_BUCKET: ${{ secrets.EXAMPLES_S3_BUCKET }}
+          S3_PREFIX: ${{ secrets.EXAMPLES_S3_PREFIX }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.EXAMPLES_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.EXAMPLES_AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.EXAMPLES_AWS_REGION }}
+        run: |
+          # Skip cleanly when upload isn't configured — useful on PRs.
+          MISSING=""
+          for v in S3_ENDPOINT_URL S3_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+            eval "val=\$$v"
+            [ -z "$val" ] && MISSING="$MISSING $v"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "Missing upload secrets:$MISSING — skipping upload (compile artifacts kept locally)."
+            exit 0
+          fi
+          pixi run --environment examples python scripts/upload_examples.py

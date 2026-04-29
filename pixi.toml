@@ -32,6 +32,8 @@ prod = { features = ["prod"], solve-group = "prod", no-default-feature = true }
 # typer, …) resolve to the same versions that local `prod` uses — i.e. the
 # pixi.lock is the single source of truth for both local and image.
 serve = { features = ["serve"], solve-group = "prod", no-default-feature = true }
+# `examples` env: `prod` (compile deps) + obstore for the uploader.
+examples = { features = ["examples", "prod"], solve-group = "prod", no-default-feature = true }
 test-core = { features = ["test-core"], solve-group = "prod", no-default-feature = true }
 test = { features = ["test", "test-core", "prod"], solve-group = "prod", no-default-feature = true }
 profile = { features = ["profile", "prod","test-core"], solve-group = "prod", no-default-feature = true }
@@ -60,6 +62,16 @@ plotly = "*"
 python-kaleido = "*"
 pydantic = ">=2.0"
 playwright = "*"
+
+[feature.examples.dependencies]
+# obstore for uploading compiled bundles to the configured object store.
+# Inherits everything else (pandoc, plotly, …) from the prod feature so
+# `OneDoc.compile()` can run end-to-end.
+obstore = ">=0.3"
+
+[feature.examples.tasks]
+compile-examples = { cmd = "python scripts/compile_examples.py", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" } }
+upload-examples = { cmd = "python scripts/upload_examples.py", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }, depends-on = ["compile-examples"] }
 
 [feature.serve.dependencies]
 # Runtime deps for `paradoc-serve` — kept to a minimum so the container
