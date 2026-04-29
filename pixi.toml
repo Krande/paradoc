@@ -79,10 +79,41 @@ compile-examples = { cmd = "python scripts/compile_examples.py", env = { PYTHONP
 upload-examples = { cmd = "python scripts/upload_examples.py", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }, depends-on = ["compile-examples"] }
 
 [feature.examples-figs.dependencies]
-# adapy + its native CAD/OCC stack. Heavy (~1.5 GiB), so only this env
-# carries it — the regular `examples` compile and the runtime `serve`
-# image both stay free of this dependency.
-ada-py = "*"
+# adapy's native runtime — copied from ../adapy/pixi.toml's `prod`
+# feature, minus the jupyter GUI bits we don't need for a headless
+# compile-time render. We can't depend on conda `ada-py` directly
+# because pixi then refuses to override it with a pypi git source
+# (warns "already selected as a conda package"). Listing the natives
+# explicitly gives us the OCC/render stack while leaving the `ada-py`
+# name free for the git pin in [pypi-dependencies].
+pythonocc-core = "*"
+occt = "*"
+ifcopenshell = "*"
+bcf-client = "*"
+python-gmsh = "*"
+hdf5 = "*"
+h5py = "*"
+trimesh = "*"
+meshio = "*"
+send2trash = "*"
+pyparsing = "*"
+glfw = "==3.4"
+pyglfw = "*"
+pygfx = ">=0.13"
+flatbuffers = "*"
+python-flatbuffers = "*"
+lark = "*"
+pillow = "*"
+# Pure-python deps adapy expects. They're on conda-forge so we get
+# binary wheels via the OCC channel rather than pip building from sdist.
+pyquaternion = "*"
+
+[feature.examples-figs.pypi-dependencies]
+# Branch `chore/fea-report-v2` carries the fix for the `TopoDS_Solid`
+# `geometry` attribute error that 0.7.11 hits on round-tripped STEP
+# files. Pin the exact sha so cache invalidation is explicit and the
+# CI-built bundle is reproducible.
+ada-py = { git = "https://github.com/Krande/adapy.git", rev = "62a1ee5da30fe0d190d81f8a0dd96df7b94d7f59" }
 
 [feature.examples-figs.tasks]
 # Builds JUST doc_figure_sources into dist/examples/. The

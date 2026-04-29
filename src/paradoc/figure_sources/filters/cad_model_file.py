@@ -32,7 +32,28 @@ class CADModelFileFilter(FigureSourceFilter):
         glb_path = out_dir / f"{key}.glb"
         png_path = out_dir / f"{key}.png"
 
-        self._render_with_adapy(source_path, glb_path, png_path, spec.camera_pos)
+        # Fast path: a pre-rendered `<source>.glb` (and optional .png)
+        # next to the input bypasses the adapy tessellation entirely.
+        # Useful when the build env doesn't have ada-py installed, when
+        # adapy doesn't tessellate the specific STEP file cleanly (e.g.
+        # the round-trip-from-Beam case that hits the TopoDS_Solid
+        # geometry bug in 0.7.11), or when the asset is genuinely
+        # static and re-rendering on every build is wasted work.
+        prebuilt_glb = source_path.with_suffix(".glb")
+        prebuilt_png = source_path.with_suffix(".png")
+        if prebuilt_glb.is_file():
+            import shutil
+
+            shutil.copy(prebuilt_glb, glb_path)
+            if prebuilt_png.is_file():
+                shutil.copy(prebuilt_png, png_path)
+            else:
+                # No PNG ready — render one from the glb if we can,
+                # otherwise leave it absent and the doc shows a broken
+                # static-image fallback.
+                self._render_png_from_glb(glb_path, png_path)
+        else:
+            self._render_with_adapy(source_path, glb_path, png_path, spec.camera_pos)
 
         glb_bytes = glb_path.read_bytes()
         return RenderResult(
@@ -45,6 +66,26 @@ class CADModelFileFilter(FigureSourceFilter):
             source_type=self.figure_source,
             metadata={"source_inp": str(source_path)},
         )
+
+    def _render_png_from_glb(self, glb_in: Path, png_out: Path) -> None:
+        """Best-effort PNG fallback: try trimesh's built-in scene render.
+
+        Used only when a pre-baked .glb exists but the matching .png
+        doesn't. If trimesh isn't available or the render fails, we
+        leave png_out absent and let the markdown reference fall back.
+        """
+        try:
+            import trimesh
+
+            scene = trimesh.load(glb_in)
+            try:
+                png = scene.save_image(resolution=(800, 600))
+            except Exception:
+                png = None
+            if png:
+                png_out.write_bytes(png)
+        except Exception:
+            pass
 
     def _render_with_adapy(self, source: Path, glb_out: Path, png_out: Path, camera_pos: str) -> None:
         """Run adapy to produce the glb + PNG.
