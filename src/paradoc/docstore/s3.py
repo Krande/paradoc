@@ -92,20 +92,65 @@ class S3DocStore(DocStore):
     # ---------------- DocStore interface ----------------
 
     def list_doc_ids(self) -> list[str]:
+        # Prefer `list_with_delimiter` so we get the per-doc subdirectories
+        # back as `common_prefixes` directly, instead of paginating every
+        # object in the bucket and reducing to first-segments. Trailing
+        # slash matters: obstore evaluates prefixes on a path-segment
+        # basis, so `examples/` matches `examples/foo` but not
+        # `examples-other/foo` (and without the slash, listing is
+        # technically still correct but less obviously scoped).
         try:
-            iter_ = self._store.list(prefix=self.prefix or None)
-            seen: set[str] = set()
-            for entry in iter_:
-                key = entry["path"] if isinstance(entry, dict) else getattr(entry, "path", "")
-                rel = key[len(self.prefix) :].lstrip("/") if self.prefix else key
-                first = rel.split("/", 1)[0]
-                if first.endswith(".json") or first.endswith(".sqlite"):
-                    continue
-                if first:
-                    seen.add(first)
-            return sorted(seen)
+            import obstore as _obstore
+        except ImportError:
+            return []
+
+        list_prefix = (self.prefix.rstrip("/") + "/") if self.prefix else None
+        try:
+            result = _obstore.list_with_delimiter(self._store, prefix=list_prefix)
+            common = result["common_prefixes"] if isinstance(result, dict) else getattr(result, "common_prefixes", [])
+        except Exception as exc:
+            # Surface the error in logs rather than returning [] silently —
+            # an empty doc list looked identical to "everything's fine but
+            # nothing's published" and made this hard to diagnose.
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "S3DocStore.list_doc_ids via list_with_delimiter failed: %r", exc
+            )
+            return self._list_doc_ids_via_flat_listing(list_prefix)
+
+        strip_len = len(list_prefix) if list_prefix else 0
+        seen: set[str] = set()
+        for cp in common:
+            cp_str = str(cp).rstrip("/")
+            seg = cp_str[strip_len:] if list_prefix and cp_str.startswith(list_prefix) else cp_str
+            seg = seg.split("/", 1)[0]
+            if seg:
+                seen.add(seg)
+        return sorted(seen)
+
+    def _list_doc_ids_via_flat_listing(self, list_prefix: Optional[str]) -> list[str]:
+        """Fallback for backends that don't support `list_with_delimiter` —
+        paginate every object and reduce to first-segment-after-prefix.
+        """
+        try:
+            stream = self._store.list(prefix=list_prefix)
         except Exception:
             return []
+        seen: set[str] = set()
+        strip_len = len(list_prefix) if list_prefix else 0
+        try:
+            for batch in stream:
+                # `batch` is a Sequence[ObjectMeta]; ObjectMeta is a dict.
+                for entry in batch:
+                    key = entry["path"] if isinstance(entry, dict) else getattr(entry, "path", "")
+                    rel = key[strip_len:] if strip_len and key.startswith(list_prefix or "") else key
+                    first = rel.split("/", 1)[0]
+                    if first and "." not in first:
+                        seen.add(first)
+        except Exception:
+            return sorted(seen)
+        return sorted(seen)
 
     def _db(self, doc_id: str) -> DbManager:
         cached = self._db_managers.get(doc_id)
