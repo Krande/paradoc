@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "build:standalone": "vite build && node ./scripts/pack.js"
+    "build:standalone": "vite build && node ./scripts/pack.js",
+    "build:serve": "vite build --config vite.config.serve.ts"
   },
   "dependencies": {
     "katex": "^0.16.25",

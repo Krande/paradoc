@@ -12,7 +12,10 @@ WORKDIR /frontend
 COPY src/frontend/package.json src/frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY src/frontend/ ./
-RUN npm run build
+# `build:serve` uses vite.config.serve.ts — split chunks, no singlefile
+# inlining. The default `build` (and `build:standalone`) still emit the
+# self-contained 6.8 MiB index.html for offline/emailable docs.
+RUN npm run build:serve
 
 
 FROM ghcr.io/prefix-dev/pixi:${PIXI_VERSION} AS runtime
