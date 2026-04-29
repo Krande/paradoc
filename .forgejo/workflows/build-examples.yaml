@@ -25,10 +25,18 @@ on:
 jobs:
   build-and-upload:
     runs-on: docker-build
-    container:
-      image: ghcr.io/prefix-dev/pixi:0.67.0
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install pixi
+        run: |
+          # The docker-build runner ships node (for actions/checkout) +
+          # docker but not pixi; pull the same pinned version the local
+          # dev env uses so the lockfile resolves identically here.
+          export PIXI_VERSION=0.67.0
+          export PIXI_HOME="$HOME/.pixi"
+          curl -fsSL https://pixi.sh/install.sh | bash
+          echo "$PIXI_HOME/bin" >> "$GITHUB_PATH"
 
       - name: Solve `examples` env from pixi.lock
         run: pixi install --environment examples --locked
@@ -55,4 +63,6 @@ jobs:
             echo "Missing upload secrets:$MISSING — skipping upload (compile artifacts kept locally)."
             exit 0
           fi
+          # Bypass the depends-on (compile already ran) — calling the
+          # task directly would re-run compile and waste ~2 minutes.
           pixi run --environment examples python scripts/upload_examples.py
