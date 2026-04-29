@@ -42,6 +42,12 @@ export interface HorizontalRule { t: 'HorizontalRule' }
 export interface RawBlock { t: 'RawBlock'; c: [string, string] }
 export interface Div { t: 'Div'; c: [Attr, PandocBlock[]] }
 
+// Pandoc v3+ Figure: c = [Attr, Caption, [Blocks content]]
+// Caption is [ShortCaption|null, [Blocks]] — kept loose because we only
+// peek at the first caption block's inlines in the renderer.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface Figure { t: 'Figure'; c: [Attr, any, PandocBlock[]] }
+
 // Table structure in Pandoc JSON
 // Table: [Attr, Caption, [ColSpec], TableHead, [TableBody], TableFoot]
 export interface Table {

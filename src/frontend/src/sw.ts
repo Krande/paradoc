@@ -1,27 +1,31 @@
+/// <reference lib="webworker" />
+
 // Minimal Service Worker for sectioned static bundles
 // Caches manifest and section JSON under a versioned cache name.
+//
+// `self` is typed as `Window` because the DOM lib is loaded for the
+// rest of the SPA; the local cast pulls in the SW shape for this
+// file without stomping the global declaration.
+
+const sw = self as unknown as ServiceWorkerGlobalScope
 
 const CACHE = 'paradoc-sections-v1'
 
-self.addEventListener('install', (event: ExtendableEvent) => {
+sw.addEventListener('install', (event: ExtendableEvent) => {
   event.waitUntil((async () => {
-    // Activate immediately
-    // @ts-expect-error skipWaiting exists in SW context
-    await self.skipWaiting?.()
+    await sw.skipWaiting?.()
   })())
 })
 
-self.addEventListener('activate', (event: ExtendableEvent) => {
+sw.addEventListener('activate', (event: ExtendableEvent) => {
   event.waitUntil((async () => {
-    // @ts-expect-error clients in SW context
-    await self.clients?.claim?.()
-    // Cleanup old caches
+    await sw.clients?.claim?.()
     const keys = await caches.keys()
     await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
   })())
 })
 
-self.addEventListener('fetch', (event: FetchEvent) => {
+sw.addEventListener('fetch', (event: FetchEvent) => {
   const url = new URL(event.request.url)
   // Only handle our JSON endpoints
   const isManifest = /\/doc\/[^/]+\/manifest\.json$/.test(url.pathname)
