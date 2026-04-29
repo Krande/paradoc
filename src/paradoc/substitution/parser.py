@@ -38,6 +38,14 @@ _IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 # supported in v1.
 _SUBSTITUTION_RE = re.compile(r"\$\{([^}]*)\}")
 
+# Backtick code spans (`...` or ``...``) and fenced code blocks (```...```)
+# — substitutions inside these are documentation, not references, and
+# parsing them would surface as `SubstitutionError` whenever the doc
+# describes the syntax itself. Match conservatively: same-line backticks
+# for spans, multi-line for fences.
+_CODE_SPAN_RE = re.compile(r"(?P<ticks>`+)(?:(?!\n).)*?(?P=ticks)")
+_CODE_FENCE_RE = re.compile(r"^(`{3,}|~{3,}).*?\n.*?\n\1\s*$", re.MULTILINE | re.DOTALL)
+
 # Quick header pattern: `name`, `name.attr`. Anything after this is args+fmt.
 _HEADER_RE = re.compile(
     r"""
@@ -71,8 +79,23 @@ class Substitution:
 
 
 def find_substitutions(text: str) -> Iterator[Substitution]:
-    """Yield each `${...}` substitution found in `text`, in order."""
+    """Yield each `${...}` substitution found in `text`, in order.
+
+    Skips matches that fall inside markdown code spans / fenced code
+    blocks — those are docs of the syntax, not references to substitute.
+    """
+    masked_spans: list[tuple[int, int]] = []
+    for cm in _CODE_FENCE_RE.finditer(text):
+        masked_spans.append(cm.span())
+    for cm in _CODE_SPAN_RE.finditer(text):
+        masked_spans.append(cm.span())
+
+    def in_code(start: int, end: int) -> bool:
+        return any(s <= start and end <= e for s, e in masked_spans)
+
     for match in _SUBSTITUTION_RE.finditer(text):
+        if in_code(*match.span()):
+            continue
         body = match.group(1)
         sub = parse_substitution_body(body, raw=match.group(0), span=match.span())
         yield sub

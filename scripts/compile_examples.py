@@ -36,6 +36,15 @@ DEFAULT_DOCS = [
     "doc_bullet_points",
     "doc_regular_table",
     "doc_table",
+    # Auto-discovered data.db (already populated, checked into the repo).
+    "doc_lorum",
+    "doc_table_db",
+    # NB: doc_figure_sources is intentionally NOT in this list — it
+    # needs ada-py at compile time for STEP→GLB rendering, which would
+    # bloat the lightweight `examples` env. It's compiled separately
+    # via the `examples-figs` env (see pixi.toml). The CI workflow
+    # invokes both passes and they share dist/examples/ so the uploader
+    # picks them up together.
 ]
 
 
@@ -53,6 +62,64 @@ def _setup_doc_table(od: "pa.OneDoc") -> None:
     od.add_table("my_table_3", df, "No Space 1")
     od.add_table("my_table_4", df, "No Space 2")
     od.add_table("my_table_5", df, "No Space 3")
+
+
+def _setup_doc_table_db(od: "pa.OneDoc") -> None:
+    """`files/doc_table_db/data.db` ships my_table + my_table_3, but the
+    appendix markdown references my_table_2/4/5 which were never baked.
+    Register the missing three in-memory so the example renders end-to-
+    end. The db-backed pair still exercises the auto-discovery path."""
+    import pandas as pd
+
+    df = pd.DataFrame([(0, 0), (1, 2)], columns=["a", "b"])
+    od.add_table("my_table_2", df, "Appendix table 2")
+    od.add_table("my_table_4", df, "Appendix table 4")
+    od.add_table("my_table_5", df, "Appendix table 5")
+
+
+def _setup_doc_figure_sources(od: "pa.OneDoc") -> None:
+    """`files/doc_figure_sources/` references:
+
+    * ``${ demo_table }`` and the legacy ``{{__demo_table__}}`` alias —
+      the same db-backed table seen via both syntaxes.
+    * ``${ eig_main.frequency_table }`` — a filter attribute that returns
+      ``TableView(table_key="eigen_freqs")``, so we need an
+      ``eigen_freqs`` row to exist when the legacy substituter runs.
+
+    Plus a STEP file (already in the repo at ``files/doc_figure_sources/
+    files/cad.stp``) which adapy renders to glb + PNG at compile time.
+    """
+    import pandas as pd
+
+    from paradoc.db import dataframe_to_table_data
+
+    # demo_table — referenced from source_table.md (both new & legacy).
+    od.db_manager.add_table(
+        dataframe_to_table_data(
+            "demo_table",
+            pd.DataFrame(
+                [(i, i**2, f"row_{i}") for i in range(5)],
+                columns=["index", "squared", "label"],
+            ),
+            "Demonstration table",
+        )
+    )
+
+    # eigen_freqs — referenced indirectly via the EigenResultsDemo filter.
+    od.db_manager.add_table(
+        dataframe_to_table_data(
+            "eigen_freqs",
+            pd.DataFrame(
+                [
+                    (1, 12.345, 0.012),
+                    (2, 17.890, 0.014),
+                    (3, 23.117, 0.011),
+                ],
+                columns=["mode", "freq_hz", "damping"],
+            ),
+            "First three eigenmodes",
+        )
+    )
 
 
 def _setup_doc_math(od: "pa.OneDoc") -> None:
@@ -88,7 +155,9 @@ def _setup_doc_math(od: "pa.OneDoc") -> None:
 # and compile straight through.
 SETUP_HOOKS: dict[str, Callable[["pa.OneDoc"], None]] = {
     "doc_table": _setup_doc_table,
+    "doc_table_db": _setup_doc_table_db,
     "doc_math": _setup_doc_math,
+    "doc_figure_sources": _setup_doc_figure_sources,
 }
 
 

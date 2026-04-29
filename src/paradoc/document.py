@@ -932,7 +932,19 @@ class OneDoc:
 
             import re as _re
             _legacy_re = _re.compile(r"{{(.*)}}")
+            # Same code-span guard as paradoc.substitution.parser: a
+            # `{{__key__}}` inside backticks is doc-of-the-syntax, not a
+            # reference to substitute.
+            from paradoc.substitution.parser import _CODE_FENCE_RE, _CODE_SPAN_RE
+            _masked = [m.span() for m in _CODE_FENCE_RE.finditer(md_str_original)]
+            _masked += [m.span() for m in _CODE_SPAN_RE.finditer(md_str_original)]
+
+            def _in_code(start: int, end: int) -> bool:
+                return any(s <= start and end <= e for s, e in _masked)
+
             for m in _legacy_re.finditer(md_str_original):
+                if _in_code(*m.span()):
+                    continue
                 res = m.group(1)
                 key = res.split("|")[0] if "|" in res else res
                 list_of_flags = res.split("|")[1:] if "|" in res else None
