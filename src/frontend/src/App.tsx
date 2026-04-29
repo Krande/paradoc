@@ -31,7 +31,7 @@ function AppContent() {
   const workerRef = useRef<Worker | null>(null)
 
   // AST/Sections store
-  const { state, setManifest, upsertSection } = useSectionStore()
+  const { state, setManifest, upsertSection, resetSections } = useSectionStore()
 
   useEffect(() => {
     if (state.manifest) {
@@ -264,6 +264,11 @@ function AppContent() {
   }, [docId, state.manifest])
 
   const handleSelectDoc = (id: string) => {
+    if (id === docId) return
+    // Drop the previous doc's manifest + sections so the REST loader's
+    // `if (state.manifest) return` short-circuit lifts and we actually
+    // refetch for the new doc.
+    resetSections()
     setDocId(id)
     try {
       const url = new URL(window.location.href)
@@ -293,56 +298,13 @@ function AppContent() {
         <Topbar
           connected={connected}
           frontendId={frontendId}
+          docId={docId}
+          onSelectDoc={handleSelectDoc}
           connectedFrontends={connectedFrontends}
           processInfo={processInfo}
           logFilePath={logFilePath}
           workerRef={workerRef}
-          onSendMock={() => {
-          // Build and broadcast a minimal AST manifest + section over WS for demo purposes
-          const manifest = {
-            docId: 'mock-doc',
-            sections: [
-              { id: 'h1-intro', title: 'Introduction', level: 1, index: 0 },
-              { id: 'h2-goals', title: 'Goals', level: 2, index: 1 },
-              { id: 'h2-scope', title: 'Scope', level: 2, index: 2 },
-              { id: 'h1-details', title: 'Details', level: 1, index: 3 },
-              { id: 'h2-arch', title: 'Architecture', level: 2, index: 4 },
-              { id: 'h3-components', title: 'Components', level: 3, index: 5 },
-            ]
-          }
-          const section = {
-            section: manifest.sections[0],
-            doc: {
-              blocks: [
-                { t: 'Header', c: [1, { id: 'h1-intro', classes: [], attributes: {} }, [{ t: 'Str', c: 'Introduction' }]] },
-                { t: 'Para', c: [ { t: 'Str', c: 'This' }, { t: 'Space' }, { t: 'Str', c: 'is' }, { t: 'Space' }, { t: 'Str', c: 'intro' }, { t: 'Str', c: '.' } ] },
-                { t: 'Header', c: [2, { id: 'h2-goals', classes: [], attributes: {} }, [{ t: 'Str', c: 'Goals' }]] },
-                { t: 'Para', c: [ { t: 'Str', c: 'Goals' }, { t: 'Space' }, { t: 'Str', c: 'content' } ] },
-                { t: 'Header', c: [2, { id: 'h2-scope', classes: [], attributes: {} }, [{ t: 'Str', c: 'Scope' }]] },
-                { t: 'Para', c: [ { t: 'Str', c: 'Scope' }, { t: 'Space' }, { t: 'Str', c: 'content' } ] },
-                { t: 'Header', c: [1, { id: 'h1-details', classes: [], attributes: {} }, [{ t: 'Str', c: 'Details' }]] },
-                { t: 'Para', c: [ { t: 'Str', c: 'Details' }, { t: 'Space' }, { t: 'Str', c: 'content' } ] },
-                { t: 'Header', c: [2, { id: 'h2-arch', classes: [], attributes: {} }, [{ t: 'Str', c: 'Architecture' }]] },
-                { t: 'Para', c: [ { t: 'Str', c: 'Arch' }, { t: 'Space' }, { t: 'Str', c: 'content' } ] },
-                { t: 'Header', c: [3, { id: 'h3-components', classes: [], attributes: {} }, [{ t: 'Str', c: 'Components' }]] },
-                { t: 'Para', c: [ { t: 'Str', c: 'Components' }, { t: 'Space' }, { t: 'Str', c: 'content' } ] },
-              ]
-            }
-          }
-
-          // Update local store so it works even without WS connectivity
-          setManifest(manifest as DocManifest)
-          upsertSection(section as SectionBundle)
-
-          // Broadcast over WS so other connected clients receive it
-          try {
-            const w = workerRef.current
-            if (w) {
-              w.postMessage({ type: 'send', html: JSON.stringify({ kind: 'manifest', manifest }) })
-              w.postMessage({ type: 'send', html: JSON.stringify({ kind: 'ast_section', section: section.section, doc: section.doc }) })
-            }
-          } catch {}
-        }} onToggleSidebar={toggleSidebar} />
+          onToggleSidebar={toggleSidebar} />
         {state.manifest ? (
           <VirtualReader docId={docId} manifest={state.manifest} sections={state.sections} />
         ) : (() => {

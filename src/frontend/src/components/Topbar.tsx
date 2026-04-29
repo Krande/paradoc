@@ -1,11 +1,13 @@
 import React from 'react'
 import { useSourceDisplayStore } from '../store/sourceDisplayStore'
 import { WebsocketStatusMenu } from './WebsocketStatusMenu'
+import { DocSwitcher } from './DocSwitcher'
 
 export function Topbar({
                            connected,
                            frontendId,
-                           onSendMock,
+                           docId,
+                           onSelectDoc,
                            onToggleSidebar,
                            processInfo,
                            connectedFrontends,
@@ -14,7 +16,8 @@ export function Topbar({
                        }: {
     connected: boolean
     frontendId: string
-    onSendMock: () => void
+    docId: string
+    onSelectDoc: (docId: string) => void
     onToggleSidebar: () => void
     processInfo: { pid: number; thread_id: number } | null
     connectedFrontends: string[]
@@ -71,12 +74,7 @@ export function Topbar({
                         </svg>
                         Source
                     </button>
-                    <button
-                        className="cursor-pointer text-xs font-medium px-3 py-1.5 rounded-md bg-gray-900 text-white hover:bg-gray-800 transition"
-                        onClick={onSendMock}
-                    >
-                        Send Mock
-                    </button>
+                    <DocSwitcher currentDocId={docId} onSelect={onSelectDoc} />
                 </div>
             </div>
         </header>

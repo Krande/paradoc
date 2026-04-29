@@ -63,8 +63,11 @@ export function useSectionStore() {
 
   const setManifest = (m: DocManifest) => setState((s) => ({ ...s, manifest: m, order: m.sections.map((x) => x.id) }))
   const upsertSection = (b: SectionBundle) => setState((s) => ({ ...s, sections: { ...s.sections, [b.section.id]: b } }))
+  // Drop manifest + section cache so the REST loader's `if (state.manifest) return`
+  // guard releases and refetches for the newly-selected doc.
+  const resetSections = () => setState({ manifest: null, sections: {}, order: [] })
 
-  return { state, setManifest, upsertSection }
+  return { state, setManifest, upsertSection, resetSections }
 }
 
 export async function fetchManifest(docId: string): Promise<DocManifest> {
