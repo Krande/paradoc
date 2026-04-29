@@ -8,6 +8,7 @@ glbs efficiently from S3-backed deployments.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, Optional
 
 from paradoc.docstore import DocStore
@@ -19,6 +20,7 @@ def create_app(
     *,
     doc_store: DocStore,
     auth_policy: Optional[AuthPolicy] = None,
+    static_dir: Optional[Path] = None,
 ):
     """Build the FastAPI app. Imports FastAPI lazily so this module is
     importable without the `serve` extra installed.
@@ -105,5 +107,13 @@ def create_app(
                 "X-Paradoc-Camera-Pos": meta.camera_pos,
             },
         )
+
+    # Mount the SPA last so the API routes above keep precedence. With
+    # html=True a bare GET / returns index.html (the build:standalone
+    # output is a single file, so deep-link fallback isn't needed).
+    if static_dir is not None and static_dir.is_dir():
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
 
     return app

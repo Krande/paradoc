@@ -32,6 +32,7 @@ COPY --from=frontend-build /frontend/dist /app/static
 
 ENV PYTHONPATH=/app/src \
     PARADOC_BUNDLE=/data/bundle \
+    PARADOC_STATIC_DIR=/app/static \
     PARADOC_HOST=0.0.0.0 \
     PARADOC_PORT=8000
 

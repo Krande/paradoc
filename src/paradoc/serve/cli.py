@@ -14,6 +14,7 @@ S3 URLs require `obstore` (install the `serve` extra).
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 import typer
 
@@ -33,6 +34,12 @@ def serve(
         False,
         "--require-auth",
         help="Reject requests without an authenticated principal header.",
+    ),
+    static_dir: Optional[Path] = typer.Option(
+        None,
+        "--static-dir",
+        envvar="PARADOC_STATIC_DIR",
+        help="Directory containing the SPA bundle to mount at /. Skipped when unset.",
     ),
 ) -> None:
     """Start the REST server."""
@@ -55,7 +62,7 @@ def serve(
         store = LocalDocStore(Path(bundle), db_filename=db_filename)
 
     policy = IngressTrustPolicy(require_principal=require_auth)
-    fastapi_app = create_app(doc_store=store, auth_policy=policy)
+    fastapi_app = create_app(doc_store=store, auth_policy=policy, static_dir=static_dir)
     uvicorn.run(fastapi_app, host=host, port=port)
 
 
