@@ -31,7 +31,13 @@ from .db.plot_renderer import PlotRenderer
 from .equations import Equation
 from .exceptions import LatexNotInstalled
 from .io.ast.exporter import ASTExporter
+from .pandoc_helper import ensure_pandoc_path
 from .utils import get_list_of_files
+
+# Used to be called from paradoc/__init__.py at import time. Moved here so the
+# serve path (which imports paradoc.serve.cli) doesn't trigger it. Importers
+# of OneDoc still get pandoc on PYPANDOC_PANDOC the same as before.
+ensure_pandoc_path()
 
 if TYPE_CHECKING:
     from .io.pdf.exporter import PdfExporter
