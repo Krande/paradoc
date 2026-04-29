@@ -34,6 +34,11 @@ prod = { features = ["prod"], solve-group = "prod", no-default-feature = true }
 serve = { features = ["serve"], solve-group = "prod", no-default-feature = true }
 # `examples` env: `prod` (compile deps) + obstore for the uploader.
 examples = { features = ["examples", "prod"], solve-group = "prod", no-default-feature = true }
+# `examples-figs` env: same as `examples` plus ada-py for the
+# figure-sources example (STEP → glb + PNG rendering at compile time).
+# Walled off so the lightweight `examples` env stays slim and the
+# heavy CAD/OCC stack only inflates the one env that actually needs it.
+examples-figs = { features = ["examples", "examples-figs", "prod"], solve-group = "prod", no-default-feature = true }
 test-core = { features = ["test-core"], solve-group = "prod", no-default-feature = true }
 test = { features = ["test", "test-core", "prod"], solve-group = "prod", no-default-feature = true }
 profile = { features = ["profile", "prod","test-core"], solve-group = "prod", no-default-feature = true }
@@ -72,6 +77,19 @@ obstore = ">=0.3"
 [feature.examples.tasks]
 compile-examples = { cmd = "python scripts/compile_examples.py", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" } }
 upload-examples = { cmd = "python scripts/upload_examples.py", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }, depends-on = ["compile-examples"] }
+
+[feature.examples-figs.dependencies]
+# adapy + its native CAD/OCC stack. Heavy (~1.5 GiB), so only this env
+# carries it — the regular `examples` compile and the runtime `serve`
+# image both stay free of this dependency.
+ada-py = "*"
+
+[feature.examples-figs.tasks]
+# Builds JUST doc_figure_sources into dist/examples/. The
+# `compile-examples` task above bakes the lightweight set; this task
+# bakes the figure-sources example. Both write into the same
+# dist/examples/ tree so `upload-examples` picks them up together.
+compile-examples-figs = { cmd = "python scripts/compile_examples.py doc_figure_sources", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" } }
 
 [feature.serve.dependencies]
 # Runtime deps for `paradoc-serve` — kept to a minimum so the container

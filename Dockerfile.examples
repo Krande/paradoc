@@ -13,9 +13,12 @@ ARG PIXI_VERSION=0.67.0
 FROM ghcr.io/prefix-dev/pixi:${PIXI_VERSION}
 WORKDIR /work
 
-# Solve env first so source-only edits don't bust the heavy layer cache.
+# Solve envs first so source-only edits don't bust the heavy layer
+# cache. Two envs: `examples` for the lightweight set, `examples-figs`
+# for the figure-sources example (it pulls ada-py + native CAD libs).
 COPY pixi.toml pixi.lock pyproject.toml ./
-RUN pixi install --environment examples --locked
+RUN pixi install --environment examples --locked && \
+    pixi install --environment examples-figs --locked
 
 # Source + scripts + the source-of-truth examples.
 COPY src ./src
@@ -23,8 +26,11 @@ COPY scripts ./scripts
 COPY files ./files
 
 # Compile bundles at build time so the image already contains
-# dist/examples/<doc_id>/_build when `docker run` lands.
-RUN pixi run --environment examples compile-examples
+# dist/examples/<doc_id>/_build when `docker run` lands. Both passes
+# write into the same dist/examples/ tree so the uploader picks them
+# up together.
+RUN pixi run --environment examples compile-examples && \
+    pixi run --environment examples-figs compile-examples-figs
 
 # Default command uploads. Override on `docker run` if you want to drop
 # into a shell to inspect the baked bundles instead.
