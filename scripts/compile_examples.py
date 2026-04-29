@@ -55,12 +55,40 @@ def _setup_doc_table(od: "pa.OneDoc") -> None:
     od.add_table("my_table_5", df, "No Space 3")
 
 
+def _setup_doc_math(od: "pa.OneDoc") -> None:
+    """`files/doc_math/` references {{__my_equation_1__}}, {{__my_equation_2__}},
+    {{__results__}}, {{__results_2__}}; register equations + result tables.
+    Mirrors tests/equations/test_doc_math.py."""
+    from paradoc.utils import make_df
+
+    def my_calc_example_1(a, b):
+        """A calculation with doc stub"""
+        V_x = a + 1 * (0.3 + a * b) ** 2
+        return V_x
+
+    def my_calc_example_2(a, b):
+        """A calculation with a longer doc stub"""
+        V_n = a + 1 * (0.16 + a * b) ** 2
+        V_x = V_n * 0.98
+        return V_x
+
+    inputs = [(0, 0), (1, 1), (2, 1), (2, 2)]
+    df1 = make_df(inputs, ("a", "b", "V_x"), my_calc_example_1)
+    df2 = make_df(inputs, ("a", "b", "V_x"), my_calc_example_2)
+
+    od.add_equation("my_equation_1", my_calc_example_1, include_python_code=True)
+    od.add_equation("my_equation_2", my_calc_example_2)
+    od.add_table("results", df1, "Results from Equation my_equation")
+    od.add_table("results_2", df2, "Results from Equation my_equation_2")
+
+
 # Per-doc setup hooks. Examples that need build-time inputs (tables,
 # plots, equations) register a callback here. Examples whose markdown is
-# self-contained — doc_math, doc_regular_table, doc_bullet_points — are
-# omitted and compile straight through.
+# self-contained — doc_regular_table, doc_bullet_points — are omitted
+# and compile straight through.
 SETUP_HOOKS: dict[str, Callable[["pa.OneDoc"], None]] = {
     "doc_table": _setup_doc_table,
+    "doc_math": _setup_doc_math,
 }
 
 
