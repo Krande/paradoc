@@ -67,6 +67,37 @@ export function renderDiv(b: any, renderBlock: (b: any, k?: React.Key, hn?: Head
   return <div key={key} {...divAttrs}>{blocks.map((bb, j) => renderBlock(bb, j))}</div>
 }
 
+// Walk a Figure's content looking for an Image whose Pandoc attrs carry
+// `data-3d-key=...`. The bracket-attr syntax in `![cap](png){...}` puts
+// the attr on the Image, not the surrounding Figure block, so we have
+// to descend into Plain/Para wrappers to find it.
+function findThreeDKeyInBlocks(blocks: PandocBlock[] | unknown): string | undefined {
+  if (!Array.isArray(blocks)) return undefined
+  for (const block of blocks) {
+    const found = findThreeDKeyInNode(block)
+    if (found) return found
+  }
+  return undefined
+}
+
+function findThreeDKeyInNode(node: any): string | undefined {
+  if (!node || typeof node !== 'object') return undefined
+  if (node.t === 'Image') {
+    // Image: c = [Attr, [inlines], [src, title]]
+    const a = Array.isArray(node.c) ? node.c[0] : undefined
+    return attrs(a)['data-3d-key']
+  }
+  // Recurse into common inline/block containers.
+  const c = (node as any).c
+  if (Array.isArray(c)) {
+    for (const child of c) {
+      const found = findThreeDKeyInNode(child)
+      if (found) return found
+    }
+  }
+  return undefined
+}
+
 /**
  * Render a Figure block (Pandoc v3+ with proper caption support)
  */
@@ -115,7 +146,12 @@ export function renderFigure(b: any, renderBlock: (b: any, k?: React.Key, hn?: H
   }
 
   // 3D figures get routed to the lazy-loading Interactive3DFigure first.
-  const threeDKey = figAttrs['data-3d-key']
+  // Pandoc attaches `{data-3d-key=...}` to the *Image* inside the figure
+  // (since that's where the bracket-attr syntax in `![cap](png){...}` is
+  // parsed), not to the outer Figure block. Probe both: figure attr first
+  // for forward-compat, then walk the content for the first Image whose
+  // attrs carry the key.
+  const threeDKey = figAttrs['data-3d-key'] || findThreeDKeyInBlocks(content)
   if (threeDKey && docId) {
     const caption = captionInlines && captionInlines.length > 0 ? renderInlines(captionInlines as any) : undefined
     return (
