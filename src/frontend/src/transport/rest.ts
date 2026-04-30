@@ -71,19 +71,29 @@ export class RESTTransport implements AssetTransport {
       knownSha = meta?.sha256
     }
 
+    // Only send If-None-Match when we actually have the blob locally.
+    // The server returns 304 purely on header match — without a cached
+    // blob, that 304 leaves us with nothing to render and an error
+    // ("cache hit but local cache missing"). Probing IndexedDB first
+    // costs one DB read but keeps the round-trip safe even after the
+    // user wipes site data or visits the doc for the first time.
     const url = this.url(`/api/docs/${encodeURIComponent(docId)}/3d/${encodeURIComponent(key)}/blob`)
     const headers: HeadersInit = {}
-    if (knownSha) headers['If-None-Match'] = `"${knownSha}"`
+    const cachedBlob = knownSha
+      ? await dbGet<ArrayBuffer>('three_d_blob' as any, knownSha)
+      : undefined
+    if (knownSha && cachedBlob) headers['If-None-Match'] = `"${knownSha}"`
 
     const res = await fetch(url, { headers })
 
     if (res.status === 304) {
-      const cached = await dbGet<ArrayBuffer>('three_d_blob' as any, knownSha!)
+      // We only sent the header when cachedBlob was present, so this
+      // branch is the happy path: serve the cached bytes back.
       const meta = await this.getThreeDMeta(docId, key)
-      if (!cached || !meta) {
+      if (!cachedBlob || !meta) {
         throw new Error('server reported cache hit but local cache is missing')
       }
-      return { ...meta, bytes: new Uint8Array(cached) }
+      return { ...meta, bytes: new Uint8Array(cachedBlob) }
     }
 
     if (!res.ok) throw new Error(`3d blob fetch failed: ${res.status}`)
