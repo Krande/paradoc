@@ -17,9 +17,16 @@ WORKDIR /work
 # (see `[feature.examples-figs.pypi-dependencies]`); the prefix-dev
 # pixi image is Ubuntu-slim and ships no git, so the clone fails with
 # "Git executable not found" and the whole build aborts before any
-# example doc compiles. Same layer also clears the apt cache.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends git ca-certificates \
+# example doc compiles.
+#
+# We rewrite Ubuntu's mirrors to HTTPS first because the Forgejo
+# runner's build sandbox blocks plain-HTTP egress (so the default
+# http://archive.ubuntu.com fails with apt exit 100) but HTTPS works
+# fine — that's how `pixi install` reaches conda/pypi in the same
+# image. ca-certificates already ships in the base.
+RUN sed -i 's|http://archive.ubuntu.com|https://archive.ubuntu.com|g; s|http://security.ubuntu.com|https://security.ubuntu.com|g' /etc/apt/sources.list.d/*.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
 
 # Solve envs first so source-only edits don't bust the heavy layer
