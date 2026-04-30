@@ -212,6 +212,19 @@ def create_app(
             raise HTTPException(status_code=404, detail=f"plot {key!r} not found")
         return JSONResponse(content=json.loads(plot.model_dump_json()))
 
+    @app.get("/api/docs/{doc_id}/presets")
+    async def get_presets(doc_id: str, request: Request):
+        # Camera preset table the 3D viewer needs to mirror the static
+        # PNG's framing. Empty `{}` (rather than 404) when the bundle
+        # has none, so the frontend can fall back to a hardcoded
+        # default without spamming the console with a missing-asset
+        # error.
+        _authorize(doc_id, request)
+        data = doc_store.get_presets_bytes(doc_id)
+        if data is None:
+            return JSONResponse(content={})
+        return Response(content=data, media_type="application/json")
+
     @app.get("/api/docs/{doc_id}/3d/{key}/meta")
     async def get_3d_meta(doc_id: str, key: str, request: Request):
         _authorize(doc_id, request)

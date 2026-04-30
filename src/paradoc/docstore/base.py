@@ -104,3 +104,11 @@ class DocStore(ABC):
         """Return the raw bytes of `static/images.json` (embedded base64 image
         payloads keyed by image path)."""
         return None
+
+    def get_presets_bytes(self, doc_id: str) -> Optional[bytes]:
+        """Return the raw bytes of `assets/presets.json` — the camera
+        preset map adapy emits at compile time. The 3D viewer needs this
+        to mirror the static PNG's camera framing (preset names alone
+        aren't enough; the viewer needs `distance`, `target`, etc.).
+        """
+        return None

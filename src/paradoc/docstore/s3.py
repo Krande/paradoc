@@ -216,6 +216,9 @@ class S3DocStore(DocStore):
     def get_static_images_bytes(self, doc_id: str) -> Optional[bytes]:
         return self._fetch_object(self._key(doc_id, "static", "images.json"))
 
+    def get_presets_bytes(self, doc_id: str) -> Optional[bytes]:
+        return self._fetch_object(self._key(doc_id, "assets", "presets.json"))
+
     def _fetch_object(self, key: str) -> Optional[bytes]:
         try:
             payload = self._store.get(key).bytes()

@@ -99,6 +99,15 @@ class LocalDocStore(DocStore):
     def get_static_images_bytes(self, doc_id: str) -> Optional[bytes]:
         return self._read_static(doc_id, "images.json")
 
+    def get_presets_bytes(self, doc_id: str) -> Optional[bytes]:
+        bundle = self._bundle_dir(doc_id)
+        path = (bundle / "assets" / "presets.json").resolve()
+        if not path.is_relative_to(bundle):
+            raise PermissionError("presets path escapes bundle")
+        if not path.is_file():
+            return None
+        return path.read_bytes()
+
     def _read_static(self, doc_id: str, rel: str) -> Optional[bytes]:
         bundle = self._bundle_dir(doc_id)
         path = (bundle / "static" / rel).resolve()
