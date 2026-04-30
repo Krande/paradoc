@@ -1,5 +1,6 @@
 import React from 'react'
 import { getAssetTransport, getRuntimeConfig } from '../transport'
+import { useViewerControlsStore } from '../store/viewerControlsStore'
 import type { CameraPreset } from '../../vendor/ada-viewer'
 
 interface ThreeDRendererProps {
@@ -23,9 +24,6 @@ function loadPresets(docId: string): Promise<Record<string, CameraPreset>> {
   if (cached) return cached
   const p = (async () => {
     const cfg = getRuntimeConfig()
-    // REST mode hits the dedicated per-doc endpoint. Static / WS
-    // builds keep using the page-relative path so single-file HTML
-    // bundles still resolve.
     let url: string
     if (cfg.transport === 'rest') {
       url = (cfg.apiBase || '').replace(/\/?$/, '') +
@@ -44,16 +42,10 @@ function loadPresets(docId: string): Promise<Record<string, CameraPreset>> {
       const raw = (await res.json()) as Record<string, Omit<CameraPreset, 'name'>>
       const out: Record<string, CameraPreset> = {}
       for (const [name, body] of Object.entries(raw)) out[name] = { name, ...body }
-      // Empty payload (server returns `{}` when bundle has no presets)
-      // — drop into the same fallback as a fetch failure so the viewer
-      // never tries to use a no-distance/no-target camera.
       if (Object.keys(out).length === 0) throw new Error('empty presets')
       return out
     } catch (e) {
       console.warn('[ThreeDRenderer] failed to load presets; using fallback', e)
-      // Hardcoded mirror of paradoc.camera.presets["iso_3"] — keeps
-      // distance:"fit" + target:"bbox_center" so the viewer at least
-      // frames the model instead of staring at the origin.
       const fallback: Record<string, CameraPreset> = {
         iso_3: {
           name: 'iso_3',
@@ -78,7 +70,13 @@ export function ThreeDRenderer({ threeDKey, docId, caption }: ThreeDRendererProp
   const viewerRef = React.useRef<ViewerHandle | null>(null)
   const [progress, setProgress] = React.useState<{ received: number; total: number } | null>(null)
   const [error, setError] = React.useState<string | null>(null)
+  const { enabled: showControls } = useViewerControlsStore()
 
+  // Re-mount the viewer whenever the global "show adapy controls"
+  // toggle flips, so the navbar + selection tree appear/disappear.
+  // We refetch presets and binary on every toggle today; once the
+  // vendor viewer exposes a runtime-toggle API we can switch to
+  // calling that without the remount.
   React.useEffect(() => {
     let canceled = false
     const transport = getAssetTransport()
@@ -100,10 +98,19 @@ export function ThreeDRenderer({ threeDKey, docId, caption }: ThreeDRendererProp
         if (canceled) return
         const camera = presets[payload.cameraPos] || Object.values(presets)[0]
         if (!containerRef.current) return
+        try {
+          viewerRef.current?.dispose()
+        } catch {}
         viewerRef.current = mountViewer(containerRef.current, {
           modelBytes: payload.bytes,
           camera,
           caption: caption || payload.caption,
+          // The vendor build today ignores `showControls`; this becomes
+          // live once adapy ships a navbar/tree-aware vendor bundle.
+          // Until then, the toggle in the topbar is a no-op visually
+          // but the option is plumbed through so we don't have to
+          // touch this component again later.
+          showControls,
           onError: (err) => !canceled && setError(err.message),
         })
       } catch (err: any) {
@@ -119,7 +126,7 @@ export function ThreeDRenderer({ threeDKey, docId, caption }: ThreeDRendererProp
       } catch {}
       viewerRef.current = null
     }
-  }, [threeDKey, docId, caption])
+  }, [threeDKey, docId, caption, showControls])
 
   if (error) {
     return (
@@ -133,12 +140,8 @@ export function ThreeDRenderer({ threeDKey, docId, caption }: ThreeDRendererProp
   return (
     <div className="my-4 w-full">
       {/* The vendor viewer reads clientWidth/clientHeight to size its
-          canvas. Without an explicit aspect ratio + max-width=100% the
-          canvas grows to whatever intrinsic width the WebGLRenderer
-          picks (often the device pixel ratio × something), which on
-          mobile blows past the viewport. Pinning the wrapper to the
-          parent's flow width and giving it a stable aspect ratio
-          gives the viewer a deterministic box to render into. */}
+          canvas. Pinning aspect-ratio + max-w-full keeps the canvas
+          inside the viewport on mobile. */}
       <div
         ref={containerRef}
         className="border border-gray-300 rounded bg-white w-full max-w-full overflow-hidden"

@@ -12,6 +12,15 @@ export interface MountViewerOptions {
     modelBytes: Uint8Array;
     camera: CameraPreset;
     caption?: string;
+    /**
+     * Show adapy's native viewer controls (top navbar, selection tree,
+     * object/group info panels). The vendor bundle currently shipped
+     * with paradoc renders only the canvas + OrbitControls and ignores
+     * this flag; it becomes live once a richer vendor build is dropped
+     * in. Plumbing the option here so consumers don't have to re-call
+     * mountViewer differently when that lands.
+     */
+    showControls?: boolean;
     onReady?: () => void;
     onError?: (err: Error) => void;
 }

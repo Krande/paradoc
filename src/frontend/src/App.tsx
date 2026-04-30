@@ -15,6 +15,7 @@ import { VirtualReader } from './components/VirtualReader'
 import { DocList } from './components/DocList'
 import { calculateHeadingNumbers } from './ast/headingNumbers'
 import { SourceDisplayProvider } from './store/sourceDisplayStore'
+import { ViewerControlsProvider } from './store/viewerControlsStore'
 
 function AppContent() {
   const {
@@ -347,7 +348,9 @@ function AppContent() {
 export default function App() {
   return (
     <SourceDisplayProvider>
-      <AppContent />
+      <ViewerControlsProvider>
+        <AppContent />
+      </ViewerControlsProvider>
     </SourceDisplayProvider>
   )
 }

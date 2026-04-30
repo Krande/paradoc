@@ -1,6 +1,7 @@
 import React from 'react'
 import { AboutModal } from './AboutModal'
 import { UserInfoModal } from './UserInfoModal'
+import { useViewerControlsStore } from '../store/viewerControlsStore'
 
 interface OverflowMenuProps {
   // Mobile-only inline controls that we want available even when the
@@ -30,6 +31,8 @@ export function OverflowMenu({
   const [aboutOpen, setAboutOpen] = React.useState(false)
   const [userOpen, setUserOpen] = React.useState(false)
   const ref = React.useRef<HTMLDivElement>(null)
+  const { enabled: viewerControlsEnabled, toggleEnabled: toggleViewerControls } =
+    useViewerControlsStore()
 
   React.useEffect(() => {
     if (!open) return
@@ -113,6 +116,20 @@ export function OverflowMenu({
             <button
               role="menuitem"
               onClick={() => {
+                toggleViewerControls()
+              }}
+              className="cursor-pointer w-full text-left px-3 py-2 hover:bg-gray-100 flex items-center justify-between"
+              title="Show adapy's native viewer controls (top navbar, selection tree, object/group info)"
+            >
+              <span>3D viewer controls</span>
+              <span className={`text-xs ${viewerControlsEnabled ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
+                {viewerControlsEnabled ? 'on' : 'off'}
+              </span>
+            </button>
+
+            <button
+              role="menuitem"
+              onClick={() => {
                 setAboutOpen(true)
                 setOpen(false)
               }}
@@ -129,15 +146,6 @@ export function OverflowMenu({
               className="cursor-pointer w-full text-left px-3 py-2 hover:bg-gray-100"
             >
               User info
-            </button>
-            <button
-              role="menuitem"
-              disabled
-              className="w-full text-left px-3 py-2 text-gray-400 cursor-not-allowed flex items-center justify-between"
-              title="Admin panel — coming soon"
-            >
-              <span>Admin</span>
-              <span className="text-xs italic">soon</span>
             </button>
           </div>
         )}
