@@ -2,6 +2,8 @@ import React from 'react'
 import { useSourceDisplayStore } from '../store/sourceDisplayStore'
 import { WebsocketStatusMenu } from './WebsocketStatusMenu'
 import { DocSwitcher } from './DocSwitcher'
+import { OverflowMenu } from './OverflowMenu'
+import { useDocList } from './useDocList'
 import { getRuntimeConfig } from '../transport'
 
 export function Topbar({
@@ -31,10 +33,15 @@ export function Topbar({
     // connected. Show a plain title instead so the topbar still
     // identifies the app.
     const isRestMode = getRuntimeConfig().transport === 'rest'
+    const { allDocs } = useDocList()
 
     return (
         <header id="paradoc-topbar" className="sticky top-0 z-10 bg-white/70 backdrop-blur border-b border-gray-200">
-            <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+            {/* `min-w-0` on flex children + tighter padding on mobile keeps
+                the row from overflowing the viewport on phones. The
+                inline Source/DocSwitcher controls move into the kebab
+                menu via `hidden sm:flex`. */}
+            <div className="max-w-full mx-auto px-2 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-2 min-w-0">
                 <div className="flex items-center gap-3">
                     <button
                         className="cursor-pointer -ml-2 inline-flex items-center justify-center rounded p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -62,9 +69,9 @@ export function Topbar({
                     )}
 
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <button
-                        className={`cursor-pointer text-xs font-medium px-3 py-1.5 rounded-md transition ${
+                        className={`hidden sm:inline-flex cursor-pointer text-xs font-medium px-3 py-1.5 rounded-md transition items-center ${
                             sourceDisplayEnabled
                                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -84,7 +91,16 @@ export function Topbar({
                         </svg>
                         Source
                     </button>
-                    <DocSwitcher currentDocId={docId} onSelect={onSelectDoc} />
+                    <div className="hidden sm:block">
+                        <DocSwitcher currentDocId={docId} onSelect={onSelectDoc} />
+                    </div>
+                    <OverflowMenu
+                        sourceDisplayEnabled={sourceDisplayEnabled}
+                        onToggleSourceDisplay={toggleSourceDisplay}
+                        docs={allDocs}
+                        currentDocId={docId}
+                        onSelectDoc={onSelectDoc}
+                    />
                 </div>
             </div>
         </header>

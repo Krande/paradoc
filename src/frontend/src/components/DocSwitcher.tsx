@@ -1,66 +1,20 @@
 import React from 'react'
-import { getRuntimeConfig } from '../transport'
-
-interface DocGroup {
-  key: string
-  label: string
-  docs: string[]
-}
-
-interface DocsResponse {
-  docs?: string[]
-  groups?: DocGroup[]
-}
+import { useDocList } from './useDocList'
 
 interface DocSwitcherProps {
   currentDocId: string
   onSelect: (docId: string) => void
 }
 
-function joinUrl(base: string, path: string): string {
-  return base.replace(/\/?$/, '') + path
-}
-
 // Topbar dropdown for switching between docs published by the same
 // paradoc-serve. Renders nothing in WS mode (no /api/docs) and renders
 // nothing if the API came back empty — better than a stuck-loading UI.
 export function DocSwitcher({ currentDocId, onSelect }: DocSwitcherProps) {
-  const [groups, setGroups] = React.useState<DocGroup[]>([])
-  const [flat, setFlat] = React.useState<string[]>([])
-  const [loaded, setLoaded] = React.useState(false)
-
-  React.useEffect(() => {
-    const cfg = getRuntimeConfig()
-    if (cfg.transport !== 'rest') {
-      setLoaded(true)
-      return
-    }
-    let canceled = false
-    ;(async () => {
-      try {
-        const res = await fetch(joinUrl(cfg.apiBase || '', '/api/docs'), { cache: 'no-store' })
-        if (!res.ok) return
-        const body = (await res.json()) as DocsResponse
-        if (canceled) return
-        setGroups(body.groups || [])
-        setFlat(body.docs || [])
-      } catch {
-        // Silent — switcher just stays hidden.
-      } finally {
-        if (!canceled) setLoaded(true)
-      }
-    })()
-    return () => {
-      canceled = true
-    }
-  }, [])
+  const { loaded, groups, flat, allDocs } = useDocList()
 
   if (!loaded) return null
 
-  // Hide entirely when there's nothing to switch to. Showing a single-
-  // option dropdown next to the doc title is just visual noise.
-  const totalDocs = (groups.reduce((n, g) => n + g.docs.length, 0)) || flat.length
-  if (totalDocs <= 1) return null
+  if (allDocs.length <= 1) return null
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = e.target.value
