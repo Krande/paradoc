@@ -69,7 +69,14 @@ export function DocSwitcher({ currentDocId, onSelect }: DocSwitcherProps) {
 
   return (
     <select
-      className="cursor-pointer text-xs font-medium px-2 py-1.5 rounded-md bg-white border border-gray-300 text-gray-800 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[18rem]"
+      // Match the Source button (gray pill, same padding/text size) so
+      // both controls feel like the same toolbar family. `pr-7` leaves
+      // room for the native chevron the rounded variant tucks tight.
+      className="cursor-pointer text-xs font-medium pl-3 pr-7 py-1.5 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 transition focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[18rem] appearance-none bg-no-repeat bg-[right_0.5rem_center] bg-[length:0.75rem]"
+      style={{
+        backgroundImage:
+          "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20' stroke='%23374151' stroke-width='1.6'><path stroke-linecap='round' stroke-linejoin='round' d='M6 8l4 4 4-4'/></svg>\")",
+      }}
       value={currentDocId}
       onChange={handleChange}
       aria-label="Switch document"

@@ -2,6 +2,7 @@ import React from 'react'
 import { useSourceDisplayStore } from '../store/sourceDisplayStore'
 import { WebsocketStatusMenu } from './WebsocketStatusMenu'
 import { DocSwitcher } from './DocSwitcher'
+import { getRuntimeConfig } from '../transport'
 
 export function Topbar({
                            connected,
@@ -25,6 +26,11 @@ export function Topbar({
     workerRef: React.RefObject<Worker | null>
 }) {
     const { enabled: sourceDisplayEnabled, toggleEnabled: toggleSourceDisplay } = useSourceDisplayStore()
+    // The WS status pill (connection dot, "i" info popover, kill-server
+    // button) is meaningless in REST mode — the worker isn't even
+    // connected. Show a plain title instead so the topbar still
+    // identifies the app.
+    const isRestMode = getRuntimeConfig().transport === 'rest'
 
     return (
         <header id="paradoc-topbar" className="sticky top-0 z-10 bg-white/70 backdrop-blur border-b border-gray-200">
@@ -42,14 +48,18 @@ export function Topbar({
                                   d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
                         </svg>
                     </button>
-                    <WebsocketStatusMenu
-                        connected={connected}
-                        frontendId={frontendId}
-                        processInfo={processInfo}
-                        connectedFrontends={connectedFrontends}
-                        logFilePath={logFilePath}
-                        workerRef={workerRef}
-                    />
+                    {isRestMode ? (
+                        <h1 className="text-sm font-semibold tracking-wide text-gray-700">Paradoc Reader</h1>
+                    ) : (
+                        <WebsocketStatusMenu
+                            connected={connected}
+                            frontendId={frontendId}
+                            processInfo={processInfo}
+                            connectedFrontends={connectedFrontends}
+                            logFilePath={logFilePath}
+                            workerRef={workerRef}
+                        />
+                    )}
 
                 </div>
                 <div className="flex items-center gap-3">
