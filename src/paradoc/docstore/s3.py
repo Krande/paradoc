@@ -246,7 +246,12 @@ class S3DocStore(DocStore):
             offset = 0
             while offset < meta.size:
                 end = min(offset + chunk_size, meta.size) - 1
-                payload = store.get_range(s3_key, start=offset, end=end + 1).bytes()
+                # `get_range` returns an obstore `Bytes` object directly
+                # (unlike `get`, which wraps a `GetResult` you'd then call
+                # `.bytes()` on). Calling `.bytes()` here raises
+                # AttributeError and the whole HTTP/2 stream resets with
+                # INTERNAL_ERROR before any bytes hit the client.
+                payload = store.get_range(s3_key, start=offset, end=end + 1)
                 yield bytes(payload)
                 offset = end + 1
 
