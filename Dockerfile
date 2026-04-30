@@ -33,11 +33,22 @@ COPY src/paradoc /app/src/paradoc
 # Static SPA bundle from stage 1, served alongside the API by Traefik.
 COPY --from=frontend-build /frontend/dist /app/static
 
+# Build identity. The CI workflow passes --build-arg BUILD_SHA=$GITHUB_SHA
+# (and BUILD_TAG / BUILD_TIME) so the running pod can self-report what
+# image it is via /api/info — useful for the About panel in the UI and
+# when debugging "is my fix actually live yet?".
+ARG BUILD_SHA=unknown
+ARG BUILD_TAG=unknown
+ARG BUILD_TIME=unknown
+
 ENV PYTHONPATH=/app/src \
     PARADOC_BUNDLE=/data/bundle \
     PARADOC_STATIC_DIR=/app/static \
     PARADOC_HOST=0.0.0.0 \
-    PARADOC_PORT=8000
+    PARADOC_PORT=8000 \
+    PARADOC_BUILD_SHA=$BUILD_SHA \
+    PARADOC_BUILD_TAG=$BUILD_TAG \
+    PARADOC_BUILD_TIME=$BUILD_TIME
 
 EXPOSE 8000
 

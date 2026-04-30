@@ -9,6 +9,43 @@ that actually invoke pypandoc (see paradoc/document.py).
 
 from typing import TYPE_CHECKING
 
+
+def _resolve_version() -> str:
+    """Best-effort `__version__` lookup.
+
+    The serve container runs paradoc off PYTHONPATH (no pip install),
+    so `importlib.metadata.version("paradoc")` raises PackageNotFound.
+    Fall back to parsing `pyproject.toml` next to the source tree, then
+    to "unknown" so the About panel never crashes.
+    """
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+
+        try:
+            return version("paradoc")
+        except PackageNotFoundError:
+            pass
+    except Exception:
+        pass
+
+    try:
+        import pathlib
+        import re
+
+        pyproject = pathlib.Path(__file__).resolve().parent.parent.parent / "pyproject.toml"
+        if pyproject.is_file():
+            text = pyproject.read_text(encoding="utf-8")
+            m = re.search(r'^\s*version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+            if m:
+                return m.group(1)
+    except Exception:
+        pass
+
+    return "unknown"
+
+
+__version__ = _resolve_version()
+
 if TYPE_CHECKING:
     from .common import MY_DOCX_TMPL, MY_DOCX_TMPL_BLANK
     from .document import OneDoc

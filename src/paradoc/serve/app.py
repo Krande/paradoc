@@ -13,12 +13,51 @@ were lazy strings, causing every `request: Request` route to 422 with
 """
 
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
 from paradoc.docstore import DocStore
 
 from .auth import AuthPolicy, IngressTrustPolicy
+
+
+def _pkg_version(name: str) -> Optional[str]:
+    """Best-effort package version lookup; returns None if not installed."""
+    try:
+        from importlib.metadata import PackageNotFoundError, version as _v
+
+        try:
+            return _v(name)
+        except PackageNotFoundError:
+            return None
+    except Exception:
+        return None
+
+
+def _build_info() -> dict[str, Any]:
+    """Snapshot the runtime + image identity. Computed once at app build.
+
+    `image_sha` and `image_tag` come from env vars the Docker build bakes
+    in (see Dockerfile `PARADOC_BUILD_SHA` / `PARADOC_BUILD_TAG`); fall
+    back to "unknown" when running outside the container so local dev
+    doesn't crash on missing values.
+    """
+    import paradoc as _paradoc
+
+    return {
+        "paradoc_version": getattr(_paradoc, "__version__", _pkg_version("paradoc")),
+        "python_version": sys.version.split()[0],
+        "python_full_version": sys.version,
+        "platform": sys.platform,
+        "fastapi_version": _pkg_version("fastapi"),
+        "uvicorn_version": _pkg_version("uvicorn"),
+        "obstore_version": _pkg_version("obstore"),
+        "image_sha": os.environ.get("PARADOC_BUILD_SHA") or "unknown",
+        "image_tag": os.environ.get("PARADOC_BUILD_TAG") or "unknown",
+        "build_time": os.environ.get("PARADOC_BUILD_TIME") or "unknown",
+    }
 
 
 def create_app(
@@ -52,9 +91,40 @@ def create_app(
         if not decision.allowed:
             raise HTTPException(status_code=decision.status_code, detail=decision.reason)
 
+    # Compute build info once at app create. Env vars don't change after
+    # process start, so caching at the closure level is safe and saves a
+    # few µs per /api/info call.
+    _info_snapshot = _build_info()
+
     @app.get("/api/health")
     async def health() -> dict[str, Any]:
         return {"status": "ok", "docs": doc_store.list_doc_ids()}
+
+    @app.get("/api/info")
+    async def info() -> dict[str, Any]:
+        return _info_snapshot
+
+    @app.get("/api/me")
+    async def me(request: "Request") -> dict[str, Any]:  # noqa: F821
+        # Surface what the auth policy can see. We don't gate this on a
+        # principal — anonymous callers get `principal: null` so the
+        # frontend's User Info panel can render an explicit "not signed
+        # in" state instead of a 401.
+        decision = policy.authorize(doc_id="__me__", request=request)
+        headers = getattr(request, "headers", {}) or {}
+        return {
+            "principal": decision.principal,
+            "allowed": decision.allowed,
+            # Echo back the auth-related ingress headers we trust, so the
+            # UI can show what the upstream proxy sent. Limited list to
+            # avoid leaking unrelated headers.
+            "ingress_headers": {
+                "x-auth-request-user": headers.get("x-auth-request-user"),
+                "x-auth-request-email": headers.get("x-auth-request-email"),
+                "x-auth-request-groups": headers.get("x-auth-request-groups"),
+                "x-user-id": headers.get("x-user-id"),
+            },
+        }
 
     @app.get("/api/docs")
     async def list_docs() -> dict[str, Any]:
