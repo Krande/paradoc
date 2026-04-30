@@ -13,6 +13,15 @@ ARG PIXI_VERSION=0.67.0
 FROM ghcr.io/prefix-dev/pixi:${PIXI_VERSION}
 WORKDIR /work
 
+# `git` is needed because pixi clones the ada-py source via a git pin
+# (see `[feature.examples-figs.pypi-dependencies]`); the prefix-dev
+# pixi image is Ubuntu-slim and ships no git, so the clone fails with
+# "Git executable not found" and the whole build aborts before any
+# example doc compiles. Same layer also clears the apt cache.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 # Solve envs first so source-only edits don't bust the heavy layer
 # cache. Two envs: `examples` for the lightweight set, `examples-figs`
 # for the figure-sources example (it pulls ada-py + native CAD libs).
