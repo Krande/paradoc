@@ -23,6 +23,7 @@ interface StaticThreeDEntry {
   sha256?: string
   size?: number
   source_type?: string
+  image_path?: string
 }
 
 export class StaticTransport implements AssetTransport {
@@ -66,6 +67,7 @@ export class StaticTransport implements AssetTransport {
             caption: v.caption || '',
             sha256: v.sha256 || '',
             size: typeof v.size === 'number' ? v.size : 0,
+            imageUrl: v.image_path ? this.url(v.image_path) : undefined,
           }
         }
         return out

@@ -15,6 +15,9 @@ export interface ThreeDMeta {
   caption: string
   sha256: string
   size: number
+  /** Optional URL of a raster preview (e.g. `assets/3d/<key>.png`) the
+   *  frontend can show as a poster before mounting the live viewer. */
+  imageUrl?: string
 }
 
 export interface ThreeDPayload extends ThreeDMeta {

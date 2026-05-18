@@ -1170,6 +1170,38 @@ class ASTExporter:
                 skipped += 1
                 continue
 
+            # Optional poster PNG sibling: the producer may have rendered
+            # a raster preview alongside the GLB (e.g. via pygfx
+            # offscreen). Two sources, in order: an explicit `image_path`
+            # in the metadata dict, then a same-name `.png` next to the
+            # GLB. If found, copy as `<key>.png` and record the relative
+            # URL in the manifest so the frontend can use it as a poster.
+            poster_src: pathlib.Path | None = None
+            meta_image = (meta.metadata or {}).get("image_path") if hasattr(meta, "metadata") else None
+            if meta_image:
+                im_path = pathlib.Path(meta_image)
+                if im_path.is_absolute() and im_path.exists():
+                    poster_src = im_path
+                else:
+                    for base in search_bases:
+                        cand = (base / im_path).resolve()
+                        if cand.exists():
+                            poster_src = cand
+                            break
+            if poster_src is None:
+                sibling = resolved.with_suffix(".png")
+                if sibling.exists():
+                    poster_src = sibling
+
+            poster_url: str | None = None
+            if poster_src is not None:
+                poster_dest = assets_dir / f"{key}.png"
+                try:
+                    shutil.copyfile(poster_src, poster_dest)
+                    poster_url = f"assets/3d/{key}.png"
+                except Exception as exc:
+                    logger.warning(f"poster copy {poster_src} → {poster_dest} failed: {exc}")
+
             manifest[key] = {
                 "key": key,
                 "format": meta.format or "glb",
@@ -1179,6 +1211,8 @@ class ASTExporter:
                 "size": meta.size or dest.stat().st_size,
                 "source_type": meta.source_type or "",
             }
+            if poster_url is not None:
+                manifest[key]["image_path"] = poster_url
             copied += 1
 
         if manifest:
