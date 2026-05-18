@@ -23,6 +23,19 @@ function main() {
     process.exit(1)
   }
 
+  // Vite's `__vitePreload(loader, __VITE_PRELOAD__)` calls reference a
+  // runtime constant that vite itself rewrites in chunks but not after
+  // the singleFile inlining. With no module preload to do (single
+  // bundle), patch the dist HTML to pass an empty deps array instead
+  // so dynamic imports don't crash with
+  // `ReferenceError: __VITE_PRELOAD__ is not defined`.
+  const distHtml = fs.readFileSync(distIndex, 'utf8')
+  if (distHtml.includes('__VITE_PRELOAD__')) {
+    const patched = distHtml.replace(/__VITE_PRELOAD__/g, '[]')
+    fs.writeFileSync(distIndex, patched)
+    console.log('[pack] patched __VITE_PRELOAD__ → [] in dist/index.html')
+  }
+
   // Create zip with everything from dist (excluding the zip itself), so workers/assets are preserved
   const zip = new AdmZip()
 
