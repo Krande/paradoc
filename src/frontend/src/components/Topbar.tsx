@@ -70,14 +70,14 @@ export function Topbar({
                         />
                     )}
                     {headerLinks.length > 0 && (
-                        <nav className="hidden sm:flex items-center gap-2 ml-2 pl-3 border-l border-gray-200">
+                        <nav className="flex items-center gap-2 ml-1 pl-3 border-l border-gray-200">
                             {headerLinks.map((link, i) => (
                                 <a
                                     key={`${link.href}-${i}`}
                                     href={link.href}
                                     target={link.target}
                                     rel={link.rel ?? (link.target === '_blank' ? 'noopener noreferrer' : undefined)}
-                                    className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                    className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition"
                                 >
                                     {link.label}
                                 </a>
