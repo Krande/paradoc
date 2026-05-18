@@ -74,14 +74,20 @@ export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
 
     try {
       const figure = plotData.figure
-      const width = plotData.width || 800
-      const height = plotData.height || 600
+      const desiredWidth = plotData.width || 800
+      const desiredHeight = plotData.height || 600
 
-      // Ensure the figure has a layout object
+      // Ensure the figure has a layout object. Plotly's `responsive: true`
+      // only re-flows the figure when the container resizes — it doesn't
+      // help if we pin `layout.width` to the desired size, since that
+      // creates a 900px-wide canvas on a 360px-wide phone. Let Plotly
+      // pick the width from the container; we constrain the container's
+      // CSS `max-width` separately so the plot never grows beyond the
+      // author's intent on desktop.
       const layout = { ...(figure.layout || {}) }
-      layout.width = width
-      layout.height = height
-      layout.autosize = false
+      delete layout.width
+      layout.height = desiredHeight
+      layout.autosize = true
 
       // Add some default styling
       if (!layout.margin) {
@@ -93,6 +99,10 @@ export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
         displayModeBar: true,
         displaylogo: false,
         modeBarButtonsToRemove: ['sendDataToCloud'],
+      }
+
+      if (plotRef.current) {
+        plotRef.current.style.maxWidth = `${desiredWidth}px`
       }
 
       // Create the plot
@@ -144,11 +154,11 @@ export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
   }
 
   return (
-    <div className="my-4">
+    <div className="my-4 w-full overflow-x-auto">
       <div
         ref={plotRef}
-        className="border border-gray-300 rounded bg-white"
-        style={{ minHeight: '400px' }}
+        className="border border-gray-300 rounded bg-white w-full"
+        style={{ minHeight: '320px' }}
       />
       {plotData?.caption && (
         <p className="text-sm text-gray-600 italic mt-2 text-center">
