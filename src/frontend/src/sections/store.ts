@@ -257,16 +257,23 @@ export async function loadStaticData(): Promise<{
   }
   const manifest = await manifestRes.json() as DocManifest
 
-  // Load all sections
+  // `manifest.sections` lists every header H1..H6 for the outline /
+  // TOC, but only top-level (H1) headers get a `sections/<i>.json`
+  // bundle on disk — paradoc splits content by H1 only and numbers
+  // those bundles 0..N-1 contiguously. Fetch by H1 count rather than
+  // by manifest index so we don't issue dozens of 404s for every
+  // nested H2/H3 in the FEA verification report.
+  const h1Count = manifest.sections.filter((s: any) => (s.level ?? 1) === 1).length
+  const numBundles = Math.max(h1Count, 1)
   const sections: SectionBundle[] = []
-  for (const sectionMeta of manifest.sections) {
-    const idx = sectionMeta.index
+  for (let idx = 0; idx < numBundles; idx += 1) {
     const sectionRes = await fetch(`${basePath}sections/${idx}.json`, { cache: 'no-store' })
     if (sectionRes.ok) {
       const bundle = await sectionRes.json() as SectionBundle
       sections.push(bundle)
     } else {
       console.warn(`Failed to load section ${idx}: ${sectionRes.status}`)
+      break
     }
   }
 

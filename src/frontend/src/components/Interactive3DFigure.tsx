@@ -24,7 +24,13 @@ export function Interactive3DFigure({
   content,
   caption,
 }: Interactive3DFigureProps) {
-  const [showInteractive, setShowInteractive] = React.useState(false)
+  // Default to the interactive viewer once we've confirmed the GLB is
+  // available. The static-figure branch existed for WS / pandoc-DOCX
+  // hosts where there was a real PNG fallback alongside the GLB; the
+  // static-web exporter ships only the GLB so the markdown
+  // `MISSING_3D_IMAGE.png` placeholder would render as a broken
+  // image until the user found the hover-only 3D toggle.
+  const [showInteractive, setShowInteractive] = React.useState(true)
   const [isHovering, setIsHovering] = React.useState(false)
   const [exists, setExists] = React.useState(false)
 
