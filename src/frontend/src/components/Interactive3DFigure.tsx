@@ -24,15 +24,22 @@ export function Interactive3DFigure({
   content,
   caption,
 }: Interactive3DFigureProps) {
-  // Default to the interactive viewer once we've confirmed the GLB is
-  // available. The static-figure branch existed for WS / pandoc-DOCX
-  // hosts where there was a real PNG fallback alongside the GLB; the
-  // static-web exporter ships only the GLB so the markdown
-  // `MISSING_3D_IMAGE.png` placeholder would render as a broken
-  // image until the user found the hover-only 3D toggle.
+  // The static-figure branch existed for WS / pandoc-DOCX hosts where
+  // there was a real PNG fallback alongside the GLB. The static-web
+  // exporter ships only the GLB, so the markdown `MISSING_3D_IMAGE.png`
+  // placeholder would otherwise render as a broken image while we
+  // waited for `getThreeDMeta` to resolve (and again forever in
+  // static-web mode if the meta probe failed for any reason).
+  //
+  // Default behavior: if the host gave us a `threeDKey`, mount the
+  // ThreeDRenderer immediately and let *it* surface a loading state
+  // / error state. We still keep the runtime toggle so static-figure
+  // hosts can opt back in via the hover menu.
   const [showInteractive, setShowInteractive] = React.useState(true)
   const [isHovering, setIsHovering] = React.useState(false)
-  const [exists, setExists] = React.useState(false)
+  // Optimistically assume the GLB exists when a threeDKey is provided
+  // — the bundle / docstore is responsible for actually shipping it.
+  const [exists, setExists] = React.useState<boolean>(!!threeDKey)
 
   React.useEffect(() => {
     if (!docId || !threeDKey) {
@@ -45,7 +52,13 @@ export function Interactive3DFigure({
     let canceled = false
     const check = async () => {
       const meta = await transport.getThreeDMeta(docId, threeDKey)
-      if (!canceled) setExists(!!meta)
+      if (!canceled && meta === undefined) {
+        // Only downgrade to "not found" when the lookup explicitly
+        // returned undefined; transports that don't know how to probe
+        // ahead of time (most static hosts) keep us in the optimistic
+        // state so the renderer mounts and fetches the binary.
+        setExists(false)
+      }
     }
     check()
 
