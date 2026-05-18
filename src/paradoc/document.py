@@ -920,10 +920,16 @@ class OneDoc:
         # Reset per-build figure-source key counters.
         self._fig_source_key_counter: Dict[str, int] = {}
 
-        # Phase 1: desugar ${...} → legacy form (in-memory, never written to disk)
+        # Phase 1: desugar ${...} → legacy form (in-memory, never written to disk).
+        # Keep the original (pre-desugar, pre-figure-source) text per file too;
+        # the legacy `{{__key__}}` deprecation warning checks against the
+        # original so paradoc's own desugar output doesn't trigger false
+        # positives.
         self._desugared_md_cache = {}
+        self._pre_desugar_md_cache = {}
         for mdf in self.md_files_main + self.md_files_app:
             original = mdf.read_original_file()
+            self._pre_desugar_md_cache[mdf.path] = original
             after_figsrc = self._preprocess_figure_sources(original, mdf)
             self._desugared_md_cache[mdf.path] = self._desugar_new_syntax(after_figsrc, mdf)
 
@@ -958,7 +964,14 @@ class OneDoc:
 
                 # Check database first for table/plot keys (keys with __ markers)
                 if key.startswith("__") and key.endswith("__"):
-                    self._warn_legacy_syntax(m.group(0), md_str_original, mdf)
+                    # Skip the deprecation warning when the legacy match was
+                    # produced by our own ${...} → {{__key__}} desugar pass
+                    # rather than the user's source. We test by substring
+                    # against the pre-desugar text.
+                    raw_match = m.group(0)
+                    pre = self._pre_desugar_md_cache.get(mdf.path, "")
+                    if raw_match in pre:
+                        self._warn_legacy_syntax(raw_match, md_str_original, mdf)
                     # Get full reference including any annotation that follows
                     full_reference = m.group(0)
 
