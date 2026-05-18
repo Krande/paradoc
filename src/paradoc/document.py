@@ -343,6 +343,7 @@ class OneDoc:
         metadata_file=None,
         embed_images: bool = True,
         include_frontend: bool = True,
+        header_links: Optional[Iterable[dict]] = None,
     ) -> bool:
         """
         Export document to static files for web hosting without a WebSocket server.
@@ -355,6 +356,10 @@ class OneDoc:
             metadata_file: Optional metadata file path
             embed_images: If True, embed images as base64 in the data files
             include_frontend: If True, copy the frontend HTML/JS files to output_dir
+            header_links: Optional iterable of link dicts (``{"label": str, "href": str,
+                "target": str?, "rel": str?}``) rendered into the Topbar. Hosts that embed
+                or link to the bundle (Sphinx, MkDocs, ...) can use this for a
+                "Back to docs" affordance without rebuilding the frontend.
 
         Returns:
             True if successful, False otherwise
@@ -377,6 +382,7 @@ class OneDoc:
             output_dir=output_dir,
             embed_images=embed_images,
             include_frontend=include_frontend,
+            header_links=list(header_links) if header_links is not None else None,
         )
 
     def _prep_compilation(self, metadata_file=None):

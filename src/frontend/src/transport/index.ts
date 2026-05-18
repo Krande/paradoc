@@ -8,10 +8,25 @@ import type { AssetTransport } from './base'
 
 export type TransportKind = 'ws' | 'rest'
 
+export interface ParadocHeaderLink {
+  label: string
+  href: string
+  /** Optional `target` attribute (e.g. `_blank`). Defaults to same-tab navigation. */
+  target?: string
+  /** Optional `rel` attribute. Auto-set to `noopener noreferrer` when `target === '_blank'`. */
+  rel?: string
+}
+
 export interface ParadocRuntimeConfig {
   transport?: TransportKind
   apiBase?: string
   docId?: string
+  /**
+   * Optional links rendered into the Topbar to the left of the title. Used by
+   * static-export hosts (Sphinx / standalone sites) to wire a "Back to docs"
+   * affordance without owning the frontend.
+   */
+  headerLinks?: ParadocHeaderLink[]
 }
 
 declare global {

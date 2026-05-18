@@ -32,7 +32,9 @@ export function Topbar({
     // button) is meaningless in REST mode — the worker isn't even
     // connected. Show a plain title instead so the topbar still
     // identifies the app.
-    const isRestMode = getRuntimeConfig().transport === 'rest'
+    const runtimeCfg = getRuntimeConfig()
+    const isRestMode = runtimeCfg.transport === 'rest'
+    const headerLinks = runtimeCfg.headerLinks ?? []
     const { allDocs } = useDocList()
 
     return (
@@ -67,7 +69,21 @@ export function Topbar({
                             workerRef={workerRef}
                         />
                     )}
-
+                    {headerLinks.length > 0 && (
+                        <nav className="hidden sm:flex items-center gap-2 ml-2 pl-3 border-l border-gray-200">
+                            {headerLinks.map((link, i) => (
+                                <a
+                                    key={`${link.href}-${i}`}
+                                    href={link.href}
+                                    target={link.target}
+                                    rel={link.rel ?? (link.target === '_blank' ? 'noopener noreferrer' : undefined)}
+                                    className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                >
+                                    {link.label}
+                                </a>
+                            ))}
+                        </nav>
+                    )}
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <button

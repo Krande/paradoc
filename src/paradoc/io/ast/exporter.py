@@ -961,6 +961,7 @@ class ASTExporter:
         output_dir: pathlib.Path,
         embed_images: bool = True,
         include_frontend: bool = True,
+        header_links: List[Dict[str, str]] | None = None,
     ) -> bool:
         """
         Export document to static JSON files for static web hosting.
@@ -1049,6 +1050,8 @@ class ASTExporter:
             # Copy frontend files if requested
             if include_frontend:
                 self._copy_frontend_for_static(output_dir)
+                if header_links:
+                    self._inject_static_runtime_config(output_dir, header_links=header_links)
 
             logger.info(f"Successfully exported static files to {output_dir}")
             return True
@@ -1080,3 +1083,59 @@ class ASTExporter:
             logger.info(f"Extracted frontend to {output_dir}")
         except Exception as e:
             logger.warning(f"Failed to extract frontend: {e}")
+
+    def _inject_static_runtime_config(
+        self,
+        output_dir: pathlib.Path,
+        header_links: List[Dict[str, str]],
+    ) -> None:
+        """Inject ``window.__PARADOC_CONFIG__.headerLinks`` into the static
+        bundle's ``index.html`` so the Topbar can render host-supplied nav
+        links without owning the frontend build.
+
+        Bundled frontend ``index.html`` is a single self-contained file; we
+        rewrite the first ``<head>`` tag to prepend an inline script that
+        seeds the runtime config before the React app mounts.
+        """
+        index_path = output_dir / "index.html"
+        if not index_path.exists():
+            logger.warning("Cannot inject headerLinks — %s not found.", index_path)
+            return
+
+        # Sanitize and serialize the link list; only known string keys make it through.
+        clean_links: List[Dict[str, str]] = []
+        for raw in header_links:
+            if not isinstance(raw, dict) or "label" not in raw or "href" not in raw:
+                logger.warning("Skipping malformed header link: %r", raw)
+                continue
+            entry: Dict[str, str] = {"label": str(raw["label"]), "href": str(raw["href"])}
+            if raw.get("target"):
+                entry["target"] = str(raw["target"])
+            if raw.get("rel"):
+                entry["rel"] = str(raw["rel"])
+            clean_links.append(entry)
+
+        if not clean_links:
+            return
+
+        payload = json.dumps(clean_links, ensure_ascii=False)
+        snippet = (
+            "<script>"
+            "(function(){var c=window.__PARADOC_CONFIG__=window.__PARADOC_CONFIG__||{};"
+            f"c.headerLinks={payload};"
+            "})();"
+            "</script>"
+        )
+
+        html = index_path.read_text(encoding="utf-8")
+        head_open = html.find("<head")
+        if head_open == -1:
+            logger.warning("Cannot inject headerLinks — no <head> tag in %s.", index_path)
+            return
+        head_close = html.find(">", head_open)
+        if head_close == -1:
+            logger.warning("Cannot inject headerLinks — malformed <head> in %s.", index_path)
+            return
+        new_html = html[: head_close + 1] + snippet + html[head_close + 1 :]
+        index_path.write_text(new_html, encoding="utf-8")
+        logger.info("Injected %d headerLinks into %s", len(clean_links), index_path)
