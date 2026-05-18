@@ -6,7 +6,7 @@
 
 import type { AssetTransport } from './base'
 
-export type TransportKind = 'ws' | 'rest'
+export type TransportKind = 'ws' | 'rest' | 'static'
 
 export interface ParadocHeaderLink {
   label: string
@@ -47,7 +47,10 @@ export function getAssetTransport(): AssetTransport | null {
 
 export async function initTransport(worker: Worker | null): Promise<AssetTransport | null> {
   const config = getRuntimeConfig()
-  const kind: TransportKind = config.transport === 'rest' ? 'rest' : 'ws'
+  let kind: TransportKind
+  if (config.transport === 'rest') kind = 'rest'
+  else if (config.transport === 'static') kind = 'static'
+  else kind = 'ws'
 
   if (kind === 'rest') {
     // Empty apiBase ('') is valid — same-host serving uses current
@@ -59,6 +62,15 @@ export async function initTransport(worker: Worker | null): Promise<AssetTranspo
       _transport = new RESTTransport({ apiBase: config.apiBase })
       return _transport
     }
+  }
+
+  if (kind === 'static') {
+    // Static-web export: data lives in JSON files served alongside the HTML;
+    // GLBs live under `./assets/3d/<key>.glb`. The bundle ships
+    // `transport: 'static'` in __PARADOC_CONFIG__ for explicit selection.
+    const { StaticTransport } = await import('./static')
+    _transport = new StaticTransport()
+    return _transport
   }
 
   if (!worker) {

@@ -987,7 +987,9 @@ class ASTExporter:
             │   └── ...
             ├── images.json         # Embedded images (if embed_images=True)
             ├── plots.json          # Plot data for Plotly.js
-            └── tables.json         # Table data
+            ├── tables.json         # Table data
+            ├── three_d.json        # 3D asset metadata (key → camera/caption/sha)
+            └── assets/3d/<key>.glb # Copied 3D assets (one per ThreeDData row)
         """
 
         try:
@@ -1047,11 +1049,17 @@ class ASTExporter:
                 tables_path.write_text(json.dumps(table_data_dict, ensure_ascii=False, indent=2), encoding="utf-8")
                 logger.info(f"Wrote {len(table_data_dict)} tables to {tables_path}")
 
+            # Copy 3D assets + metadata. WS/REST docstore modes serve these
+            # via the server API; static-web has no server, so we ship the
+            # GLBs alongside the JSON and let the frontend fetch by URL.
+            self._export_three_d_assets_for_static(output_dir)
+
             # Copy frontend files if requested
             if include_frontend:
                 self._copy_frontend_for_static(output_dir)
-                if header_links:
-                    self._inject_static_runtime_config(output_dir, header_links=header_links)
+                self._inject_static_runtime_config(
+                    output_dir, header_links=header_links or None,
+                )
 
             logger.info(f"Successfully exported static files to {output_dir}")
             return True
@@ -1084,45 +1092,150 @@ class ASTExporter:
         except Exception as e:
             logger.warning(f"Failed to extract frontend: {e}")
 
+    def _export_three_d_assets_for_static(self, output_dir: pathlib.Path) -> None:
+        """Copy ThreeDData GLBs into the static bundle + write three_d.json.
+
+        The DbManager carries `glb_path` strings that are usually bundle-
+        relative (`assets/3d/<key>.glb` written by figure-source filters)
+        but legacy / external producers may register paths relative to
+        the source dir or as absolute paths. Try several base dirs to
+        locate the GLB on disk; skip with a warning if none resolve.
+        """
+        import shutil
+
+        try:
+            keys = self.one_doc.db_manager.list_three_d()
+        except Exception as exc:
+            logger.warning(f"list_three_d() failed: {exc}; skipping 3D asset export")
+            return
+        if not keys:
+            return
+
+        assets_dir = output_dir / "assets" / "3d"
+        assets_dir.mkdir(parents=True, exist_ok=True)
+
+        manifest: Dict[str, Dict[str, Any]] = {}
+
+        search_bases: List[pathlib.Path] = []
+        for cand in (
+            self.one_doc.build_dir,
+            self.one_doc.source_dir,
+            getattr(self.one_doc.source_dir, "parent", None),
+            self.one_doc.dist_dir,
+        ):
+            if cand is None:
+                continue
+            p = pathlib.Path(cand).resolve()
+            if p not in search_bases:
+                search_bases.append(p)
+
+        copied = skipped = 0
+        for key in keys:
+            try:
+                meta = self.one_doc.db_manager.get_three_d(key)
+            except Exception as exc:
+                logger.warning(f"get_three_d({key!r}) failed: {exc}; skipping")
+                skipped += 1
+                continue
+            if meta is None:
+                logger.warning(f"3d key {key!r} listed but get_three_d returned None")
+                skipped += 1
+                continue
+
+            src = pathlib.Path(meta.glb_path)
+            resolved: pathlib.Path | None = None
+            if src.is_absolute():
+                if src.exists():
+                    resolved = src
+            else:
+                for base in search_bases:
+                    candidate = (base / src).resolve()
+                    if candidate.exists():
+                        resolved = candidate
+                        break
+
+            if resolved is None:
+                logger.warning(
+                    f"3d asset {key!r}: glb_path {meta.glb_path!r} not found "
+                    f"(searched: {[str(b) for b in search_bases]})"
+                )
+                skipped += 1
+                continue
+
+            dest = assets_dir / f"{key}.glb"
+            try:
+                shutil.copyfile(resolved, dest)
+            except Exception as exc:
+                logger.warning(f"copy {resolved} → {dest} failed: {exc}; skipping")
+                skipped += 1
+                continue
+
+            manifest[key] = {
+                "key": key,
+                "format": meta.format or "glb",
+                "camera_pos": meta.camera_pos or "iso_3",
+                "caption": meta.caption or "",
+                "sha256": meta.sha256 or "",
+                "size": meta.size or dest.stat().st_size,
+                "source_type": meta.source_type or "",
+            }
+            copied += 1
+
+        if manifest:
+            three_d_path = output_dir / "three_d.json"
+            three_d_path.write_text(
+                json.dumps(manifest, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            logger.info(
+                f"Wrote {copied} 3D asset(s) → {assets_dir} (skipped {skipped}) and {three_d_path}"
+            )
+        elif skipped:
+            logger.info(f"3D export: {skipped} key(s) skipped, none successfully copied")
+
     def _inject_static_runtime_config(
         self,
         output_dir: pathlib.Path,
-        header_links: List[Dict[str, str]],
+        header_links: List[Dict[str, str]] | None,
     ) -> None:
-        """Inject ``window.__PARADOC_CONFIG__.headerLinks`` into the static
-        bundle's ``index.html`` so the Topbar can render host-supplied nav
-        links without owning the frontend build.
+        """Seed ``window.__PARADOC_CONFIG__`` in the bundled ``index.html``.
 
-        Bundled frontend ``index.html`` is a single self-contained file; we
-        rewrite the first ``<head>`` tag to prepend an inline script that
-        seeds the runtime config before the React app mounts.
+        Always sets ``transport: 'static'`` so the React app picks the
+        ``StaticTransport`` (relative-URL fetches for plots/tables/3D)
+        instead of trying to open a WebSocket to a non-existent server.
+        Optionally also seeds ``headerLinks`` for host-supplied nav.
+
+        The bundled frontend ``index.html`` is a single self-contained
+        file; we splice an inline script right after the first ``<head>``
+        tag so the config is set before any module script executes.
         """
         index_path = output_dir / "index.html"
         if not index_path.exists():
-            logger.warning("Cannot inject headerLinks — %s not found.", index_path)
+            logger.warning("Cannot inject runtime config — %s not found.", index_path)
             return
 
-        # Sanitize and serialize the link list; only known string keys make it through.
-        clean_links: List[Dict[str, str]] = []
-        for raw in header_links:
-            if not isinstance(raw, dict) or "label" not in raw or "href" not in raw:
-                logger.warning("Skipping malformed header link: %r", raw)
-                continue
-            entry: Dict[str, str] = {"label": str(raw["label"]), "href": str(raw["href"])}
-            if raw.get("target"):
-                entry["target"] = str(raw["target"])
-            if raw.get("rel"):
-                entry["rel"] = str(raw["rel"])
-            clean_links.append(entry)
+        cfg: Dict[str, Any] = {"transport": "static"}
 
-        if not clean_links:
-            return
+        if header_links:
+            clean_links: List[Dict[str, str]] = []
+            for raw in header_links:
+                if not isinstance(raw, dict) or "label" not in raw or "href" not in raw:
+                    logger.warning("Skipping malformed header link: %r", raw)
+                    continue
+                entry: Dict[str, str] = {"label": str(raw["label"]), "href": str(raw["href"])}
+                if raw.get("target"):
+                    entry["target"] = str(raw["target"])
+                if raw.get("rel"):
+                    entry["rel"] = str(raw["rel"])
+                clean_links.append(entry)
+            if clean_links:
+                cfg["headerLinks"] = clean_links
 
-        payload = json.dumps(clean_links, ensure_ascii=False)
+        payload = json.dumps(cfg, ensure_ascii=False)
         snippet = (
             "<script>"
             "(function(){var c=window.__PARADOC_CONFIG__=window.__PARADOC_CONFIG__||{};"
-            f"c.headerLinks={payload};"
+            f"Object.assign(c,{payload});"
             "})();"
             "</script>"
         )
@@ -1130,12 +1243,16 @@ class ASTExporter:
         html = index_path.read_text(encoding="utf-8")
         head_open = html.find("<head")
         if head_open == -1:
-            logger.warning("Cannot inject headerLinks — no <head> tag in %s.", index_path)
+            logger.warning("Cannot inject runtime config — no <head> tag in %s.", index_path)
             return
         head_close = html.find(">", head_open)
         if head_close == -1:
-            logger.warning("Cannot inject headerLinks — malformed <head> in %s.", index_path)
+            logger.warning("Cannot inject runtime config — malformed <head> in %s.", index_path)
             return
         new_html = html[: head_close + 1] + snippet + html[head_close + 1 :]
         index_path.write_text(new_html, encoding="utf-8")
-        logger.info("Injected %d headerLinks into %s", len(clean_links), index_path)
+        logger.info(
+            "Injected runtime config (transport=static, %d headerLinks) into %s",
+            len(cfg.get("headerLinks", [])),
+            index_path,
+        )

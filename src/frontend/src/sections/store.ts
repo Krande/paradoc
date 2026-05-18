@@ -220,6 +220,7 @@ export async function getTableData(docId: string, tableKey: string): Promise<Tab
  */
 export function isStaticMode(): boolean {
   const w = window as any
+  if (w.__PARADOC_CONFIG__?.transport === 'static') return true
   return !!w.__PARADOC_STATIC_MODE__ || !!w.__PARADOC_STATIC_BASE_PATH__
 }
 
