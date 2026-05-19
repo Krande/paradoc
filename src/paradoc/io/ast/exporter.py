@@ -1054,6 +1054,11 @@ class ASTExporter:
             # GLBs alongside the JSON and let the frontend fetch by URL.
             self._export_three_d_assets_for_static(output_dir)
 
+            # Camera presets. ThreeDRenderer fetches `assets/presets.json`
+            # on mount; without it the renderer falls back to a single
+            # hardcoded `iso_3` and the canvas can't frame the model.
+            self._export_presets_for_static(output_dir)
+
             # Copy frontend files if requested
             if include_frontend:
                 self._copy_frontend_for_static(output_dir)
@@ -1091,6 +1096,24 @@ class ASTExporter:
             logger.info(f"Extracted frontend to {output_dir}")
         except Exception as e:
             logger.warning(f"Failed to extract frontend: {e}")
+
+    def _export_presets_for_static(self, output_dir: pathlib.Path) -> None:
+        """Write `assets/presets.json` next to the 3D assets.
+
+        `compile()` routes this through `_write_bundle_artifacts`, but the
+        static export goes straight from `build_ast` to the JSON dump and
+        skipped this step — leaving the frontend with a 404 and a single
+        hardcoded fallback preset that can't frame arbitrary models.
+        """
+        from paradoc.camera.presets import export_presets_json, load_camera_presets
+
+        try:
+            paradoc_toml = self.one_doc.source_dir / "paradoc.toml"
+            presets = load_camera_presets(paradoc_toml if paradoc_toml.exists() else None)
+            export_presets_json(presets, output_dir / "assets" / "presets.json")
+            logger.info(f"Wrote {len(presets)} camera preset(s) to {output_dir / 'assets' / 'presets.json'}")
+        except Exception as exc:
+            logger.warning(f"Failed to export presets.json: {exc}")
 
     def _export_three_d_assets_for_static(self, output_dir: pathlib.Path) -> None:
         """Copy ThreeDData GLBs into the static bundle + write three_d.json.
