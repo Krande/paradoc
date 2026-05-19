@@ -277,12 +277,20 @@ def test_static_export_3d_viewer_does_not_hijack_page_scroll(
         f"{scroller_info['clientHeight']}px (viewer may have collapsed the layout)"
     )
 
-    # Reset to top, then wheel over a point outside the canvas (below
-    # it, since the viewer is near the top and filler is below).
+    # Reset to top, then wheel inside the reader container outside the
+    # canvas (below it, since the viewer is near the top and filler is
+    # below). The desktop sidebar occupies the left ~288px on desktop
+    # viewports — wheel from the reader's own bounding rect so the test
+    # is layout-independent.
+    reader_rect = page.evaluate(
+        "() => document.querySelector('[data-search-root]').getBoundingClientRect().toJSON()"
+    )
     page.evaluate("document.querySelector('[data-search-root]').scrollTop = 0")
     initial = page.evaluate("document.querySelector('[data-search-root]').scrollTop")
-    viewport_height = page.evaluate("window.innerHeight")
-    page.mouse.move(20, viewport_height - 20)
+    # Bottom-right area of the reader, well past the canvas region.
+    wheel_x = int(reader_rect["x"] + reader_rect["width"] - 20)
+    wheel_y = int(reader_rect["y"] + reader_rect["height"] - 20)
+    page.mouse.move(wheel_x, wheel_y)
     page.mouse.wheel(0, 400)
     page.wait_for_timeout(200)
     after = page.evaluate("document.querySelector('[data-search-root]').scrollTop")
@@ -376,11 +384,17 @@ def test_static_export_scroll_survives_showControls_toggle(
     page.wait_for_selector("canvas", timeout=15000)
     page.wait_for_timeout(500)
 
-    # Scroll test in the toggled state.
+    # Scroll test in the toggled state. Wheel from the reader's own
+    # rect to stay layout-independent of the (now visible) desktop
+    # sidebar.
+    reader_rect = page.evaluate(
+        "() => document.querySelector('[data-search-root]').getBoundingClientRect().toJSON()"
+    )
     page.evaluate("document.querySelector('[data-search-root]').scrollTop = 0")
     initial = page.evaluate("document.querySelector('[data-search-root]').scrollTop")
-    viewport_height = page.evaluate("window.innerHeight")
-    page.mouse.move(20, viewport_height - 20)
+    wheel_x = int(reader_rect["x"] + reader_rect["width"] - 20)
+    wheel_y = int(reader_rect["y"] + reader_rect["height"] - 20)
+    page.mouse.move(wheel_x, wheel_y)
     page.mouse.wheel(0, 400)
     page.wait_for_timeout(200)
     after = page.evaluate("document.querySelector('[data-search-root]').scrollTop")

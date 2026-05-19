@@ -340,7 +340,12 @@ function AppContent() {
     // which is the "FEA report goes black" bug we shipped to ada-docs).
     <div className="flex h-screen overflow-hidden">
       <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col min-h-0">
+      {/* `min-w-0` is essential alongside `flex-1`: default flex
+          `min-width: auto` lets the column grow to fit content
+          (e.g. the 3D viewer's canvas, which is sized from
+          `element.clientWidth` at mount), causing runaway expansion
+          past the viewport on narrow screens. */}
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
         <Topbar
           connected={connected}
           frontendId={frontendId}
