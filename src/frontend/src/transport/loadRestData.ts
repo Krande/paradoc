@@ -44,15 +44,22 @@ export async function loadRestData(apiBase: string, docId: string): Promise<Load
   }
   const manifest = (await manifestRes.json()) as DocManifest
 
+  // `manifest.sections` is every header H1..H6 (for outline / TOC),
+  // but only H1s get their own `sections/<idx>.json` bundle on disk
+  // — paradoc splits content by H1 only and numbers those bundles
+  // 0..N-1 contiguously. Static mode iterates by H1 count
+  // (`loadStaticData`); REST mode used to iterate every header's
+  // index, hitting a 404 on every nested H2/H3 in the doc.
   const sections: SectionBundle[] = []
-  for (const sectionMeta of manifest.sections) {
-    const idx = sectionMeta.index
+  const h1Count = manifest.sections.filter((s) => (s.level ?? 1) === 1).length
+  const numBundles = Math.max(h1Count, 1)
+  for (let idx = 0; idx < numBundles; idx += 1) {
     const res = await fetch(joinUrl(apiBase, `${docPath}/sections/${idx}`), {
       cache: 'no-store',
     })
     if (!res.ok) {
       console.warn(`[paradoc] section ${idx} fetch failed: HTTP ${res.status}`)
-      continue
+      break
     }
     sections.push((await res.json()) as SectionBundle)
   }
