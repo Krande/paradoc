@@ -76,6 +76,16 @@ function AppContent() {
       console.warn('[App] failed to init AssetTransport:', err)
     })
 
+    // Stop the worker's WS reconnect loop in REST / static mode. The
+    // worker boots on import and unconditionally connects to
+    // `ws://localhost:13579` (the dev WS server). In production where
+    // transport is `'rest'` or `'static'`, no WS server exists and
+    // the worker spams reconnect errors into the console forever.
+    const _cfg = getRuntimeConfig()
+    if (_cfg.transport === 'rest' || _cfg.transport === 'static') {
+      try { worker.postMessage({ type: 'stop' }) } catch {}
+    }
+
     // Track the current docId from manifest
     let currentDocId = 'demo'
 
