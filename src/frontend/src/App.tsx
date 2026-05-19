@@ -185,13 +185,21 @@ function AppContent() {
     // Skip if we already have a manifest (e.g., from WebSocket)
     if (state.manifest) return
 
-    // Check if we're in explicit static mode or auto-detect it
+    // Check if we're in explicit static mode or auto-detect it. The
+    // autodetect HEAD-fetches `./manifest.json`, which 404s when the
+    // SPA is hosted by `paradoc-serve` (REST mode) — annoying noise in
+    // the console for every page load. Skip the probe when transport
+    // is explicitly configured (rest *or* static); only fall back to
+    // autodetection when no runtime config is present at all (e.g.
+    // when somebody opens the bundled HTML out of an unknown host).
     const tryStaticLoad = async () => {
+      const cfg = getRuntimeConfig()
       const isStatic = isStaticMode()
-      const detected = !isStatic ? await detectStaticMode() : false
+      const detected =
+        !isStatic && cfg.transport === undefined ? await detectStaticMode() : false
 
       if (!isStatic && !detected) {
-        // Not in static mode, let WebSocket handle data loading
+        // Not in static mode, let WebSocket / REST handle data loading
         return
       }
 
@@ -314,9 +322,15 @@ function AppContent() {
   }, [])
 
   return (
-    <div className="flex min-h-screen">
+    // `h-screen` (not `min-h-screen`) so the inner `flex-1 overflow-auto`
+    // reader gets a bounded height and scrolls internally. With
+    // `min-h-screen`, the root grows to fit content → the scroll
+    // container's clientHeight = scrollHeight → wheel events do nothing
+    // (and a tall 3D viewer made the layout balloon past the viewport,
+    // which is the "FEA report goes black" bug we shipped to ada-docs).
+    <div className="flex h-screen overflow-hidden">
       <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         <Topbar
           connected={connected}
           frontendId={frontendId}
