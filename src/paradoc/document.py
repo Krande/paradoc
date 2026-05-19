@@ -1167,6 +1167,12 @@ class OneDoc:
         Together with the figure-source assets already written under
         `assets/3d/`, this leaves `<build_dir>/` as a portable, S3-uploadable
         directory tree that the future REST DocStore can serve as-is.
+
+        Also populates `<build_dir>/static/` with the REST-servable
+        JSON form (manifest, sections, plots, tables, images). Without
+        this, `paradoc-serve`'s `LocalDocStore._read_static` 404s every
+        section request because it reads from `<bundle>/static/` —
+        the same layout `S3DocStore` expects in object storage.
         """
         from paradoc.camera.presets import export_presets_json, load_camera_presets
         from paradoc.docstore import write_manifest
@@ -1193,6 +1199,18 @@ class OneDoc:
                 shutil.copy(db_src, db_dst)
         except Exception as exc:
             logger.error(f"failed to copy paradoc.sqlite into bundle: {exc}")
+
+        # REST-servable JSON layout. `include_frontend=False` because
+        # the SPA shell is served by the host (paradoc-serve's
+        # StaticFiles, nginx, ...), not from `<bundle>/static/`.
+        try:
+            ast_exporter = self.get_ast()
+            ast_exporter.export_to_static_files(
+                bundle_root / "static",
+                include_frontend=False,
+            )
+        except Exception as exc:
+            logger.error(f"failed to populate <bundle>/static/: {exc}")
 
     def _discover_filters_once(self) -> None:
         if self._filters_discovered:
