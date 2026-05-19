@@ -41,6 +41,11 @@ examples = { features = ["examples", "prod"], solve-group = "prod", no-default-f
 examples-figs = { features = ["examples", "examples-figs", "prod"], solve-group = "prod", no-default-feature = true }
 test-core = { features = ["test-core"], solve-group = "prod", no-default-feature = true }
 test = { features = ["test", "test-core", "prod"], solve-group = "prod", no-default-feature = true }
+# `e2e` env: superset of `test` that also pulls `serve` so REST-mode
+# Playwright tests (which boot paradoc-serve in-process) can run
+# alongside the static-mode tests in one env. Same solve-group so
+# overlapping deps stay locked to the same versions.
+e2e = { features = ["test", "test-core", "prod", "serve"], solve-group = "prod", no-default-feature = true }
 profile = { features = ["profile", "prod","test-core"], solve-group = "prod", no-default-feature = true }
 dev = { features = ["dev", "test-core", "prod"], solve-group = "dev", no-default-feature = true }
 
