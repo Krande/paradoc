@@ -5,7 +5,7 @@
 #          deps in this image are 1:1 with the local pixi env (no pip, no
 #          PyPI extras, just conda-forge via the lockfile).
 
-ARG PIXI_VERSION=0.67.0
+ARG PIXI_VERSION=0.68.0
 
 FROM node:20-alpine AS frontend-build
 WORKDIR /frontend

@@ -8,7 +8,7 @@
 # After build, `docker run` the image with the upload env vars and it
 # pushes dist/examples/<doc_id>/ to the configured object store.
 
-ARG PIXI_VERSION=0.67.0
+ARG PIXI_VERSION=0.68.0
 
 FROM ghcr.io/prefix-dev/pixi:${PIXI_VERSION}
 WORKDIR /work
