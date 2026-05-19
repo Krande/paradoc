@@ -76,9 +76,17 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
           className={`absolute inset-0 bg-black/20 transition-opacity ${open ? 'opacity-100' : 'opacity-0'}`}
           onClick={onClose}
         />
-        {/* Panel */}
+        {/* Panel. Tailwind v4 dropped the `transform` helper class —
+            it still emits a CSS rule but the rule references legacy
+            `--tw-rotate` / `--tw-skew-*` vars that don't exist in v4,
+            so the resulting `transform: translate(…) rotate(…) skew(…)`
+            value is invalid and the browser falls back to `none`. The
+            v4-correct utilities (`-translate-x-full` / `translate-x-0`)
+            already set the CSS `translate` property directly, so we
+            need `transition-[translate]` to animate that property
+            instead of the old `transition-transform`. */}
         <aside
-          className={`absolute left-0 top-0 bottom-0 w-72 bg-white border-r border-gray-200 shadow-xl transform transition-transform ${open ? 'translate-x-0' : '-translate-x-full'}`}
+          className={`absolute left-0 top-0 bottom-0 w-72 bg-white border-r border-gray-200 shadow-xl transition-[translate] duration-150 ease-out ${open ? 'translate-x-0' : '-translate-x-full'}`}
           role="dialog"
           aria-modal="true"
         >
