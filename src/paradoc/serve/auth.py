@@ -263,13 +263,19 @@ class _JWKSVerifier:
             break
         assert signing_key is not None
 
+        # Accept the issuer with or without a trailing slash. The config
+        # is normalized (stripped) when loaded, but Authentik (and some
+        # other IdPs) emit the token's `iss` claim *with* the slash, so
+        # passing a single string to pyjwt does exact-match and fails
+        # "issuer mismatch" even when the strings are equivalent.
+        accepted_iss = [self._provider.issuer, self._provider.issuer + "/"]
         try:
             claims = jwt.decode(
                 token,
                 signing_key,
                 algorithms=[unverified_header.get("alg", "RS256")],
                 audience=self._provider.audience or self._provider.client_id,
-                issuer=self._provider.issuer,
+                issuer=accepted_iss,
                 options={"require": ["exp", "iat", "iss", "sub"]},
             )
         except jwt.ExpiredSignatureError:
