@@ -288,8 +288,13 @@ class _MultiProviderVerifier:
 
     def __init__(self, config: AuthConfig) -> None:
         self._config = config
+        # Normalize the key the same way the token's iss claim is
+        # normalized below — Authentik emits the issuer with a trailing
+        # slash; config files often carry it the same way. Without
+        # rstrip on the key side, every token gets rejected as
+        # "issuer not trusted" even though the strings match.
         self._by_issuer: dict[str, _JWKSVerifier] = {
-            p.issuer: _JWKSVerifier(p) for p in config.providers
+            p.issuer.rstrip("/"): _JWKSVerifier(p) for p in config.providers
         }
 
     async def aclose(self) -> None:

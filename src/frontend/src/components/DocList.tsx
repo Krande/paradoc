@@ -1,5 +1,6 @@
 import React from 'react'
 import { getRuntimeConfig } from '../transport'
+import { authedFetch } from '../services/auth/oidc'
 
 interface DocListProps {
   // Called when the user picks a doc. Implementation updates the URL +
@@ -27,7 +28,7 @@ export function DocList({ onSelect }: DocListProps) {
     let canceled = false
     ;(async () => {
       try {
-        const res = await fetch(joinUrl(apiBase, '/api/docs'), { cache: 'no-store' })
+        const res = await authedFetch(joinUrl(apiBase, '/api/docs'), { cache: 'no-store' })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const body = (await res.json()) as { docs: string[] }
         if (canceled) return
