@@ -38,6 +38,8 @@ spec:
             - name: AWS_ENDPOINT_URL
               value: {{ .Values.s3.endpoint | quote }}
             {{- end }}
+            {{- include "paradoc-frontend.authEnv" . | nindent 12 }}
+            {{- include "paradoc-frontend.databaseEnv" . | nindent 12 }}
           {{- if and (eq .Values.bundle.source "s3") .Values.s3.existingSecret }}
           envFrom:
             - secretRef:
