@@ -1,9 +1,12 @@
 """Upload compiled example bundles to the configured object store.
 
 Reads ``dist/examples/<doc_id>/_build/`` (the output of ``compile-examples``)
-and pushes each file to ``<S3_PREFIX>/<doc_id>/<rel-path>`` in the bucket
-identified by env. Everything that pinpoints a specific cluster lives in
-env vars, never in this source tree.
+and pushes each file to ``<S3_PREFIX>/shared/<doc_id>/<rel-path>`` in the
+bucket identified by env. The ``shared/`` segment is the scope prefix
+that paradoc-serve's scope-aware DocStore expects — examples are
+deployment-wide shared content, never per-user or per-project, so they
+live under ``shared/``. Everything that pinpoints a specific cluster
+lives in env vars, never in this source tree.
 
 Required env vars:
 
@@ -91,11 +94,14 @@ def main(argv: list[str] | None = None) -> int:
                 if not fp.is_file():
                     continue
                 rel = fp.relative_to(bundle).as_posix()
-                key = "/".join(p for p in [prefix, doc_id, rel] if p)
+                # Examples are deployment-wide shared content; upload
+                # under the `shared/` scope prefix that paradoc-serve's
+                # DocStore expects.
+                key = "/".join(p for p in [prefix, "shared", doc_id, rel] if p)
                 with open(fp, "rb") as fh:
                     obstore.put(store, key, fh)
                 n += 1
-            print(f"[ok] {doc_id}: {n} files uploaded under {prefix or '(root)'}/{doc_id}")
+            print(f"[ok] {doc_id}: {n} files uploaded under {prefix or '(root)'}/shared/{doc_id}")
         except Exception as exc:
             failed.append(doc_id)
             sys.stderr.write(f"[fail] {doc_id}: {exc!r}\n")

@@ -141,12 +141,21 @@ compile-examples-figs = { cmd = "python scripts/compile_examples.py doc_figure_s
 # Runtime deps for `paradoc-serve` — kept to a minimum so the container
 # image stays slim. typer + pydantic are explicit (don't lean on transitive
 # pulls from fastapi). obstore is what handles s3:// bundle URLs.
+# asyncpg drives the optional Postgres control plane (users, projects,
+# memberships) — when PARADOC_DATABASE_URL is unset the pool stays None
+# and paradoc-serve runs in shared-only mode.
 python = "3.12.*"
 fastapi = ">=0.115"
 uvicorn = ">=0.30"
 typer = "*"
 pydantic = ">=2.0"
 obstore = ">=0.3"
+asyncpg = ">=0.29"
+# pyjwt + httpx drive the OIDC verifier — JWT decode/signature checks
+# and JWKS fetching against Authentik / Azure AD discovery endpoints.
+pyjwt = ">=2.8"
+httpx = ">=0.27"
+cryptography = "*"
 
 [feature.test-core.pypi-dependencies]
 pytest-playwright = "*"

@@ -1,8 +1,10 @@
 import React, { useEffect, useRef } from 'react'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { useAppStore } from './store/appStore'
 import { Topbar } from './components/Topbar'
 import { Navbar, TocItem } from './components/Navbar'
 import { SearchBar } from './components/SearchBar'
+import AdminApp from './components/admin/AdminApp'
 
 // Inline the worker so it's embedded in the bundle
 import InlineWorker from './ws/worker.ts?worker&inline'
@@ -376,11 +378,21 @@ function AppContent() {
 }
 export default function App() {
   return (
-    <SourceDisplayProvider>
-      <ViewerControlsProvider>
-        <AppContent />
-      </ViewerControlsProvider>
-    </SourceDisplayProvider>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/admin/*" element={<AdminApp />} />
+        <Route
+          path="*"
+          element={
+            <SourceDisplayProvider>
+              <ViewerControlsProvider>
+                <AppContent />
+              </ViewerControlsProvider>
+            </SourceDisplayProvider>
+          }
+        />
+      </Routes>
+    </BrowserRouter>
   )
 }
 

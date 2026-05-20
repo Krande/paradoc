@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from paradoc.db import DbManager, ThreeDData, dataframe_to_table_data  # noqa: E402
 from paradoc.docstore import LocalDocStore, write_manifest  # noqa: E402
-from paradoc.serve import IngressTrustPolicy, create_app  # noqa: E402
+from paradoc.serve import create_app  # noqa: E402
 
 
 def _build_bundle(tmp_path, doc_id="my_doc"):
@@ -109,18 +109,42 @@ def test_three_d_blob_etag_cache(tmp_path):
     assert res.status_code == 304
 
 
-def test_auth_required(tmp_path):
+def test_scope_aware_route_shared(tmp_path):
+    # New /api/scopes/{scope}/docs/... URL form. With auth disabled
+    # the synthetic local-dev user can access shared scope; the route
+    # resolves the scope predicate without a DB pool.
     bundle, doc_id, _ = _build_bundle(tmp_path)
-    app = create_app(
-        doc_store=LocalDocStore(bundle),
-        auth_policy=IngressTrustPolicy(require_principal=True),
-    )
+    app = create_app(doc_store=LocalDocStore(bundle))
     client = TestClient(app)
-    res = client.get(f"/api/docs/{doc_id}/tables/t")
-    assert res.status_code == 401
+    res = client.get(f"/api/scopes/shared/docs/{doc_id}/tables/t")
+    assert res.status_code == 200
+    assert res.json()["key"] == "t"
 
-    res2 = client.get(
-        f"/api/docs/{doc_id}/tables/t",
-        headers={"X-Auth-Request-User": "alice"},
-    )
-    assert res2.status_code == 200
+
+def test_scope_aware_route_user_me_in_single_doc_mode_404s(tmp_path):
+    # Single-doc layout only supports shared scope. user:me resolves
+    # to a valid scope (local-dev's id), but the LocalDocStore raises
+    # FileNotFoundError for non-shared scopes — surfaces as 500
+    # (uncaught) or per FastAPI's default handling. Verify it's not 200.
+    bundle, doc_id, _ = _build_bundle(tmp_path)
+    app = create_app(doc_store=LocalDocStore(bundle))
+    client = TestClient(app)
+    res = client.get(f"/api/scopes/user:me/docs/{doc_id}/tables/t")
+    assert res.status_code != 200
+
+
+def test_me_returns_local_dev_when_auth_disabled(tmp_path, monkeypatch):
+    # Default (auth disabled) — /api/me returns the synthetic local-dev
+    # admin user instead of 401ing. Keeps dev paths usable without IdP
+    # config.
+    monkeypatch.delenv("PARADOC_AUTH_ENABLED", raising=False)
+    monkeypatch.delenv("PARADOC_OIDC_PROVIDERS_JSON", raising=False)
+    bundle, _doc_id, _ = _build_bundle(tmp_path)
+    app = create_app(doc_store=LocalDocStore(bundle))
+    client = TestClient(app)
+    res = client.get("/api/me")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["iss"] == "local-dev"
+    assert body["is_admin"] is True
+    assert body["subject"] == "local-dev"

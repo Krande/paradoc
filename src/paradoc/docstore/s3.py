@@ -1,15 +1,18 @@
 """S3-backed `DocStore` via `obstore`.
 
-Layout in S3 mirrors the local layout::
+Layout in S3 mirrors the local scope-aware layout::
 
-    s3://<bucket>/<doc_id>/manifest.json
-    s3://<bucket>/<doc_id>/paradoc.sqlite
-    s3://<bucket>/<doc_id>/assets/3d/<key>.glb
+    s3://<bucket>/<prefix?>/<scope_kind>/<scope_id?>/<doc_id>/manifest.json
+    s3://<bucket>/<prefix?>/<scope_kind>/<scope_id?>/<doc_id>/paradoc.sqlite
+    s3://<bucket>/<prefix?>/<scope_kind>/<scope_id?>/<doc_id>/assets/3d/<key>.glb
     ...
 
+Where ``<scope_kind>/<scope_id?>`` comes from :meth:`Scope.prefix`:
+``shared`` / ``users/<user_id>`` / ``projects/<project_id>``.
+
 The sqlite database is downloaded to a local cache on first access for
-each doc; we never run sqlite over HTTP. Glb bytes stream directly from
-S3 via obstore range reads.
+each (scope, doc) pair; we never run sqlite over HTTP. Glb bytes stream
+directly from S3 via obstore range reads.
 """
 
 from __future__ import annotations
@@ -18,13 +21,16 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import AsyncIterator, Optional
+from typing import TYPE_CHECKING, AsyncIterator, Optional
 from urllib.parse import urlparse
 
 from paradoc.db import DbManager
 from paradoc.db.models import PlotData, TableData, ThreeDData
 
-from .base import DocStore
+from .base import DocStore, _default_shared_scope
+
+if TYPE_CHECKING:
+    from paradoc.serve.scope import Scope
 
 
 def _env_first(*names: str) -> Optional[str]:
@@ -104,19 +110,28 @@ class S3DocStore(DocStore):
 
     # ---------------- key helpers ----------------
 
-    def _doc_prefix(self, doc_id: str) -> str:
+    def _scope_prefix(self, scope: "Scope") -> str:
+        """Full key prefix up to and including the scope segment.
+
+        Joins ``self.prefix`` (the store-level prefix from the s3://
+        URL) with ``scope.prefix()`` (``shared`` / ``users/<id>`` /
+        ``projects/<id>``).
+        """
+        sp = scope.prefix()
+        return f"{self.prefix}/{sp}" if self.prefix else sp
+
+    def _doc_prefix(self, doc_id: str, scope: "Scope") -> str:
         if "/" in doc_id or doc_id.startswith(".."):
             raise PermissionError(f"doc_id {doc_id!r} is not a single path segment")
-        if self.prefix:
-            return f"{self.prefix}/{doc_id}"
-        return doc_id
+        return f"{self._scope_prefix(scope)}/{doc_id}"
 
-    def _key(self, doc_id: str, *path: str) -> str:
-        return "/".join([self._doc_prefix(doc_id), *path])
+    def _key(self, doc_id: str, scope: "Scope", *path: str) -> str:
+        return "/".join([self._doc_prefix(doc_id, scope), *path])
 
     # ---------------- DocStore interface ----------------
 
-    def list_doc_ids(self) -> list[str]:
+    def list_doc_ids(self, scope: Optional["Scope"] = None) -> list[str]:
+        s = scope if scope is not None else _default_shared_scope()
         # Prefer `list_with_delimiter` so we get the per-doc subdirectories
         # back as `common_prefixes` directly, instead of paginating every
         # object in the bucket and reducing to first-segments. Trailing
@@ -129,7 +144,10 @@ class S3DocStore(DocStore):
         except ImportError:
             return []
 
-        list_prefix = (self.prefix.rstrip("/") + "/") if self.prefix else None
+        # Listing is bounded by the scope: enumerate only the immediate
+        # children of `<store_prefix>/<scope.prefix()>/`.
+        scope_prefix = self._scope_prefix(s)
+        list_prefix = scope_prefix + "/" if scope_prefix else None
         try:
             result = _obstore.list_with_delimiter(self._store, prefix=list_prefix)
             common = result["common_prefixes"] if isinstance(result, dict) else getattr(result, "common_prefixes", [])
@@ -177,47 +195,78 @@ class S3DocStore(DocStore):
             return sorted(seen)
         return sorted(seen)
 
-    def _db(self, doc_id: str) -> DbManager:
-        cached = self._db_managers.get(doc_id)
+    def _db(self, doc_id: str, scope: "Scope") -> DbManager:
+        # Cache keyed by (scope, doc) so the same doc_id under different
+        # scopes (e.g. ``shared/foo`` vs ``projects/x/foo``) doesn't
+        # collide in the local cache.
+        cache_key = f"{scope.prefix()}/{doc_id}"
+        cached = self._db_managers.get(cache_key)
         if cached is not None:
             return cached
-        local_db_path = self.cache_dir / doc_id / self.db_filename
+        local_db_path = self.cache_dir / scope.prefix() / doc_id / self.db_filename
         local_db_path.parent.mkdir(parents=True, exist_ok=True)
         if not local_db_path.exists():
-            payload = self._store.get(self._key(doc_id, self.db_filename)).bytes()
+            payload = self._store.get(self._key(doc_id, scope, self.db_filename)).bytes()
             local_db_path.write_bytes(bytes(payload))
         manager = DbManager(local_db_path)
-        self._db_managers[doc_id] = manager
+        self._db_managers[cache_key] = manager
         return manager
 
-    def get_table(self, doc_id: str, key: str) -> Optional[TableData]:
-        return self._db(doc_id).get_table(key)
+    def get_table(
+        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
+    ) -> Optional[TableData]:
+        s = scope if scope is not None else _default_shared_scope()
+        return self._db(doc_id, s).get_table(key)
 
-    def get_plot(self, doc_id: str, key: str) -> Optional[PlotData]:
-        return self._db(doc_id).get_plot(key)
+    def get_plot(
+        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
+    ) -> Optional[PlotData]:
+        s = scope if scope is not None else _default_shared_scope()
+        return self._db(doc_id, s).get_plot(key)
 
-    def get_three_d_meta(self, doc_id: str, key: str) -> Optional[ThreeDData]:
-        return self._db(doc_id).get_three_d(key)
+    def get_three_d_meta(
+        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
+    ) -> Optional[ThreeDData]:
+        s = scope if scope is not None else _default_shared_scope()
+        return self._db(doc_id, s).get_three_d(key)
 
-    def get_static_manifest_bytes(self, doc_id: str) -> Optional[bytes]:
-        return self._fetch_object(self._key(doc_id, "static", "manifest.json"))
+    def get_static_manifest_bytes(
+        self, doc_id: str, *, scope: Optional["Scope"] = None
+    ) -> Optional[bytes]:
+        s = scope if scope is not None else _default_shared_scope()
+        return self._fetch_object(self._key(doc_id, s, "static", "manifest.json"))
 
-    def get_static_section_bytes(self, doc_id: str, idx: int) -> Optional[bytes]:
+    def get_static_section_bytes(
+        self, doc_id: str, idx: int, *, scope: Optional["Scope"] = None
+    ) -> Optional[bytes]:
         if idx < 0:
             return None
-        return self._fetch_object(self._key(doc_id, "static", "sections", f"{idx}.json"))
+        s = scope if scope is not None else _default_shared_scope()
+        return self._fetch_object(self._key(doc_id, s, "static", "sections", f"{idx}.json"))
 
-    def get_static_plots_bytes(self, doc_id: str) -> Optional[bytes]:
-        return self._fetch_object(self._key(doc_id, "static", "plots.json"))
+    def get_static_plots_bytes(
+        self, doc_id: str, *, scope: Optional["Scope"] = None
+    ) -> Optional[bytes]:
+        s = scope if scope is not None else _default_shared_scope()
+        return self._fetch_object(self._key(doc_id, s, "static", "plots.json"))
 
-    def get_static_tables_bytes(self, doc_id: str) -> Optional[bytes]:
-        return self._fetch_object(self._key(doc_id, "static", "tables.json"))
+    def get_static_tables_bytes(
+        self, doc_id: str, *, scope: Optional["Scope"] = None
+    ) -> Optional[bytes]:
+        s = scope if scope is not None else _default_shared_scope()
+        return self._fetch_object(self._key(doc_id, s, "static", "tables.json"))
 
-    def get_static_images_bytes(self, doc_id: str) -> Optional[bytes]:
-        return self._fetch_object(self._key(doc_id, "static", "images.json"))
+    def get_static_images_bytes(
+        self, doc_id: str, *, scope: Optional["Scope"] = None
+    ) -> Optional[bytes]:
+        s = scope if scope is not None else _default_shared_scope()
+        return self._fetch_object(self._key(doc_id, s, "static", "images.json"))
 
-    def get_presets_bytes(self, doc_id: str) -> Optional[bytes]:
-        return self._fetch_object(self._key(doc_id, "assets", "presets.json"))
+    def get_presets_bytes(
+        self, doc_id: str, *, scope: Optional["Scope"] = None
+    ) -> Optional[bytes]:
+        s = scope if scope is not None else _default_shared_scope()
+        return self._fetch_object(self._key(doc_id, s, "assets", "presets.json"))
 
     def _fetch_object(self, key: str) -> Optional[bytes]:
         try:
@@ -236,13 +285,15 @@ class S3DocStore(DocStore):
         doc_id: str,
         key: str,
         *,
+        scope: Optional["Scope"] = None,
         chunk_size: int = 256 * 1024,
     ) -> AsyncIterator[bytes]:
-        meta = self.get_three_d_meta(doc_id, key)
+        s = scope if scope is not None else _default_shared_scope()
+        meta = self.get_three_d_meta(doc_id, key, scope=s)
         if meta is None:
             raise KeyError(f"3D asset not found: doc_id={doc_id!r} key={key!r}")
 
-        s3_key = self._key(doc_id, *meta.glb_path.split("/"))
+        s3_key = self._key(doc_id, s, *meta.glb_path.split("/"))
         store = self._store
 
         async def _gen() -> AsyncIterator[bytes]:

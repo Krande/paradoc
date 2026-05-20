@@ -147,6 +147,13 @@ export function OverflowMenu({
             >
               User info
             </button>
+            <a
+              role="menuitem"
+              href="/admin"
+              className="cursor-pointer block w-full text-left px-3 py-2 hover:bg-gray-100"
+            >
+              Admin
+            </a>
           </div>
         )}
       </div>
