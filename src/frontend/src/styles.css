@@ -3,8 +3,15 @@
 /* Tailwind v4: opt the dark: variant onto the `.dark` class set on
    <html> by the pre-paint script in index.html. Without this directive
    v4 defaults to media-query mode which can't be overridden by a manual
-   toggle. */
-@custom-variant dark (&:where(.dark, .dark *));
+   toggle.
+   We deliberately do NOT use `:where()` here. Wrapping `.dark` in
+   `:where()` strips the class's specificity to zero, so `dark:bg-x`
+   tied with any plain `.bg-x` rule on cascade order — meaning any
+   stylesheet declared LATER (e.g. the adapy embed's Tailwind reset
+   when the 3D viewer mounts) clobbered paradoc's dark mode. Plain
+   `.dark &` gives the variant a real selector and a true (0,2,0)
+   specificity that wins over single-class collisions. */
+@custom-variant dark (.dark &);
 
 /* Global gray tones theme and sensible defaults */
 @layer base {
