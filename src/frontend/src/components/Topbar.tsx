@@ -15,17 +15,15 @@ function BrandMark({ className = 'w-5 h-5' }: { className?: string }) {
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      fill="currentColor"
       className={className}
       aria-hidden="true"
     >
-      <path d="M5 3 H14 L19 8 V21 H5 Z" />
-      <path d="M14 3 V8 H19" />
-      <path d="M7 17 L10 13 L13 15 L17 10" />
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M3 3 H21 V21 H3 Z M6 6 H18 V18 H6 Z M7 17 L7 13 L10 13 L10 11 L13 11 L13 8 L17 8 L17 17 Z"
+      />
     </svg>
   )
 }
