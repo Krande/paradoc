@@ -1,16 +1,48 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import mimetypes
+import os
 import pathlib
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
 import pypandoc
 
+from paradoc.citation import FILTER_PATH as SHELF_CITATION_FILTER
 from paradoc.config import logger
 
 if TYPE_CHECKING:
     from paradoc import OneDoc
+
+
+@contextlib.contextmanager
+def _shelf_citation_env(one: "OneDoc"):
+    """Set env vars consumed by the shelf-citation pandoc filter.
+
+    Mirrors HTMLExporter's helper — kept inline rather than shared so
+    the two exporters' contracts stay independent.
+    """
+    keys = ("PARADOC_BIBLIOGRAPHY", "PARADOC_SHELF_BASE_URL")
+    prior = {k: os.environ.get(k) for k in keys}
+    bib = getattr(one, "bibliography_file", None)
+    if bib is not None:
+        os.environ["PARADOC_BIBLIOGRAPHY"] = str(bib)
+    else:
+        os.environ.pop("PARADOC_BIBLIOGRAPHY", None)
+    shelf_url = getattr(one, "shelf_base_url", "")
+    if shelf_url:
+        os.environ["PARADOC_SHELF_BASE_URL"] = shelf_url
+    else:
+        os.environ.pop("PARADOC_SHELF_BASE_URL", None)
+    try:
+        yield
+    finally:
+        for k, v in prior.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
 def _reset_kaleido_scope():
@@ -87,19 +119,22 @@ class ASTExporter:
 
         combined_str = "\n\n".join(md_parts)
 
-        ast_json = pypandoc.convert_text(
-            combined_str,
-            to="json",
-            format="markdown",
-            extra_args=[
-                "-M2GB",
-                "+RTS",
-                "-K64m",
-                "-RTS",
-                f"--metadata-file={one.metadata_file}",
-            ],
-            filters=["pandoc-crossref"],
-        )
+        with _shelf_citation_env(one):
+            ast_json = pypandoc.convert_text(
+                combined_str,
+                to="json",
+                format="markdown",
+                extra_args=[
+                    "-M2GB",
+                    "+RTS",
+                    "-K64m",
+                    "-RTS",
+                    f"--metadata-file={one.metadata_file}",
+                ],
+                # Shelf citation filter appended after pandoc-crossref;
+                # it's a no-op when bibliography_file is unset.
+                filters=["pandoc-crossref", str(SHELF_CITATION_FILTER)],
+            )
         try:
             ast = json.loads(ast_json)
         except Exception as e:

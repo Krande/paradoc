@@ -147,6 +147,8 @@ class OneDoc:
         output_dir=None,
         work_dir=None,
         use_default_html_style=True,
+        bibliography_file=None,
+        shelf_base_url=None,
         **kwargs,
     ):
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
@@ -174,6 +176,23 @@ class OneDoc:
         self.md_files_app = []
         self.metadata_file = None
         self.use_default_html_style = use_default_html_style
+
+        # Shelf citation deep-link config. ``bibliography_file`` points
+        # to a YAML file with CSL-style `references:` entries; the
+        # citation filter (paradoc.citation.filter) loads it via env at
+        # compile time. Defaults to ``<source_dir>/references.yaml``
+        # when that file exists. ``shelf_base_url`` is substituted into
+        # the ``{shelf_base_url}`` placeholder in each entry's ``URL``;
+        # falls back to env ``PARADOC_SHELF_BASE_URL`` then empty.
+        if bibliography_file is not None:
+            self.bibliography_file = pathlib.Path(bibliography_file)
+        else:
+            default_bib = self.source_dir / "references.yaml"
+            self.bibliography_file = default_bib if default_bib.is_file() else None
+        if shelf_base_url is not None:
+            self.shelf_base_url = str(shelf_base_url)
+        else:
+            self.shelf_base_url = os.environ.get("PARADOC_SHELF_BASE_URL", "").strip()
 
         # Initialize database manager at source_dir/data.db
         db_path = self.source_dir / "data.db"
