@@ -20,7 +20,7 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
         {toc.map((item) => (
           <li key={item.id}>
             <a
-              className="cursor-pointer block text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded px-2 py-1"
+              className="cursor-pointer block text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded px-2 py-1"
               style={{ paddingLeft: `${item.level * 16 + 8}px` }}
               href={`#${item.id}`}
               onClick={(e) => {
@@ -36,7 +36,7 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
               }}
               aria-label={`Go to ${item.text}`}
             >
-              {item.number && <span className="mr-2 text-gray-500">{item.number}</span>}
+              {item.number && <span className="mr-2 text-gray-500 dark:text-gray-400">{item.number}</span>}
               {item.text}
             </a>
           </li>
@@ -58,9 +58,9 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className={`${open ? 'md:flex' : 'md:hidden'} hidden flex-col w-72 shrink-0 border-r border-gray-200 bg-white/60 backdrop-blur sticky top-0 h-dvh overflow-auto`}>
-        <div className="px-4 py-3 border-b border-gray-200">
-          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Outline</div>
+      <aside className={`${open ? 'md:flex' : 'md:hidden'} hidden flex-col w-72 shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-gray-950/60 backdrop-blur sticky top-0 h-dvh overflow-auto`}>
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Outline</div>
         </div>
         {NavList}
       </aside>
@@ -86,14 +86,14 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
             need `transition-[translate]` to animate that property
             instead of the old `transition-transform`. */}
         <aside
-          className={`absolute left-0 top-0 bottom-0 w-72 bg-white border-r border-gray-200 shadow-xl transition-[translate] duration-150 ease-out ${open ? 'translate-x-0' : '-translate-x-full'}`}
+          className={`absolute left-0 top-0 bottom-0 w-72 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 shadow-xl transition-[translate] duration-150 ease-out ${open ? 'translate-x-0' : '-translate-x-full'}`}
           role="dialog"
           aria-modal="true"
         >
-          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-            <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Outline</div>
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+            <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Outline</div>
             <button
-              className="cursor-pointer inline-flex items-center justify-center rounded p-2 text-gray-500 hover:text-gray-700"
+              className="cursor-pointer inline-flex items-center justify-center rounded p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
               onClick={onClose}
               aria-label="Close contents"
             >

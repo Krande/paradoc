@@ -4,9 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="data-appendix-start" content="Appendix" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Paradoc Reader</title>
+    <script>
+      // Apply the persisted theme before first paint so the SPA doesn't
+      // flash light-on-dark or vice-versa. Stored value: 'light' | 'dark'
+      // | 'system' (default). Read here lives outside React because the
+      // first render needs the class on <html> already.
+      (function () {
+        try {
+          var stored = localStorage.getItem('paradoc-theme') || 'system';
+          var prefersDark =
+            window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var dark = stored === 'dark' || (stored === 'system' && prefersDark);
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (_) {}
+      })();
+    </script>
   </head>
-  <body class="min-h-screen bg-gray-50 text-gray-900">
+  <body class="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100">
     <div id="root"></div>
     <!--
       Hosted REST mode injects window.__PARADOC_CONFIG__ via /config.js.

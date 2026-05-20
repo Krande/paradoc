@@ -16,7 +16,7 @@ import { initTransport, getRuntimeConfig } from './transport'
 import { loadRestData } from './transport/loadRestData'
 import type { DocManifest, SectionBundle } from './ast/types'
 import { VirtualReader } from './components/VirtualReader'
-import { DocList } from './components/DocList'
+import { LandingPage } from './components/LandingPage'
 import { calculateHeadingNumbers } from './ast/headingNumbers'
 import { SourceDisplayProvider } from './store/sourceDisplayStore'
 import { ViewerControlsProvider } from './store/viewerControlsStore'
@@ -319,7 +319,13 @@ function AppContent() {
     setDocId(id)
     try {
       const url = new URL(window.location.href)
-      url.searchParams.set('doc', id)
+      if (id) {
+        url.searchParams.set('doc', id)
+      } else {
+        // Empty id = "back to landing" (clicked the brand mark). Drop
+        // the ?doc= param so a refresh stays on the landing page.
+        url.searchParams.delete('doc')
+      }
       window.history.pushState({}, '', url.toString())
     } catch {}
   }
@@ -369,11 +375,11 @@ function AppContent() {
         ) : (() => {
           const cfg = getRuntimeConfig()
           if (cfg.transport === 'rest' && !docId) {
-            return <DocList onSelect={handleSelectDoc} />
+            return <LandingPage onSelect={handleSelectDoc} />
           }
           return (
             <div className="flex-1 overflow-auto p-6">
-              <div className="text-sm text-gray-500">Waiting for document manifest…</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Waiting for document manifest…</div>
             </div>
           )
         })()}

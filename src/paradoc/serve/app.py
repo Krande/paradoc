@@ -417,6 +417,59 @@ def create_app(
     ):
         return await _get_3d_blob(doc_id, key, scope_obj, request)
 
+    # ── Landing aggregator ───────────────────────────────────────────
+    #
+    # One round-trip backing the landing-page UI. Bundles the
+    # shared / personal / per-project doc lists so the SPA doesn't
+    # have to fan out N requests to draw the first screen. Each entry
+    # is intentionally minimal (`id` + `scope`) — the SPA still calls
+    # /api/docs/{id}/manifest for full metadata when the user opens
+    # one. `recent` stays empty until we surface per-doc updated_at;
+    # the frontend hides the section when it's empty.
+
+    @app.get("/api/landing")
+    async def get_landing(
+        request: Request,
+        user: User = Depends(auth_module.current_user),
+    ) -> dict[str, Any]:
+        shared_ids = doc_store.list_doc_ids(Scope.shared())
+        shared = [{"id": d, "scope": "shared"} for d in shared_ids]
+
+        personal: list[dict[str, Any]] = []
+        # Synthetic local-dev users keep the zero UUID; their bundles
+        # never live under users/<id>/, so skip the listing.
+        if user.id and not user.id.startswith("00000000"):
+            try:
+                personal_ids = doc_store.list_doc_ids(Scope.user(user.id))
+                personal = [{"id": d, "scope": "personal"} for d in personal_ids]
+            except Exception:
+                personal = []
+
+        projects_out: list[dict[str, Any]] = []
+        pool = getattr(request.app.state, "db_pool", None)
+        if pool is not None and user.id and not user.id.startswith("00000000"):
+            from . import db as _db
+            user_projects = await _db.list_user_projects(pool, user.id)
+            for p in user_projects:
+                try:
+                    doc_ids = doc_store.list_doc_ids(Scope.project(p.id))
+                except Exception:
+                    doc_ids = []
+                projects_out.append(
+                    {
+                        "slug": p.slug,
+                        "name": p.name,
+                        "docs": [{"id": d, "scope": "project"} for d in doc_ids],
+                    }
+                )
+
+        return {
+            "recent": [],
+            "personal": personal,
+            "shared": shared,
+            "projects": projects_out,
+        }
+
     # ── Admin API ────────────────────────────────────────────────────
     #
     # Project CRUD + member management + shelf_base_url config. All

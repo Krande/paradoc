@@ -26,7 +26,7 @@ export function DocSwitcher({ currentDocId, onSelect }: DocSwitcherProps) {
       // Match the Source button (gray pill, same padding/text size) so
       // both controls feel like the same toolbar family. `pr-7` leaves
       // room for the native chevron the rounded variant tucks tight.
-      className="cursor-pointer text-xs font-medium pl-3 pr-7 py-1.5 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 transition focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[18rem] appearance-none bg-no-repeat bg-[right_0.5rem_center] bg-[length:0.75rem]"
+      className="cursor-pointer text-xs font-medium pl-3 pr-7 py-1.5 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 transition focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[18rem] appearance-none bg-no-repeat bg-[right_0.5rem_center] bg-[length:0.75rem]"
       style={{
         backgroundImage:
           "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20' stroke='%23374151' stroke-width='1.6'><path stroke-linecap='round' stroke-linejoin='round' d='M6 8l4 4 4-4'/></svg>\")",
