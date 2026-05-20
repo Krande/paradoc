@@ -27,16 +27,26 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
                 e.preventDefault()
                 const el = document.getElementById(item.id)
                 if (el) {
-                  // `scrollIntoView` walks up to the nearest scrollable
-                  // ancestor (the VirtualReader's `overflow-auto` div).
-                  // We previously used `window.scrollTo` here — but the
-                  // app root has `overflow:hidden`, so the window isn't
-                  // scrollable; on mobile that triggered the browser's
-                  // visual-viewport pinch-zoom heuristic instead of a
-                  // real scroll. Top-bar clearance is handled by the
-                  // `scroll-mt-*` utility on the reader's headings
-                  // (see styles.css scroll-margin-top rule).
-                  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  // Find the reader's overflow-auto container explicitly
+                  // (it carries `data-search-root`). Scroll *only* that
+                  // container — neither `window.scrollTo` (worked on
+                  // desktop, triggered the visual-viewport pinch-zoom
+                  // heuristic on mobile) nor `scrollIntoView` (walks
+                  // multiple scroll ancestors on iOS / Android Chrome,
+                  // shifting the page chrome and pushing the topbar
+                  // out of view).
+                  const scroller = el.closest('[data-search-root]') as HTMLElement | null
+                  if (scroller) {
+                    const elRect = el.getBoundingClientRect()
+                    const scRect = scroller.getBoundingClientRect()
+                    const target = elRect.top - scRect.top + scroller.scrollTop - 16
+                    scroller.scrollTo({
+                      top: Math.max(0, target),
+                      behavior: 'smooth',
+                    })
+                  } else {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
                 }
                 onClose()
               }}
