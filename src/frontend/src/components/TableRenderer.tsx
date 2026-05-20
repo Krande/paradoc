@@ -42,10 +42,10 @@ export function TableRenderer({ tableKey, docId }: TableRendererProps) {
 
   if (loading) {
     return (
-      <div className="my-4 p-4 border border-gray-300 rounded bg-gray-50">
+      <div className="my-4 p-4 border border-gray-300 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-900">
         <div className="flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Loading table...</span>
+          <span className="ml-3 text-gray-600 dark:text-gray-400">Loading table...</span>
         </div>
       </div>
     )
@@ -127,23 +127,23 @@ export function TableRenderer({ tableKey, docId }: TableRendererProps) {
         <p className="text-sm font-semibold mb-2">{tableData.caption}</p>
       )}
 
-      <div className="overflow-x-auto border border-gray-300 rounded">
-        <table className="min-w-full border-collapse bg-white">
-          <thead className="bg-gray-100">
+      <div className="overflow-x-auto border border-gray-300 dark:border-gray-700 rounded">
+        <table className="min-w-full border-collapse bg-white dark:bg-gray-900">
+          <thead className="bg-gray-100 dark:bg-gray-800">
             <tr>
               {tableData.show_index_default && (
-                <th className="px-3 py-2 text-left border-b border-gray-300 font-semibold text-sm">
+                <th className="px-3 py-2 text-left border-b border-gray-300 dark:border-gray-700 font-semibold text-sm">
                   #
                 </th>
               )}
               {tableData.columns.map((col: any) => (
                 <th
                   key={col.name}
-                  className="px-3 py-2 text-left border-b border-gray-300 font-semibold text-sm"
+                  className="px-3 py-2 text-left border-b border-gray-300 dark:border-gray-700 font-semibold text-sm"
                 >
                   <div className="flex flex-col gap-1">
                     <div
-                      className="flex items-center cursor-pointer hover:bg-gray-200 -mx-3 -my-2 px-3 py-2 rounded select-none"
+                      className="flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 -mx-3 -my-2 px-3 py-2 rounded select-none"
                       onClick={() => handleSort(col.name)}
                     >
                       <span>{col.name}</span>
@@ -159,7 +159,7 @@ export function TableRenderer({ tableKey, docId }: TableRendererProps) {
                       value={columnFilters[col.name] || ''}
                       onChange={(e) => handleColumnFilter(col.name, e.target.value)}
                       onClick={(e) => e.stopPropagation()}
-                      className="px-2 py-1 text-xs border border-gray-300 rounded w-full focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-700 rounded w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
                 </th>
@@ -170,17 +170,21 @@ export function TableRenderer({ tableKey, docId }: TableRendererProps) {
             {rows.map((row, rowIdx) => (
               <tr
                 key={rowIdx}
-                className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
+                className={
+                  rowIdx % 2 === 0
+                    ? 'bg-white dark:bg-gray-900'
+                    : 'bg-gray-50 dark:bg-gray-800/50'
+                }
               >
                 {tableData.show_index_default && (
-                  <td className="px-3 py-2 border-b border-gray-200 text-sm text-gray-600">
+                  <td className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
                     {rowIdx}
                   </td>
                 )}
                 {tableData.columns.map((col: any) => (
                   <td
                     key={col.name}
-                    className="px-3 py-2 border-b border-gray-200 text-sm"
+                    className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 text-sm"
                   >
                     {(row as any)[col.name] !== undefined ? String((row as any)[col.name]) : ''}
                   </td>
@@ -191,7 +195,7 @@ export function TableRenderer({ tableKey, docId }: TableRendererProps) {
         </table>
       </div>
 
-      <p className="text-xs text-gray-500 mt-2">
+      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
         Showing {rows.length} {rows.length === 1 ? 'row' : 'rows'}
       </p>
     </div>

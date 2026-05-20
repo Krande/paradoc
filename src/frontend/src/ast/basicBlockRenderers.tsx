@@ -102,7 +102,7 @@ export function renderCodeBlock(b: CodeBlock, key?: React.Key, sourceInfo?: { so
   const [a, code] = b.c
   const codeAttrs = attrs(a)
   return (
-    <SourceBadge key={key} sourceInfo={sourceInfo}><pre {...codeAttrs} className={'my-3 p-3 rounded bg-gray-100 overflow-auto text-sm ' + (codeAttrs.className || '')}>
+    <SourceBadge key={key} sourceInfo={sourceInfo}><pre {...codeAttrs} className={'my-3 p-3 rounded bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 overflow-auto text-sm ' + (codeAttrs.className || '')}>
       <code>{code}</code>
     </pre></SourceBadge>
   )
@@ -112,7 +112,7 @@ export function renderCodeBlock(b: CodeBlock, key?: React.Key, sourceInfo?: { so
  * Render a BlockQuote
  */
 export function renderBlockQuote(b: BlockQuote, renderBlock: (b: any, k?: React.Key, hn?: HeadingNumbering) => React.ReactElement | null, key?: React.Key, sourceInfo?: { source_file?: string; source_dir?: string }): React.ReactElement {
-    return <SourceBadge key={key} sourceInfo={sourceInfo}><blockquote className="border-l-4 pl-4 my-3 text-gray-700">{b.c.map((bb, j) => renderBlock(bb, j))}</blockquote></SourceBadge>
+    return <SourceBadge key={key} sourceInfo={sourceInfo}><blockquote className="border-l-4 border-gray-200 dark:border-gray-700 pl-4 my-3 text-gray-700 dark:text-gray-300">{b.c.map((bb, j) => renderBlock(bb, j))}</blockquote></SourceBadge>
 }
 
 /**

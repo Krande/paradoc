@@ -74,7 +74,23 @@ export function renderInlines(xs: PandocInline[]): React.ReactNode {
       case 'Code': {
         const [a, code] = x.c
         const codeAttrs = attrs(a)
-        out.push(<code key={i} {...codeAttrs} className={'px-1 py-0.5 rounded bg-gray-100 ' + (codeAttrs.className || '')}>{code}</code>)
+        // Inline className wins over the @layer base `code { ... }`
+        // rule, so the dark variants have to live here too — otherwise
+        // inline tokens like `${ name(.attr)?(args)? }` render with a
+        // light-gray fill against dark-mode body text and become
+        // unreadable.
+        out.push(
+          <code
+            key={i}
+            {...codeAttrs}
+            className={
+              'px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 ' +
+              (codeAttrs.className || '')
+            }
+          >
+            {code}
+          </code>,
+        )
         break
       }
       case 'Link': {
@@ -101,7 +117,7 @@ export function renderInlines(xs: PandocInline[]): React.ReactNode {
             {...linkAttrs}
             href={href}
             title={title}
-            className={'text-blue-600 hover:underline cursor-pointer ' + (linkAttrs.className || '')}
+            className={'text-blue-600 dark:text-blue-400 hover:underline cursor-pointer ' + (linkAttrs.className || '')}
             onClick={handleClick}
           >
             {renderInlines(content)}

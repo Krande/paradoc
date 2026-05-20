@@ -191,7 +191,7 @@ export function renderFigure(b: any, renderBlock: (b: any, k?: React.Key, hn?: H
     <figure key={key} {...figAttrs} className={className}>
       {Array.isArray(content) ? content.map((bb, j) => renderBlock(bb as any, j)) : null}
       {captionInlines && captionInlines.length > 0 ? (
-        <figcaption className="text-sm text-gray-600 italic mt-2">
+        <figcaption className="text-sm text-gray-600 dark:text-gray-400 italic mt-2">
           {renderInlines(captionInlines as any)}
         </figcaption>
       ) : null}
@@ -218,8 +218,8 @@ function renderTableContent(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
     const cellAttrs = attrs(cellAttr)
     const content = Array.isArray(cellBlocks) ? cellBlocks.map((bb: any, i: number) => renderBlock(bb, i)) : null
     const className = isHeader
-      ? 'px-3 py-2 bg-gray-100 font-semibold text-left border border-gray-300'
-      : 'px-3 py-2 border border-gray-300'
+      ? 'px-3 py-2 bg-gray-100 dark:bg-gray-800 font-semibold text-left border border-gray-300 dark:border-gray-700'
+      : 'px-3 py-2 border border-gray-300 dark:border-gray-700'
 
     const Tag = isHeader ? 'th' : 'td'
     return (
@@ -252,7 +252,7 @@ function renderTableContent(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
     <div key={key} className="overflow-x-auto">
       <table
         {...tableAttrs}
-        className={'min-w-full border-collapse border border-gray-300 ' + (tableAttrs.className || '')}
+        className={'min-w-full border-collapse border border-gray-300 dark:border-gray-700 ' + (tableAttrs.className || '')}
       >
         {tableHead && Array.isArray(tableHead) && tableHead.length > 1 && Array.isArray(tableHead[1]) && tableHead[1].length > 0 ? (
           <thead>
@@ -325,7 +325,7 @@ export function renderTable(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
 
 
   const captionContent = captionInlines && captionInlines.length > 0 ? (
-    <div className="text-sm text-gray-600 italic mt-2 text-center">
+    <div className="text-sm text-gray-600 dark:text-gray-400 italic mt-2 text-center">
       {renderInlines(captionInlines)}
     </div>
   ) : null

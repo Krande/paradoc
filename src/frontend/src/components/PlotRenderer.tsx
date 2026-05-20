@@ -135,10 +135,10 @@ export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
 
   if (loading) {
     return (
-      <div className="my-4 p-4 border border-gray-300 rounded bg-gray-50">
+      <div className="my-4 p-4 border border-gray-300 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-900">
         <div className="flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600">Loading plot...</span>
+          <span className="ml-3 text-gray-600 dark:text-gray-400">Loading plot...</span>
         </div>
       </div>
     )
@@ -157,11 +157,11 @@ export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
     <div className="my-4 w-full overflow-x-auto">
       <div
         ref={plotRef}
-        className="border border-gray-300 rounded bg-white w-full"
+        className="border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 w-full"
         style={{ minHeight: '320px' }}
       />
       {plotData?.caption && (
-        <p className="text-sm text-gray-600 italic mt-2 text-center">
+        <p className="text-sm text-gray-600 dark:text-gray-400 italic mt-2 text-center">
           {plotData.caption}
         </p>
       )}
