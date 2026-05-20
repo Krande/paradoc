@@ -8,9 +8,22 @@ This page demonstrates every form of the figure-source / filter system:
 - A standalone rasterized PNG produced by `assembly.render_offscreen()`
 - Custom camera presets in `paradoc.toml`
 
-## 1. Inline CAD figure (comment-block sugar)
+## Inline CAD figure (comment-block sugar)
 
 The simplest path: drop a STEP file in line with no Python at all.
+
+The markdown that produces the figure below looks like:
+
+```markdown
+<!-- paradoc:figure
+figure_source: cad_model_file
+figure_title: Source CAD Model (STEP)
+source_inp: files/cad.stp
+camera_pos: iso_3
+-->
+```
+
+And the rendered output, in this very document:
 
 <!-- paradoc:figure
 figure_source: cad_model_file
@@ -23,7 +36,7 @@ The block above expands to a static PNG plus a `data-3d-key=...` so the
 live-view frontend renders an interactive 3D viewer when the user clicks
 "3D".
 
-## 2. Named filter references
+## Named filter references
 
 For computed views — eigenvalue results, comparison plots, multiple
 camera angles of the same model — use a filter class declared in
@@ -35,7 +48,7 @@ The first three eigenmodes are summarized in:
 
 ${ eig_main.frequency_table }
 
-## 3. Rasterized preview (offscreen render)
+## Rasterized preview (offscreen render)
 
 The same model also ships with a pre-rendered PNG. `populate_sources.py`
 calls `assembly.render_offscreen()` (adapy's pygfx-backed renderer) and
@@ -48,7 +61,7 @@ a broken 3D placeholder.
 Re-running `populate_sources.py` regenerates the PNG from scratch; the
 markdown reference picks up whatever the script last wrote.
 
-## 4. Custom camera presets
+## Custom camera presets
 
 Define alternative camera presets in `paradoc.toml` under
 `[cameras.custom.<name>]` and reference them from any figure source.

@@ -29,10 +29,74 @@ FIGURE_SOURCE_RE = re.compile(
 )
 
 
+def _fenced_code_ranges(text: str) -> list[tuple[int, int]]:
+    """Return ``(start, end)`` offsets for every fenced-code block.
+
+    Pandoc-flavoured fences: a line of 3+ backticks or 3+ tildes opens,
+    and a closing line of *at least* as many of the same character on
+    its own (optionally trailing whitespace) closes. We walk line by
+    line and track open/close so a doc that documents paradoc's own
+    syntax can put a literal ``<!-- paradoc:figure ... -->`` inside a
+    code fence without the preprocessor trying to render it.
+    """
+    ranges: list[tuple[int, int]] = []
+    open_char: str | None = None
+    open_len: int = 0
+    open_offset: int = 0
+    cursor = 0
+    for line in text.splitlines(keepends=True):
+        stripped = line.lstrip(" ")
+        if open_char is None:
+            # Look for an opening fence: 3+ of `~` or 3+ of `` ` ``.
+            for ch in ("`", "~"):
+                if stripped.startswith(ch * 3):
+                    n = len(stripped) - len(stripped.lstrip(ch))
+                    open_char = ch
+                    open_len = n
+                    open_offset = cursor
+                    break
+        else:
+            # Inside a fence — look for a matching close (same char,
+            # at least as long, nothing but the fence char + optional
+            # trailing whitespace on the line).
+            line_no_ws = stripped.rstrip()
+            if (
+                line_no_ws
+                and line_no_ws == open_char * len(line_no_ws)
+                and len(line_no_ws) >= open_len
+            ):
+                ranges.append((open_offset, cursor + len(line)))
+                open_char = None
+                open_len = 0
+                open_offset = 0
+        cursor += len(line)
+    # Unclosed fence: treat the rest of the document as inside the
+    # fence — same way pandoc handles "missing close" (rendered as one
+    # big code block reaching EOF).
+    if open_char is not None:
+        ranges.append((open_offset, len(text)))
+    return ranges
+
+
+def _is_in_ranges(pos: int, ranges: list[tuple[int, int]]) -> bool:
+    for start, end in ranges:
+        if start <= pos < end:
+            return True
+    return False
+
+
 def extract_figure_source_blocks(text: str) -> list[tuple[int, int, str]]:
-    """Yield `(start, end, body)` tuples for every figure block in `text`."""
+    """Yield ``(start, end, body)`` tuples for every figure block in ``text``.
+
+    Skips matches that fall inside a fenced code block so documentation
+    pages can show literal ``<!-- paradoc:figure ... -->`` examples
+    without triggering rendering.
+    """
+    code_ranges = _fenced_code_ranges(text)
     out: list[tuple[int, int, str]] = []
     for m in FIGURE_SOURCE_RE.finditer(text):
+        if _is_in_ranges(m.start(), code_ranges):
+            continue
         out.append((m.start(), m.end(), m.group("body").strip()))
     return out
 
