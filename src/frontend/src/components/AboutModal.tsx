@@ -64,8 +64,8 @@ export function AboutModal({ open, onClose }: AboutModalProps) {
 
   return (
     <Modal open={open} onClose={onClose} title="About paradoc">
-      {loading && <div className="text-gray-500">Loading…</div>}
-      {error && <div className="text-red-600">Could not load build info: {error}</div>}
+      {loading && <div className="text-gray-500 dark:text-gray-400">Loading…</div>}
+      {error && <div className="text-red-600 dark:text-red-400">Could not load build info: {error}</div>}
       {info && (
         <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2">
           <Row label="paradoc" value={info.paradoc_version} />
@@ -86,9 +86,9 @@ export function AboutModal({ open, onClose }: AboutModalProps) {
 function Row({ label, value, mono, title }: { label: string; value?: string; mono?: boolean; title?: string }) {
   return (
     <>
-      <dt className="text-gray-500">{label}</dt>
-      <dd className={(mono ? 'font-mono ' : '') + 'text-gray-800 break-all'} title={title}>
-        {value || <span className="text-gray-400 italic">unknown</span>}
+      <dt className="text-gray-500 dark:text-gray-400">{label}</dt>
+      <dd className={(mono ? 'font-mono ' : '') + 'text-gray-800 dark:text-gray-200 break-all'} title={title}>
+        {value || <span className="text-gray-400 dark:text-gray-500 italic">unknown</span>}
       </dd>
     </>
   )

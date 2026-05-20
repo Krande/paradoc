@@ -71,12 +71,12 @@ export function UserInfoModal({ open, onClose }: UserInfoModalProps) {
 
   return (
     <Modal open={open} onClose={onClose} title="User info">
-      {loading && <div className="text-gray-500">Loading…</div>}
-      {error && <div className="text-red-600">Could not load user info: {error}</div>}
+      {loading && <div className="text-gray-500 dark:text-gray-400">Loading…</div>}
+      {error && <div className="text-red-600 dark:text-red-400">Could not load user info: {error}</div>}
       {unauthenticated && (
         <div className="space-y-2">
-          <div className="font-mono text-gray-800">Not signed in</div>
-          <p className="text-xs text-gray-500 italic">
+          <div className="font-mono text-gray-800 dark:text-gray-200">Not signed in</div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 italic">
             The server requires an OIDC bearer token but none was provided.
             Sign in via the upstream IdP and reload.
           </p>
@@ -85,29 +85,29 @@ export function UserInfoModal({ open, onClose }: UserInfoModalProps) {
       {me && (
         <div className="space-y-3">
           <div>
-            <div className="text-gray-500 text-xs uppercase tracking-wide">Signed in as</div>
-            <div className="font-mono text-gray-800 break-all">
+            <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">Signed in as</div>
+            <div className="font-mono text-gray-800 dark:text-gray-200 break-all">
               {me.display_name}
-              {me.email && <span className="text-gray-500"> &lt;{me.email}&gt;</span>}
+              {me.email && <span className="text-gray-500 dark:text-gray-400"> &lt;{me.email}&gt;</span>}
             </div>
           </div>
           <div>
-            <div className="text-gray-500 text-xs uppercase tracking-wide mb-1">Identity</div>
+            <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Identity</div>
             <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-              <dt className="font-mono text-xs text-gray-500">id</dt>
-              <dd className="font-mono text-xs text-gray-800 break-all">{me.id}</dd>
-              <dt className="font-mono text-xs text-gray-500">issuer</dt>
-              <dd className="font-mono text-xs text-gray-800 break-all">{me.iss}</dd>
-              <dt className="font-mono text-xs text-gray-500">subject</dt>
-              <dd className="font-mono text-xs text-gray-800 break-all">{me.subject}</dd>
-              <dt className="font-mono text-xs text-gray-500">admin</dt>
-              <dd className="font-mono text-xs text-gray-800">{me.is_admin ? 'yes' : 'no'}</dd>
+              <dt className="font-mono text-xs text-gray-500 dark:text-gray-400">id</dt>
+              <dd className="font-mono text-xs text-gray-800 dark:text-gray-200 break-all">{me.id}</dd>
+              <dt className="font-mono text-xs text-gray-500 dark:text-gray-400">issuer</dt>
+              <dd className="font-mono text-xs text-gray-800 dark:text-gray-200 break-all">{me.iss}</dd>
+              <dt className="font-mono text-xs text-gray-500 dark:text-gray-400">subject</dt>
+              <dd className="font-mono text-xs text-gray-800 dark:text-gray-200 break-all">{me.subject}</dd>
+              <dt className="font-mono text-xs text-gray-500 dark:text-gray-400">admin</dt>
+              <dd className="font-mono text-xs text-gray-800 dark:text-gray-200">{me.is_admin ? 'yes' : 'no'}</dd>
             </dl>
           </div>
           {me.groups.length > 0 && (
             <div>
-              <div className="text-gray-500 text-xs uppercase tracking-wide mb-1">Groups</div>
-              <ul className="font-mono text-xs text-gray-800 space-y-0.5">
+              <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Groups</div>
+              <ul className="font-mono text-xs text-gray-800 dark:text-gray-200 space-y-0.5">
                 {me.groups.map((g) => (
                   <li key={g}>{g}</li>
                 ))}
@@ -115,7 +115,7 @@ export function UserInfoModal({ open, onClose }: UserInfoModalProps) {
             </div>
           )}
           {me.iss === 'local-dev' && (
-            <p className="text-xs text-gray-500 italic">
+            <p className="text-xs text-gray-500 dark:text-gray-400 italic">
               Auth is disabled (PARADOC_AUTH_ENABLED unset or false). All
               requests get the synthetic local-dev admin user.
             </p>

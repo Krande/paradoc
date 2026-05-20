@@ -32,15 +32,15 @@ export function Modal({ open, title, onClose, children }: ModalProps) {
       aria-label={title}
     >
       <div
-        className="bg-white rounded-lg shadow-xl border border-gray-200 w-full max-w-md max-h-[90vh] flex flex-col"
+        className="bg-white dark:bg-gray-900 rounded-lg shadow-xl dark:shadow-black/40 border border-gray-200 dark:border-gray-800 w-full max-w-md max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-          <h2 className="text-base font-semibold text-gray-800">{title}</h2>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer rounded p-1 text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+            className="cursor-pointer rounded p-1 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
             aria-label="Close"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
@@ -48,7 +48,7 @@ export function Modal({ open, title, onClose, children }: ModalProps) {
             </svg>
           </button>
         </div>
-        <div className="px-4 py-3 overflow-y-auto text-sm text-gray-700">{children}</div>
+        <div className="px-4 py-3 overflow-y-auto text-sm text-gray-700 dark:text-gray-300">{children}</div>
       </div>
     </div>
   )
