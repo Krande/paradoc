@@ -66,6 +66,24 @@ class DocStore(ABC):
     def list_doc_ids(self, scope: Optional["Scope"] = None) -> list[str]:
         """All doc IDs the store can serve within ``scope``."""
 
+    def get_file_bytes(
+        self,
+        doc_id: str,
+        rel_path: str,
+        *,
+        scope: Optional["Scope"] = None,
+    ) -> Optional[bytes]:
+        """Return raw bytes of ``<bundle>/files/<rel_path>``.
+
+        Backs the ``/api/docs/{doc_id}/files/{path}`` route so plain
+        markdown image refs (``![](files/cad.png)``) work without going
+        through the IndexedDB-embedding round-trip the static-mode SPA
+        relies on. Implementations must reject any ``rel_path`` that
+        escapes the bundle root (``..``, absolute paths, etc.).
+        Returns ``None`` when the file is missing.
+        """
+        return None
+
     def get_bundle_manifest(
         self, doc_id: str, *, scope: Optional["Scope"] = None
     ) -> Optional["BundleManifest"]:

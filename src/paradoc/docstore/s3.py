@@ -231,6 +231,22 @@ class S3DocStore(DocStore):
         s = scope if scope is not None else _default_shared_scope()
         return self._db(doc_id, s).get_three_d(key)
 
+    def get_file_bytes(
+        self,
+        doc_id: str,
+        rel_path: str,
+        *,
+        scope: Optional["Scope"] = None,
+    ) -> Optional[bytes]:
+        s = scope if scope is not None else _default_shared_scope()
+        # Reject path-traversal attempts. Posix-normalised, we expect a
+        # purely-relative path with no `..` segments. The S3 key path is
+        # joined with '/' so even a leading slash would corrupt the key.
+        clean = rel_path.replace("\\", "/").strip("/")
+        if not clean or ".." in clean.split("/"):
+            return None
+        return self._fetch_object(self._key(doc_id, s, "files", *clean.split("/")))
+
     def get_bundle_manifest(
         self, doc_id: str, *, scope: Optional["Scope"] = None
     ) -> Optional[BundleManifest]:

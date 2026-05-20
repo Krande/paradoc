@@ -114,6 +114,29 @@ class LocalDocStore(DocStore):
                     continue
         return out
 
+    def get_file_bytes(
+        self,
+        doc_id: str,
+        rel_path: str,
+        *,
+        scope: Optional["Scope"] = None,
+    ) -> Optional[bytes]:
+        s = scope if scope is not None else _default_shared_scope()
+        try:
+            bundle = self._bundle_dir(doc_id, s)
+        except (FileNotFoundError, PermissionError):
+            return None
+        files_root = (bundle / "files").resolve()
+        # Resolve the candidate path and reject anything that climbs out
+        # of <bundle>/files/. ``resolve()`` collapses ``..`` segments;
+        # ``is_relative_to`` is the final gate.
+        candidate = (files_root / rel_path).resolve()
+        if not candidate.is_relative_to(files_root):
+            return None
+        if not candidate.is_file():
+            return None
+        return candidate.read_bytes()
+
     def get_bundle_manifest(
         self, doc_id: str, *, scope: Optional["Scope"] = None
     ) -> Optional["BundleManifest"]:

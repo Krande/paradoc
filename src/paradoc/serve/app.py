@@ -257,6 +257,30 @@ def create_app(
             raise HTTPException(status_code=404, detail=f"3D asset {key!r} not found")
         return JSONResponse(content=json.loads(meta.model_dump_json()))
 
+    def _get_file(doc_id: str, rel_path: str, scope: Scope):
+        data = doc_store.get_file_bytes(doc_id, rel_path, scope=scope)
+        if data is None:
+            raise HTTPException(status_code=404, detail=f"file not found: {rel_path!r}")
+        import mimetypes
+
+        media_type, _ = mimetypes.guess_type(rel_path)
+        # Default to octet-stream; the browser still treats <img>-loaded
+        # PNG bytes correctly because mimetypes guesses image/png from
+        # the extension, but anything new (e.g. .glb) needs an explicit
+        # add or it falls back here and downloads instead of inlines.
+        if media_type is None:
+            media_type = "application/octet-stream"
+        return Response(
+            content=data,
+            media_type=media_type,
+            headers={
+                # Bundle files are immutable per published_at — long
+                # cache + revalidation via the bundle's etag at the
+                # browser-cache layer is safe.
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
+
     async def _get_3d_blob(doc_id: str, key: str, scope: Scope, request: Request):
         meta = doc_store.get_three_d_meta(doc_id, key, scope=scope)
         if meta is None:
@@ -358,6 +382,14 @@ def create_app(
     ):
         return await _get_3d_blob(doc_id, key, _shared, request)
 
+    @app.get("/api/docs/{doc_id}/files/{rel_path:path}")
+    async def get_doc_file(
+        doc_id: str,
+        rel_path: str,
+        user: User = Depends(auth_module.current_user),
+    ):
+        return _get_file(doc_id, rel_path, _shared)
+
     # ── Scope-aware /api/scopes/{scope}/docs/... routes ──────────────
 
     @app.get("/api/scopes/{scope}/docs")
@@ -416,6 +448,14 @@ def create_app(
         scope_obj: Scope = Depends(_scope_dep),
     ):
         return await _get_3d_blob(doc_id, key, scope_obj, request)
+
+    @app.get("/api/scopes/{scope}/docs/{doc_id}/files/{rel_path:path}")
+    async def s_get_doc_file(
+        doc_id: str,
+        rel_path: str,
+        scope_obj: Scope = Depends(_scope_dep),
+    ):
+        return _get_file(doc_id, rel_path, scope_obj)
 
     # ── Landing aggregator ───────────────────────────────────────────
     #

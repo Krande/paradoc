@@ -4,6 +4,7 @@ import 'katex/dist/katex.min.css'
 import type { PandocInline } from './types'
 import { attrs, resolveAssetUrl } from './utils'
 import { useDocId } from './context'
+import { authedFetch } from '../services/auth/oidc'
 
 /**
  * Component to render LaTeX math using KaTeX
@@ -39,7 +40,16 @@ export function MathElement({ latex, displayMode }: { latex: string; displayMode
 }
 
 /**
- * Component to render an image with async URL resolution (checks IndexedDB first)
+ * Component to render an image with async URL resolution.
+ *
+ * resolveAssetUrl gives us one of three shapes:
+ *   * data: URL (embedded base64 from IndexedDB) — use directly
+ *   * absolute http(s):// URL — use directly
+ *   * `/api/...` route path (REST mode files/* lookup) — needs the
+ *     bearer token, so we authedFetch the bytes and turn them into a
+ *     blob: URL. Without this the browser fetches the route as the
+ *     anonymous SPA catch-all returns index.html and the <img> fails
+ *     to decode HTML as image.
  */
 export function AsyncImage({ src, alt, title, className, imgAttrs }: {
   src: string;
@@ -52,7 +62,38 @@ export function AsyncImage({ src, alt, title, className, imgAttrs }: {
   const [resolvedSrc, setResolvedSrc] = React.useState<string>(src)
 
   React.useEffect(() => {
-    resolveAssetUrl(src, docId).then(setResolvedSrc).catch(() => setResolvedSrc(src))
+    let cancelled = false
+    let blobUrl: string | null = null
+    ;(async () => {
+      try {
+        const resolved = await resolveAssetUrl(src, docId)
+        if (cancelled) return
+        // API-routed images go through authedFetch so the bearer
+        // token reaches the server. We swap to a blob: URL so the
+        // browser caches it and the <img> can decode normally.
+        if (resolved.startsWith('/api/') || resolved.includes('/api/docs/')) {
+          try {
+            const res = await authedFetch(resolved)
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            const blob = await res.blob()
+            if (cancelled) return
+            blobUrl = URL.createObjectURL(blob)
+            setResolvedSrc(blobUrl)
+            return
+          } catch {
+            if (!cancelled) setResolvedSrc(resolved)
+            return
+          }
+        }
+        setResolvedSrc(resolved)
+      } catch {
+        if (!cancelled) setResolvedSrc(src)
+      }
+    })()
+    return () => {
+      cancelled = true
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    }
   }, [src, docId])
 
   return <img {...imgAttrs} src={resolvedSrc} alt={alt} title={title} className={className} />

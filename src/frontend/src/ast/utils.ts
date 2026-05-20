@@ -1,5 +1,6 @@
 import type { Attr } from './types'
 import { getEmbeddedImage } from '../sections/store'
+import { getRuntimeConfig } from '../transport'
 
 /**
  * Check if a URL is absolute or a data URL
@@ -8,15 +9,50 @@ export function isAbsoluteOrData(url: string): boolean {
   return /^([a-z]+:)?\/\//i.test(url) || url.startsWith('data:')
 }
 
+function joinUrl(base: string, path: string): string {
+  return base.replace(/\/?$/, '') + (path.startsWith('/') ? path : '/' + path)
+}
+
 /**
- * Resolve an asset URL by checking IndexedDB first, then falling back to HTTP server
+ * Resolve an asset URL.
+ *
+ * Order of preference:
+ *   1. Absolute / data URLs pass through.
+ *   2. Markdown ``files/...`` paths in REST mode → ``/api/docs/{id}/files/{path}``.
+ *      Stops the IndexedDB race (sections render before images.json
+ *      finished seeding) and avoids paying the embedded-base64 cost
+ *      for files that already live in S3.
+ *   3. IndexedDB lookup (static-mode SPA + any path that was embedded
+ *      via ``images.json``).
+ *   4. Whatever ``__PARADOC_ASSET_BASE`` rewriting the host runtime
+ *      configured.
  */
 export async function resolveAssetUrl(src: string, docId?: string): Promise<string> {
   try {
     if (!src) return src
     if (isAbsoluteOrData(src)) return src
 
-    // Try to get embedded image from IndexedDB first
+    // REST mode + relative path starting with `files/`: route through
+    // the doc's static-file endpoint. This is the fast path for plain
+    // markdown image references — no IndexedDB round-trip, no race
+    // with the bulk images.json fetch.
+    const cfg = getRuntimeConfig()
+    if (cfg.transport === 'rest' && docId) {
+      const normalized = src.replace(/^\.\//, '').replace(/^\//, '')
+      if (normalized.startsWith('files/')) {
+        const apiBase = cfg.apiBase || ''
+        const rel = normalized.slice('files/'.length)
+        return joinUrl(
+          apiBase,
+          `/api/docs/${encodeURIComponent(docId)}/files/${rel
+            .split('/')
+            .map(encodeURIComponent)
+            .join('/')}`,
+        )
+      }
+    }
+
+    // Try to get embedded image from IndexedDB next (static-mode bundle).
     if (docId) {
       // Normalize path: try original, without ./, and without leading /
       const pathVariants = [
