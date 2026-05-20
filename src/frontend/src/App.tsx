@@ -339,13 +339,14 @@ function AppContent() {
   }, [])
 
   return (
-    // `h-screen` (not `min-h-screen`) so the inner `flex-1 overflow-auto`
-    // reader gets a bounded height and scrolls internally. With
-    // `min-h-screen`, the root grows to fit content → the scroll
-    // container's clientHeight = scrollHeight → wheel events do nothing
-    // (and a tall 3D viewer made the layout balloon past the viewport,
-    // which is the "FEA report goes black" bug we shipped to ada-docs).
-    <div className="flex h-screen overflow-hidden">
+    // `h-dvh` (dynamic-viewport, not `100vh`) so mobile browsers' URL
+    // bar show/hide doesn't leave the layout mis-sized vs the visible
+    // viewport — that's the "can't scroll to top after closing a 3D
+    // viewer" mobile bug. Keep the bounded-height invariant: the
+    // inner `flex-1 overflow-auto` reader still gets a fixed parent
+    // and scrolls internally (with `min-h-screen` the root grew to
+    // fit content, clientHeight = scrollHeight, wheel was a no-op).
+    <div className="flex h-dvh overflow-hidden">
       <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       {/* `min-w-0` is essential alongside `flex-1`: default flex
           `min-width: auto` lets the column grow to fit content

@@ -58,7 +58,7 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className={`${open ? 'md:flex' : 'md:hidden'} hidden flex-col w-72 shrink-0 border-r border-gray-200 bg-white/60 backdrop-blur sticky top-0 h-screen overflow-auto`}>
+      <aside className={`${open ? 'md:flex' : 'md:hidden'} hidden flex-col w-72 shrink-0 border-r border-gray-200 bg-white/60 backdrop-blur sticky top-0 h-dvh overflow-auto`}>
         <div className="px-4 py-3 border-b border-gray-200">
           <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Outline</div>
         </div>

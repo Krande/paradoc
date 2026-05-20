@@ -142,10 +142,15 @@ export function ThreeDRenderer({ threeDKey, docId, caption }: ThreeDRendererProp
     <div className="my-4 w-full">
       {/* The vendor viewer reads clientWidth/clientHeight to size its
           canvas. Pinning aspect-ratio + max-w-full keeps the canvas
-          inside the viewport on mobile. */}
+          inside the viewport on mobile.
+          `touch-none` tells the browser not to pan/pinch-zoom the page
+          on touches that start inside the canvas — without it, a pinch
+          on the 3D viewer zoomed the whole page on mobile and the user
+          couldn't reach top/bottom afterwards. `overscroll-contain`
+          stops wheel/touch from bubbling up to the doc scroll. */}
       <div
         ref={containerRef}
-        className="border border-gray-300 rounded bg-white w-full max-w-full overflow-hidden"
+        className="border border-gray-300 rounded bg-white w-full max-w-full overflow-hidden touch-none overscroll-contain"
         style={{ aspectRatio: '4 / 3' }}
       />
       {progress && progress.total > 0 && progress.received < progress.total && (
