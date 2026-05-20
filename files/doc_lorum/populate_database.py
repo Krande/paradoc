@@ -2,7 +2,7 @@
 Script to populate the doc_lorum database with all plots and tables using DbManager.
 
 This script creates all the plot and table data for the doc_lorum example and stores
-them in the database so they can be referenced with {{__key__}} syntax in markdown.
+them in the database so they can be referenced with ${ key } syntax in markdown.
 """
 
 from pathlib import Path
@@ -526,7 +526,7 @@ def main():
     print(f"Database location: {db_location}")
     print()
     print("Next steps:")
-    print("  1. Update markdown files to use {{__key__}} syntax")
+    print("  1. Reference each entry from markdown as ${ key }")
     print("  2. Run test_document.py to compile the document")
 
     # Close database

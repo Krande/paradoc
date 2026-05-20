@@ -8,7 +8,7 @@ output; the legacy form prints a deprecation warning at compile time.
 
 New (preferred): ${ demo_table }
 
-Legacy alias: {{__demo_table__}}
+Legacy alias: ${ demo_table }
 
 ## With kwargs (annotation flags become Python kwargs)
 

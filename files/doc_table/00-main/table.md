@@ -2,8 +2,8 @@
 
 Some text before the table
 
-{{__my_table__}}
+${ my_table }
 
-{{__my_table_3__}}
+${ my_table_3 }
 
 And some text after

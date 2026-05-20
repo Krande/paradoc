@@ -18,7 +18,7 @@ Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliqu
 
 Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.
 
-{{__historical_trends__}}
+${ historical_trends }
 
 As shown in [@fig:historical_trends], the historical trends demonstrate a clear pattern over time. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
 
@@ -26,7 +26,7 @@ As shown in [@fig:historical_trends], the historical trends demonstrate a clear 
 
 At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecat cupidatat non proident. The current metrics are summarized in [@tbl:current_metrics].
 
-{{__current_metrics__}}
+${ current_metrics }
 
 ## Research Objectives
 
@@ -45,7 +45,7 @@ Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad mi
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec sed odio dui. Etiam porta sem malesuada magna mollis euismod. Nullam id dolor id nibh ultricies vehicula ut id elit. The data collection framework is illustrated in [@fig:data_framework].
 
-{{__data_framework__}}
+${ data_framework }
 
 ### Sample Selection Criteria
 
@@ -60,7 +60,7 @@ Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Vivamus sagi
 
 Cras mattis consectetur purus sit amet fermentum. Cras justo odio, dapibus ac facilisis in, egestas eget quam. Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Detailed measurement specifications are provided in [@tbl:measurement_specs].
 
-{{__measurement_specs__}}
+${ measurement_specs }
 
 ## Analytical Framework
 
@@ -70,7 +70,7 @@ Nullam quis risus eget urna mollis ornare vel eu leo. Cum sociis natoque penatib
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus posuere velit aliquet. The statistical analysis workflow is demonstrated in [@fig:statistical_workflow].
 
-{{__statistical_workflow__}}
+${ statistical_workflow }
 
 The analysis incorporates multiple statistical techniques including regression analysis, variance decomposition, and Monte Carlo simulations. Maecenas sed diam eget risus varius blandit sit amet non magna.
 
@@ -78,7 +78,7 @@ The analysis incorporates multiple statistical techniques including regression a
 
 Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Key validation results are summarized in [@tbl:validation_results].
 
-{{__validation_results__}}
+${ validation_results }
 
 # Results and Analysis
 
@@ -88,7 +88,7 @@ Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras mattis consectetur purus sit amet fermentum. Cras justo odio, dapibus ac facilisis in, egestas eget quam. The primary results are visualized in [@fig:primary_results].
 
-{{__primary_results__}}
+${ primary_results }
 
 As demonstrated in [@fig:primary_results], the experimental data reveals several significant trends. Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Praesent commodo cursus magna, vel scelerisque nisl consectetur et[^2].
 
@@ -96,7 +96,7 @@ As demonstrated in [@fig:primary_results], the experimental data reveals several
 
 Aenean lacinia bibendum nulla sed consectetur. Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Donec sed odio dui. Comprehensive quantitative metrics are presented in [@tbl:quantitative_metrics].
 
-{{__quantitative_metrics__}}
+${ quantitative_metrics }
 
 ### Qualitative Observations
 
@@ -111,17 +111,17 @@ Nullam quis risus eget urna mollis ornare vel eu leo. Integer posuere erat a ant
 
 Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. The comparative analysis across different conditions is illustrated in [@fig:comparative_analysis].
 
-{{__comparative_analysis__}}
+${ comparative_analysis }
 
 Sed posuere consectetur est at lobortis. Aenean lacinia bibendum nulla sed consectetur. Integer posuere erat a ante venenatis dapibus posuere velit aliquet. The comparison data is detailed in [@tbl:comparison_data].
 
-{{__comparison_data__}}
+${ comparison_data }
 
 ## Error Analysis
 
 Maecenas sed diam eget risus varius blandit sit amet non magna. Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh.
 
-{{__error_analysis__}}
+${ error_analysis }
 
 The error distribution shown in [@fig:error_analysis] indicates that the measurement uncertainty remains within acceptable bounds. Sed posuere consectetur est at lobortis.
 
@@ -133,7 +133,7 @@ Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Vivamus sagi
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam id dolor id nibh ultricies vehicula ut id elit. Sed posuere consectetur est at lobortis. The results align with theoretical predictions as shown in [@fig:theory_comparison].
 
-{{__theory_comparison__}}
+${ theory_comparison }
 
 Aenean eu leo quam. Pellentesque ornare sem lacinia quam venenatis vestibulum. Cras mattis consectetur purus sit amet fermentum. Integer posuere erat a ante venenatis dapibus posuere velit aliquet.
 
@@ -150,7 +150,7 @@ Donec sed odio dui. Etiam porta sem malesuada magna mollis euismod. Nullam quis 
 
 Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec ullamcorper nulla non metus auctor fringilla. Maecenas faucibus mollis interdum. Practical implementation guidelines are summarized in [@tbl:implementation_guide].
 
-{{__implementation_guide__}}
+${ implementation_guide }
 
 # Conclusions
 

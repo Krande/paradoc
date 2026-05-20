@@ -10,6 +10,6 @@ three families of references it covers:
 3. **3D figure sources** — declared via `<!-- paradoc:figure ... -->` blocks
    that desugar to filter calls.
 
-The legacy `{{__key__}}{tbl|plt:...}` syntax still works with a
+The legacy `${ key }{tbl|plt:...}` syntax still works with a
 deprecation warning at compile time. Run `paradoc-migrate-syntax
 <doc_root>` to rewrite legacy markdown in place.
