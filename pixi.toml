@@ -108,6 +108,12 @@ python-gmsh = "*"
 hdf5 = "*"
 h5py = "*"
 trimesh = "*"
+# scipy: trimesh routines that pygfx's `geometry_from_trimesh` reaches
+# into (sparse-index ops, face neighbours) silently fall back to an
+# error stub if scipy is missing, producing a blank offscreen render.
+# Adding it explicitly here keeps the populate script's CAD → PNG
+# pipeline working at compile time.
+scipy = "*"
 meshio = "*"
 send2trash = "*"
 pyparsing = "*"
@@ -123,11 +129,13 @@ pillow = "*"
 pyquaternion = "*"
 
 [feature.examples-figs.pypi-dependencies]
-# Branch `chore/fea-report-v2` carries the fix for the `TopoDS_Solid`
-# `geometry` attribute error that 0.7.11 hits on round-tripped STEP
-# files. Pin the exact sha so cache invalidation is explicit and the
-# CI-built bundle is reproducible.
-ada-py = { git = "https://github.com/Krande/adapy.git", rev = "62a1ee5da30fe0d190d81f8a0dd96df7b94d7f59" }
+# Pinned to a sha that:
+#   * has the `TopoDS_Solid.geometry` fix the 0.7.11 release hits on
+#     round-tripped STEP files (originally pulled from chore/fea-report-v2)
+#   * uses `rendercanvas.offscreen.OffscreenRenderCanvas` instead of the
+#     removed-in-wgpu-0.31 `wgpu.gui.offscreen` module, so the populate
+#     script's CAD → PNG render works in modern envs (commit 493dd9f6).
+ada-py = { git = "https://github.com/Krande/adapy.git", rev = "493dd9f64b6b07802d0184517269ad837daab847" }
 
 [feature.examples-figs.tasks]
 # Builds JUST doc_figure_sources into dist/examples/. The

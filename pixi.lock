@@ -2509,6 +2509,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/rapidjson-1.1.0.post20240409-h3f2d84a_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/readline-8.3-h853b02a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/ruff-0.15.11-h7805a7d_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/scipy-1.17.1-py312h54fa4ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/sdl2-2.32.56-h54a6638_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/sdl3-3.4.4-hdeec2a5_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/shaderc-2025.5-h3e344bc_0.conda
@@ -2650,7 +2651,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/wslink-2.5.6-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/xsdata-26.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/zipp-3.23.1-pyhcf101f3_0.conda
-      - pypi: git+https://github.com/Krande/adapy.git?rev=62a1ee5da30fe0d190d81f8a0dd96df7b94d7f59#62a1ee5da30fe0d190d81f8a0dd96df7b94d7f59
+      - pypi: git+https://github.com/Krande/adapy.git?rev=493dd9f64b6b07802d0184517269ad837daab847#493dd9f64b6b07802d0184517269ad837daab847
       osx-64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/_python_abi3_support-1.0-hd8ed1ab_2.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/aiohappyeyeballs-2.6.1-pyhd8ed1ab_0.conda
@@ -2913,6 +2914,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/rapidjson-1.1.0.post20240409-h92383a6_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/readline-8.3-h68b038d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/ruff-0.15.11-h16586dd_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/scipy-1.17.1-py312h6309490_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/sdl2-2.32.56-h53ec75d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/sdl3-3.4.4-hf9078ff_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/shaderc-2025.5-hda4194c_0.conda
@@ -2950,7 +2952,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/zfp-1.0.1-h1b13a81_4.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/zlib-ng-2.3.3-h8bce59a_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/zstd-1.5.7-h8210216_2.conda
-      - pypi: git+https://github.com/Krande/adapy.git?rev=62a1ee5da30fe0d190d81f8a0dd96df7b94d7f59#62a1ee5da30fe0d190d81f8a0dd96df7b94d7f59
+      - pypi: git+https://github.com/Krande/adapy.git?rev=493dd9f64b6b07802d0184517269ad837daab847#493dd9f64b6b07802d0184517269ad837daab847
       win-64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/_python_abi3_support-1.0-hd8ed1ab_2.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/aiohappyeyeballs-2.6.1-pyhd8ed1ab_0.conda
@@ -3187,6 +3189,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/qt6-main-6.11.0-pl5321hfcac499_4.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/rapidjson-1.1.0.post20240409-he0c23c2_2.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/ruff-0.15.11-h02f8532_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/scipy-1.17.1-py312h9b3c559_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/sdl2-2.32.56-h5112557_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/sdl3-3.4.4-h5112557_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/shaderc-2025.5-haa9a63f_0.conda
@@ -3226,7 +3229,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/zfp-1.0.1-h2f0f97f_5.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/zlib-ng-2.3.3-h0261ad2_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/zstd-1.5.7-hbeecb71_2.conda
-      - pypi: git+https://github.com/Krande/adapy.git?rev=62a1ee5da30fe0d190d81f8a0dd96df7b94d7f59#62a1ee5da30fe0d190d81f8a0dd96df7b94d7f59
+      - pypi: git+https://github.com/Krande/adapy.git?rev=493dd9f64b6b07802d0184517269ad837daab847#493dd9f64b6b07802d0184517269ad837daab847
   frontend:
     channels:
     - url: https://conda.anaconda.org/conda-forge/
@@ -10324,6 +10327,29 @@ packages:
   - pkg:pypi/ruff?source=compressed-mapping
   size: 9327937
   timestamp: 1776378777189
+- conda: https://conda.anaconda.org/conda-forge/linux-64/scipy-1.17.1-py312h54fa4ab_0.conda
+  sha256: e3ad577361d67f6c078a6a7a3898bf0617b937d44dc4ccd57aa3336f2b5778dd
+  md5: 3e38daeb1fb05a95656ff5af089d2e4c
+  depends:
+  - __glibc >=2.17,<3.0.a0
+  - libblas >=3.9.0,<4.0a0
+  - libcblas >=3.9.0,<4.0a0
+  - libgcc >=14
+  - libgfortran
+  - libgfortran5 >=14.3.0
+  - liblapack >=3.9.0,<4.0a0
+  - libstdcxx >=14
+  - numpy <2.7
+  - numpy >=1.23,<3
+  - numpy >=1.25.2
+  - python >=3.12,<3.13.0a0
+  - python_abi 3.12.* *_cp312
+  license: BSD-3-Clause
+  license_family: BSD
+  purls:
+  - pkg:pypi/scipy?source=hash-mapping
+  size: 17109648
+  timestamp: 1771880675810
 - conda: https://conda.anaconda.org/conda-forge/linux-64/sdl2-2.32.56-h54a6638_0.conda
   sha256: 987ad072939fdd51c92ea8d3544b286bb240aefda329f9b03a51d9b7e777f9de
   md5: cdd138897d94dc07d99afe7113a07bec
@@ -20544,6 +20570,28 @@ packages:
   - pkg:pypi/ruff?source=hash-mapping
   size: 9350619
   timestamp: 1776378920511
+- conda: https://conda.anaconda.org/conda-forge/osx-64/scipy-1.17.1-py312h6309490_0.conda
+  sha256: 81842a4b39f700e122c8ba729034c7fc7b3a6bfd8d3ca41fe64e2bc8b0d1a4f4
+  md5: 07c955303eea8d00535164eb5f63ee97
+  depends:
+  - __osx >=11.0
+  - libblas >=3.9.0,<4.0a0
+  - libcblas >=3.9.0,<4.0a0
+  - libcxx >=19
+  - libgfortran
+  - libgfortran5 >=14.3.0
+  - liblapack >=3.9.0,<4.0a0
+  - numpy <2.7
+  - numpy >=1.23,<3
+  - numpy >=1.25.2
+  - python >=3.12,<3.13.0a0
+  - python_abi 3.12.* *_cp312
+  license: BSD-3-Clause
+  license_family: BSD
+  purls:
+  - pkg:pypi/scipy?source=hash-mapping
+  size: 15312767
+  timestamp: 1771881124085
 - conda: https://conda.anaconda.org/conda-forge/osx-64/sdl2-2.32.56-h53ec75d_0.conda
   sha256: 3f64f2cabdfe2f4ed8df6adf26a86bd9db07380cb8fa28d18a80040cc8b8b7d9
   md5: 0a8a18995e507da927d1f8c4b7f15ca8
@@ -25573,6 +25621,27 @@ packages:
   - pkg:pypi/ruff?source=compressed-mapping
   size: 9828825
   timestamp: 1776378829267
+- conda: https://conda.anaconda.org/conda-forge/win-64/scipy-1.17.1-py312h9b3c559_0.conda
+  sha256: bdb2437aa5db3a00c5e69808f9d1a695bbe74b4758ffdf2e79777c8e11680443
+  md5: bf4d70d225c530053128bae8d2531516
+  depends:
+  - libblas >=3.9.0,<4.0a0
+  - libcblas >=3.9.0,<4.0a0
+  - liblapack >=3.9.0,<4.0a0
+  - numpy <2.7
+  - numpy >=1.23,<3
+  - numpy >=1.25.2
+  - python >=3.12,<3.13.0a0
+  - python_abi 3.12.* *_cp312
+  - ucrt >=10.0.20348.0
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
+  license: BSD-3-Clause
+  license_family: BSD
+  purls:
+  - pkg:pypi/scipy?source=hash-mapping
+  size: 15009886
+  timestamp: 1771881635432
 - conda: https://conda.anaconda.org/conda-forge/win-64/sdl2-2.32.56-h5112557_0.conda
   sha256: d17da21386bdbf32bce5daba5142916feb95eed63ef92b285808c765705bbfd2
   md5: 4cffbfebb6614a1bff3fc666527c25c7
@@ -26584,7 +26653,7 @@ packages:
   purls: []
   size: 354697
   timestamp: 1742433568506
-- pypi: git+https://github.com/Krande/adapy.git?rev=62a1ee5da30fe0d190d81f8a0dd96df7b94d7f59#62a1ee5da30fe0d190d81f8a0dd96df7b94d7f59
+- pypi: git+https://github.com/Krande/adapy.git?rev=493dd9f64b6b07802d0184517269ad837daab847#493dd9f64b6b07802d0184517269ad837daab847
   name: ada-py
   version: 0.7.12
   requires_python: '>=3.10'
