@@ -27,6 +27,17 @@ export interface ParadocRuntimeConfig {
    * affordance without owning the frontend.
    */
   headerLinks?: ParadocHeaderLink[]
+  /**
+   * OIDC config emitted by paradoc-serve's /config.js when
+   * PARADOC_AUTH_ENABLED=true. The SPA reads this to initiate a PKCE
+   * code flow against the configured Authentik / Azure AD provider.
+   * When `authEnabled` is false or absent, the SPA renders normally
+   * with no auth gate (anonymous mode for offline / local-dev bundles).
+   */
+  authEnabled?: boolean
+  authIssuer?: string
+  authClientId?: string
+  authAudience?: string
 }
 
 declare global {

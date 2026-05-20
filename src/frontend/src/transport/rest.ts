@@ -6,6 +6,7 @@
 
 import { dbGet, dbPut } from '../sections/store'
 import type { PlotData, TableData } from '../sections/store'
+import { authedFetch } from '../services/auth/oidc'
 import type {
   AssetTransport,
   BinaryFetchProgress,
@@ -28,21 +29,21 @@ export class RESTTransport implements AssetTransport {
   }
 
   async getTableData(docId: string, key: string): Promise<TableData | undefined> {
-    const res = await fetch(this.url(`/api/docs/${encodeURIComponent(docId)}/tables/${encodeURIComponent(key)}`))
+    const res = await authedFetch(this.url(`/api/docs/${encodeURIComponent(docId)}/tables/${encodeURIComponent(key)}`))
     if (res.status === 404) return undefined
     if (!res.ok) throw new Error(`table fetch failed: ${res.status}`)
     return (await res.json()) as TableData
   }
 
   async getPlotData(docId: string, key: string): Promise<PlotData | undefined> {
-    const res = await fetch(this.url(`/api/docs/${encodeURIComponent(docId)}/plots/${encodeURIComponent(key)}`))
+    const res = await authedFetch(this.url(`/api/docs/${encodeURIComponent(docId)}/plots/${encodeURIComponent(key)}`))
     if (res.status === 404) return undefined
     if (!res.ok) throw new Error(`plot fetch failed: ${res.status}`)
     return (await res.json()) as PlotData
   }
 
   async getThreeDMeta(docId: string, key: string): Promise<ThreeDMeta | undefined> {
-    const res = await fetch(this.url(`/api/docs/${encodeURIComponent(docId)}/3d/${encodeURIComponent(key)}/meta`))
+    const res = await authedFetch(this.url(`/api/docs/${encodeURIComponent(docId)}/3d/${encodeURIComponent(key)}/meta`))
     if (res.status === 404) return undefined
     if (!res.ok) throw new Error(`3d meta fetch failed: ${res.status}`)
     const body = await res.json()
@@ -84,7 +85,7 @@ export class RESTTransport implements AssetTransport {
       : undefined
     if (knownSha && cachedBlob) headers['If-None-Match'] = `"${knownSha}"`
 
-    const res = await fetch(url, { headers })
+    const res = await authedFetch(url, { headers })
 
     if (res.status === 304) {
       // We only sent the header when cachedBlob was present, so this

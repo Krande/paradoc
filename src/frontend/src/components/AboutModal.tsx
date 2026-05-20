@@ -1,6 +1,7 @@
 import React from 'react'
 import { Modal } from './Modal'
 import { getRuntimeConfig } from '../transport'
+import { authedFetch } from '../services/auth/oidc'
 
 interface BuildInfo {
   paradoc_version?: string
@@ -46,7 +47,7 @@ export function AboutModal({ open, onClose }: AboutModalProps) {
     setError(null)
     ;(async () => {
       try {
-        const res = await fetch(joinUrl(cfg.apiBase || '', '/api/info'), { cache: 'no-store' })
+        const res = await authedFetch(joinUrl(cfg.apiBase || '', '/api/info'), { cache: 'no-store' })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const body = (await res.json()) as BuildInfo
         if (!canceled) setInfo(body)

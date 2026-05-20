@@ -22,7 +22,7 @@ from typing import Any, Optional
 
 from paradoc.docstore import DocStore
 
-from .auth import User
+from .auth import AuthConfig, User
 from .scope import Scope, scope_from_path
 
 logger = logging.getLogger(__name__)
@@ -144,13 +144,24 @@ def create_app(
         return _info_snapshot
 
     # Runtime config injected at the SPA's <script src="/config.js">. Same-host
-    # serving (paradoc.<host>/ and /api/*), so apiBase is empty.
+    # serving (paradoc.<host>/ and /api/*), so apiBase is empty. When auth is
+    # enabled, also emits the first trusted IdP's issuer + client_id so the
+    # SPA can initiate the OIDC PKCE code flow without hard-coding values
+    # into the bundle. Multi-provider UI is a later iteration; the SPA picks
+    # the first entry for v0.
     @app.get("/config.js")
     async def config_js():
-        body = (
-            "window.__PARADOC_CONFIG__ = "
-            "{\"transport\": \"rest\", \"apiBase\": \"\"};\n"
-        )
+        cfg: AuthConfig = app.state.auth_config
+        payload: dict[str, Any] = {"transport": "rest", "apiBase": ""}
+        if cfg.enabled and cfg.providers:
+            p = cfg.providers[0]
+            payload["authEnabled"] = True
+            payload["authIssuer"] = p.issuer
+            payload["authClientId"] = p.client_id
+            payload["authAudience"] = p.audience or p.client_id
+        else:
+            payload["authEnabled"] = False
+        body = "window.__PARADOC_CONFIG__ = " + json.dumps(payload) + ";\n"
         return Response(content=body, media_type="application/javascript")
 
     # ── Authenticated endpoints ──────────────────────────────────────

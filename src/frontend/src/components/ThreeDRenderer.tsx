@@ -1,5 +1,6 @@
 import React from 'react'
 import { getAssetTransport, getRuntimeConfig } from '../transport'
+import { authedFetch } from '../services/auth/oidc'
 import { useViewerControlsStore } from '../store/viewerControlsStore'
 import type { CameraPreset } from '../../vendor/ada-viewer'
 
@@ -37,7 +38,7 @@ function loadPresets(docId: string): Promise<Record<string, CameraPreset>> {
       url = base.replace(/\/?$/, '/') + 'assets/presets.json'
     }
     try {
-      const res = await fetch(url, { cache: 'no-store' })
+      const res = await authedFetch(url, { cache: 'no-store' })
       if (!res.ok) throw new Error(`presets HTTP ${res.status}`)
       const raw = (await res.json()) as Record<string, Omit<CameraPreset, 'name'>>
       const out: Record<string, CameraPreset> = {}

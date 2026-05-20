@@ -5,6 +5,8 @@ import { Topbar } from './components/Topbar'
 import { Navbar, TocItem } from './components/Navbar'
 import { SearchBar } from './components/SearchBar'
 import AdminApp from './components/admin/AdminApp'
+import { AuthGate } from './components/auth/AuthGate'
+import { AuthCallback } from './components/auth/AuthCallback'
 
 // Inline the worker so it's embedded in the bundle
 import InlineWorker from './ws/worker.ts?worker&inline'
@@ -380,15 +382,28 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/admin/*" element={<AdminApp />} />
+        {/* OIDC redirect_uri — must NOT be inside AuthGate or the gate
+            will redirect back to /auth/callback in an infinite loop
+            since isSignedIn() is still false at that point. */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route
+          path="/admin/*"
+          element={
+            <AuthGate>
+              <AdminApp />
+            </AuthGate>
+          }
+        />
         <Route
           path="*"
           element={
-            <SourceDisplayProvider>
-              <ViewerControlsProvider>
-                <AppContent />
-              </ViewerControlsProvider>
-            </SourceDisplayProvider>
+            <AuthGate>
+              <SourceDisplayProvider>
+                <ViewerControlsProvider>
+                  <AppContent />
+                </ViewerControlsProvider>
+              </SourceDisplayProvider>
+            </AuthGate>
           }
         />
       </Routes>

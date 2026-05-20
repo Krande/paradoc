@@ -1,5 +1,6 @@
 import React from 'react'
 import { getRuntimeConfig } from '../transport'
+import { authedFetch } from '../services/auth/oidc'
 
 interface DocGroup {
   key: string
@@ -41,7 +42,7 @@ export function useDocList(): DocList {
     let canceled = false
     ;(async () => {
       try {
-        const res = await fetch(joinUrl(cfg.apiBase || '', '/api/docs'), { cache: 'no-store' })
+        const res = await authedFetch(joinUrl(cfg.apiBase || '', '/api/docs'), { cache: 'no-store' })
         if (!res.ok) return
         const body = (await res.json()) as DocsResponse
         if (canceled) return

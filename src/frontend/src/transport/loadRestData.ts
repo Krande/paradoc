@@ -7,6 +7,7 @@
 
 import type { DocManifest, SectionBundle } from '../ast/types'
 import type { PlotData, TableData } from '../sections/store'
+import { authedFetch } from '../services/auth/oidc'
 
 export interface LoadRestResult {
   manifest: DocManifest
@@ -25,7 +26,7 @@ async function fetchOptionalJson<T>(url: string, fallback: T): Promise<T> {
   // none, but a deployment with an older paradoc-serve will 404. Treat
   // any non-2xx as the empty fallback rather than failing the doc load.
   try {
-    const res = await fetch(url, { cache: 'no-store' })
+    const res = await authedFetch(url, { cache: 'no-store' })
     if (!res.ok) return fallback
     return (await res.json()) as T
   } catch {
@@ -36,7 +37,7 @@ async function fetchOptionalJson<T>(url: string, fallback: T): Promise<T> {
 export async function loadRestData(apiBase: string, docId: string): Promise<LoadRestResult> {
   const docPath = `/api/docs/${encodeURIComponent(docId)}`
 
-  const manifestRes = await fetch(joinUrl(apiBase, `${docPath}/manifest`), {
+  const manifestRes = await authedFetch(joinUrl(apiBase, `${docPath}/manifest`), {
     cache: 'no-store',
   })
   if (!manifestRes.ok) {
@@ -54,7 +55,7 @@ export async function loadRestData(apiBase: string, docId: string): Promise<Load
   const h1Count = manifest.sections.filter((s) => (s.level ?? 1) === 1).length
   const numBundles = Math.max(h1Count, 1)
   for (let idx = 0; idx < numBundles; idx += 1) {
-    const res = await fetch(joinUrl(apiBase, `${docPath}/sections/${idx}`), {
+    const res = await authedFetch(joinUrl(apiBase, `${docPath}/sections/${idx}`), {
       cache: 'no-store',
     })
     if (!res.ok) {

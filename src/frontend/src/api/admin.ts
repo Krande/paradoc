@@ -7,6 +7,7 @@
 // itself.
 
 import { getRuntimeConfig } from '../transport'
+import { authedFetch } from '../services/auth/oidc'
 
 function apiBase(): string {
   return (getRuntimeConfig().apiBase || '').replace(/\/?$/, '')
@@ -32,7 +33,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     init.headers = { ...(init.headers || {}), 'Content-Type': 'application/json' }
     init.body = JSON.stringify(body)
   }
-  const res = await fetch(url(path), init)
+  const res = await authedFetch(url(path), init)
   if (res.status === 204) {
     return undefined as unknown as T
   }

@@ -1,6 +1,7 @@
 import React from 'react'
 import { Modal } from './Modal'
 import { getRuntimeConfig } from '../transport'
+import { authedFetch } from '../services/auth/oidc'
 
 interface MeResponse {
   id: string
@@ -46,7 +47,7 @@ export function UserInfoModal({ open, onClose }: UserInfoModalProps) {
     setUnauthenticated(false)
     ;(async () => {
       try {
-        const res = await fetch(joinUrl(cfg.apiBase || '', '/api/me'), { cache: 'no-store' })
+        const res = await authedFetch(joinUrl(cfg.apiBase || '', '/api/me'), { cache: 'no-store' })
         if (res.status === 401) {
           if (!canceled) {
             setUnauthenticated(true)
