@@ -427,21 +427,47 @@ def create_app(
     # one. `recent` stays empty until we surface per-doc updated_at;
     # the frontend hides the section when it's empty.
 
+    def _doc_entry(doc_id: str, scope: Scope, scope_label: str) -> dict[str, Any]:
+        """Build a landing-card entry — id + scope + provenance.
+
+        Reads each doc's bundle manifest so the SPA can show
+        published_at + git info on the card. Missing manifest (pre-v2
+        bundle, S3 fetch failed, etc.) gracefully degrades to id-only.
+        """
+        entry: dict[str, Any] = {"id": doc_id, "scope": scope_label}
+        try:
+            bm = doc_store.get_bundle_manifest(doc_id, scope=scope)
+        except Exception:
+            bm = None
+        if bm is not None:
+            entry["published_at"] = bm.published_at or bm.created_at
+            entry["paradoc_version"] = bm.paradoc_version
+            if bm.git is not None:
+                entry["git"] = {
+                    "short_commit": bm.git.short_commit,
+                    "branch": bm.git.branch,
+                    "is_dirty": bm.git.is_dirty,
+                    "remote_url": bm.git.remote_url,
+                }
+        return entry
+
     @app.get("/api/landing")
     async def get_landing(
         request: Request,
         user: User = Depends(auth_module.current_user),
     ) -> dict[str, Any]:
-        shared_ids = doc_store.list_doc_ids(Scope.shared())
-        shared = [{"id": d, "scope": "shared"} for d in shared_ids]
+        shared_scope = Scope.shared()
+        shared_ids = doc_store.list_doc_ids(shared_scope)
+        shared = [_doc_entry(d, shared_scope, "shared") for d in shared_ids]
 
         personal: list[dict[str, Any]] = []
         # Synthetic local-dev users keep the zero UUID; their bundles
         # never live under users/<id>/, so skip the listing.
         if user.id and not user.id.startswith("00000000"):
             try:
-                personal_ids = doc_store.list_doc_ids(Scope.user(user.id))
-                personal = [{"id": d, "scope": "personal"} for d in personal_ids]
+                user_scope = Scope.user(user.id)
+                personal_ids = doc_store.list_doc_ids(user_scope)
+                personal = [_doc_entry(d, user_scope, "personal") for d in personal_ids]
             except Exception:
                 personal = []
 
@@ -452,19 +478,29 @@ def create_app(
             user_projects = await _db.list_user_projects(pool, user.id)
             for p in user_projects:
                 try:
-                    doc_ids = doc_store.list_doc_ids(Scope.project(p.id))
+                    project_scope = Scope.project(p.id)
+                    doc_ids = doc_store.list_doc_ids(project_scope)
+                    docs = [_doc_entry(d, project_scope, "project") for d in doc_ids]
                 except Exception:
-                    doc_ids = []
+                    docs = []
                 projects_out.append(
                     {
                         "slug": p.slug,
                         "name": p.name,
-                        "docs": [{"id": d, "scope": "project"} for d in doc_ids],
+                        "docs": docs,
                     }
                 )
 
+        # Recent strip = all accessible docs sorted by published_at desc,
+        # capped. We dedupe by (scope, id) so the same doc doesn't appear
+        # twice if it's pushed to both shared + a project.
+        all_entries = shared + personal + [d for g in projects_out for d in g["docs"]]
+        with_ts = [e for e in all_entries if e.get("published_at")]
+        with_ts.sort(key=lambda e: e["published_at"], reverse=True)
+        recent = with_ts[:8]
+
         return {
-            "recent": [],
+            "recent": recent,
             "personal": personal,
             "shared": shared,
             "projects": projects_out,

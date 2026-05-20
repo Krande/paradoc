@@ -28,6 +28,7 @@ from paradoc.db import DbManager
 from paradoc.db.models import PlotData, TableData, ThreeDData
 
 from .base import DocStore, _default_shared_scope
+from .manifest import BundleManifest
 
 if TYPE_CHECKING:
     from paradoc.serve.scope import Scope
@@ -229,6 +230,20 @@ class S3DocStore(DocStore):
     ) -> Optional[ThreeDData]:
         s = scope if scope is not None else _default_shared_scope()
         return self._db(doc_id, s).get_three_d(key)
+
+    def get_bundle_manifest(
+        self, doc_id: str, *, scope: Optional["Scope"] = None
+    ) -> Optional[BundleManifest]:
+        s = scope if scope is not None else _default_shared_scope()
+        # Bundle manifest sits at the bundle root, NOT under static/ —
+        # static/manifest.json is the DocManifest the SPA reads.
+        raw = self._fetch_object(self._key(doc_id, s, "manifest.json"))
+        if raw is None:
+            return None
+        try:
+            return BundleManifest(**json.loads(raw))
+        except Exception:
+            return None
 
     def get_static_manifest_bytes(
         self, doc_id: str, *, scope: Optional["Scope"] = None

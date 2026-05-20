@@ -33,6 +33,8 @@ from .manifest import read_manifest
 if TYPE_CHECKING:
     from paradoc.serve.scope import Scope
 
+    from .manifest import BundleManifest
+
 
 class LocalDocStore(DocStore):
     """Filesystem-backed doc store. Scope-aware in multi-doc mode."""
@@ -111,6 +113,19 @@ class LocalDocStore(DocStore):
                 except FileNotFoundError:
                     continue
         return out
+
+    def get_bundle_manifest(
+        self, doc_id: str, *, scope: Optional["Scope"] = None
+    ) -> Optional["BundleManifest"]:
+        s = scope if scope is not None else _default_shared_scope()
+        try:
+            bundle = self._bundle_dir(doc_id, s)
+        except (FileNotFoundError, PermissionError):
+            return None
+        try:
+            return read_manifest(bundle)
+        except (FileNotFoundError, Exception):
+            return None
 
     def get_table(
         self, doc_id: str, key: str, *, scope: Optional["Scope"] = None

@@ -1200,7 +1200,10 @@ class OneDoc:
         bundle_root.mkdir(parents=True, exist_ok=True)
 
         try:
-            write_manifest(bundle_root, doc_id=doc_id)
+            # source_dir is the project repo's source root — git provenance
+            # extracted from there reflects the project that produced the
+            # doc, not paradoc itself.
+            write_manifest(bundle_root, doc_id=doc_id, repo_root=self.source_dir)
         except Exception as exc:
             logger.error(f"failed to write manifest.json: {exc}")
 

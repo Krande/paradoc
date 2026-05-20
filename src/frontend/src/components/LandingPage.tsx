@@ -16,10 +16,23 @@ import { getRuntimeConfig } from '../transport'
 // every result under "Shared" — that matches the current behavior of
 // DocList. Personal/Projects sections stay hidden in fallback mode.
 
+interface GitInfo {
+  short_commit: string
+  branch: string
+  is_dirty: boolean
+  remote_url?: string
+}
+
 interface LandingDoc {
   id: string
   title?: string
+  /** Legacy field kept for backwards-compat with the /api/docs fallback. */
   updated_at?: string
+  /** v2 manifest field. The card displays this when present, falling
+   *  back to updated_at then to "no timestamp". */
+  published_at?: string
+  paradoc_version?: string
+  git?: GitInfo
   scope?: 'shared' | 'personal' | 'project'
 }
 
@@ -73,6 +86,34 @@ function ScopeChip({ scope }: { scope?: LandingDoc['scope'] }) {
   )
 }
 
+function GitFooter({ git, ts }: { git?: GitInfo; ts?: string }) {
+  const branch = git?.branch || ''
+  const sha = git?.short_commit || ''
+  const dirty = git?.is_dirty
+  const rel = ts ? formatRelative(ts) : ''
+  // Footer renders only when we have at least one of git, timestamp.
+  if (!branch && !sha && !rel) return null
+  return (
+    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 font-mono">
+      {dirty && (
+        <span
+          title="Built from a dirty working tree"
+          className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500"
+        />
+      )}
+      {(branch || sha) && (
+        <span className="truncate min-w-0">
+          {branch ? branch : ''}
+          {branch && sha ? '@' : ''}
+          {sha}
+        </span>
+      )}
+      {(branch || sha) && rel && <span className="text-gray-300 dark:text-gray-700">·</span>}
+      {rel && <span className="whitespace-nowrap">{rel}</span>}
+    </div>
+  )
+}
+
 function DocCard({
   doc,
   onSelect,
@@ -82,6 +123,7 @@ function DocCard({
   onSelect: (id: string) => void
   compact?: boolean
 }) {
+  const ts = doc.published_at || doc.updated_at
   return (
     <button
       onClick={() => onSelect(doc.id)}
@@ -94,11 +136,6 @@ function DocCard({
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <ScopeChip scope={doc.scope} />
-        {doc.updated_at && (
-          <span className="text-[11px] text-gray-500 dark:text-gray-400">
-            {formatRelative(doc.updated_at)}
-          </span>
-        )}
       </div>
       <p className="font-medium text-gray-900 dark:text-gray-100 break-words leading-snug">
         {doc.title || doc.id}
@@ -106,6 +143,7 @@ function DocCard({
       {doc.title && doc.title !== doc.id && (
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-all">{doc.id}</p>
       )}
+      <GitFooter git={doc.git} ts={ts} />
     </button>
   )
 }

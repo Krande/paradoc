@@ -23,6 +23,8 @@ from paradoc.db.models import PlotData, TableData, ThreeDData
 if TYPE_CHECKING:
     from paradoc.serve.scope import Scope
 
+    from .manifest import BundleManifest
+
 
 def _default_shared_scope() -> "Scope":
     """Local helper avoiding a top-level import of paradoc.serve.scope.
@@ -63,6 +65,18 @@ class DocStore(ABC):
     @abstractmethod
     def list_doc_ids(self, scope: Optional["Scope"] = None) -> list[str]:
         """All doc IDs the store can serve within ``scope``."""
+
+    def get_bundle_manifest(
+        self, doc_id: str, *, scope: Optional["Scope"] = None
+    ) -> Optional["BundleManifest"]:
+        """Return the parsed ``<bundle>/manifest.json`` for ``doc_id``.
+
+        Used by aggregation endpoints (``/api/landing``) that want
+        published_at + git provenance per doc without paying for the
+        full static-bundle read. ``None`` if the manifest is missing or
+        unparseable; callers fall back to id-only display.
+        """
+        return None
 
     def list_doc_groups(self) -> list[DocGroup]:
         """Return docs partitioned into named groups for the UI dropdown.
