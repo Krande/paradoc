@@ -57,6 +57,13 @@ let refreshInflight: Promise<boolean> | null = null
 // page leaves.
 let signInInflight = false
 
+// Same problem on the callback side: StrictMode double-mounts
+// AuthCallback, so its effect fires completeSignIn() twice. The first
+// call reads-and-removes STORAGE_STATE; the second sees null and
+// throws "state mismatch". Cache the in-flight promise so both effect
+// runs share the same result.
+let completeSignInInflight: Promise<string> | null = null
+
 function redirectUri(): string {
   return `${window.location.origin}/auth/callback`
 }
@@ -190,39 +197,43 @@ export async function signIn(returnUrl?: string): Promise<void> {
 
 /** Handle the redirect-back URL. Returns the original return path. */
 export async function completeSignIn(): Promise<string> {
-  const url = new URL(window.location.href)
-  const code = url.searchParams.get('code')
-  const state = url.searchParams.get('state')
-  const expectedState = sessionStorage.getItem(STORAGE_STATE)
-  sessionStorage.removeItem(STORAGE_STATE)
-  if (!code) throw new Error('no auth code in callback URL')
-  if (!expectedState || state !== expectedState) {
-    throw new Error('state mismatch — possible CSRF, refusing to sign in')
-  }
-  const verifier = sessionStorage.getItem(STORAGE_PKCE)
-  sessionStorage.removeItem(STORAGE_PKCE)
-  if (!verifier) throw new Error('no PKCE verifier (sessionStorage cleared?)')
-  const d = await loadDiscovery()
-  const cfg = getRuntimeConfig()
-  const params = new URLSearchParams({
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: redirectUri(),
-    client_id: cfg.authClientId || '',
-    code_verifier: verifier,
-  })
-  const r = await fetch(d.token_endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString(),
-  })
-  if (!r.ok) {
-    throw new Error(`token exchange failed: ${r.status} ${await r.text()}`)
-  }
-  acceptTokenResponse(await r.json())
-  const ret = sessionStorage.getItem(STORAGE_RETURN) || '/'
-  sessionStorage.removeItem(STORAGE_RETURN)
-  return ret
+  if (completeSignInInflight) return completeSignInInflight
+  completeSignInInflight = (async () => {
+    const url = new URL(window.location.href)
+    const code = url.searchParams.get('code')
+    const state = url.searchParams.get('state')
+    const expectedState = sessionStorage.getItem(STORAGE_STATE)
+    sessionStorage.removeItem(STORAGE_STATE)
+    if (!code) throw new Error('no auth code in callback URL')
+    if (!expectedState || state !== expectedState) {
+      throw new Error('state mismatch — possible CSRF, refusing to sign in')
+    }
+    const verifier = sessionStorage.getItem(STORAGE_PKCE)
+    sessionStorage.removeItem(STORAGE_PKCE)
+    if (!verifier) throw new Error('no PKCE verifier (sessionStorage cleared?)')
+    const d = await loadDiscovery()
+    const cfg = getRuntimeConfig()
+    const params = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri(),
+      client_id: cfg.authClientId || '',
+      code_verifier: verifier,
+    })
+    const r = await fetch(d.token_endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    })
+    if (!r.ok) {
+      throw new Error(`token exchange failed: ${r.status} ${await r.text()}`)
+    }
+    acceptTokenResponse(await r.json())
+    const ret = sessionStorage.getItem(STORAGE_RETURN) || '/'
+    sessionStorage.removeItem(STORAGE_RETURN)
+    return ret
+  })()
+  return completeSignInInflight
 }
 
 /** Refresh the access token using the stored refresh token. Returns
