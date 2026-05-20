@@ -57,8 +57,10 @@ spec:
               port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          args:
-            {{- if .Values.auth.requireAuth }}
-            - "--require-auth"
-            {{- end }}
+          # Note: the legacy `--require-auth` arg was removed when the
+          # OIDC bearer-token layer landed (Phase 1a). Auth posture is now
+          # controlled entirely by PARADOC_AUTH_ENABLED + PARADOC_OIDC_*
+          # env vars. The `auth.requireAuth` value still parses for
+          # backwards-compat with deployed values files but is otherwise
+          # a no-op until the helm-chart OIDC wiring lands.
 {{- end }}
