@@ -36,6 +36,13 @@
   h4 { @apply text-lg font-semibold text-gray-900 dark:text-gray-100; }
   h5 { @apply text-base font-semibold text-gray-900 dark:text-gray-100; }
   h6 { @apply text-sm font-semibold text-gray-900 dark:text-gray-100; }
+  /* Topbar is `sticky top-0 h-14`. When a TOC link scrolls a heading
+     into view, the heading would otherwise tuck under the topbar; the
+     scroll-margin-top tells the browser to leave room. Section
+     wrappers already carry `scroll-mt-14` from VirtualReader; this
+     covers sub-headings (h2..h6) inside a section that the TOC also
+     links to. */
+  h1, h2, h3, h4, h5, h6 { scroll-margin-top: 4rem; }
 
   p { @apply text-gray-800 dark:text-gray-200; }
   a { @apply text-blue-600 dark:text-blue-400 hover:underline cursor-pointer; }

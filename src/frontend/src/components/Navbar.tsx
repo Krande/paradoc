@@ -27,10 +27,16 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
                 e.preventDefault()
                 const el = document.getElementById(item.id)
                 if (el) {
-                  const topbar = document.getElementById('paradoc-topbar')
-                  const offset = topbar ? topbar.getBoundingClientRect().height : 0
-                  const top = window.scrollY + el.getBoundingClientRect().top - offset - 8
-                  window.scrollTo({ top, behavior: 'smooth' })
+                  // `scrollIntoView` walks up to the nearest scrollable
+                  // ancestor (the VirtualReader's `overflow-auto` div).
+                  // We previously used `window.scrollTo` here — but the
+                  // app root has `overflow:hidden`, so the window isn't
+                  // scrollable; on mobile that triggered the browser's
+                  // visual-viewport pinch-zoom heuristic instead of a
+                  // real scroll. Top-bar clearance is handled by the
+                  // `scroll-mt-*` utility on the reader's headings
+                  // (see styles.css scroll-margin-top rule).
+                  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
                 }
                 onClose()
               }}
