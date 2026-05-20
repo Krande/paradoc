@@ -15,6 +15,9 @@ spec:
       labels:
         {{- include "paradoc-frontend.selectorLabels" . | nindent 8 }}
     spec:
+      {{- with .Values.hostAliases }}
+      hostAliases: {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: paradoc
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

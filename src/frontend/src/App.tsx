@@ -72,23 +72,26 @@ function AppContent() {
   }, [])
 
   useEffect(() => {
-    // Use inline worker for single-file builds that work from filesystem
-    const worker = new InlineWorker()
+    // The inline worker exists only to serve the WS live-view loop.
+    // Only instantiate it when transport === 'ws'; otherwise the
+    // worker would boot, fail to connect to ws://localhost:13579 (the
+    // dev WS server isn't reachable from REST/static/embed deployments),
+    // and either spam reconnect errors or sit doing nothing useful.
+    // Stopping it post-init via postMessage('stop') still let one
+    // failed WS connection through before the stop arrived, hence
+    // gating the construction itself.
+    const _cfg = getRuntimeConfig()
+    const needsWorker = _cfg.transport !== 'rest' && _cfg.transport !== 'static'
+    const worker = needsWorker ? new InlineWorker() : null
     workerRef.current = worker
-    // Initialize the AssetTransport so 3D figures can fetch glb bytes.
     initTransport(worker).catch((err) => {
       console.warn('[App] failed to init AssetTransport:', err)
     })
 
-    // Stop the worker's WS reconnect loop in REST / static mode. The
-    // worker boots on import and unconditionally connects to
-    // `ws://localhost:13579` (the dev WS server). In production where
-    // transport is `'rest'` or `'static'`, no WS server exists and
-    // the worker spams reconnect errors into the console forever.
-    const _cfg = getRuntimeConfig()
-    if (_cfg.transport === 'rest' || _cfg.transport === 'static') {
-      try { worker.postMessage({ type: 'stop' }) } catch {}
-    }
+    // No WS worker in non-ws modes — skip the message-handler wiring
+    // and lifecycle entirely. Doc data flows through the REST loader
+    // (loadRestData) or the static-files loader instead.
+    if (!worker) return
 
     // Track the current docId from manifest
     let currentDocId = 'demo'

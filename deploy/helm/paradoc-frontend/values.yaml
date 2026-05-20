@@ -68,6 +68,16 @@ resources:
     cpu: 100m
     memory: 128Mi
 
+# Map externally-resolvable hostnames to in-cluster service IPs.
+# Required when paradoc-serve has to call IdP discovery / JWKS
+# endpoints that live behind the same Traefik ingress that fronts
+# the pod — kube-dns doesn't resolve those publicly-routed names
+# from inside the cluster (Tailscale DNS, no split DNS).
+#
+# Find the Traefik service ClusterIP with:
+#   kubectl -n traefik get svc traefik -o jsonpath='{.spec.clusterIP}'
+hostAliases: []
+
 service:
   type: ClusterIP
   port: 8000
