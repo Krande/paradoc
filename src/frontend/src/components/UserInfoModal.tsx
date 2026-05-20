@@ -120,8 +120,182 @@ export function UserInfoModal({ open, onClose }: UserInfoModalProps) {
               requests get the synthetic local-dev admin user.
             </p>
           )}
+          {me.iss !== 'local-dev' && <TokenSection />}
         </div>
       )}
     </Modal>
+  )
+}
+
+interface ApiToken {
+  id: string
+  name: string
+  created_at: string
+  last_used_at?: string
+}
+
+// Tokens section. Lists active API tokens, lets the user create a new
+// one (plaintext shown once with a copy button), and revoke any of
+// them. Backed by the /api/me/tokens endpoints — server only ever
+// returns the plaintext on create.
+function TokenSection() {
+  const [tokens, setTokens] = React.useState<ApiToken[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+  const [newName, setNewName] = React.useState('')
+  const [creating, setCreating] = React.useState(false)
+  const [createdPlaintext, setCreatedPlaintext] = React.useState<string | null>(null)
+  const [createdName, setCreatedName] = React.useState<string | null>(null)
+
+  const apiBase = getRuntimeConfig().apiBase || ''
+
+  const refresh = React.useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await authedFetch(joinUrl(apiBase, '/api/me/tokens'), { cache: 'no-store' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const body = (await res.json()) as { tokens: ApiToken[] }
+      setTokens(body.tokens || [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'failed')
+    } finally {
+      setLoading(false)
+    }
+  }, [apiBase])
+
+  React.useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  const create = async () => {
+    const name = newName.trim()
+    if (!name) return
+    setCreating(true)
+    setError(null)
+    try {
+      const res = await authedFetch(joinUrl(apiBase, '/api/me/tokens'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const body = (await res.json()) as { token: string; name: string }
+      setCreatedPlaintext(body.token)
+      setCreatedName(body.name)
+      setNewName('')
+      await refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'failed')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const revoke = async (id: string) => {
+    setError(null)
+    try {
+      const res = await authedFetch(joinUrl(apiBase, `/api/me/tokens/${encodeURIComponent(id)}`), {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      await refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'failed')
+    }
+  }
+
+  return (
+    <div>
+      <div className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide mb-2">
+        API tokens
+      </div>
+
+      {createdPlaintext && (
+        <div className="mb-3 p-3 border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 rounded">
+          <div className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-1">
+            New token "{createdName}" — copy now, this is the only time you'll see it.
+          </div>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 font-mono text-xs break-all bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 rounded px-2 py-1">
+              {createdPlaintext}
+            </code>
+            <button
+              type="button"
+              className="text-xs px-2 py-1 rounded bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900 hover:opacity-80 cursor-pointer"
+              onClick={() => {
+                void navigator.clipboard.writeText(createdPlaintext)
+              }}
+            >
+              Copy
+            </button>
+            <button
+              type="button"
+              className="text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-700 cursor-pointer"
+              onClick={() => {
+                setCreatedPlaintext(null)
+                setCreatedName(null)
+              }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-gray-500 dark:text-gray-400 text-xs">Loading…</div>
+      ) : tokens.length === 0 ? (
+        <div className="text-gray-500 dark:text-gray-400 text-xs italic">
+          No tokens yet. Create one below to use with `paradoc publish`.
+        </div>
+      ) : (
+        <ul className="space-y-1.5">
+          {tokens.map((t) => (
+            <li
+              key={t.id}
+              className="flex items-center justify-between gap-2 text-xs border border-gray-200 dark:border-gray-800 rounded px-2 py-1.5"
+            >
+              <div className="min-w-0">
+                <div className="font-medium text-gray-900 dark:text-gray-100 truncate">{t.name}</div>
+                <div className="text-gray-500 dark:text-gray-400 font-mono">
+                  created {t.created_at.slice(0, 10)}
+                  {t.last_used_at && ` · last used ${t.last_used_at.slice(0, 10)}`}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="text-xs text-red-600 dark:text-red-400 hover:underline cursor-pointer shrink-0"
+                onClick={() => void revoke(t.id)}
+              >
+                Revoke
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex items-center gap-2 mt-3">
+        <input
+          type="text"
+          value={newName}
+          placeholder="Token name (e.g. ci-build, laptop)"
+          onChange={(e) => setNewName(e.target.value)}
+          className="flex-1 text-xs px-2 py-1.5 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+        <button
+          type="button"
+          disabled={creating || !newName.trim()}
+          onClick={() => void create()}
+          className="text-xs px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        >
+          {creating ? 'Creating…' : 'New token'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="text-red-600 dark:text-red-400 text-xs mt-2">Token error: {error}</div>
+      )}
+    </div>
   )
 }

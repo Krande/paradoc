@@ -247,6 +247,23 @@ class S3DocStore(DocStore):
             return None
         return self._fetch_object(self._key(doc_id, s, "files", *clean.split("/")))
 
+    def put_bundle_file(
+        self,
+        doc_id: str,
+        rel_path: str,
+        data: bytes,
+        *,
+        scope: Optional["Scope"] = None,
+    ) -> None:
+        import obstore as _obstore
+
+        s = scope if scope is not None else _default_shared_scope()
+        clean = rel_path.replace("\\", "/").strip("/")
+        if not clean or ".." in clean.split("/"):
+            raise PermissionError(f"invalid rel_path: {rel_path!r}")
+        key = self._key(doc_id, s, *clean.split("/"))
+        _obstore.put(self._store, key, data)
+
     def get_bundle_manifest(
         self, doc_id: str, *, scope: Optional["Scope"] = None
     ) -> Optional[BundleManifest]:

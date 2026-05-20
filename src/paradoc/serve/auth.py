@@ -366,6 +366,40 @@ def _bearer_token(request: Request) -> str:
     return token
 
 
+async def _resolve_api_token(request: Request, token: str) -> Optional["User"]:
+    """Look up a ``paradoc_*`` API token in the control plane.
+
+    Returns ``None`` when the token doesn't match a live row (caller
+    treats that as 401). Requires a DB pool — without it the API-token
+    feature is dormant and any ``paradoc_*`` bearer raises invalid.
+    """
+    import hashlib
+
+    pool = getattr(request.app.state, "db_pool", None)
+    if pool is None:
+        return None
+    from . import db as db_module
+
+    digest = hashlib.sha256(token.encode("utf-8")).digest()
+    row = await db_module.resolve_api_token(pool, digest)
+    if row is None:
+        return None
+    # API tokens inherit the issuing user's identity. No claims-based
+    # admin lift here — the token's scope is whatever the user already
+    # has via OIDC + admin_group membership. Group membership isn't
+    # stored on `users` rows so we leave it empty and let admin gates
+    # require a fresh OIDC sign-in for now.
+    return User(
+        id=row["id"],
+        iss=row["oidc_iss"],
+        subject=row["oidc_sub"],
+        email=row["email"] or "",
+        display_name=row["display_name"] or row["oidc_sub"],
+        groups=frozenset(),
+        is_admin=False,
+    )
+
+
 def _claims_to_partial_user(
     claims: dict[str, Any], provider: ProviderConfig, admin_group: str
 ) -> tuple[str, str, str, frozenset[str], bool]:
@@ -428,6 +462,16 @@ async def current_user(request: Request) -> User:
         return User.local_dev()
     try:
         token = _bearer_token(request)
+        # API tokens are opaque ``paradoc_<base64url>`` strings issued
+        # by the user from the UI (api_tokens table). Detect them by
+        # the prefix and resolve via the control plane before falling
+        # through to the JWT verifier — they don't carry claims, so
+        # admin/groups come from the owning user's stored profile.
+        if token.startswith("paradoc_"):
+            api_user = await _resolve_api_token(request, token)
+            if api_user is not None:
+                return api_user
+            raise TokenError("invalid api token")
         verifier: _MultiProviderVerifier = request.app.state.auth_verifier
         claims, provider = await verifier.verify(token)
     except TokenError as exc:

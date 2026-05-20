@@ -66,6 +66,23 @@ class DocStore(ABC):
     def list_doc_ids(self, scope: Optional["Scope"] = None) -> list[str]:
         """All doc IDs the store can serve within ``scope``."""
 
+    def put_bundle_file(
+        self,
+        doc_id: str,
+        rel_path: str,
+        data: bytes,
+        *,
+        scope: Optional["Scope"] = None,
+    ) -> None:
+        """Write ``data`` to ``<bundle>/<rel_path>`` within the doc.
+
+        Used by the upload route the ``paradoc publish`` CLI hits.
+        Implementations must reject path-traversal and overwrite-safe
+        the destination atomically when possible. Read-only stores
+        raise ``NotImplementedError``.
+        """
+        raise NotImplementedError
+
     def get_file_bytes(
         self,
         doc_id: str,

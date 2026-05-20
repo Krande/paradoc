@@ -437,3 +437,115 @@ async def user_exists(pool: asyncpg.Pool, user_id: str) -> bool:
         "SELECT 1 FROM users WHERE id = $1::uuid", user_id
     )
     return row is not None
+
+
+# ── API tokens ──────────────────────────────────────────────────────
+#
+# Long-lived bearer credentials for the `paradoc publish` CLI and other
+# automation that can't drive the interactive OIDC flow. Issued by the
+# user from the UI; presented as a `Bearer paradoc_<32-byte-base64url>`
+# in the Authorization header on uploads. The verifier hashes the
+# plaintext and looks up here.
+
+
+async def create_api_token(
+    pool: asyncpg.Pool,
+    *,
+    user_id: str,
+    name: str,
+    token_hash: bytes,
+) -> dict:
+    """Insert a fresh token row and return the row contents (no plaintext)."""
+    row = await pool.fetchrow(
+        """
+        INSERT INTO api_tokens (user_id, name, token_hash)
+        VALUES ($1::uuid, $2, $3)
+        RETURNING id, user_id, name, created_at
+        """,
+        user_id,
+        name,
+        token_hash,
+    )
+    return {
+        "id": str(row["id"]),
+        "user_id": str(row["user_id"]),
+        "name": row["name"],
+        "created_at": row["created_at"].isoformat(),
+    }
+
+
+async def list_api_tokens(pool: asyncpg.Pool, user_id: str) -> list[dict]:
+    """All non-revoked tokens for ``user_id`` with metadata only."""
+    rows = await pool.fetch(
+        """
+        SELECT id, name, created_at, last_used_at
+        FROM api_tokens
+        WHERE user_id = $1::uuid AND revoked_at IS NULL
+        ORDER BY created_at DESC
+        """,
+        user_id,
+    )
+    return [
+        {
+            "id": str(r["id"]),
+            "name": r["name"],
+            "created_at": r["created_at"].isoformat(),
+            "last_used_at": r["last_used_at"].isoformat() if r["last_used_at"] else None,
+        }
+        for r in rows
+    ]
+
+
+async def revoke_api_token(
+    pool: asyncpg.Pool, *, token_id: str, user_id: str
+) -> bool:
+    """Mark a user's token revoked. Returns whether anything changed."""
+    row = await pool.fetchrow(
+        """
+        UPDATE api_tokens
+        SET revoked_at = NOW()
+        WHERE id = $1::uuid AND user_id = $2::uuid AND revoked_at IS NULL
+        RETURNING id
+        """,
+        token_id,
+        user_id,
+    )
+    return row is not None
+
+
+async def resolve_api_token(pool: asyncpg.Pool, token_hash: bytes) -> Optional[dict]:
+    """Look up a presented token by hash. Bumps last_used_at on hit.
+
+    Returns the owning user's identity tuple (id, oidc_iss, oidc_sub,
+    display_name, email) so the verifier can hand a paradoc User
+    upstream without a second SELECT. None when the hash doesn't match
+    a live (non-revoked) token.
+    """
+    row = await pool.fetchrow(
+        """
+        UPDATE api_tokens
+        SET last_used_at = NOW()
+        WHERE token_hash = $1 AND revoked_at IS NULL
+        RETURNING user_id
+        """,
+        token_hash,
+    )
+    if row is None:
+        return None
+    user = await pool.fetchrow(
+        """
+        SELECT id, oidc_iss, oidc_sub, display_name, email
+        FROM users
+        WHERE id = $1::uuid
+        """,
+        row["user_id"],
+    )
+    if user is None:
+        return None
+    return {
+        "id": str(user["id"]),
+        "oidc_iss": user["oidc_iss"],
+        "oidc_sub": user["oidc_sub"],
+        "display_name": user["display_name"],
+        "email": user["email"],
+    }

@@ -1,9 +1,14 @@
 import typer
 
 from paradoc import OneDoc
+from paradoc.cli.publish import app as publish_app
 from paradoc.common import ExportFormats
 
 app = typer.Typer()
+# `paradoc publish <doc_dir>` — compile and upload a bundle to a
+# running paradoc-serve. Lives in its own module so the heavy
+# paradoc.OneDoc compile path stays out of `paradoc --help`.
+app.add_typer(publish_app, name="publish")
 
 
 @app.command("paradoc")

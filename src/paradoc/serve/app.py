@@ -178,6 +178,93 @@ def create_app(
             "is_admin": user.is_admin,
         }
 
+    # ── API tokens (paradoc publish CLI) ─────────────────────────────
+    #
+    # Long-lived bearer credentials owned by each user. The plaintext
+    # token is shown exactly once on create; subsequent GETs only
+    # return metadata. Hash is sha256 of plaintext, no salt — the
+    # plaintext is 32 bytes of secrets.token_bytes (256 bits), so
+    # brute-forcing the hash is not a realistic attack.
+
+    @app.get("/api/me/tokens")
+    async def list_my_tokens(
+        request: Request, user: User = Depends(auth_module.current_user)
+    ) -> dict[str, Any]:
+        pool = getattr(request.app.state, "db_pool", None)
+        if pool is None:
+            raise HTTPException(
+                status_code=503,
+                detail="api-token feature requires a Postgres-backed deployment",
+            )
+        from . import db as _db
+        return {"tokens": await _db.list_api_tokens(pool, user.id)}
+
+    @app.post("/api/me/tokens")
+    async def create_my_token(
+        request: Request,
+        user: User = Depends(auth_module.current_user),
+    ) -> dict[str, Any]:
+        import hashlib
+        import secrets
+
+        pool = getattr(request.app.state, "db_pool", None)
+        if pool is None:
+            raise HTTPException(
+                status_code=503,
+                detail="api-token feature requires a Postgres-backed deployment",
+            )
+        # Local-dev synthetic user is in the DB (auto-upserted) but we
+        # don't issue tokens for it — it's already a no-auth shortcut.
+        if user.id.startswith("00000000"):
+            raise HTTPException(
+                status_code=403,
+                detail="cannot issue tokens for the local-dev user",
+            )
+        body = await request.json()
+        name = str(body.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="name required")
+        if len(name) > 200:
+            raise HTTPException(status_code=400, detail="name too long")
+
+        # Plaintext shape: `paradoc_` + base64url(32 bytes). The prefix
+        # makes the token recognisable in logs / vault dumps and gates
+        # the API-token path inside the verifier.
+        raw = secrets.token_urlsafe(32)
+        plaintext = f"paradoc_{raw}"
+        digest = hashlib.sha256(plaintext.encode("utf-8")).digest()
+
+        from . import db as _db
+        row = await _db.create_api_token(
+            pool, user_id=user.id, name=name, token_hash=digest
+        )
+        # Plaintext returned exactly once. The client is expected to
+        # stash it immediately; subsequent GETs only see the metadata.
+        return {**row, "token": plaintext}
+
+    @app.delete("/api/me/tokens/{token_id}")
+    async def revoke_my_token(
+        token_id: str,
+        request: Request,
+        user: User = Depends(auth_module.current_user),
+    ) -> dict[str, Any]:
+        pool = getattr(request.app.state, "db_pool", None)
+        if pool is None:
+            raise HTTPException(
+                status_code=503,
+                detail="api-token feature requires a Postgres-backed deployment",
+            )
+        import uuid as _uuid
+        try:
+            _uuid.UUID(token_id)
+        except (ValueError, AttributeError, TypeError):
+            raise HTTPException(status_code=400, detail="invalid token id")
+        from . import db as _db
+        ok = await _db.revoke_api_token(pool, token_id=token_id, user_id=user.id)
+        if not ok:
+            raise HTTPException(status_code=404, detail="token not found")
+        return {"status": "revoked"}
+
     # ── Doc-content endpoints ────────────────────────────────────────
     #
     # Each operation has two URL forms:
@@ -456,6 +543,38 @@ def create_app(
         scope_obj: Scope = Depends(_scope_dep),
     ):
         return _get_file(doc_id, rel_path, scope_obj)
+
+    # ── Bundle upload (paradoc publish CLI) ───────────────────────────
+    #
+    # One PUT per bundle file. The CLI walks the compiled bundle and
+    # pushes each file under its bundle-relative path. The scope dep
+    # gates access: shared = anyone with a valid bearer, user:me = the
+    # token owner, project:<id> = a project member.
+
+    @app.put("/api/scopes/{scope}/docs/{doc_id}/bundle/{rel_path:path}")
+    async def s_put_doc_bundle_file(
+        doc_id: str,
+        rel_path: str,
+        request: Request,
+        scope_obj: Scope = Depends(_scope_dep),
+    ):
+        # 8 MB cap on a single file — large GLBs already chunk via the
+        # bundle structure, the 3D viewer streams from the glb route.
+        # Anything bigger is almost certainly a wrong-source-tree upload.
+        MAX_SIZE = 8 * 1024 * 1024
+        body = await request.body()
+        if len(body) > MAX_SIZE:
+            raise HTTPException(status_code=413, detail="payload too large")
+        try:
+            doc_store.put_bundle_file(doc_id, rel_path, body, scope=scope_obj)
+        except PermissionError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except NotImplementedError:
+            raise HTTPException(
+                status_code=501,
+                detail="this docstore does not support uploads",
+            )
+        return {"status": "ok", "size": len(body)}
 
     # ── Landing aggregator ───────────────────────────────────────────
     #

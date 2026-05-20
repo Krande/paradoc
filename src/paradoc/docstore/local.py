@@ -137,6 +137,31 @@ class LocalDocStore(DocStore):
             return None
         return candidate.read_bytes()
 
+    def put_bundle_file(
+        self,
+        doc_id: str,
+        rel_path: str,
+        data: bytes,
+        *,
+        scope: Optional["Scope"] = None,
+    ) -> None:
+        s = scope if scope is not None else _default_shared_scope()
+        # Single-doc deployments shouldn't be uploaded into via the
+        # CLI; the file layout has no per-doc subdirectory.
+        if self._is_single_doc():
+            raise PermissionError(
+                "uploads not supported on single-doc deployments"
+            )
+        scope_root = self._scope_root(s)
+        bundle_root = (scope_root / doc_id).resolve()
+        if not bundle_root.is_relative_to(scope_root):
+            raise PermissionError(f"doc_id {doc_id!r} escapes scope root")
+        target = (bundle_root / rel_path).resolve()
+        if not target.is_relative_to(bundle_root):
+            raise PermissionError(f"rel_path {rel_path!r} escapes bundle root")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+
     def get_bundle_manifest(
         self, doc_id: str, *, scope: Optional["Scope"] = None
     ) -> Optional["BundleManifest"]:
