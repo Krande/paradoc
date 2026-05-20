@@ -48,6 +48,15 @@ let userClaims: Record<string, unknown> | null = null
 // into a single refresh request.
 let refreshInflight: Promise<boolean> | null = null
 
+// Single-flight guard for signIn(). React.StrictMode double-invokes
+// effects in development (and AuthGate's effect calls signIn on
+// missing token), which previously raced two PKCE state values into
+// sessionStorage and produced a guaranteed "state mismatch" on the
+// callback. Once a signIn is in flight (we've written the state and
+// started navigating), every subsequent call is a no-op until the
+// page leaves.
+let signInInflight = false
+
 function redirectUri(): string {
   return `${window.location.origin}/auth/callback`
 }
@@ -145,6 +154,8 @@ export function getUser(): { sub?: string; email?: string; name?: string } {
 
 /** Kick off the authorize redirect. Caller is the AuthGate UI. */
 export async function signIn(returnUrl?: string): Promise<void> {
+  if (signInInflight) return
+  signInInflight = true
   const d = await loadDiscovery()
   const cfg = getRuntimeConfig()
   const verifier = randomUrl(32)
