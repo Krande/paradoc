@@ -21,8 +21,33 @@ RUN npm run build:serve
 FROM ghcr.io/prefix-dev/pixi:${PIXI_VERSION} AS runtime
 WORKDIR /app
 
+# Sibling adapy checkout — even though the `serve` env doesn't depend
+# on ada-py, pixi's `--locked` check verifies the whole workspace
+# manifest against the lockfile, and `[feature.examples-figs]` carries
+# `ada-py = { path = "../adapy", editable = true }`. Without the path
+# present pixi rejects the lock as out-of-sync. Same pattern as
+# Dockerfile.examples; the clone is shallow so it's cheap.
+#
+# `git` isn't in the slim pixi base, so install it from apt first.
+# Mirror rewrite + HTTPS for the same egress reasons as adapy's
+# Dockerfile.docs.
+RUN sed -i 's|http://archive.ubuntu.com|https://archive.ubuntu.com|g; s|http://security.ubuntu.com|https://security.ubuntu.com|g' /etc/apt/sources.list.d/*.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG ADAPY_GIT_URL
+ARG ADAPY_REF=main
+ARG CACHE_BUST=""
+RUN test -n "$ADAPY_GIT_URL" \
+        || (echo "::error::ADAPY_GIT_URL build-arg is required" >&2; exit 1) \
+    && echo "cache-bust: $CACHE_BUST" \
+    && git clone --depth 1 --branch "$ADAPY_REF" "$ADAPY_GIT_URL" /adapy
+
 # Solve and materialise the pinned `serve` env first so source-only edits
-# don't bust the heavy conda layer cache.
+# don't bust the heavy conda layer cache. pixi resolves `../adapy`
+# relative to the workdir, so the sibling layout has to land before
+# this RUN — see the clone above.
 COPY pixi.toml pixi.lock pyproject.toml ./
 RUN pixi install --environment serve --locked
 
