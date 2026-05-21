@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from ..models import CADModelFile
 from .base import FigureSourceFilter, RenderResult, register_filter
@@ -92,11 +95,17 @@ class CADModelFileFilter(FigureSourceFilter):
 
                 glb_to_image_via_browser(glb_in).save(png_out)
                 return
-            except Exception:  # pragma: no cover - exercised manually
-                # Fall through to the trimesh best-effort path so the
-                # bundle still gets *some* poster when chromium is
-                # unavailable on the build host.
-                pass
+            except Exception as exc:  # pragma: no cover - exercised manually
+                # Surface the actual failure (playwright not installed,
+                # chromium libs missing on the build host, render
+                # timeout, etc.) so CI logs can pinpoint why the
+                # chromium poster is missing. Then fall through to the
+                # trimesh best-effort path so the bundle still gets
+                # *some* poster.
+                logger.warning(
+                    "chromium poster render failed for %s: %s",
+                    glb_in.name, exc, exc_info=True,
+                )
 
         try:
             import trimesh
