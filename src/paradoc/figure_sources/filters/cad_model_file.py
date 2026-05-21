@@ -8,6 +8,26 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+
+def _find_vendored_embed() -> Path | None:
+    """Locate paradoc's vendored adapy-embed bundle, or ``None``.
+
+    Walks upward from this file looking for
+    ``src/frontend/vendor/ada-viewer/index.js`` — the same artifact the
+    SPA inlines at build time. Found when the figure-source filter
+    runs from a paradoc workspace clone (the only context that compiles
+    figures today). Returns ``None`` when paradoc is installed without
+    the source tree, letting the chromium helper fall back to its own
+    adapy default path so the error message remains the actionable one
+    (run ``npm run build:embed`` in src/frontend/).
+    """
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "src" / "frontend" / "vendor" / "ada-viewer" / "index.js"
+        if candidate.is_file():
+            return candidate
+    return None
+
 from ..models import CADModelFile
 from .base import FigureSourceFilter, RenderResult, register_filter
 
@@ -93,7 +113,17 @@ class CADModelFileFilter(FigureSourceFilter):
                     glb_to_image_via_browser,
                 )
 
-                glb_to_image_via_browser(glb_in).save(png_out)
+                # adapy's dist-embed is built by `npm run build:embed`
+                # in src/frontend/ — present locally, *absent* in CI
+                # where we only do a shallow git clone of adapy. paradoc
+                # vendors the same artifact under src/frontend/vendor/
+                # ada-viewer/index.js (the SPA bundle inlines it) so we
+                # prefer that when available — same bytes, always
+                # present alongside the paradoc workspace.
+                embed_bundle = _find_vendored_embed()
+                glb_to_image_via_browser(
+                    glb_in, embed_bundle=embed_bundle,
+                ).save(png_out)
                 return
             except Exception as exc:  # pragma: no cover - exercised manually
                 # Surface the actual failure (playwright not installed,
