@@ -94,8 +94,22 @@ export interface DocManifest {
    * the cached entry, and wipes per-docId IndexedDB stores on
    * mismatch — that's the auto-invalidation hook so a bundle
    * rebuild doesn't keep serving stale AST out of IDB.
+   *
+   * `git` mirrors BundleManifest.git so AboutModal can show
+   * branch@short_commit + dirty flag in static / embed mode where
+   * there's no /api/info to query.
    */
   published_at?: string
   paradoc_version?: string
+  git?: {
+    commit?: string
+    short_commit?: string
+    branch?: string
+    author_email?: string
+    author_name?: string
+    timestamp?: string
+    remote_url?: string
+    is_dirty?: boolean
+  }
   // Optional additional data like cross-ref registry can be added later
 }

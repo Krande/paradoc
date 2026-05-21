@@ -1047,11 +1047,30 @@ class ASTExporter:
             # last week's AST out of the visitor's IndexedDB.
             from datetime import datetime, timezone
 
+            from paradoc.docstore._git import extract as _git_extract, find_repo_root
             from paradoc.docstore.manifest import _detect_paradoc_version
 
             now = datetime.now(timezone.utc).isoformat()
             manifest.setdefault("published_at", now)
             manifest.setdefault("paradoc_version", _detect_paradoc_version())
+
+            # Git provenance — mirrors BundleManifest.git so the SPA's
+            # AboutModal can display "branch@short_sha" + commit + dirty
+            # status in static (embed) mode where there's no /api/info
+            # to call. Sourced from the project's source_dir (same
+            # convention as Document._write_bundle_artifacts) so the
+            # provenance reflects the project repo, not paradoc itself.
+            if "git" not in manifest:
+                try:
+                    source_dir = getattr(self.one_doc, "source_dir", None)
+                    search_from = source_dir if source_dir else output_dir.parent
+                    repo = find_repo_root(search_from)
+                    if repo is not None:
+                        g = _git_extract(repo)
+                        if g is not None:
+                            manifest["git"] = g.to_dict()
+                except Exception as exc:
+                    logger.warning("git provenance extract failed: %s", exc)
 
             # Create sections directory
             sections_dir = output_dir / "sections"
