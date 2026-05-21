@@ -12,6 +12,10 @@ interface Interactive3DFigureProps {
   caption?: React.ReactNode
 }
 
+// Lazy-load the live viewer — pulls in the bundled adapy embed
+// (~3 MiB), three.js, and the worker-cache wiring. Only mounted when
+// the user flips to the Interactive tab; the Static path doesn't pay
+// the import cost.
 const ThreeDRenderer = React.lazy(() =>
   import('./ThreeDRenderer').then((mod) => ({ default: mod.ThreeDRenderer })),
 )
@@ -24,16 +28,17 @@ export function Interactive3DFigure({
   content: _content,
   caption,
 }: Interactive3DFigureProps) {
-  const containerRef = React.useRef<HTMLDivElement | null>(null)
-  // `mountViewer` flips on when the user explicitly clicks the load
-  // button. Auto-mounting on intersection was *too* eager — a long
-  // page still ends up with 20+ live viewers as the user scrolls. The
-  // poster PNG gives them a real preview; only mount the live viewer
-  // when they actually want to interact with it.
-  const [mountViewer, setMountViewer] = React.useState(false)
-  // `showViewer` is the visible-state toggle; once mounted, the user
-  // can hide it without disposing the GL context (re-show is instant).
-  const [showViewer, setShowViewer] = React.useState(false)
+  // Match the InteractiveTable / InteractiveFigure idiom: hover-only
+  // Static | Interactive segmented toggle in the top-right corner.
+  // Default to Static so the page stays calm on first paint — the
+  // big "Load interactive 3D viewer" button felt like a distraction
+  // wherever a figure landed in the doc flow.
+  const [showInteractive, setShowInteractive] = React.useState(false)
+  // Once the user has opened Interactive once, keep the viewer mounted
+  // so flipping back-and-forth is instant. Toggling Static just hides
+  // it; we don't dispose the GL context until unmount.
+  const [hasMounted, setHasMounted] = React.useState(false)
+  const [isHovering, setIsHovering] = React.useState(false)
   const [posterUrl, setPosterUrl] = React.useState<string | undefined>(undefined)
 
   React.useEffect(() => {
@@ -50,16 +55,13 @@ export function Interactive3DFigure({
     }
   }, [docId, threeDKey])
 
-  // Caption rendered as a string when possible — falls back to the
-  // raw React nodes (e.g. with formatting) inside <figcaption>.
   const captionNode = caption ? (
     <figcaption className="text-sm text-gray-600 italic mt-2">{caption}</figcaption>
   ) : null
 
-  const placeholder = (
+  const staticView = (
     <figure
       id={figureId}
-      ref={containerRef}
       className={`${className} my-4 border border-gray-200 rounded bg-gray-50 p-3 flex flex-col items-center text-center`}
     >
       {posterUrl ? (
@@ -90,52 +92,75 @@ export function Interactive3DFigure({
         </div>
       )}
       {captionNode}
-      <button
-        onClick={() => {
-          setMountViewer(true)
-          setShowViewer(true)
-        }}
-        className="mt-3 inline-flex items-center px-3 py-1.5 rounded-md text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition cursor-pointer"
-      >
-        Load interactive 3D viewer
-      </button>
     </figure>
   )
 
-  if (!docId || !threeDKey) return placeholder
+  if (!docId || !threeDKey) return staticView
 
   return (
-    <div ref={containerRef} className="relative group my-4">
-      {/* Hover toggle: show / hide viewer without disposing it once mounted. */}
-      <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition">
-        <button
-          onClick={() => setShowViewer((v) => !v)}
-          className="bg-white shadow-md rounded-md border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 cursor-pointer"
-        >
-          {showViewer ? 'Hide 3D' : 'Show 3D'}
-        </button>
-      </div>
-
-      {mountViewer && showViewer ? (
-        <React.Suspense
-          fallback={
-            <div className="border border-gray-200 rounded bg-gray-50 p-6 text-sm text-gray-500 text-center min-h-[180px] flex items-center justify-center">
-              Loading 3D viewer…
-            </div>
-          }
-        >
-          <ThreeDRenderer
-            threeDKey={threeDKey}
-            docId={docId}
-            caption={typeof caption === 'string' ? caption : undefined}
-          />
-        </React.Suspense>
-      ) : (
-        placeholder
+    <div
+      className="relative group my-4"
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+    >
+      {/* Segmented toggle — mirrors InteractiveTable/InteractiveFigure
+          so users see one consistent control across every kind of
+          embedded artefact. Hover-only to keep the static figure
+          clean at rest. */}
+      {isHovering && (
+        <div className="absolute top-2 right-2 bg-white shadow-lg rounded-md border border-gray-200 p-2 z-10 flex gap-2">
+          <button
+            onClick={() => setShowInteractive(false)}
+            className={`px-3 py-1 rounded text-sm cursor-pointer transition-colors ${
+              !showInteractive
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Static
+          </button>
+          <button
+            onClick={() => {
+              setShowInteractive(true)
+              setHasMounted(true)
+            }}
+            className={`px-3 py-1 rounded text-sm cursor-pointer transition-colors ${
+              showInteractive
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Interactive
+          </button>
+        </div>
       )}
-      {/* Render caption underneath the viewer too (the renderer wraps
-          its own canvas without one). */}
-      {mountViewer && showViewer && captionNode}
+
+      {/* Keep both panes in the DOM once Interactive has mounted, but
+          hide the inactive one with `display: none`. The viewer keeps
+          its GL context warm; toggling back is instant. */}
+      <div style={{ display: showInteractive ? 'none' : 'block' }}>
+        {staticView}
+      </div>
+      {hasMounted && (
+        <div style={{ display: showInteractive ? 'block' : 'none' }}>
+          <React.Suspense
+            fallback={
+              <div className="border border-gray-200 rounded bg-gray-50 p-6 text-sm text-gray-500 text-center min-h-[180px] flex items-center justify-center">
+                Loading 3D viewer…
+              </div>
+            }
+          >
+            <ThreeDRenderer
+              threeDKey={threeDKey}
+              docId={docId}
+              caption={typeof caption === 'string' ? caption : undefined}
+            />
+          </React.Suspense>
+          {/* Caption underneath the viewer too — the renderer wraps
+              its own canvas without one. */}
+          {captionNode}
+        </div>
+      )}
     </div>
   )
 }
