@@ -11,23 +11,61 @@ type StoreName =
   | 'three_d_meta'   // map ${docId}:${key} -> ThreeDMeta
   | 'three_d_blob'   // map sha256 -> ArrayBuffer (deduped by content hash)
 
+// Bump on any schema change OR when we want to force-evict every
+// client's cached data (the cache has no per-entry version key, so
+// `fetchManifest` / `fetchSection` cheerfully return stale content
+// after a bundle rebuild — this version bump is the only handle we
+// have today to wipe everyone's IndexedDB without asking them to
+// hit the Clear-cache button in the settings menu).
+const DB_VERSION = 5
+const STORE_NAMES: StoreName[] = [
+  'sections',
+  'manifests',
+  'images',
+  'plots',
+  'tables',
+  'three_d_meta',
+  'three_d_blob',
+]
+
 function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('paradoc-cache', 4)
+    const req = indexedDB.open('paradoc-cache', DB_VERSION)
     req.onupgradeneeded = () => {
       const db = req.result
-      if (!db.objectStoreNames.contains('sections')) db.createObjectStore('sections')
-      if (!db.objectStoreNames.contains('manifests')) db.createObjectStore('manifests')
-      if (!db.objectStoreNames.contains('images')) db.createObjectStore('images')
-      if (!db.objectStoreNames.contains('plots')) db.createObjectStore('plots')
-      if (!db.objectStoreNames.contains('tables')) db.createObjectStore('tables')
-      if (!db.objectStoreNames.contains('three_d_meta')) db.createObjectStore('three_d_meta')
-      if (!db.objectStoreNames.contains('three_d_blob')) db.createObjectStore('three_d_blob')
+      // On upgrade — delete every existing store and recreate it
+      // empty. Cheap one-line "wipe everyone's stale cache" knob:
+      // bump DB_VERSION and the next visit clears its own state.
+      for (const name of STORE_NAMES) {
+        if (db.objectStoreNames.contains(name)) db.deleteObjectStore(name)
+        db.createObjectStore(name)
+      }
     }
     req.onerror = () => reject(req.error)
     req.onsuccess = () => {
       const db = req.result
       fn(db).then((r) => { db.close(); resolve(r) }, (e) => { db.close(); reject(e) })
+    }
+  })
+}
+
+/**
+ * Drop the entire `paradoc-cache` IndexedDB database. Used by the
+ * "Clear cache" button in the settings menu when a user has stale
+ * data after a bundle rebuild and the version-bump auto-wipe didn't
+ * fire (e.g. someone manually skipped a release). The page is
+ * expected to be reloaded immediately after.
+ */
+export async function clearAllCache(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.deleteDatabase('paradoc-cache')
+    req.onsuccess = () => resolve()
+    req.onerror = () => reject(req.error)
+    req.onblocked = () => {
+      // Some other tab still holds an open handle. Resolve anyway —
+      // the delete will complete once that tab closes. Reload on
+      // the caller side surfaces the lingering issue if any.
+      resolve()
     }
   })
 }

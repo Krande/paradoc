@@ -2,6 +2,7 @@ import React from 'react'
 import { AboutModal } from './AboutModal'
 import { UserInfoModal } from './UserInfoModal'
 import { useViewerControlsStore } from '../store/viewerControlsStore'
+import { clearAllCache } from '../sections/store'
 
 interface OverflowMenuProps {
   // Mobile-only inline controls that we want available even when the
@@ -192,6 +193,30 @@ export function OverflowMenu({
             >
               Admin
             </a>
+
+            <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
+
+            <button
+              role="menuitem"
+              onClick={() => {
+                void (async () => {
+                  try {
+                    await clearAllCache()
+                  } catch (err) {
+                    console.warn('clearAllCache failed:', err)
+                  }
+                  // Reload bust caches a stale image/section that the
+                  // SPA already had in memory but hadn't re-read from
+                  // IndexedDB. A hard reload (no cache) also evicts
+                  // any HTTP-level cache.
+                  window.location.reload()
+                })()
+              }}
+              className="cursor-pointer w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+              title="Wipe IndexedDB-cached manifests / sections / images / plots / tables / 3D blobs and reload"
+            >
+              Clear cache &amp; reload
+            </button>
           </div>
         )}
       </div>
