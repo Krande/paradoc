@@ -231,6 +231,26 @@ class S3DocStore(DocStore):
         s = scope if scope is not None else _default_shared_scope()
         return self._db(doc_id, s).get_three_d(key)
 
+    def get_three_d_poster(
+        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
+    ) -> Optional[bytes]:
+        s = scope if scope is not None else _default_shared_scope()
+        meta = self.get_three_d_meta(doc_id, key, scope=s)
+        if meta is None or not isinstance(meta.metadata, dict):
+            return None
+        image_path = meta.metadata.get("image_path")
+        if not image_path:
+            return None
+        # Same path-traversal guard as get_file_bytes — the value
+        # originated from the figure-source filter, but defense-in-depth
+        # keeps a bad metadata write from reaching elsewhere in the
+        # bucket. No `files/` prefix here: posters live under
+        # `<bundle>/assets/3d/`.
+        clean = image_path.replace("\\", "/").strip("/")
+        if not clean or ".." in clean.split("/"):
+            return None
+        return self._fetch_object(self._key(doc_id, s, *clean.split("/")))
+
     def get_file_bytes(
         self,
         doc_id: str,

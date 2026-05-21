@@ -345,13 +345,30 @@ def create_app(
         body = json.loads(meta.model_dump_json())
         # Promote `metadata.image_path` (set by the figure-source
         # filters when a poster PNG sibling was baked) to a top-level
-        # field so the REST transport in the frontend can build an
-        # imageUrl without having to peek into per-source metadata.
+        # field so the REST transport in the frontend can detect that
+        # a poster is available and fetch it via /3d/{key}/poster.
         # Mirrors what the static-export pass writes into three_d.json.
         meta_image = (meta.metadata or {}).get("image_path") if isinstance(meta.metadata, dict) else None
         if meta_image:
             body["image_path"] = meta_image
         return JSONResponse(content=body)
+
+    def _get_3d_poster(doc_id: str, key: str, scope: Scope):
+        data = doc_store.get_three_d_poster(doc_id, key, scope=scope)
+        if data is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"3D asset {key!r} has no poster (no metadata.image_path or file missing)",
+            )
+        return Response(
+            content=data,
+            media_type="image/png",
+            headers={
+                # Poster contents are bundle-immutable per published_at.
+                # Long browser cache + revalidation on bundle rebuild.
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
 
     def _get_file(doc_id: str, rel_path: str, scope: Scope):
         data = doc_store.get_file_bytes(doc_id, rel_path, scope=scope)
@@ -478,6 +495,12 @@ def create_app(
     ):
         return await _get_3d_blob(doc_id, key, _shared, request)
 
+    @app.get("/api/docs/{doc_id}/3d/{key}/poster")
+    async def get_3d_poster(
+        doc_id: str, key: str, user: User = Depends(auth_module.current_user)
+    ):
+        return _get_3d_poster(doc_id, key, _shared)
+
     @app.get("/api/docs/{doc_id}/files/{rel_path:path}")
     async def get_doc_file(
         doc_id: str,
@@ -544,6 +567,12 @@ def create_app(
         scope_obj: Scope = Depends(_scope_dep),
     ):
         return await _get_3d_blob(doc_id, key, scope_obj, request)
+
+    @app.get("/api/scopes/{scope}/docs/{doc_id}/3d/{key}/poster")
+    async def s_get_3d_poster(
+        doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)
+    ):
+        return _get_3d_poster(doc_id, key, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/files/{rel_path:path}")
     async def s_get_doc_file(

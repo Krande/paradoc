@@ -157,6 +157,21 @@ class DocStore(ABC):
     ) -> AsyncIterator[bytes]:
         """Yield binary payload (currently glb) in `chunk_size` chunks."""
 
+    def get_three_d_poster(
+        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
+    ) -> Optional[bytes]:
+        """Return the poster PNG bytes for a 3D asset, or None.
+
+        Reads `metadata.image_path` from the ThreeDData row (set by the
+        figure-source filters) and fetches that bundle-relative path
+        directly — bypasses the `files/`-scoped `get_file_bytes` so we
+        can reach `assets/3d/<key>.png` which lives outside the
+        bundle's user-files subtree.
+
+        Default implementation returns None; backends override.
+        """
+        return None
+
     def get_static_manifest_bytes(
         self, doc_id: str, *, scope: Optional["Scope"] = None
     ) -> Optional[bytes]:

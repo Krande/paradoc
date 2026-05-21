@@ -202,6 +202,31 @@ class LocalDocStore(DocStore):
         except FileNotFoundError:
             return None
 
+    def get_three_d_poster(
+        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
+    ) -> Optional[bytes]:
+        s = scope if scope is not None else _default_shared_scope()
+        meta = self.get_three_d_meta(doc_id, key, scope=s)
+        if meta is None or not isinstance(meta.metadata, dict):
+            return None
+        image_path = meta.metadata.get("image_path")
+        if not image_path:
+            return None
+        try:
+            bundle = self._bundle_dir(doc_id, s)
+        except (FileNotFoundError, PermissionError):
+            return None
+        # `assets/3d/<key>.png` lives outside <bundle>/files/, so we
+        # resolve from the bundle root and just gate the result with
+        # `is_relative_to(bundle)`.
+        candidate = (bundle / image_path).resolve()
+        bundle = bundle.resolve()
+        if not candidate.is_relative_to(bundle):
+            return None
+        if not candidate.is_file():
+            return None
+        return candidate.read_bytes()
+
     def get_static_manifest_bytes(
         self, doc_id: str, *, scope: Optional["Scope"] = None
     ) -> Optional[bytes]:
