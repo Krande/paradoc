@@ -119,7 +119,14 @@ send2trash = "*"
 pyparsing = "*"
 glfw = "==3.4"
 pyglfw = "*"
-pygfx = ">=0.13"
+pygfx = ">=0.16"
+# pygfx 0.16 transitively requires wgpu ≥ 0.21 (where the legacy
+# `wgpu.gui.offscreen` module was dropped in favour of
+# `rendercanvas.offscreen.OffscreenRenderCanvas`). Pin explicit
+# lower bounds so the solver doesn't downgrade to a wgpu where the
+# render-offscreen path can't import.
+wgpu-py = ">=0.31"
+rendercanvas = ">=2.6"
 flatbuffers = "*"
 python-flatbuffers = "*"
 lark = "*"
