@@ -45,15 +45,19 @@ class CADModelFileFilter(FigureSourceFilter):
             import shutil
 
             shutil.copy(prebuilt_glb, glb_path)
-            if prebuilt_png.is_file():
+            # When the caller asked for the chromium backend we always
+            # re-render — the prebuilt `.png` was almost certainly baked
+            # by the pygfx default and won't reflect the embed's output.
+            if spec.renderer == "pygfx" and prebuilt_png.is_file():
                 shutil.copy(prebuilt_png, png_path)
             else:
-                # No PNG ready — render one from the glb if we can,
-                # otherwise leave it absent and the doc shows a broken
-                # static-image fallback.
-                self._render_png_from_glb(glb_path, png_path)
+                # Render from the glb directly using the chosen backend.
+                # Falls back silently to a missing PNG if rendering fails.
+                self._render_png_from_glb(glb_path, png_path, renderer=spec.renderer)
         else:
-            self._render_with_adapy(source_path, glb_path, png_path, spec.camera_pos)
+            self._render_with_adapy(
+                source_path, glb_path, png_path, spec.camera_pos, renderer=spec.renderer,
+            )
 
         glb_bytes = glb_path.read_bytes()
         return RenderResult(
@@ -67,13 +71,33 @@ class CADModelFileFilter(FigureSourceFilter):
             metadata={"source_inp": str(source_path)},
         )
 
-    def _render_png_from_glb(self, glb_in: Path, png_out: Path) -> None:
-        """Best-effort PNG fallback: try trimesh's built-in scene render.
+    def _render_png_from_glb(
+        self, glb_in: Path, png_out: Path, *, renderer: str = "pygfx",
+    ) -> None:
+        """Render a PNG straight from an existing GLB.
 
-        Used only when a pre-baked .glb exists but the matching .png
-        doesn't. If trimesh isn't available or the render fails, we
-        leave png_out absent and let the markdown reference fall back.
+        Used when a pre-baked `.glb` exists but the matching `.png` is
+        missing OR when the figure spec explicitly asks for the
+        chromium backend (in which case we can't reuse the prebuilt
+        pygfx-baked PNG).
+
+        Failures are swallowed — the bundle survives without a poster
+        and the frontend falls back to a placeholder card.
         """
+        if renderer == "chromium":
+            try:
+                from ada.visit.rendering.chromium_offscreen_utils import (
+                    glb_to_image_via_browser,
+                )
+
+                glb_to_image_via_browser(glb_in).save(png_out)
+                return
+            except Exception:  # pragma: no cover - exercised manually
+                # Fall through to the trimesh best-effort path so the
+                # bundle still gets *some* poster when chromium is
+                # unavailable on the build host.
+                pass
+
         try:
             import trimesh
 
@@ -87,12 +111,28 @@ class CADModelFileFilter(FigureSourceFilter):
         except Exception:
             pass
 
-    def _render_with_adapy(self, source: Path, glb_out: Path, png_out: Path, camera_pos: str) -> None:
+    def _render_with_adapy(
+        self,
+        source: Path,
+        glb_out: Path,
+        png_out: Path,
+        camera_pos: str,
+        *,
+        renderer: str = "pygfx",
+    ) -> None:
         """Run adapy to produce the glb + PNG.
 
         Adapy is an optional runtime dep (only build-time needs it). We
         import lazily so test environments without adapy can still parse
         markdown and run unrelated tests.
+
+        ``renderer`` picks the offscreen backend for the static PNG:
+
+        * ``"pygfx"`` (default) — fast wgpu render, `camera` argument
+          honored.
+        * ``"chromium"`` — drives the production embed in headless
+          Chromium and screenshots the canvas. `camera` is ignored;
+          the embed applies the bundle's ``camera_pos`` preset itself.
         """
         try:
             import ada
@@ -114,8 +154,11 @@ class CADModelFileFilter(FigureSourceFilter):
         assembly.to_gltf(glb_out)
 
         # Static PNG for Word/PDF/HTML — adapy returns a PIL Image.
-        camera = self._build_camera_for_assembly(assembly, camera_pos)
-        image = assembly.render_offscreen(camera=camera)
+        if renderer == "chromium":
+            image = assembly.render_offscreen(backend="chromium")
+        else:
+            camera = self._build_camera_for_assembly(assembly, camera_pos)
+            image = assembly.render_offscreen(camera=camera)
         image.save(png_out)
 
     def _build_camera_for_assembly(self, assembly, camera_pos: str):

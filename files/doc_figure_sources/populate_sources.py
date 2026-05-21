@@ -10,13 +10,14 @@ Three outputs land next to this script under ``files/``:
     re-running adapy's tessellation, useful when the build env doesn't
     have the OCC stack available.
   * ``cad.png`` — an offscreen-rendered rasterized image of the same
-    model. Used as the static poster shown in HTML / PDF / Word and
-    embedded in the "Rasterized preview" section of ``source_3d.md`` as
-    a standalone figure.
+    model. Used as the standalone PNG in the "Rasterized preview"
+    section of ``source_3d.md``.
 
-Re-running this script regenerates all three. The demo therefore stays
-self-contained: a clone + ``pixi run -e examples-figs python populate_sources.py``
-reproduces the CAD assets without any hand-placed PNGs.
+Re-running this script regenerates all three. The renderer-comparison
+section in ``source_3d.md`` does *not* pre-render PNGs here — it relies
+on the ``<!-- paradoc:figure renderer: pygfx|chromium -->`` block sugar
+to bake both backends at compile time straight from this same
+``cad.stp`` source.
 """
 
 from __future__ import annotations

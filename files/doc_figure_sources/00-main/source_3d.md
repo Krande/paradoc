@@ -6,6 +6,7 @@ This page demonstrates every form of the figure-source / filter system:
 - Named filter references via `${ filter.attr }`
 - Inline scalars with format specs
 - A standalone rasterized PNG produced by `assembly.render_offscreen()`
+- A side-by-side comparison of the pygfx vs. headless-Chromium offscreen backends
 - Custom camera presets in `paradoc.toml`
 
 ## Inline CAD figure (comment-block sugar)
@@ -60,6 +61,63 @@ a broken 3D placeholder.
 
 Re-running `populate_sources.py` regenerates the PNG from scratch; the
 markdown reference picks up whatever the script last wrote.
+
+## Renderer comparison: pygfx vs. headless Chromium
+
+The `<!-- paradoc:figure -->` block accepts a `renderer:` key
+(`pygfx` or `chromium`) that picks the offscreen backend used to bake
+the static poster PNG. Two paradoc-figure blocks pointed at the same
+`cad.stp`, one per backend, render the comparison below at compile
+time — no pre-rendered images checked into the repo:
+
+```markdown
+<!-- paradoc:figure
+figure_source: cad_model_file
+figure_title: pygfx (fast, pure-Python wgpu)
+source_inp: files/cad.stp
+camera_pos: iso_3
+renderer: pygfx
+-->
+
+<!-- paradoc:figure
+figure_source: cad_model_file
+figure_title: chromium (live-embed screenshot)
+source_inp: files/cad.stp
+camera_pos: iso_3
+renderer: chromium
+-->
+```
+
+| Backend     | How                                                                                                | Output                                            |
+| ----------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `pygfx`     | Pure-Python wgpu render. Fast (~1 s/figure), no browser dependency.                                 | What `assembly.render_offscreen()` has always produced. |
+| `chromium`  | Mounts the production adapy embed (`mountViewer`) in headless Chromium via Playwright and screenshots the canvas. | Bit-identical to what the live 3D viewer renders in the user's browser. |
+
+The chromium path's framing, materials, and edge lines are whatever the
+embed's `applyCameraPreset` + Three.js setup emits — so if the live viewer
+ever drifts visually, the static poster drifts with it instead of needing
+a separate re-implementation kept in sync.
+
+<!-- paradoc:figure
+figure_source: cad_model_file
+figure_title: pygfx (fast, pure-Python wgpu)
+source_inp: files/cad.stp
+camera_pos: iso_3
+renderer: pygfx
+-->
+
+<!-- paradoc:figure
+figure_source: cad_model_file
+figure_title: chromium (live-embed screenshot)
+source_inp: files/cad.stp
+camera_pos: iso_3
+renderer: chromium
+-->
+
+Under the hood both blocks dispatch into adapy as
+`assembly.render_offscreen(backend=…)`, exposed as a regular Python kwarg
+so you can call it directly from a Task or a notebook when the comment-
+block sugar is the wrong fit.
 
 ## Custom camera presets
 

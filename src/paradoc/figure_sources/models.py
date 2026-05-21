@@ -46,6 +46,16 @@ class BaseFigureSource(BaseModel):
     figure_source: str
     figure_title: str
     camera_pos: str = Field("iso_3", description="Camera preset name (built-in or custom).")
+    renderer: Literal["pygfx", "chromium"] = Field(
+        "pygfx",
+        description=(
+            "Offscreen backend used to bake the static poster PNG. "
+            "`pygfx` (default) is fast, pure-Python wgpu render. "
+            "`chromium` mounts the production adapy embed in headless "
+            "Chromium via Playwright, producing a PNG bit-identical to "
+            "what the live 3D viewer renders."
+        ),
+    )
 
     model_config = {"frozen": False}
 
