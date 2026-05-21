@@ -83,7 +83,9 @@ export function WebsocketStatusMenu({
             <div className="w-2 h-2 rounded-full "
                  title={connected ? 'WebSocket connected' : 'WebSocket disconnected'}
                  style={{backgroundColor: connected ? '#22c55e' : '#ef4444'}}/>
-            <h1 className="text-sm font-semibold tracking-wide text-gray-700">Paradoc Reader</h1>
+            {/* No brand label here — Topbar already renders the paradoc
+                wordmark + mark just to the left of this pill. Repeating
+                "Paradoc Reader" doubled the chrome. */}
             <button
                 className="cursor-pointer w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white bg-gray-500 hover:bg-gray-600 transition"
                 onClick={handleInfoClick}
@@ -99,7 +101,7 @@ export function WebsocketStatusMenu({
                     />
                     <div
                         className="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-30 p-3">
-                        <div className="text-sm font-semibold text-gray-700 mb-2">Paradoc Reader Info</div>
+                        <div className="text-sm font-semibold text-gray-700 mb-2">Server info</div>
                         <div className="text-xs text-gray-600 space-y-2 mb-3">
                             <div className="border-b border-gray-200 pb-2">
                                 <div className="font-medium text-gray-700 mb-1">Frontend Instance</div>

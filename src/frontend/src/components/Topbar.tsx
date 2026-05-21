@@ -52,7 +52,11 @@ export function Topbar({
   const { enabled: sourceDisplayEnabled, toggleEnabled: toggleSourceDisplay } =
     useSourceDisplayStore()
   const runtimeCfg = getRuntimeConfig()
-  const isRestMode = runtimeCfg.transport === 'rest'
+  // The WS connection pill only makes sense in WS mode — REST mode has
+  // no socket, and static-export bundles (paradoc.OneDoc.export_static,
+  // used by adapy's FEA verification report) ship a self-contained
+  // SPA with no backend at all. Both should hide the pill entirely.
+  const isWsMode = runtimeCfg.transport === 'ws'
   const headerLinks = runtimeCfg.headerLinks ?? []
   const { allDocs } = useDocList()
   const hasDoc = Boolean(docId)
@@ -109,7 +113,7 @@ export function Topbar({
             </>
           )}
 
-          {!isRestMode && (
+          {isWsMode && (
             <div className="ml-1">
               <WebsocketStatusMenu
                 connected={connected}

@@ -1,0 +1,77 @@
+name: Check frontend.zip freshness
+
+# Fail fast when a push touches SPA source without also rebuilding the
+# bundled `src/paradoc/frontend/resources/frontend.zip`. Static-export
+# consumers (paradoc.OneDoc.export_static — used by adapy's FEA
+# verification report, the figure-sources demo, anyone else who pulls
+# paradoc to bake a doc) inline this zip; a stale zip means downstream
+# users see an old SPA even after a fresh paradoc clone. This guard
+# catches the slip-up at push time so it never reaches ada-docs.
+#
+# Rebuild path (run from the repo root):
+#   pixi run -e frontend wbuild
+# That invokes `npm run build:standalone` in src/frontend/ and writes
+# the zip to src/paradoc/frontend/resources/frontend.zip via
+# scripts/package_frontend.py. Commit the updated zip in the same
+# change as the SPA source edit and the guard goes green.
+
+on:
+  push:
+    branches: [feat/figure-sources, main]
+  pull_request:
+    branches: [feat/figure-sources, main]
+
+jobs:
+  guard:
+    runs-on: docker-build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # `git diff $BEFORE HEAD` below needs full history.
+          fetch-depth: 0
+
+      - name: Verify frontend.zip was rebuilt with the SPA source
+        run: |
+          BEFORE="${{ github.event.before }}"
+          # Force-push or initial push (BEFORE is all-zeros) leaves us
+          # without a meaningful baseline. Skip the guard rather than
+          # false-positive on a branch rewind.
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "no usable BEFORE sha (initial push / dispatch) — skipping freshness check"
+            exit 0
+          fi
+
+          # Guard against detect-style failure where BEFORE is no
+          # longer reachable (force-push rewrote history). Same
+          # rationale as the adapy build.yaml's path-filter detect.
+          if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "BEFORE sha $BEFORE not reachable — likely a force-push, skipping"
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+          echo "files changed in this push:"
+          echo "$CHANGED" | sed 's/^/  /'
+
+          spa_touched=false
+          for pat in '^src/frontend/src/' '^src/frontend/index\.html$' '^src/frontend/public/' '^src/frontend/vendor/' '^src/frontend/vite\.config\.ts$' '^src/frontend/postcss\.config\.cjs$' '^src/frontend/tsconfig.*\.json$' '^src/frontend/package(-lock)?\.json$'; do
+            if echo "$CHANGED" | grep -qE "$pat"; then
+              spa_touched=true
+              break
+            fi
+          done
+
+          if ! $spa_touched; then
+            echo "no SPA source changes — frontend.zip freshness not relevant"
+            exit 0
+          fi
+
+          if echo "$CHANGED" | grep -qE '^src/paradoc/frontend/resources/frontend\.zip$'; then
+            echo "SPA source changed AND frontend.zip rebuilt — OK"
+            exit 0
+          fi
+
+          echo "::error::SPA source changed but src/paradoc/frontend/resources/frontend.zip was not rebuilt in this push."
+          echo "Run: pixi run -e frontend wbuild"
+          echo "Commit the updated zip alongside your SPA edit. Static-export consumers (adapy ada-docs, paradoc CLI publish, anyone calling OneDoc.export_static) inline this zip; without the rebuild they ship an outdated SPA."
+          exit 1
