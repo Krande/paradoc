@@ -1,6 +1,7 @@
 import React from 'react'
 import type { PandocBlock } from '../ast/types'
 import { getAssetTransport } from '../transport'
+import { AsyncImage } from '../ast/inlineRenderers'
 
 interface Interactive3DFigureProps {
   figureId?: string
@@ -62,11 +63,16 @@ export function Interactive3DFigure({
       className={`${className} my-4 border border-gray-200 rounded bg-gray-50 p-3 flex flex-col items-center text-center`}
     >
       {posterUrl ? (
-        <img
+        // AsyncImage handles `/api/...` URLs via authedFetch + blob URL
+        // so the bearer token reaches paradoc-serve's /3d/{key}/poster
+        // endpoint. A plain <img src=…> would 401 in REST mode because
+        // browsers don't send Authorization headers on image loads.
+        <AsyncImage
           src={posterUrl}
           alt={typeof caption === 'string' ? caption : `3D preview: ${threeDKey}`}
+          title=""
           className="max-w-full max-h-[420px] rounded border border-gray-200 bg-white"
-          loading="lazy"
+          imgAttrs={{ loading: 'lazy' }}
         />
       ) : (
         <div className="w-full max-h-[420px] flex flex-col items-center justify-center py-10 text-gray-400 border border-dashed border-gray-300 rounded">
