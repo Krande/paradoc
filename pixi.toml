@@ -136,21 +136,36 @@ pillow = "*"
 pyquaternion = "*"
 
 [feature.examples-figs.pypi-dependencies]
-# Pinned to a sha that:
-#   * has the `TopoDS_Solid.geometry` fix the 0.7.11 release hits on
-#     round-tripped STEP files (originally pulled from chore/fea-report-v2)
-#   * uses `rendercanvas.offscreen.OffscreenRenderCanvas` instead of the
-#     removed-in-wgpu-0.31 `wgpu.gui.offscreen` module, so the populate
-#     script's CAD → PNG render works in modern envs (commit 493dd9f6).
-ada-py = { git = "https://github.com/Krande/adapy.git", rev = "493dd9f64b6b07802d0184517269ad837daab847" }
+# Editable install from a sibling adapy checkout. Replaces the old git
+# SHA pin: local dev now picks up adapy edits immediately, and CI clones
+# adapy into `../adapy` before `pixi install` (see Dockerfile.examples).
+# The path must exist at resolve time — `pixi install -e examples-figs`
+# fails fast if you don't have ../adapy checked out alongside this repo.
+#
+# Why pypi (not conda): we can't depend on conda `ada-py` directly
+# because pixi then refuses to override it with a path/git source
+# (warns "already selected as a conda package"). The native OCC / wgpu
+# stack lives in [feature.examples-figs.dependencies] above; this
+# entry just supplies the Python package.
+ada-py = { path = "../adapy", editable = true }
+# playwright Python package + chromium binary (installed via the
+# `playwright-install` task below) so the figure-source `renderer:
+# chromium` option can spin up headless chrome and screenshot the
+# production adapy embed. Conda-forge ships only the Node SDK under
+# `node_modules`, hence the pypi entry.
+playwright = "*"
 
 [feature.examples-figs.tasks]
+# Pull the chromium binary playwright drives so the populate script's
+# `render_offscreen(backend="chromium")` call works the first time.
+# Cached in the playwright browsers dir, so subsequent runs no-op.
+playwright-install = { cmd = "playwright install chromium" }
 # Builds JUST doc_figure_sources into dist/examples/. The
 # `compile-examples` task above bakes the lightweight set; this task
 # bakes the figure-sources example. Both write into the same
 # dist/examples/ tree so `upload-examples` picks them up together.
 # Same chrome-prefetch dependency as the lightweight compile.
-compile-examples-figs = { cmd = "python scripts/compile_examples.py doc_figure_sources", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }, depends-on = ["chrome-prefetch"] }
+compile-examples-figs = { cmd = "python scripts/compile_examples.py doc_figure_sources", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }, depends-on = ["chrome-prefetch", "playwright-install"] }
 
 [feature.serve.dependencies]
 # Runtime deps for `paradoc-serve` — kept to a minimum so the container

@@ -45,9 +45,29 @@ RUN sed -i 's|http://archive.ubuntu.com|https://archive.ubuntu.com|g; s|http://s
         libxext6 libxfixes3 libxkbcommon0 libxrandr2 \
     && rm -rf /var/lib/apt/lists/*
 
+# Sibling adapy checkout — required by the `examples-figs` env's
+# `ada-py = { path = "../adapy", editable = true }` entry. The clone
+# has to land *before* `pixi install` because pixi reads the package
+# metadata off disk at resolve time. URL comes from a workflow secret
+# (no source-host hostname in this file); the repo is public-readable
+# so no token is needed. Mirrors adapy/Dockerfile.docs' inverse clone.
+ARG ADAPY_GIT_URL
+ARG ADAPY_REF=main
+# CACHE_BUST forces a fresh clone when ``ADAPY_REF`` is a moving
+# branch; without it Docker would reuse whatever HEAD was cloned the
+# first time. Workflow passes ``${{ github.run_id }}`` so every run
+# fetches the latest tip.
+ARG CACHE_BUST=""
+RUN test -n "$ADAPY_GIT_URL" \
+        || (echo "::error::ADAPY_GIT_URL build-arg is required" >&2; exit 1) \
+    && echo "cache-bust: $CACHE_BUST" \
+    && git clone --depth 1 --branch "$ADAPY_REF" "$ADAPY_GIT_URL" /adapy
+
 # Solve envs first so source-only edits don't bust the heavy layer
 # cache. Two envs: `examples` for the lightweight set, `examples-figs`
 # for the figure-sources example (it pulls ada-py + native CAD libs).
+# pixi resolves `../adapy` relative to the workdir, so the sibling
+# layout has to land before this RUN — see the clone above.
 COPY pixi.toml pixi.lock pyproject.toml ./
 RUN pixi install --environment examples --locked && \
     pixi install --environment examples-figs --locked

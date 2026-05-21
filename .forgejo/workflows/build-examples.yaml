@@ -33,7 +33,26 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build examples image (compiles bundles in-layer)
-        run: docker build -f Dockerfile.examples -t paradoc-examples:ci .
+        env:
+          # Sibling adapy clone fed into the image. The pixi `examples-figs`
+          # env now uses `ada-py = { path = "../adapy", editable = true }`
+          # instead of a git SHA, so the build context must include adapy.
+          # URL comes from a workflow secret to keep the source-host name
+          # out of the file. ADAPY_REF defaults to main; override per
+          # workflow run if you need to test a feature branch.
+          ADAPY_GIT_URL: ${{ secrets.ADAPY_GIT_URL }}
+          ADAPY_REF: ${{ vars.ADAPY_REF || 'main' }}
+        run: |
+          if [ -z "$ADAPY_GIT_URL" ]; then
+            echo "::error::ADAPY_GIT_URL secret is required to build the examples image."
+            exit 1
+          fi
+          docker build \
+            -f Dockerfile.examples \
+            --build-arg ADAPY_GIT_URL="$ADAPY_GIT_URL" \
+            --build-arg ADAPY_REF="$ADAPY_REF" \
+            --build-arg CACHE_BUST="${{ github.run_id }}" \
+            -t paradoc-examples:ci .
 
       - name: Upload bundles to object store
         env:
