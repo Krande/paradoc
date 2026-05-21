@@ -50,7 +50,12 @@ class CameraPreset(BaseModel):
     fov_deg : float
         Vertical field of view in degrees.
     margin : float
-        Fraction of bbox diagonal added as padding when `distance="fit"`.
+        Multiplier on the `distance="fit"` result. The fit distance is
+        `radius / sin(fov/2)` (just-touches-the-viewport); `margin`
+        scales it. ``1.0`` is the tightest crop, ``1.15`` (default)
+        gives a comfortable 15 %-padding feel, ``< 1.0`` puts the
+        camera *inside* the bbox so avoid that. Same semantics adapy's
+        embed viewer uses for `applyCameraPreset.margin`.
     """
 
     name: str = Field(..., description="Preset identifier.")
@@ -60,7 +65,10 @@ class CameraPreset(BaseModel):
     target: Literal["bbox_center"] = "bbox_center"
     distance: _DistanceSpec = "fit"
     fov_deg: float = 45.0
-    margin: float = 0.1
+    # 1.15 matches adapy embed's DEFAULT_MARGIN. The earlier 0.1 read
+    # like "10% padding" but the embed multiplies the fit distance by
+    # this value, so 0.1 landed the camera inside the geometry.
+    margin: float = 1.15
 
     model_config = {"frozen": True}
 
