@@ -87,5 +87,15 @@ export interface DocManifest {
   docId: string
   sections: SectionMeta[]
   assetBase?: string // optional: base URL for resolving relative asset paths
+  /**
+   * Bundle freshness markers. Stamped by paradoc.io.ast.exporter at
+   * static-export time (mirrors BundleManifest fields). The SPA
+   * reads `published_at` on every fetchManifest, compares against
+   * the cached entry, and wipes per-docId IndexedDB stores on
+   * mismatch — that's the auto-invalidation hook so a bundle
+   * rebuild doesn't keep serving stale AST out of IDB.
+   */
+  published_at?: string
+  paradoc_version?: string
   // Optional additional data like cross-ref registry can be added later
 }

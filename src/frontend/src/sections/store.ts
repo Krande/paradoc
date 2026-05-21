@@ -50,6 +50,49 @@ function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
 }
 
 /**
+ * Wipe every entry across every store whose key is prefixed with
+ * ``${docId}:``. Used by `fetchManifest` when the freshly-fetched
+ * DocManifest's `published_at` differs from the one cached for this
+ * docId — i.e. the bundle has been rebuilt since we last saw it, so
+ * everything we have cached about its sections / images / plots /
+ * tables / 3D-meta is stale.
+ *
+ * The `manifests` store keys by raw docId (no prefix) and gets a
+ * direct delete. Other stores key by `${docId}:${specificKey}` so
+ * we walk and prune.
+ */
+export async function invalidateDocCache(docId: string): Promise<void> {
+  return withDb<void>((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAMES, 'readwrite')
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
+
+    // Top-level manifest is keyed exactly by docId.
+    tx.objectStore('manifests').delete(docId)
+
+    // Other stores are keyed `${docId}:${rest}`. Walk with a cursor
+    // and delete matching entries; `IDBKeyRange.bound` would also
+    // work for sorted string keys but cursors are clearer when the
+    // key shape isn't strictly typed.
+    const prefix = `${docId}:`
+    const upper = `${docId};`  // ':' + 1; bounds the scan
+    for (const name of STORE_NAMES) {
+      if (name === 'manifests') continue
+      const os = tx.objectStore(name)
+      const range = IDBKeyRange.bound(prefix, upper, false, true)
+      const req = os.openCursor(range)
+      req.onsuccess = () => {
+        const cur = req.result
+        if (!cur) return
+        cur.delete()
+        cur.continue()
+      }
+    }
+  }))
+}
+
+/**
  * Drop the entire `paradoc-cache` IndexedDB database. Used by the
  * "Clear cache" button in the settings menu when a user has stale
  * data after a bundle rebuild and the version-bump auto-wipe didn't
@@ -110,7 +153,6 @@ export function useSectionStore() {
 
 export async function fetchManifest(docId: string): Promise<DocManifest> {
   const cached = await dbGet<DocManifest>('manifests', docId)
-  if (cached) return cached
 
   // Build document base URL
   let docBase = ''
@@ -127,20 +169,49 @@ export async function fetchManifest(docId: string): Promise<DocManifest> {
 
   const url = docBase ? (docBase.replace(/\/?$/, '/') + 'manifest.json') : `/doc/${encodeURIComponent(docId)}/manifest.json`
 
+  // Always HEAD-style hit the manifest endpoint so we see fresh
+  // `published_at` even when we have a cached copy — that's the
+  // hook for per-docId invalidation. The bundle manifest is small
+  // (~few KB), so the round-trip is cheap.
   const res = await fetch(url, { cache: 'no-store' })
-  if (!res.ok) throw new Error(`manifest fetch failed: ${res.status} ${res.statusText}`)
+  if (!res.ok) {
+    // Network failure with a cached manifest? Serve the cache —
+    // working offline beats a hard failure. (No cached manifest →
+    // throw as before.)
+    if (cached) return cached
+    throw new Error(`manifest fetch failed: ${res.status} ${res.statusText}`)
+  }
   const ct = res.headers.get('content-type') || ''
   const text = await res.text()
+  let fresh: DocManifest
   try {
-    const m = JSON.parse(text) as DocManifest
-    await dbPut('manifests', docId, m)
-    return m
+    fresh = JSON.parse(text) as DocManifest
   } catch (e) {
     if (/^\s*<!doctype/i.test(text) || ct.includes('text/html')) {
       throw new Error('manifest fetch returned HTML instead of JSON. Ensure you are serving the JSON from the Paradoc HTTP server (default http://localhost:13580).')
     }
     throw e
   }
+
+  // Per-docId auto-invalidation. Bundle exporter stamps the
+  // manifest with `published_at` (mirrors BundleManifest); if the
+  // value differs from what we have cached, wipe every store entry
+  // scoped to this docId before recording the new manifest. Falls
+  // back to "keep cache" only when neither side has the field —
+  // that's the legacy-bundle case where we have nothing to compare.
+  if (cached) {
+    const a = cached.published_at
+    const b = fresh.published_at
+    if (a && b && a !== b) {
+      await invalidateDocCache(docId)
+    } else if (b && !a) {
+      // Cache was written before the field existed — wipe defensively
+      // so it can't keep masking a real change after the upgrade.
+      await invalidateDocCache(docId)
+    }
+  }
+  await dbPut('manifests', docId, fresh)
+  return fresh
 }
 
 export async function fetchSection(docId: string, sectionId: string, index?: number): Promise<SectionBundle> {

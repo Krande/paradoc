@@ -1037,6 +1037,22 @@ class ASTExporter:
             manifest, sections = self.slice_sections(ast)
             _doc_id = manifest.get("docId") or self._infer_doc_id()
 
+            # Stamp the manifest with the same `published_at` /
+            # `paradoc_version` the BundleManifest carries — frontend
+            # uses it for per-docId IndexedDB invalidation:
+            # `fetchManifest` compares the fresh value to the cached
+            # one and wipes manifests / sections / images / plots /
+            # tables / 3d-meta entries scoped to this doc when they
+            # differ. Without this, a rebuilt bundle keeps serving
+            # last week's AST out of the visitor's IndexedDB.
+            from datetime import datetime, timezone
+
+            from paradoc.docstore.manifest import _detect_paradoc_version
+
+            now = datetime.now(timezone.utc).isoformat()
+            manifest.setdefault("published_at", now)
+            manifest.setdefault("paradoc_version", _detect_paradoc_version())
+
             # Create sections directory
             sections_dir = output_dir / "sections"
             sections_dir.mkdir(exist_ok=True)
