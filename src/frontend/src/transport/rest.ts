@@ -47,6 +47,15 @@ export class RESTTransport implements AssetTransport {
     if (res.status === 404) return undefined
     if (!res.ok) throw new Error(`3d meta fetch failed: ${res.status}`)
     const body = await res.json()
+    // `image_path` is the bundle-relative poster path the backend
+    // promotes from the ThreeDData metadata dict. Translate it to the
+    // doc-files endpoint so <img src> resolves correctly behind auth.
+    // Falls back to undefined when the bundle was baked before the
+    // figure-source filters started writing image_path — the figure
+    // component then shows its cube-icon placeholder.
+    const imageUrl = body.image_path
+      ? this.url(`/api/docs/${encodeURIComponent(docId)}/files/${body.image_path}`)
+      : undefined
     return {
       key: body.key,
       format: body.format,
@@ -54,6 +63,7 @@ export class RESTTransport implements AssetTransport {
       caption: body.caption,
       sha256: body.sha256,
       size: body.size,
+      imageUrl,
     }
   }
 

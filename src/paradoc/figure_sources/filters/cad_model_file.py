@@ -83,15 +83,23 @@ class CADModelFileFilter(FigureSourceFilter):
             )
 
         glb_bytes = glb_path.read_bytes()
+        png_rel = str(Path("assets") / "3d" / png_path.name)
+        # `image_path` lives in the metadata dict so it persists into
+        # the SQLite ThreeDData row — that's what `/api/docs/.../3d/{key}/meta`
+        # reads in REST mode. Without it the REST response carries no
+        # imageUrl and the frontend falls back to its cube-icon
+        # placeholder. The static-export pass already promotes the
+        # same key to a top-level `image_path` in three_d.json, so
+        # static mode keeps working unchanged.
         return RenderResult(
-            png_path=str(Path("assets") / "3d" / png_path.name),
+            png_path=png_rel,
             glb_path=str(Path("assets") / "3d" / glb_path.name),
             glb_sha256=hashlib.sha256(glb_bytes).hexdigest(),
             glb_size=len(glb_bytes),
             caption=spec.figure_title,
             camera_pos=spec.camera_pos,
             source_type=self.figure_source,
-            metadata={"source_inp": str(source_path)},
+            metadata={"source_inp": str(source_path), "image_path": png_rel},
         )
 
     def _render_png_from_glb(

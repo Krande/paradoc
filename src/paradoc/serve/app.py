@@ -342,7 +342,16 @@ def create_app(
         meta = doc_store.get_three_d_meta(doc_id, key, scope=scope)
         if meta is None:
             raise HTTPException(status_code=404, detail=f"3D asset {key!r} not found")
-        return JSONResponse(content=json.loads(meta.model_dump_json()))
+        body = json.loads(meta.model_dump_json())
+        # Promote `metadata.image_path` (set by the figure-source
+        # filters when a poster PNG sibling was baked) to a top-level
+        # field so the REST transport in the frontend can build an
+        # imageUrl without having to peek into per-source metadata.
+        # Mirrors what the static-export pass writes into three_d.json.
+        meta_image = (meta.metadata or {}).get("image_path") if isinstance(meta.metadata, dict) else None
+        if meta_image:
+            body["image_path"] = meta_image
+        return JSONResponse(content=body)
 
     def _get_file(doc_id: str, rel_path: str, scope: Scope):
         data = doc_store.get_file_bytes(doc_id, rel_path, scope=scope)
