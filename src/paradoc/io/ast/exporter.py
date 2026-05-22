@@ -1136,12 +1136,61 @@ class ASTExporter:
                     output_dir, header_links=header_links or None,
                 )
 
+            # Bundle-files manifest for the static-mode "Bundle files"
+            # panel. REST mode hits the server's
+            # /api/docs/{id}/manifest/files endpoint; static-served
+            # bundles have no server to query, so we enumerate every
+            # shipped file here and write the same JSON shape the
+            # backend would emit. Walk after the frontend has been
+            # extracted so the index also covers the SPA assets and
+            # the user can see exactly what nginx is serving. Excludes
+            # the manifest_files.json itself to keep the list stable
+            # across re-runs (otherwise the file would grow / shrink
+            # depending on whether the prior export wrote it).
+            self._export_bundle_files_manifest(output_dir)
+
             logger.info(f"Successfully exported static files to {output_dir}")
             return True
 
         except Exception as e:
             logger.error(f"Failed to export static files: {e}", exc_info=True)
             return False
+
+    def _export_bundle_files_manifest(self, output_dir: pathlib.Path) -> None:
+        """Write `manifest_files.json` with every file under `output_dir`.
+
+        Mirrors the REST-mode `/api/docs/{id}/manifest/files` payload so
+        the frontend's BundleFilesModal can use the same `{files: [
+        {rel_path, size, content_type}]}` shape in both modes — no
+        separate code path to maintain.
+        """
+        import mimetypes
+
+        out_path = output_dir / "manifest_files.json"
+        entries: list[dict] = []
+        for path in sorted(output_dir.rglob("*")):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(output_dir).as_posix()
+            # Skip the manifest itself so re-runs are idempotent — the
+            # list shouldn't shift just because a previous export
+            # left a `manifest_files.json` behind.
+            if rel == "manifest_files.json":
+                continue
+            try:
+                size = path.stat().st_size
+            except OSError:
+                continue
+            ctype, _ = mimetypes.guess_type(rel)
+            entries.append(
+                {"rel_path": rel, "size": int(size), "content_type": ctype or ""}
+            )
+        doc_id = self.one_doc.source_dir.name or "doc"
+        out_path.write_text(
+            json.dumps({"doc_id": doc_id, "files": entries}, indent=2),
+            encoding="utf-8",
+        )
+        logger.info(f"Wrote {len(entries)} bundle file entries to {out_path}")
 
     def _copy_frontend_for_static(self, output_dir: pathlib.Path):
         """

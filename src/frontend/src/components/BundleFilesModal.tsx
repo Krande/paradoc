@@ -50,20 +50,35 @@ export function BundleFilesModal({ open, onClose, docId }: BundleFilesModalProps
   React.useEffect(() => {
     if (!open || !docId) return
     const cfg = getRuntimeConfig()
-    if (cfg.transport !== 'rest') {
-      setError('File manifest is only available in REST mode.')
-      return
-    }
     let canceled = false
     setLoading(true)
     setError(null)
     ;(async () => {
       try {
-        const url = joinUrl(
-          cfg.apiBase || '',
-          `/api/docs/${encodeURIComponent(docId)}/manifest/files`,
-        )
-        const res = await authedFetch(url, { cache: 'no-store' })
+        let url: string
+        if (cfg.transport === 'rest') {
+          url = joinUrl(
+            cfg.apiBase || '',
+            `/api/docs/${encodeURIComponent(docId)}/manifest/files`,
+          )
+        } else {
+          // Static mode: paradoc's exporter writes a sibling
+          // `manifest_files.json` next to the bundle's `index.html`.
+          // Resolve via the same window globals ThreeDRenderer uses
+          // (`__PARADOC_ASSET_BASE` / `__PARADOC_HTTP_DOC_BASE`),
+          // falling back to a relative path so the SPA's current
+          // origin is the anchor.
+          const w = window as any
+          const base: string =
+            w.__PARADOC_HTTP_DOC_BASE ||
+            (w.__PARADOC_ASSET_BASE ? `${w.__PARADOC_ASSET_BASE}` : '') ||
+            './'
+          url = base.replace(/\/?$/, '/') + 'manifest_files.json'
+        }
+        const res =
+          cfg.transport === 'rest'
+            ? await authedFetch(url, { cache: 'no-store' })
+            : await fetch(url, { cache: 'no-store' })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const body = (await res.json()) as BundleFilesResponse
         if (!canceled) setData(body)
@@ -92,10 +107,18 @@ export function BundleFilesModal({ open, onClose, docId }: BundleFilesModalProps
 
   function downloadUrl(rel: string): string {
     const cfg = getRuntimeConfig()
-    return joinUrl(
-      cfg.apiBase || '',
-      `/api/docs/${encodeURIComponent(docId || '')}/files/${rel}`,
-    )
+    if (cfg.transport === 'rest') {
+      return joinUrl(
+        cfg.apiBase || '',
+        `/api/docs/${encodeURIComponent(docId || '')}/files/${rel}`,
+      )
+    }
+    const w = window as any
+    const base: string =
+      w.__PARADOC_HTTP_DOC_BASE ||
+      (w.__PARADOC_ASSET_BASE ? `${w.__PARADOC_ASSET_BASE}` : '') ||
+      './'
+    return base.replace(/\/?$/, '/') + rel
   }
 
   return (
