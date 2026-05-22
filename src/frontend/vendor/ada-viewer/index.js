@@ -86690,7 +86690,9 @@ const tB = "node0";
 function Tfe(n) {
   let e = null;
   return n.traverse((t) => {
-    !e && t.isMesh && (e = t);
+    if (e) return;
+    const i = t;
+    (i.isMesh || i.isLineSegments || i.isLine || i.isPoints) && (e = i);
   }), e;
 }
 function Mfe(n) {
@@ -86716,7 +86718,7 @@ function Afe(n, e) {
 async function Cfe(n, e, t = 0) {
   const i = await n(e.mesh.url), l = (await new BN().parseAsync(i, "")).scene, u = Tfe(l);
   if (!u)
-    throw new Error(`fea bundle: no mesh in ${e.mesh.url}`);
+    throw new Error(`fea bundle: no renderable primitive in ${e.mesh.url}`);
   u.name = tB;
   const h = Afe(e, Math.max(0, t | 0));
   if (!h || !h.field.blob)
