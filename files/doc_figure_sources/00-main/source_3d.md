@@ -129,12 +129,12 @@ calls `assembly.render_offscreen(backend=…, preset=…, size=(640, 480))`
 once per cell — same dispatch the figure-source block sugar uses, so
 a drift here is a drift the doc would render anywhere.
 
-| view      | pygfx                                                      | chromium                                                       |
-| --------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
-| front     | ![](files/beam_front_pygfx.png){width=100%}                | ![](files/beam_front_chromium.png){width=100%}                 |
-| top       | ![](files/beam_top_pygfx.png){width=100%}                  | ![](files/beam_top_chromium.png){width=100%}                   |
-| left      | ![](files/beam_left_pygfx.png){width=100%}                 | ![](files/beam_left_chromium.png){width=100%}                  |
-| iso\_1    | ![](files/beam_iso_1_pygfx.png){width=100%}                | ![](files/beam_iso_1_chromium.png){width=100%}                 |
+| view      | pygfx                                                                   | chromium                                                                |
+| --------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| front     | ![beam front, pygfx](files/beam_front_pygfx.png){width=100%}            | ![beam front, chromium](files/beam_front_chromium.png){width=100%}      |
+| top       | ![beam top, pygfx](files/beam_top_pygfx.png){width=100%}                | ![beam top, chromium](files/beam_top_chromium.png){width=100%}          |
+| left      | ![beam left, pygfx](files/beam_left_pygfx.png){width=100%}              | ![beam left, chromium](files/beam_left_chromium.png){width=100%}        |
+| iso\_1    | ![beam iso\_1, pygfx](files/beam_iso_1_pygfx.png){width=100%}           | ![beam iso\_1, chromium](files/beam_iso_1_chromium.png){width=100%}     |
 
 Both backends consume the same `CameraPreset` shape (azimuth, elevation,
 fov, distance, margin). Chromium drives the production embed via
