@@ -47,11 +47,18 @@ export function Interactive3DFigure({
   const hideTimerRef = React.useRef<number | null>(null)
   // Bound the interactive viewer to the static poster's rendered
   // dimensions on first measurement so it doesn't expand the figure's
-  // visual footprint on wide desktops. After that, the native
-  // `resize: both` handle on the wrapper lets the user grow / shrink
-  // the viewer independently of the poster.
+  // visual footprint on wide desktops. After that, a custom pointer-
+  // event resize handle in the bottom-right corner (outside the embed's
+  // canvas) lets the user grow / shrink the viewer independently of
+  // the poster. CSS `resize: both` won't do: its drag handle is
+  // always inside the box, which on this layout overlaps the adapy
+  // viewer's orientation gizmo + gets pointer-events consumed by the
+  // embed's input handler, so dragging never reaches the wrapper.
   const posterRef = React.useRef<HTMLElement | null>(null)
   const [viewerSize, setViewerSize] = React.useState<{width: number; height: number} | null>(null)
+  const resizeStartRef = React.useRef<
+    {pointerId: number; startX: number; startY: number; baseW: number; baseH: number} | null
+  >(null)
 
   React.useEffect(() => {
     const el = posterRef.current
@@ -117,6 +124,43 @@ export function Interactive3DFigure({
       canceled = true
     }
   }, [docId, threeDKey])
+
+  const onResizeStart = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!viewerSize) return
+    // Capture so subsequent move / up events fire on the handle even
+    // when the pointer leaves it. This is what makes pointer-event
+    // resize feel native.
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    resizeStartRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      baseW: viewerSize.width,
+      baseH: viewerSize.height,
+    }
+    e.preventDefault()
+    e.stopPropagation()
+  }, [viewerSize])
+
+  const onResizeMove = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const s = resizeStartRef.current
+    if (!s || s.pointerId !== e.pointerId) return
+    const dx = e.clientX - s.startX
+    const dy = e.clientY - s.startY
+    setViewerSize({
+      width: Math.max(320, Math.round(s.baseW + dx)),
+      height: Math.max(240, Math.round(s.baseH + dy)),
+    })
+  }, [])
+
+  const onResizeEnd = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const s = resizeStartRef.current
+    if (!s || s.pointerId !== e.pointerId) return
+    try {
+      ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+    } catch {/* already released */}
+    resizeStartRef.current = null
+  }, [])
 
   const captionNode = caption ? (
     <figcaption className="text-sm text-gray-600 italic mt-2">{caption}</figcaption>
@@ -248,26 +292,23 @@ export function Interactive3DFigure({
         {staticView}
       </div>
       {hasMounted && (
-        <div style={{ display: showInteractive ? 'block' : 'none' }}>
-          {/* Resizable wrapper bounded to the static poster's
-              rendered dimensions on first paint. `resize: both` gives
-              the user a native bottom-right drag handle (matching the
-              "leaf" the user can grab); the embed's internal
-              ResizeObserver picks up the new container size and
-              re-renders the canvas at that resolution. min-* values
-              keep the viewer usable if the user shrinks it too far. */}
-          <div
-            className="relative mx-auto"
-            style={{
-              width: viewerSize ? `${viewerSize.width}px` : '100%',
-              height: viewerSize ? `${viewerSize.height}px` : 'auto',
-              maxWidth: '100%',
-              minWidth: '320px',
-              minHeight: '240px',
-              resize: 'both',
-              overflow: 'hidden',
-            }}
-          >
+        <div
+          className="relative mx-auto"
+          style={{
+            width: viewerSize ? `${viewerSize.width}px` : '100%',
+            height: viewerSize ? `${viewerSize.height}px` : 'auto',
+            maxWidth: '100%',
+            minWidth: '320px',
+            minHeight: '240px',
+            display: showInteractive ? 'block' : 'none',
+          }}
+        >
+          {/* Bounded to the static poster's rendered dimensions on
+              first paint; resized below via the bottom-right pointer
+              handle. The embed's internal ResizeObserver picks up
+              the new container size and re-renders the canvas at
+              that resolution. */}
+          <div className="w-full h-full overflow-hidden">
             <React.Suspense
               fallback={
                 <div className="border border-gray-200 rounded bg-gray-50 p-6 text-sm text-gray-500 text-center w-full h-full flex items-center justify-center">
@@ -289,20 +330,30 @@ export function Interactive3DFigure({
                 }}
               />
             </React.Suspense>
-            {/* Visual hint that the bottom-right corner is draggable.
-                The actual resize is handled by `resize: both` CSS;
-                this is just an affordance icon so users know they
-                can drag. */}
-            <div
-              aria-hidden="true"
-              className="absolute bottom-0 right-0 w-4 h-4 text-gray-400 pointer-events-none flex items-end justify-end pr-1 pb-1"
-              title="Drag to resize"
-            >
-              <svg viewBox="0 0 10 10" className="w-3 h-3" fill="currentColor">
-                <path d="M9 1v8H1V8h6V1h2z" />
-              </svg>
-            </div>
           </div>
+
+          {/* Resize handle — anchored outside the viewer's bottom-right
+              corner so it doesn't sit on top of the adapy embed's
+              orientation gizmo and doesn't get its pointer events
+              swallowed by the embed's input handler. `touch-none`
+              prevents the page-scroll gesture from cancelling the
+              drag on mobile. */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize 3D viewer"
+            title="Drag to resize"
+            onPointerDown={onResizeStart}
+            onPointerMove={onResizeMove}
+            onPointerUp={onResizeEnd}
+            onPointerCancel={onResizeEnd}
+            className="absolute -bottom-3 -right-3 w-6 h-6 rounded-full bg-blue-600 text-white shadow-md flex items-center justify-center cursor-nwse-resize z-30 touch-none opacity-90 hover:opacity-100"
+          >
+            <svg viewBox="0 0 12 12" className="w-3 h-3" fill="currentColor" aria-hidden="true">
+              <path d="M11 1v3L4 11H1V8l7-7h3z" />
+            </svg>
+          </div>
+
           {/* Caption underneath the viewer too — the renderer wraps
               its own canvas without one. */}
           {captionNode}
