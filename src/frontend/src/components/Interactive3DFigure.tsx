@@ -45,6 +45,32 @@ export function Interactive3DFigure({
   const [toggleVisible, setToggleVisible] = React.useState(false)
   const [posterUrl, setPosterUrl] = React.useState<string | undefined>(undefined)
   const hideTimerRef = React.useRef<number | null>(null)
+  // Bound the interactive viewer to the static poster's rendered
+  // dimensions on first measurement so it doesn't expand the figure's
+  // visual footprint on wide desktops. After that, the native
+  // `resize: both` handle on the wrapper lets the user grow / shrink
+  // the viewer independently of the poster.
+  const posterRef = React.useRef<HTMLElement | null>(null)
+  const [viewerSize, setViewerSize] = React.useState<{width: number; height: number} | null>(null)
+
+  React.useEffect(() => {
+    const el = posterRef.current
+    if (!el) return
+    const update = () => {
+      const rect = el.getBoundingClientRect()
+      // Only seed once — subsequent poster reflows shouldn't override
+      // a size the user has manually set via the resize handle.
+      if (rect.width > 0 && rect.height > 0) {
+        setViewerSize((prev) =>
+          prev ?? {width: Math.round(rect.width), height: Math.round(rect.height)},
+        )
+      }
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [posterUrl])
 
   const revealToggle = React.useCallback(() => {
     setToggleVisible(true)
@@ -99,6 +125,7 @@ export function Interactive3DFigure({
   const staticView = (
     <figure
       id={figureId}
+      ref={posterRef as React.RefObject<HTMLElement>}
       className={`${className} my-4 border border-gray-200 rounded bg-gray-50 p-3 flex flex-col items-center text-center`}
     >
       {posterUrl ? (
@@ -222,19 +249,60 @@ export function Interactive3DFigure({
       </div>
       {hasMounted && (
         <div style={{ display: showInteractive ? 'block' : 'none' }}>
-          <React.Suspense
-            fallback={
-              <div className="border border-gray-200 rounded bg-gray-50 p-6 text-sm text-gray-500 text-center min-h-[180px] flex items-center justify-center">
-                Loading 3D viewer…
-              </div>
-            }
+          {/* Resizable wrapper bounded to the static poster's
+              rendered dimensions on first paint. `resize: both` gives
+              the user a native bottom-right drag handle (matching the
+              "leaf" the user can grab); the embed's internal
+              ResizeObserver picks up the new container size and
+              re-renders the canvas at that resolution. min-* values
+              keep the viewer usable if the user shrinks it too far. */}
+          <div
+            className="relative mx-auto"
+            style={{
+              width: viewerSize ? `${viewerSize.width}px` : '100%',
+              height: viewerSize ? `${viewerSize.height}px` : 'auto',
+              maxWidth: '100%',
+              minWidth: '320px',
+              minHeight: '240px',
+              resize: 'both',
+              overflow: 'hidden',
+            }}
           >
-            <ThreeDRenderer
-              threeDKey={threeDKey}
-              docId={docId}
-              caption={typeof caption === 'string' ? caption : undefined}
-            />
-          </React.Suspense>
+            <React.Suspense
+              fallback={
+                <div className="border border-gray-200 rounded bg-gray-50 p-6 text-sm text-gray-500 text-center w-full h-full flex items-center justify-center">
+                  Loading 3D viewer…
+                </div>
+              }
+            >
+              <ThreeDRenderer
+                threeDKey={threeDKey}
+                docId={docId}
+                caption={typeof caption === 'string' ? caption : undefined}
+                // Fill the resizable wrapper; opt out of the
+                // renderer's default 4:3 aspect ratio so the
+                // wrapper's explicit width/height drive the canvas.
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  aspectRatio: 'auto',
+                }}
+              />
+            </React.Suspense>
+            {/* Visual hint that the bottom-right corner is draggable.
+                The actual resize is handled by `resize: both` CSS;
+                this is just an affordance icon so users know they
+                can drag. */}
+            <div
+              aria-hidden="true"
+              className="absolute bottom-0 right-0 w-4 h-4 text-gray-400 pointer-events-none flex items-end justify-end pr-1 pb-1"
+              title="Drag to resize"
+            >
+              <svg viewBox="0 0 10 10" className="w-3 h-3" fill="currentColor">
+                <path d="M9 1v8H1V8h6V1h2z" />
+              </svg>
+            </div>
+          </div>
           {/* Caption underneath the viewer too — the renderer wraps
               its own canvas without one. */}
           {captionNode}

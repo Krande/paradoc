@@ -8,6 +8,12 @@ interface ThreeDRendererProps {
   threeDKey: string
   docId: string
   caption?: string
+  /** Override the renderer container's inline style. The default
+   *  fills the parent with a 4 / 3 aspect ratio; callers that
+   *  manage their own sizing (e.g. Interactive3DFigure resizing
+   *  the viewer to match the static poster) pass an empty
+   *  aspectRatio + explicit height to opt out. */
+  style?: React.CSSProperties
 }
 
 interface ViewerHandle {
@@ -66,7 +72,7 @@ function loadPresets(docId: string): Promise<Record<string, CameraPreset>> {
   return p
 }
 
-export function ThreeDRenderer({ threeDKey, docId, caption }: ThreeDRendererProps) {
+export function ThreeDRenderer({ threeDKey, docId, caption, style }: ThreeDRendererProps) {
   const containerRef = React.useRef<HTMLDivElement | null>(null)
   const viewerRef = React.useRef<ViewerHandle | null>(null)
   const [progress, setProgress] = React.useState<{ received: number; total: number } | null>(null)
@@ -198,7 +204,7 @@ export function ThreeDRenderer({ threeDKey, docId, caption }: ThreeDRendererProp
       <div
         ref={containerRef}
         className="border border-gray-300 rounded bg-white w-full max-w-full overflow-hidden touch-none overscroll-contain"
-        style={{ aspectRatio: '4 / 3' }}
+        style={{ aspectRatio: '4 / 3', ...style }}
       />
       {progress && progress.total > 0 && progress.received < progress.total && (
         <p className="text-xs text-gray-500 mt-1 text-center">
