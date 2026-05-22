@@ -140,13 +140,42 @@ export function Interactive3DFigure({
       onMouseEnter={revealToggle}
       onMouseLeave={() => setToggleVisible(false)}
     >
+      {/* Tiny always-on "leaf" handle in the top-right corner, outside
+          the embed viewer's interactive area. On mobile the toggle's
+          auto-hide stranded users with no obvious way back to Static
+          (page-scroll listeners are flaky inside a scrollable doc
+          frame, and we deliberately don't reveal on touches inside
+          the live 3D viewer). The leaf is the fallback affordance:
+          always visible, single tap pulls the toggle back. Hides
+          itself when the toggle is up so they don't visually fight.
+          Positioned slightly above + outside the figure's frame
+          (`-top-3 -right-3`) so it doesn't overlap the embed's
+          top-right inset. */}
+      <button
+        type="button"
+        aria-label="Show static / interactive toggle"
+        onClick={(e) => {
+          e.stopPropagation()
+          revealToggle()
+        }}
+        className={`absolute -top-3 -right-3 w-7 h-7 rounded-full bg-blue-600 text-white shadow-md flex items-center justify-center text-xs cursor-pointer z-30 transition-opacity duration-200 ${
+          toggleVisible ? 'opacity-0 pointer-events-none' : 'opacity-90 hover:opacity-100'
+        }`}
+        title="Show Static | Interactive toggle"
+      >
+        {/* Chevron-down hint: tap to drop the toggle down. */}
+        <svg viewBox="0 0 12 12" className="w-3 h-3" fill="currentColor" aria-hidden="true">
+          <path d="M2 4l4 4 4-4H2z" />
+        </svg>
+      </button>
+
       {/* Segmented toggle — mirrors InteractiveTable/InteractiveFigure
           so users see one consistent control across every kind of
           embedded artefact. Auto-hides on idle so it stops covering
           the embed's top-left toolbar on mobile; reappears on hover,
-          page scroll, or touch on the static poster (NOT the live
-          viewer — orbiting the 3D model would otherwise keep
-          summoning the toggle back over the adapy toolbar). */}
+          page scroll, leaf-tap, or touch on the static poster (NOT
+          the live viewer — orbiting the 3D model would otherwise
+          keep summoning the toggle back over the adapy toolbar). */}
       <div
         className={`absolute top-2 right-2 bg-white shadow-lg rounded-md border border-gray-200 p-2 z-20 flex gap-2 transition-opacity duration-200 ${
           toggleVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
