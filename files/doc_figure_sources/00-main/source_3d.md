@@ -119,6 +119,28 @@ Under the hood both blocks dispatch into adapy as
 so you can call it directly from a Task or a notebook when the comment-
 block sugar is the wrong fit.
 
+## Multi-view renderer comparison (FOV / framing diff)
+
+The single iso comparison above didn't make the framing drift obvious.
+This grid renders the same beam through both backends at four standard
+camera presets so any FOV / fit / aspect mismatch shows up as a
+position or scale shift between paired cells. `populate_sources.py`
+calls `assembly.render_offscreen(backend=…, preset=…, size=(640, 480))`
+once per cell — same dispatch the figure-source block sugar uses, so
+a drift here is a drift the doc would render anywhere.
+
+| view      | pygfx                                                      | chromium                                                       |
+| --------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
+| front     | ![](files/beam_front_pygfx.png){width=100%}                | ![](files/beam_front_chromium.png){width=100%}                 |
+| top       | ![](files/beam_top_pygfx.png){width=100%}                  | ![](files/beam_top_chromium.png){width=100%}                   |
+| left      | ![](files/beam_left_pygfx.png){width=100%}                 | ![](files/beam_left_chromium.png){width=100%}                  |
+| iso\_1    | ![](files/beam_iso_1_pygfx.png){width=100%}                | ![](files/beam_iso_1_chromium.png){width=100%}                 |
+
+Both backends consume the same `CameraPreset` shape (azimuth, elevation,
+fov, distance, margin). Chromium drives the production embed via
+Playwright so its output is the live viewer's render exactly.
+Visible drift between paired cells is a pygfx-side bug worth chasing.
+
 ## Custom camera presets
 
 Define alternative camera presets in `paradoc.toml` under

@@ -64,6 +64,44 @@ def write_png(assembly: ada.Assembly, dest: Path) -> None:
     logger.info("wrote %s (size %s, mode %s)", dest, image.size, image.mode)
 
 
+# Side-by-side renderer comparison: one beam, four camera presets, both
+# backends. Lands as eight PNGs the markdown table in source_3d.md
+# stitches into a 4×2 visual diff so the reader (and we) can spot
+# framing / FOV / lighting drift between pygfx-offscreen and the
+# chromium-headless screenshot of the live embed.
+_COMPARISON_PRESETS = ("front", "top", "left", "iso_1")
+
+
+def write_comparison_grid(assembly: ada.Assembly) -> None:
+    """Render each preset through both pygfx + chromium backends.
+
+    Output filenames follow ``beam_<preset>_<backend>.png`` so the
+    markdown table can reference them with predictable paths. Backend
+    selection routes through ``assembly.render_offscreen(backend=…)``
+    — same dispatch the figure-sources block sugar uses, so a drift
+    seen here is a drift the doc would render anyway.
+    """
+    from paradoc.camera.presets import BUILTIN_PRESETS
+
+    for preset_name in _COMPARISON_PRESETS:
+        preset = BUILTIN_PRESETS[preset_name].model_dump()
+        for backend in ("pygfx", "chromium"):
+            dest = OUT_DIR / f"beam_{preset_name}_{backend}.png"
+            try:
+                image = assembly.render_offscreen(
+                    camera=None,
+                    backend=backend,
+                    preset=preset,
+                    size=(640, 480),
+                )
+                image.save(dest)
+                logger.info("wrote %s (backend=%s, preset=%s)", dest, backend, preset_name)
+            except Exception as exc:
+                logger.warning(
+                    "comparison render failed (%s, %s): %s", backend, preset_name, exc
+                )
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -71,6 +109,7 @@ def main() -> None:
     write_step(assembly, OUT_DIR / "cad.stp")
     write_glb(assembly, OUT_DIR / "cad.glb")
     write_png(assembly, OUT_DIR / "cad.png")
+    write_comparison_grid(assembly)
 
 
 if __name__ == "__main__":
