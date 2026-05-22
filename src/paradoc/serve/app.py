@@ -348,9 +348,17 @@ def create_app(
         # field so the REST transport in the frontend can detect that
         # a poster is available and fetch it via /3d/{key}/poster.
         # Mirrors what the static-export pass writes into three_d.json.
-        meta_image = (meta.metadata or {}).get("image_path") if isinstance(meta.metadata, dict) else None
-        if meta_image:
-            body["image_path"] = meta_image
+        md = meta.metadata if isinstance(meta.metadata, dict) else {}
+        if md.get("image_path"):
+            body["image_path"] = md["image_path"]
+        # FEA artefact bundle hints: when adapy's bake landed under
+        # `assets/3d/<key>/`, surface the bundle directory + manifest
+        # path so the frontend knows to dispatch to the artefact-aware
+        # mount (load_fea_streaming-style) instead of plain mountViewer.
+        if md.get("fea_bundle_dir"):
+            body["fea_bundle_dir"] = md["fea_bundle_dir"]
+        if md.get("fea_manifest_path"):
+            body["fea_manifest_path"] = md["fea_manifest_path"]
         return JSONResponse(content=body)
 
     def _list_bundle_files(doc_id: str, scope: Scope):
@@ -366,6 +374,31 @@ def create_app(
                 for e in entries
             ],
         }
+
+    def _get_3d_fea_artefact(doc_id: str, key: str, filename: str, scope: Scope):
+        data = doc_store.get_three_d_fea_artefact(doc_id, key, filename, scope=scope)
+        if data is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"FEA artefact {filename!r} not found for 3D key {key!r}",
+            )
+        import mimetypes
+
+        media_type, _ = mimetypes.guess_type(filename)
+        if media_type is None:
+            # `.bin` field blobs aren't mime-typed by default; fall
+            # back to octet-stream so browsers don't try to decode
+            # them as text.
+            media_type = "application/octet-stream"
+        return Response(
+            content=data,
+            media_type=media_type,
+            headers={
+                # Artefacts are bundle-immutable per published_at; the
+                # frontend revalidates via the bundle's manifest sha.
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
 
     def _get_3d_poster(doc_id: str, key: str, scope: Scope):
         data = doc_store.get_three_d_poster(doc_id, key, scope=scope)
@@ -515,6 +548,15 @@ def create_app(
     ):
         return _get_3d_poster(doc_id, key, _shared)
 
+    @app.get("/api/docs/{doc_id}/3d/{key}/fea/{filename:path}")
+    async def get_3d_fea_artefact(
+        doc_id: str,
+        key: str,
+        filename: str,
+        user: User = Depends(auth_module.current_user),
+    ):
+        return _get_3d_fea_artefact(doc_id, key, filename, _shared)
+
     @app.get("/api/docs/{doc_id}/files/{rel_path:path}")
     async def get_doc_file(
         doc_id: str,
@@ -593,6 +635,15 @@ def create_app(
         doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)
     ):
         return _get_3d_poster(doc_id, key, scope_obj)
+
+    @app.get("/api/scopes/{scope}/docs/{doc_id}/3d/{key}/fea/{filename:path}")
+    async def s_get_3d_fea_artefact(
+        doc_id: str,
+        key: str,
+        filename: str,
+        scope_obj: Scope = Depends(_scope_dep),
+    ):
+        return _get_3d_fea_artefact(doc_id, key, filename, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/files/{rel_path:path}")
     async def s_get_doc_file(

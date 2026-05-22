@@ -1306,6 +1306,30 @@ class ASTExporter:
             }
             if poster_url is not None:
                 manifest[key]["image_path"] = poster_url
+
+            # FEA artefact bundle: the writer ships a sibling directory
+            # next to the mesh GLB (`fea.manifest.json`, `fea.<field>.bin`,
+            # etc.) that drives the streaming-FEA viewer. Copy the whole
+            # directory under `assets/3d/<key>/` so paradoc-serve can
+            # expose it via the doc-files endpoint and the frontend's
+            # `load_fea_streaming.ts` mount path can hit it. Recorded in
+            # the three_d manifest as `fea_bundle_dir` so the frontend
+            # knows to dispatch to the artefact path instead of plain
+            # `mountViewer`.
+            if (meta.source_type or "") == "fea_artefact_bundle":
+                bundle_src = resolved.parent
+                bundle_dest = assets_dir / key
+                try:
+                    if bundle_dest.exists():
+                        shutil.rmtree(bundle_dest)
+                    shutil.copytree(bundle_src, bundle_dest)
+                    bundle_url = f"assets/3d/{key}"
+                    manifest[key]["fea_bundle_dir"] = bundle_url
+                    manifest[key]["fea_manifest_path"] = f"{bundle_url}/fea.manifest.json"
+                except Exception as exc:
+                    logger.warning(
+                        f"FEA artefact bundle copy {bundle_src} → {bundle_dest} failed: {exc}"
+                    )
             copied += 1
 
         if manifest:

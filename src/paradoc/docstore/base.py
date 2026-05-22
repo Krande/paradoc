@@ -184,6 +184,27 @@ class DocStore(ABC):
     ) -> AsyncIterator[bytes]:
         """Yield binary payload (currently glb) in `chunk_size` chunks."""
 
+    def get_three_d_fea_artefact(
+        self,
+        doc_id: str,
+        key: str,
+        filename: str,
+        *,
+        scope: Optional["Scope"] = None,
+    ) -> Optional[bytes]:
+        """Return the bytes of an FEA artefact bundle file, or ``None``.
+
+        The exporter copies adapy's `_assets/<case>/fea.*` tree under
+        `<bundle>/assets/3d/<key>/` so the bundled report carries the
+        same artefacts the standalone viewer's `load_fea_streaming.ts`
+        path consumes (mesh GLB, edge / element sidecars, per-field
+        blobs, manifest). This method resolves `<filename>` against
+        that subtree with path-traversal protection.
+
+        Default returns None; backends override.
+        """
+        return None
+
     def get_three_d_poster(
         self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
     ) -> Optional[bytes]:

@@ -226,6 +226,32 @@ class LocalDocStore(DocStore):
             out.append(BundleFileEntry(rel_path=rel, size=size, content_type=ctype or ""))
         return out
 
+    def get_three_d_fea_artefact(
+        self,
+        doc_id: str,
+        key: str,
+        filename: str,
+        *,
+        scope: Optional["Scope"] = None,
+    ) -> Optional[bytes]:
+        s = scope if scope is not None else _default_shared_scope()
+        try:
+            bundle = self._bundle_dir(doc_id, s).resolve()
+        except (FileNotFoundError, PermissionError):
+            return None
+        # Reject path traversal: filename must resolve under
+        # `<bundle>/assets/3d/<key>/`.
+        clean = filename.replace("\\", "/").strip("/")
+        if not clean or ".." in clean.split("/") or "/" in key or ".." in key:
+            return None
+        artefact_root = (bundle / "assets" / "3d" / key).resolve()
+        candidate = (artefact_root / clean).resolve()
+        if not candidate.is_relative_to(artefact_root):
+            return None
+        if not candidate.is_file():
+            return None
+        return candidate.read_bytes()
+
     def get_three_d_poster(
         self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
     ) -> Optional[bytes]:

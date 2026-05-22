@@ -267,6 +267,26 @@ class S3DocStore(DocStore):
         s = scope if scope is not None else _default_shared_scope()
         return self._db(doc_id, s).get_three_d(key)
 
+    def get_three_d_fea_artefact(
+        self,
+        doc_id: str,
+        key: str,
+        filename: str,
+        *,
+        scope: Optional["Scope"] = None,
+    ) -> Optional[bytes]:
+        s = scope if scope is not None else _default_shared_scope()
+        clean = filename.replace("\\", "/").strip("/")
+        if not clean or ".." in clean.split("/") or "/" in key or ".." in key:
+            return None
+        # Bundle layout: <scope>/<doc_id>/assets/3d/<key>/<filename>.
+        # Compose the key the same way; no separate guarded prefix
+        # because the docstore's own _key helper already roots us in
+        # the bundle.
+        return self._fetch_object(
+            self._key(doc_id, s, "assets", "3d", key, *clean.split("/"))
+        )
+
     def get_three_d_poster(
         self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
     ) -> Optional[bytes]:
