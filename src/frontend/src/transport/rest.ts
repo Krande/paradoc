@@ -58,6 +58,17 @@ export class RESTTransport implements AssetTransport {
     const imageUrl = body.image_path
       ? this.url(`/api/docs/${encodeURIComponent(docId)}/3d/${encodeURIComponent(key)}/poster`)
       : undefined
+
+    // FEA artefact bundle: the backend exposes its files via
+    // `/api/docs/{docId}/3d/{key}/fea/{filename:path}`. We pass the
+    // manifest URL up to the renderer; the renderer also builds a
+    // matching per-filename fetcher when it dispatches to the
+    // artefact-aware mount path.
+    const feaBundleDir = body.fea_bundle_dir as string | undefined
+    const feaManifestUrl = feaBundleDir
+      ? this.url(`/api/docs/${encodeURIComponent(docId)}/3d/${encodeURIComponent(key)}/fea/fea.manifest.json`)
+      : undefined
+
     return {
       key: body.key,
       format: body.format,
@@ -66,6 +77,8 @@ export class RESTTransport implements AssetTransport {
       sha256: body.sha256,
       size: body.size,
       imageUrl,
+      feaBundleDir,
+      feaManifestUrl,
     }
   }
 

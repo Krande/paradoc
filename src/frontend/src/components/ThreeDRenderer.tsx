@@ -88,29 +88,76 @@ export function ThreeDRenderer({ threeDKey, docId, caption }: ThreeDRendererProp
 
     ;(async () => {
       try {
-        const [{ mountViewer }, presets, payload] = await Promise.all([
-          import('../../vendor/ada-viewer'),
-          loadPresets(docId),
-          transport.fetchBinary(docId, threeDKey, {
-            onProgress: (p) =>
-              !canceled && setProgress({ received: p.bytesReceived, total: p.totalSize }),
-          }),
-        ])
+        // Look up the asset metadata first so we know whether it's a
+        // single-GLB or an FEA artefact bundle. The two paths share
+        // the camera preset + caption + showControls plumbing but
+        // diverge on what the embed actually mounts.
+        const meta = await transport.getThreeDMeta(docId, threeDKey)
         if (canceled) return
-        const camera = presets[payload.cameraPos] || Object.values(presets)[0]
-        if (!containerRef.current) return
+
+        const presets = await loadPresets(docId)
+        if (canceled) return
+        const camera =
+          presets[meta?.cameraPos || 'iso_3'] || Object.values(presets)[0]
+
+        const vendor = await import('../../vendor/ada-viewer')
+        if (canceled || !containerRef.current) return
         try {
           viewerRef.current?.dispose()
         } catch {}
-        viewerRef.current = mountViewer(containerRef.current, {
+
+        if (meta?.feaManifestUrl && meta?.feaBundleDir) {
+          // FEA artefact-bundle path. The embed assembles the
+          // consolidated GLB (mesh + morph targets + animation clips
+          // + edges) from the manifest + per-filename fetcher; the
+          // fetcher resolves manifest-relative filenames against the
+          // bundle's directory URL the backend exposes via
+          // `/api/docs/{id}/3d/{key}/fea/...`.
+          const manifestRes = await authedFetch(meta.feaManifestUrl, {
+            cache: 'no-store',
+          })
+          if (!manifestRes.ok) {
+            throw new Error(`fea manifest fetch failed: ${manifestRes.status}`)
+          }
+          const manifest = await manifestRes.json()
+          if (canceled) return
+
+          // The manifest URL ends in `fea.manifest.json`; strip that
+          // to get the bundle base URL the fetcher composes against.
+          const base = meta.feaManifestUrl.replace(/[^/]+$/, '')
+          const fetcher = async (filename: string) => {
+            const clean = filename.replace(/^\/+/, '')
+            const r = await authedFetch(base + clean)
+            if (!r.ok) {
+              throw new Error(`fea fetcher: ${r.status} for ${filename}`)
+            }
+            return r.arrayBuffer()
+          }
+          viewerRef.current = vendor.mountFeaArtefactViewer(
+            containerRef.current,
+            {
+              manifest,
+              fetcher,
+              camera,
+              caption: caption || meta?.caption,
+              showControls,
+              onError: (err) => !canceled && setError(err.message),
+            },
+          )
+          return
+        }
+
+        // Single-GLB path (CAD figures, legacy FEA mode shapes,
+        // anything without a bundle).
+        const payload = await transport.fetchBinary(docId, threeDKey, {
+          onProgress: (p) =>
+            !canceled && setProgress({ received: p.bytesReceived, total: p.totalSize }),
+        })
+        if (canceled || !containerRef.current) return
+        viewerRef.current = vendor.mountViewer(containerRef.current, {
           modelBytes: payload.bytes,
           camera,
           caption: caption || payload.caption,
-          // The vendor build today ignores `showControls`; this becomes
-          // live once adapy ships a navbar/tree-aware vendor bundle.
-          // Until then, the toggle in the topbar is a no-op visually
-          // but the option is plumbed through so we don't have to
-          // touch this component again later.
           showControls,
           onError: (err) => !canceled && setError(err.message),
         })

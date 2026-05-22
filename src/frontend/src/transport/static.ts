@@ -24,6 +24,8 @@ interface StaticThreeDEntry {
   size?: number
   source_type?: string
   image_path?: string
+  fea_bundle_dir?: string
+  fea_manifest_path?: string
 }
 
 export class StaticTransport implements AssetTransport {
@@ -68,6 +70,10 @@ export class StaticTransport implements AssetTransport {
             sha256: v.sha256 || '',
             size: typeof v.size === 'number' ? v.size : 0,
             imageUrl: v.image_path ? this.url(v.image_path) : undefined,
+            feaBundleDir: v.fea_bundle_dir,
+            feaManifestUrl: v.fea_manifest_path
+              ? this.url(v.fea_manifest_path)
+              : undefined,
           }
         }
         return out

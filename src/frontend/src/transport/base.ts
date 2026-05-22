@@ -18,6 +18,15 @@ export interface ThreeDMeta {
   /** Optional URL of a raster preview (e.g. `assets/3d/<key>.png`) the
    *  frontend can show as a poster before mounting the live viewer. */
   imageUrl?: string
+  /** When set, the asset is an adapy FEA artefact bundle, not a
+   *  single GLB. ThreeDRenderer routes via `mountFeaArtefactViewer`
+   *  instead of `mountViewer`, using `feaManifestUrl` to fetch the
+   *  manifest and `feaBundleDir` + the doc-files endpoint as the
+   *  per-filename fetcher base. Either both fields are present or
+   *  neither — set together by the exporter when an artefact bundle
+   *  has been baked under `<bundle>/assets/3d/<key>/`. */
+  feaBundleDir?: string
+  feaManifestUrl?: string
 }
 
 export interface ThreeDPayload extends ThreeDMeta {
