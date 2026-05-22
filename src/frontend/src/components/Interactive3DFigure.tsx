@@ -38,8 +38,45 @@ export function Interactive3DFigure({
   // so flipping back-and-forth is instant. Toggling Static just hides
   // it; we don't dispose the GL context until unmount.
   const [hasMounted, setHasMounted] = React.useState(false)
-  const [isHovering, setIsHovering] = React.useState(false)
+  // Toggle visibility. On desktop the hover state controls it — pointer
+  // enters, toggle appears; pointer leaves, toggle hides. On mobile
+  // (no hover) we fade it out after 2 s of idle so it stops covering
+  // the embed's top-left toolbar; any scroll / tap brings it back.
+  const [toggleVisible, setToggleVisible] = React.useState(false)
   const [posterUrl, setPosterUrl] = React.useState<string | undefined>(undefined)
+  const hideTimerRef = React.useRef<number | null>(null)
+
+  const revealToggle = React.useCallback(() => {
+    setToggleVisible(true)
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current)
+    }
+    // Touch users get an auto-hide so the toggle doesn't permanently
+    // cover the adapy viewer's tree / info / simcontrols buttons.
+    // Desktop's `onMouseLeave` will pre-empt this with an instant
+    // hide; the timeout is the mobile-friendly fallback.
+    hideTimerRef.current = window.setTimeout(() => {
+      setToggleVisible(false)
+      hideTimerRef.current = null
+    }, 2200)
+  }, [])
+
+  React.useEffect(() => () => {
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current)
+    }
+  }, [])
+
+  // Re-reveal on page scroll so the user can find the toggle again
+  // after it auto-hides. Scoped to window because the user might
+  // scroll outside the figure's bounds while still wanting to flip
+  // back to Static.
+  React.useEffect(() => {
+    if (!hasMounted) return
+    const onScroll = () => revealToggle()
+    window.addEventListener('scroll', onScroll, {passive: true})
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [hasMounted, revealToggle])
 
   React.useEffect(() => {
     if (!docId || !threeDKey) return
@@ -100,15 +137,20 @@ export function Interactive3DFigure({
   return (
     <div
       className="relative group my-4"
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
+      onMouseEnter={revealToggle}
+      onMouseLeave={() => setToggleVisible(false)}
+      onTouchStart={revealToggle}
     >
       {/* Segmented toggle — mirrors InteractiveTable/InteractiveFigure
           so users see one consistent control across every kind of
-          embedded artefact. Hover-only to keep the static figure
-          clean at rest. */}
-      {isHovering && (
-        <div className="absolute top-2 right-2 bg-white shadow-lg rounded-md border border-gray-200 p-2 z-10 flex gap-2">
+          embedded artefact. Auto-hides on idle so it stops covering
+          the embed's top-left toolbar on mobile; reappears on hover,
+          tap, or page scroll. */}
+      <div
+        className={`absolute top-2 right-2 bg-white shadow-lg rounded-md border border-gray-200 p-2 z-20 flex gap-2 transition-opacity duration-200 ${
+          toggleVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      >
           <button
             onClick={() => setShowInteractive(false)}
             className={`px-3 py-1 rounded text-sm cursor-pointer transition-colors ${
@@ -132,8 +174,7 @@ export function Interactive3DFigure({
           >
             Interactive
           </button>
-        </div>
-      )}
+      </div>
 
       {/* Keep both panes in the DOM once Interactive has mounted, but
           hide the inactive one with `display: none`. The viewer keeps
