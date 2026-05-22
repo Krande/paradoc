@@ -27,6 +27,10 @@ export interface ThreeDMeta {
    *  has been baked under `<bundle>/assets/3d/<key>/`. */
   feaBundleDir?: string
   feaManifestUrl?: string
+  /** 0-based mode index to render. Mode-view rows in the bundle
+   *  share one set of files but ask the embed to show a specific
+   *  mode. Absent on the canonical bundle row (renderer treats as 0). */
+  feaModeIndex?: number
 }
 
 export interface ThreeDPayload extends ThreeDMeta {

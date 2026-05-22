@@ -26,6 +26,7 @@ interface StaticThreeDEntry {
   image_path?: string
   fea_bundle_dir?: string
   fea_manifest_path?: string
+  fea_mode_index?: number
 }
 
 export class StaticTransport implements AssetTransport {
@@ -74,6 +75,8 @@ export class StaticTransport implements AssetTransport {
             feaManifestUrl: v.fea_manifest_path
               ? this.url(v.fea_manifest_path)
               : undefined,
+            feaModeIndex:
+              typeof v.fea_mode_index === 'number' ? v.fea_mode_index : undefined,
           }
         }
         return out

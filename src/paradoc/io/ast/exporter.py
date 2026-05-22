@@ -1379,6 +1379,27 @@ class ASTExporter:
                     logger.warning(
                         f"FEA artefact bundle copy {bundle_src} → {bundle_dest} failed: {exc}"
                     )
+
+            # Mode-view row: share the canonical bundle's files (no
+            # extra copy — that's the whole point of the artefact
+            # design) and surface `fea_bundle_key` + `fea_mode_index`
+            # so the renderer can build a manifest URL pointing at
+            # the bundle's directory and ask the embed to render the
+            # right mode. Bundle key + mode index live in the row's
+            # ``metadata`` dict; the adapy bake writes them when it
+            # registers per-mode views alongside the canonical bundle
+            # row.
+            if (meta.source_type or "") == "fea_artefact_bundle_mode_view":
+                md = meta.metadata if isinstance(meta.metadata, dict) else {}
+                bundle_key = md.get("fea_bundle_key")
+                mode_idx = md.get("fea_mode_index")
+                if bundle_key:
+                    bundle_url = f"assets/3d/{bundle_key}"
+                    manifest[key]["fea_bundle_dir"] = bundle_url
+                    manifest[key]["fea_manifest_path"] = f"{bundle_url}/fea.manifest.json"
+                    manifest[key]["fea_bundle_key"] = bundle_key
+                if isinstance(mode_idx, int):
+                    manifest[key]["fea_mode_index"] = mode_idx
             copied += 1
 
         if manifest:

@@ -147,6 +147,7 @@ export function ThreeDRenderer({ threeDKey, docId, caption, style }: ThreeDRende
               camera,
               caption: caption || meta?.caption,
               showControls,
+              modeIndex: meta.feaModeIndex,
               onError: (err) => !canceled && setError(err.message),
             },
           )

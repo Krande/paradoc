@@ -65,8 +65,18 @@ export class RESTTransport implements AssetTransport {
     // matching per-filename fetcher when it dispatches to the
     // artefact-aware mount path.
     const feaBundleDir = body.fea_bundle_dir as string | undefined
+    // Mode-view rows point at the canonical bundle key under
+    // `assets/3d/<bundle_key>/`; the REST fetch endpoint is keyed by
+    // the BUNDLE key, not the mode-view's own key, so we route the
+    // manifest URL there. `_get_3d_meta` already returns
+    // `fea_bundle_key` for mode-view rows so the renderer can build
+    // the right URL.
+    const feaBundleKey = (body.fea_bundle_key as string | undefined) || key
     const feaManifestUrl = feaBundleDir
-      ? this.url(`/api/docs/${encodeURIComponent(docId)}/3d/${encodeURIComponent(key)}/fea/fea.manifest.json`)
+      ? this.url(`/api/docs/${encodeURIComponent(docId)}/3d/${encodeURIComponent(feaBundleKey)}/fea/fea.manifest.json`)
+      : undefined
+    const feaModeIndex = typeof body.fea_mode_index === 'number'
+      ? body.fea_mode_index
       : undefined
 
     return {
@@ -79,6 +89,7 @@ export class RESTTransport implements AssetTransport {
       imageUrl,
       feaBundleDir,
       feaManifestUrl,
+      feaModeIndex,
     }
   }
 

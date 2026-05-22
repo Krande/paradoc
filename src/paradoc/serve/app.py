@@ -359,6 +359,17 @@ def create_app(
             body["fea_bundle_dir"] = md["fea_bundle_dir"]
         if md.get("fea_manifest_path"):
             body["fea_manifest_path"] = md["fea_manifest_path"]
+        # Mode-view rows (`fea_artefact_bundle_mode_view`) share the
+        # canonical bundle's files but ask the embed to render a
+        # specific mode. `fea_bundle_key` is the key the bundle was
+        # copied under (`<bundle>/assets/3d/<bundle_key>/...`), which
+        # the frontend uses to build the manifest URL — distinct from
+        # `key`, which is the mode-view row's own identifier (e.g.
+        # `<case>_mode_3`).
+        if md.get("fea_bundle_key"):
+            body["fea_bundle_key"] = md["fea_bundle_key"]
+        if isinstance(md.get("fea_mode_index"), int):
+            body["fea_mode_index"] = md["fea_mode_index"]
         return JSONResponse(content=body)
 
     def _list_bundle_files(doc_id: str, scope: Scope):
