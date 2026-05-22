@@ -353,6 +353,20 @@ def create_app(
             body["image_path"] = meta_image
         return JSONResponse(content=body)
 
+    def _list_bundle_files(doc_id: str, scope: Scope):
+        entries = doc_store.list_bundle_files(doc_id, scope=scope)
+        return {
+            "doc_id": doc_id,
+            "files": [
+                {
+                    "rel_path": e.rel_path,
+                    "size": e.size,
+                    "content_type": e.content_type,
+                }
+                for e in entries
+            ],
+        }
+
     def _get_3d_poster(doc_id: str, key: str, scope: Scope):
         data = doc_store.get_three_d_poster(doc_id, key, scope=scope)
         if data is None:
@@ -509,6 +523,12 @@ def create_app(
     ):
         return _get_file(doc_id, rel_path, _shared)
 
+    @app.get("/api/docs/{doc_id}/manifest/files")
+    async def list_doc_files(
+        doc_id: str, user: User = Depends(auth_module.current_user)
+    ):
+        return _list_bundle_files(doc_id, _shared)
+
     # ── Scope-aware /api/scopes/{scope}/docs/... routes ──────────────
 
     @app.get("/api/scopes/{scope}/docs")
@@ -581,6 +601,12 @@ def create_app(
         scope_obj: Scope = Depends(_scope_dep),
     ):
         return _get_file(doc_id, rel_path, scope_obj)
+
+    @app.get("/api/scopes/{scope}/docs/{doc_id}/manifest/files")
+    async def s_list_doc_files(
+        doc_id: str, scope_obj: Scope = Depends(_scope_dep)
+    ):
+        return _list_bundle_files(doc_id, scope_obj)
 
     # ── Bundle upload (paradoc publish CLI) ───────────────────────────
     #

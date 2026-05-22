@@ -225,6 +225,42 @@ class S3DocStore(DocStore):
         s = scope if scope is not None else _default_shared_scope()
         return self._db(doc_id, s).get_plot(key)
 
+    def list_bundle_files(
+        self, doc_id: str, *, scope: Optional["Scope"] = None
+    ) -> list:
+        import mimetypes
+
+        from .base import BundleFileEntry
+
+        s = scope if scope is not None else _default_shared_scope()
+        # Bundle prefix is `<scope.prefix()>/<doc_id>/` — list everything
+        # under it and surface as bundle-relative paths.
+        bundle_prefix = self._key(doc_id, s) + "/"
+        try:
+            stream = self._store.list(prefix=bundle_prefix)
+        except Exception:
+            return []
+        out: list[BundleFileEntry] = []
+        strip = len(bundle_prefix)
+        try:
+            for batch in stream:
+                for entry in batch:
+                    key = entry["path"] if isinstance(entry, dict) else getattr(entry, "path", "")
+                    if not key.startswith(bundle_prefix):
+                        continue
+                    rel = key[strip:]
+                    if not rel:
+                        continue
+                    size = entry.get("size", 0) if isinstance(entry, dict) else int(getattr(entry, "size", 0))
+                    ctype, _ = mimetypes.guess_type(rel)
+                    out.append(
+                        BundleFileEntry(rel_path=rel, size=int(size), content_type=ctype or "")
+                    )
+        except Exception:
+            return out
+        out.sort(key=lambda e: e.rel_path)
+        return out
+
     def get_three_d_meta(
         self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
     ) -> Optional[ThreeDData]:

@@ -202,6 +202,30 @@ class LocalDocStore(DocStore):
         except FileNotFoundError:
             return None
 
+    def list_bundle_files(
+        self, doc_id: str, *, scope: Optional["Scope"] = None
+    ) -> list:
+        from .base import BundleFileEntry
+        import mimetypes
+
+        s = scope if scope is not None else _default_shared_scope()
+        try:
+            bundle = self._bundle_dir(doc_id, s).resolve()
+        except (FileNotFoundError, PermissionError):
+            return []
+        out: list[BundleFileEntry] = []
+        for path in sorted(bundle.rglob("*")):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(bundle).as_posix()
+            try:
+                size = path.stat().st_size
+            except OSError:
+                continue
+            ctype, _ = mimetypes.guess_type(rel)
+            out.append(BundleFileEntry(rel_path=rel, size=size, content_type=ctype or ""))
+        return out
+
     def get_three_d_poster(
         self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
     ) -> Optional[bytes]:

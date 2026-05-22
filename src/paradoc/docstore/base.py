@@ -39,6 +39,20 @@ def _default_shared_scope() -> "Scope":
 
 
 @dataclass(frozen=True)
+class BundleFileEntry:
+    """One file inside a doc bundle, as surfaced to the file-manifest UI.
+
+    `rel_path` is bundle-relative (forward slashes), `size` is in bytes,
+    `content_type` is a best-effort mimetype guess used by the frontend's
+    "preview / download" affordance.
+    """
+
+    rel_path: str
+    size: int
+    content_type: str
+
+
+@dataclass(frozen=True)
 class DocGroup:
     """A named bucket of doc IDs surfaced to the doc-switcher UI.
 
@@ -65,6 +79,19 @@ class DocStore(ABC):
     @abstractmethod
     def list_doc_ids(self, scope: Optional["Scope"] = None) -> list[str]:
         """All doc IDs the store can serve within ``scope``."""
+
+    def list_bundle_files(
+        self, doc_id: str, *, scope: Optional["Scope"] = None
+    ) -> list[BundleFileEntry]:
+        """Enumerate every file inside the doc's bundle directory.
+
+        Used by the options-panel "Files" view so users can inspect
+        exactly what's shipped in a report — markdown sections, GLBs,
+        baked FEA artefacts, posters, the SQLite db, the lot.
+
+        Default returns an empty list; backends override.
+        """
+        return []
 
     def put_bundle_file(
         self,

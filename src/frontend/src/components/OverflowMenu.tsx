@@ -1,6 +1,7 @@
 import React from 'react'
 import { AboutModal } from './AboutModal'
 import { UserInfoModal } from './UserInfoModal'
+import { BundleFilesModal } from './BundleFilesModal'
 import { useViewerControlsStore } from '../store/viewerControlsStore'
 import { clearAllCache } from '../sections/store'
 
@@ -36,6 +37,7 @@ export function OverflowMenu({
   const [open, setOpen] = React.useState(false)
   const [aboutOpen, setAboutOpen] = React.useState(false)
   const [userOpen, setUserOpen] = React.useState(false)
+  const [filesOpen, setFilesOpen] = React.useState(false)
   const ref = React.useRef<HTMLDivElement>(null)
   const { enabled: viewerControlsEnabled, toggleEnabled: toggleViewerControls } =
     useViewerControlsStore()
@@ -186,6 +188,17 @@ export function OverflowMenu({
             >
               User info
             </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setFilesOpen(true)
+                setOpen(false)
+              }}
+              className="cursor-pointer w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+              title="List every file in this report's bundle (sections, GLBs, FEA artefacts, posters, the SQLite db)."
+            >
+              Bundle files
+            </button>
             <a
               role="menuitem"
               href="/admin"
@@ -223,6 +236,12 @@ export function OverflowMenu({
 
       <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <UserInfoModal open={userOpen} onClose={() => setUserOpen(false)} />
+      <BundleFilesModal
+        open={filesOpen}
+        onClose={() => setFilesOpen(false)}
+        docId={currentDocId}
+      />
+
     </>
   )
 }
