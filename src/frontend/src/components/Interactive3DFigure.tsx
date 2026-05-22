@@ -139,13 +139,14 @@ export function Interactive3DFigure({
       className="relative group my-4"
       onMouseEnter={revealToggle}
       onMouseLeave={() => setToggleVisible(false)}
-      onTouchStart={revealToggle}
     >
       {/* Segmented toggle — mirrors InteractiveTable/InteractiveFigure
           so users see one consistent control across every kind of
           embedded artefact. Auto-hides on idle so it stops covering
           the embed's top-left toolbar on mobile; reappears on hover,
-          tap, or page scroll. */}
+          page scroll, or touch on the static poster (NOT the live
+          viewer — orbiting the 3D model would otherwise keep
+          summoning the toggle back over the adapy toolbar). */}
       <div
         className={`absolute top-2 right-2 bg-white shadow-lg rounded-md border border-gray-200 p-2 z-20 flex gap-2 transition-opacity duration-200 ${
           toggleVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
@@ -178,8 +179,16 @@ export function Interactive3DFigure({
 
       {/* Keep both panes in the DOM once Interactive has mounted, but
           hide the inactive one with `display: none`. The viewer keeps
-          its GL context warm; toggling back is instant. */}
-      <div style={{ display: showInteractive ? 'none' : 'block' }}>
+          its GL context warm; toggling back is instant.
+
+          `onTouchStart` is scoped to the Static pane only so touches
+          on the live 3D viewer (camera orbit on mobile) don't reveal
+          the toggle. Page-scroll still reveals it from anywhere via
+          the window listener in the `revealToggle` effect. */}
+      <div
+        style={{ display: showInteractive ? 'none' : 'block' }}
+        onTouchStart={revealToggle}
+      >
         {staticView}
       </div>
       {hasMounted && (
