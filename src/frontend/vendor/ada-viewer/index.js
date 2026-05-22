@@ -85304,13 +85304,13 @@ function Zue(n, e, t, i) {
     !1
   ), e.minDistance = m * 0.05, e.maxDistance = m * 20;
 }
-function Xfe(n, e) {
+function Wfe(n, e) {
   let t = !1, i = null;
   n.innerHTML = "";
   const r = document.createElement("div");
   return r.style.cssText = "display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-height:200px;color:#666;font:14px system-ui;", r.textContent = "Loading FEA mode shapes…", n.appendChild(r), (async () => {
     try {
-      const { assembleAnimatedFeaGlb: o } = await Promise.resolve().then(() => Cfe), l = await o(
+      const { assembleAnimatedFeaGlb: o } = await Promise.resolve().then(() => Rfe), l = await o(
         e.fetcher,
         e.manifest,
         // typed loosely on the public API
@@ -86693,32 +86693,43 @@ function Tfe(n) {
   }), e;
 }
 function Mfe(n) {
-  if (!n || !Array.isArray(n.fields)) return null;
-  const e = n.fields.find(
-    (t) => t.category === "displacement" && t.blob
-  );
-  return e || (n.fields.find(
-    (t) => t.blob && (t.name_canonical?.toUpperCase().startsWith("U") || t.name_canonical?.toUpperCase().includes("DEPL"))
-  ) ?? null);
+  return !n || !Array.isArray(n.fields) ? [] : n.fields.filter((e) => {
+    if (!e.blob) return !1;
+    const t = (e.name_canonical || "").toUpperCase();
+    return e.category === "displacement" || t === "U" || t.startsWith("U[") || t.includes("DEPL") || t.includes("DISPLACEMENT");
+  });
 }
-async function Afe(n, e, t = 0) {
+function Afe(n, e) {
+  const t = Mfe(n);
+  if (t.length === 0) return null;
+  let i = 0;
+  for (const o of t) {
+    const l = Math.max(1, o.n_steps | 0);
+    if (e < i + l)
+      return { field: o, stepIndex: e - i };
+    i += l;
+  }
+  const r = t[t.length - 1];
+  return { field: r, stepIndex: Math.max(0, (r.n_steps | 0) - 1) };
+}
+async function Cfe(n, e, t = 0) {
   const i = await n(e.mesh.url), l = (await new BN().parseAsync(i, "")).scene, u = Tfe(l);
   if (!u)
     throw new Error(`fea bundle: no mesh in ${e.mesh.url}`);
   u.name = eB;
-  const h = Mfe(e);
-  if (!h || !h.blob)
+  const h = Afe(e, Math.max(0, t | 0));
+  if (!h || !h.field.blob)
     throw new Error(
-      "fea bundle: manifest has no displacement field (category=displacement); nothing to animate. Static mesh will still render but SimulationControls won't surface."
+      "fea bundle: manifest has no displacement fields; nothing to deform."
     );
-  const p = await n(h.blob.url), m = y5(p), { n_steps: y, n_points: _, n_components: b } = m.header, w = u.geometry.getAttribute("position");
-  if (!w)
+  const p = h.field, m = await n(p.blob.url), y = y5(m), { n_points: _, n_components: b } = y.header, w = Math.min(h.stepIndex, y.steps.length - 1), T = u.geometry.getAttribute("position");
+  if (!T)
     throw new Error("fea bundle: base mesh has no position attribute");
-  if (w.count !== _)
+  if (T.count !== _)
     throw new Error(
-      `fea bundle: vertex count mismatch — mesh has ${w.count} vertices, displacement field has ${_}. Bundle is corrupt.`
+      `fea bundle: vertex count mismatch — mesh has ${T.count} vertices, displacement field has ${_}. Bundle is corrupt.`
     );
-  const T = Math.max(0, Math.min(m.steps.length - 1, t | 0)), M = m.steps[T], E = w.array, D = new Float32Array(E.length), R = new Float32Array(_);
+  const M = y.steps[w], E = T.array, D = new Float32Array(E.length), R = new Float32Array(_);
   let O = 0;
   for (let j = 0; j < _; j++) {
     const ee = M[j * b + 0], ie = b >= 2 ? M[j * b + 1] : 0, q = b >= 3 ? M[j * b + 2] : 0;
@@ -86785,11 +86796,11 @@ async function Afe(n, e, t = 0) {
     throw new Error("fea bundle: GLTFExporter returned JSON, expected binary");
   return new Uint8Array(z);
 }
-const Cfe = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
+const Rfe = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  assembleAnimatedFeaGlb: Afe
+  assembleAnimatedFeaGlb: Cfe
 }, Symbol.toStringTag, { value: "Module" }));
 export {
-  Xfe as mountFeaArtefactViewer,
+  Wfe as mountFeaArtefactViewer,
   Kue as mountViewer
 };
