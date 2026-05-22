@@ -62,10 +62,12 @@ class AttrCache:
             return cached
         try:
             source = inspect.getsource(getattr(filter_cls, attr_name))
-        except (OSError, TypeError):
-            # Builtins / dynamically generated → fall back to an unstable hash
-            # that still varies with the qualname so different classes don't
-            # share entries.
+        except (OSError, TypeError, AttributeError):
+            # Builtins / dynamically generated / class-level missing
+            # (subclasses can expose @attr-marked methods only on the
+            # instance via __getattr__) → fall back to an unstable hash
+            # that still varies with the qualname so different classes
+            # don't share entries.
             digest = hashlib.sha256(
                 f"{filter_cls.__qualname__}.{attr_name}".encode()
             ).hexdigest()
