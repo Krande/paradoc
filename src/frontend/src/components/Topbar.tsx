@@ -4,7 +4,6 @@ import { WebsocketStatusMenu } from './WebsocketStatusMenu'
 import { DocSwitcher } from './DocSwitcher'
 import { OverflowMenu } from './OverflowMenu'
 import { ThemeToggle } from './ThemeToggle'
-import { useDocList } from './useDocList'
 import { getRuntimeConfig } from '../transport'
 
 // Inline favicon glyph — same paths as public/favicon.svg, but rendered
@@ -58,7 +57,6 @@ export function Topbar({
   // SPA with no backend at all. Both should hide the pill entirely.
   const isWsMode = runtimeCfg.transport === 'ws'
   const headerLinks = runtimeCfg.headerLinks ?? []
-  const { allDocs } = useDocList()
   const hasDoc = Boolean(docId)
 
   return (
@@ -153,9 +151,7 @@ export function Topbar({
           <OverflowMenu
             sourceDisplayEnabled={sourceDisplayEnabled}
             onToggleSourceDisplay={toggleSourceDisplay}
-            docs={allDocs}
             currentDocId={docId}
-            onSelectDoc={onSelectDoc}
           />
         </div>
       </div>

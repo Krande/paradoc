@@ -6,17 +6,18 @@ import { useViewerControlsStore } from '../store/viewerControlsStore'
 import { clearAllCache } from '../sections/store'
 
 interface OverflowMenuProps {
-  // Mobile-only inline controls that we want available even when the
-  // viewport is narrow enough to hide the toolbar versions. On desktop
-  // these props are still passed but the menu items hide via `sm:hidden`
-  // and the user uses the inline toolbar instead.
+  // Mobile-only inline control that we want available even when the
+  // viewport is narrow enough to hide the toolbar version. On desktop
+  // it's still passed but the menu item hides via `sm:hidden` and the
+  // user uses the inline toolbar instead.
   sourceDisplayEnabled: boolean
   onToggleSourceDisplay: () => void
-  // Doc switcher entries (mobile only). Empty = WS mode or single doc;
-  // the switcher section just doesn't render in that case.
-  docs: string[]
+  // Doc id is still surfaced so the "Bundle files" modal knows which
+  // doc to list. Doc *switching* lives in the Topbar's ``DocSwitcher``
+  // dropdown for both viewports — it used to be duplicated here on
+  // mobile, but that cluttered the menu and the dropdown already shows
+  // up at every breakpoint.
   currentDocId: string
-  onSelectDoc: (id: string) => void
 }
 
 // Settings dropdown (cog icon) that hosts the About / User Info / Admin
@@ -30,9 +31,7 @@ interface OverflowMenuProps {
 export function OverflowMenu({
   sourceDisplayEnabled,
   onToggleSourceDisplay,
-  docs,
   currentDocId,
-  onSelectDoc,
 }: OverflowMenuProps) {
   const [open, setOpen] = React.useState(false)
   const [aboutOpen, setAboutOpen] = React.useState(false)
@@ -57,8 +56,6 @@ export function OverflowMenu({
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
-
-  const showSwitcher = docs.length > 1
 
   return (
     <>
@@ -119,34 +116,7 @@ export function OverflowMenu({
               </span>
             </button>
 
-            {showSwitcher && (
-              <div className="sm:hidden border-t border-gray-100 dark:border-gray-800 my-1 pt-1">
-                <div className="px-3 py-1 text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                  Switch document
-                </div>
-                {docs.map((id) => (
-                  <button
-                    key={id}
-                    role="menuitem"
-                    onClick={() => {
-                      onSelectDoc(id)
-                      setOpen(false)
-                    }}
-                    className={`cursor-pointer w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                      id === currentDocId
-                        ? 'font-semibold text-blue-700 dark:text-blue-400'
-                        : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    {id}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Always-on entries. The mobile-only block above renders a
-                divider already; on desktop we need our own divider here. */}
-            <div className="border-t border-gray-100 dark:border-gray-800 my-1 hidden sm:block" />
+            <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
 
             <button
               role="menuitem"
