@@ -85186,7 +85186,7 @@ function tfe(n, e) {
     globalThis.__adaViewerEmbedInjectCss?.();
   } catch {
   }
-  n.innerHTML = "", n.style.minHeight || (n.style.minHeight = `${C2}px`), n.style.position = "relative", n.style.overflow = "hidden";
+  n.innerHTML = "", !n.style.minHeight && !n.style.height && (n.style.minHeight = `${C2}px`), n.style.position = "relative", n.style.overflow = "hidden";
   const u = document.createElement("div");
   u.style.position = "absolute", u.style.inset = "0", u.style.zIndex = "0", n.appendChild(u);
   const h = document.createElement("div");
