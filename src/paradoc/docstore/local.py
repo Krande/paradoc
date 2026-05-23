@@ -126,16 +126,18 @@ class LocalDocStore(DocStore):
             bundle = self._bundle_dir(doc_id, s)
         except (FileNotFoundError, PermissionError):
             return None
-        files_root = (bundle / "files").resolve()
-        # Resolve the candidate path and reject anything that climbs out
-        # of <bundle>/files/. ``resolve()`` collapses ``..`` segments;
-        # ``is_relative_to`` is the final gate.
-        candidate = (files_root / rel_path).resolve()
-        if not candidate.is_relative_to(files_root):
-            return None
-        if not candidate.is_file():
-            return None
-        return candidate.read_bytes()
+        # Try `files/<rel>` first (source-side assets the markdown
+        # referenced literally), then `static/<rel>` (rendered plot
+        # images the static-export pipeline drops into
+        # ``static/images/...`` — kept in S3 layout sync with this).
+        for subdir in ("files", "static"):
+            root = (bundle / subdir).resolve()
+            candidate = (root / rel_path).resolve()
+            if not candidate.is_relative_to(root):
+                continue
+            if candidate.is_file():
+                return candidate.read_bytes()
+        return None
 
     def put_bundle_file(
         self,

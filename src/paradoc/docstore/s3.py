@@ -321,7 +321,22 @@ class S3DocStore(DocStore):
         clean = rel_path.replace("\\", "/").strip("/")
         if not clean or ".." in clean.split("/"):
             return None
-        return self._fetch_object(self._key(doc_id, s, "files", *clean.split("/")))
+        parts = clean.split("/")
+        # Probe `files/<rel>` first — that's where source-side assets
+        # the markdown referenced literally (`![](files/x.png)`, the
+        # ``cad.stp`` doc_figure_sources convention) live. If that
+        # misses, fall through to `static/<rel>`: the static-export
+        # pipeline copies rendered plots into ``static/images/<key>.png``
+        # (per ``_export_images_for_static``) while leaving the section
+        # AST's Image src as the original ``images/<key>.png`` — the
+        # frontend constructs ``/api/docs/<id>/files/images/<key>.png``
+        # from that src, so without this fallback DB-backed plots
+        # (`${ historical_trends }` substitutions) 404 in REST mode
+        # despite the file being present in the bundle.
+        primary = self._fetch_object(self._key(doc_id, s, "files", *parts))
+        if primary is not None:
+            return primary
+        return self._fetch_object(self._key(doc_id, s, "static", *parts))
 
     def put_bundle_file(
         self,
