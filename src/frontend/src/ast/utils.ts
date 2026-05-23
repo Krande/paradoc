@@ -22,16 +22,18 @@ function encodePathSegments(path: string): string {
  *
  * Order of preference (per transport):
  *   1. Absolute / data URLs pass through.
- *   2. REST mode: route any relative path through ``/api/docs/{id}/files/{path}``.
- *      The endpoint streams the file from the bundle (S3 or local) — fully
- *      lazy, browser-cacheable. Replaces the IndexedDB-seeded bulk
- *      ``/images`` fetch.
- *   3. Static (embed) mode: return ``<basePath><path>`` so the browser
+ *   2. Already-API-routed URLs (``/api/docs/...``) pass through. Some
+ *      callers (e.g. Interactive3DFigure's poster) already construct
+ *      the full API path; double-prefixing would break them.
+ *   3. REST mode + relative path: route through ``/api/docs/{id}/files/...``.
+ *      ``files/...`` srcs have the leading ``files/`` stripped first
+ *      (the endpoint adds it back), so a markdown ``![](files/x.png)``
+ *      doesn't end up as ``/files/files/x.png``.
+ *   4. Static (embed) mode: return ``<basePath><path>`` so the browser
  *      fetches the file the static exporter copied alongside the SPA.
- *      ``<img loading="lazy">`` then defers off-screen fetches natively.
- *   4. WS mode: check IndexedDB for an image pushed via the
+ *   5. WS mode: check IndexedDB for an image pushed via the
  *      ``embedded_images`` WS protocol (worker fan-in stores by path).
- *   5. Fall back to ``__PARADOC_ASSET_BASE`` for the WS+HTTP-sidecar
+ *   6. Fall back to ``__PARADOC_ASSET_BASE`` for the WS+HTTP-sidecar
  *      case where images are served by the side HTTP server.
  */
 export async function resolveAssetUrl(src: string, docId?: string): Promise<string> {
@@ -39,18 +41,25 @@ export async function resolveAssetUrl(src: string, docId?: string): Promise<stri
     if (!src) return src
     if (isAbsoluteOrData(src)) return src
 
+    // Already an API path — caller did the routing; don't double-prefix.
+    if (src.startsWith('/api/') || src.includes('/api/docs/')) return src
+
     const cfg = getRuntimeConfig()
     const normalized = src.replace(/^\.\//, '').replace(/^\//, '')
 
-    // REST mode → per-image API endpoint. Handles every relative path
-    // (`files/...`, `_images/...`, etc.), not just `files/*` as the
-    // legacy resolver did — the backend's `_get_file` already serves
-    // any bundle-relative path via `doc_store.get_file_bytes`.
+    // REST mode → per-image API endpoint. The backend's `_get_file`
+    // serves any bundle-relative path, so `_images/foo.png` works as
+    // well as `files/foo.png`. The `files/` prefix gets stripped
+    // because the endpoint root *is* `files/<rel>` — without the
+    // strip, `files/x.png` becomes `/files/files/x.png`.
     if (cfg.transport === 'rest' && docId) {
       const apiBase = cfg.apiBase || ''
+      const rel = normalized.startsWith('files/')
+        ? normalized.slice('files/'.length)
+        : normalized
       return joinUrl(
         apiBase,
-        `/api/docs/${encodeURIComponent(docId)}/files/${encodePathSegments(normalized)}`,
+        `/api/docs/${encodeURIComponent(docId)}/files/${encodePathSegments(rel)}`,
       )
     }
 
