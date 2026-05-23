@@ -89,16 +89,57 @@ class FEAModelResults(BaseFigureSource):
 FigureSourceSpec = Union[CADModelFile, FEAModel, FEAModelResults]
 
 
+# Registry mapping each ``figure_source`` literal to the spec subclass
+# that validates its kwargs. Built-in types seed the registry; plugins
+# add to it via :func:`register_spec`, called by the
+# ``paradoc.figure_sources`` entry-point dispatcher
+# (see ``_plugins.py``). The registry is one-way — once added, a spec
+# stays for the rest of the process. Re-registration with the same
+# name overwrites silently to let dev iteration (reload a plugin)
+# behave as the user expects.
+_SPEC_REGISTRY: dict[str, type[BaseFigureSource]] = {
+    "cad_model_file": CADModelFile,
+    "fea_model": FEAModel,
+    "fea_model_results": FEAModelResults,
+}
+
+
+def register_spec(figure_source: str, spec_cls: type[BaseFigureSource]) -> None:
+    """Register a spec class for the given ``figure_source`` literal.
+
+    Called by plugins from their entry-point handler:
+
+    .. code-block:: python
+
+        def register_paradoc_block_sugar(dispatcher):
+            dispatcher.register_spec("my_source", MySpec)
+            dispatcher.register_filter(MyFilter)
+
+    Overwriting an existing entry is allowed (dev-loop ergonomics) but
+    rare in practice — built-in spec types are seeded at module load
+    and plugins typically register new discriminators.
+    """
+    _SPEC_REGISTRY[figure_source] = spec_cls
+
+
 def create_figure_source(data: dict) -> FigureSourceSpec:
-    """Dispatch on `figure_source` to the right subclass."""
+    """Dispatch on ``figure_source`` to the right subclass.
+
+    Lazily fires ``paradoc.figure_sources`` plugin discovery on first
+    call so a doc that only uses the built-in types never pays the
+    entry-point import cost. Plugins that fail to load log a warning
+    rather than aborting the build.
+    """
+    from ._plugins import ensure_plugins_loaded
+
+    ensure_plugins_loaded()
+
     figure_source_type = data.get("figure_source")
-    if figure_source_type == "cad_model_file":
-        return CADModelFile(**data)
-    if figure_source_type == "fea_model":
-        return FEAModel(**data)
-    if figure_source_type == "fea_model_results":
-        return FEAModelResults(**data)
-    raise ValueError(
-        f"Unknown figure_source type: {figure_source_type!r}. "
-        f"Supported: cad_model_file, fea_model, fea_model_results."
-    )
+    spec_cls = _SPEC_REGISTRY.get(figure_source_type)
+    if spec_cls is None:
+        supported = ", ".join(sorted(_SPEC_REGISTRY))
+        raise ValueError(
+            f"Unknown figure_source type: {figure_source_type!r}. "
+            f"Supported: {supported}."
+        )
+    return spec_cls(**data)

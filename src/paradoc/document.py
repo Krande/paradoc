@@ -1129,6 +1129,7 @@ class OneDoc:
         """
         from paradoc.db.models import ThreeDData
         from paradoc.figure_sources.filters import get_filter_for
+        from paradoc.figure_sources.filters.base import RenderResult
         from paradoc.figure_sources.preprocessor import preprocess_markdown
 
         bundle_root = self.build_dir
@@ -1139,38 +1140,66 @@ class OneDoc:
             try:
                 filter_cls = get_filter_for(spec.figure_source)
                 filter_inst = filter_cls(bundle_root=bundle_root)
-                result = filter_inst.render(spec, key=key)
+                raw = filter_inst.render(spec, key=key)
             except Exception as exc:
                 logger.error(f'figure-source filter failed for key {key!r}: {exc}')
                 return f"<!-- paradoc:figure ERROR: {exc} -->"
 
-            self.db_manager.add_three_d(
-                ThreeDData(
-                    key=key,
-                    glb_path=result.glb_path,
-                    format="glb",
-                    camera_pos=result.camera_pos,
-                    caption=result.caption,
-                    sha256=result.glb_sha256,
-                    size=result.glb_size,
-                    source_type=result.source_type,
-                    metadata=result.metadata,
+            # Multi-figure filters (FEA artefact-bundle's `per_mode`
+            # layout, future history-output series) return a list of
+            # RenderResults. Normalise to a list so single-figure
+            # filters keep working through the same code path. One
+            # markdown image tag + one ThreeDData row per result;
+            # derived keys preserve uniqueness in the asset store.
+            if isinstance(raw, RenderResult):
+                results = [raw]
+            else:
+                results = list(raw)
+            if not results:
+                logger.warning(
+                    f'figure-source filter for key {key!r} returned no results'
                 )
-            )
+                return f"<!-- paradoc:figure {key} produced no results -->"
 
-            # Compute the relative path from the markdown file to the PNG so
-            # pandoc resolves it correctly for both Word/PDF and HTML.
-            png_full = bundle_root / result.png_path
-            try:
-                rel_png = os.path.relpath(png_full, md_dir)
-            except ValueError:
-                rel_png = result.png_path
+            markdown_parts: list[str] = []
+            for i, result in enumerate(results):
+                # First row keeps the allocated key (back-compat with
+                # single-figure flows + matches the key the static
+                # export uses for the canonical figure); subsequent
+                # rows get the `_2`, `_3` suffix the FEA bake convention
+                # already produces for mode-view ThreeDData rows.
+                sub_key = key if i == 0 else f"{key}_{i + 1}"
+                self.db_manager.add_three_d(
+                    ThreeDData(
+                        key=sub_key,
+                        glb_path=result.glb_path,
+                        format="glb",
+                        camera_pos=result.camera_pos,
+                        caption=result.caption,
+                        sha256=result.glb_sha256,
+                        size=result.glb_size,
+                        source_type=result.source_type,
+                        metadata=result.metadata,
+                    )
+                )
 
-            # Forward slashes for portability (pandoc + S3).
-            rel_png = rel_png.replace(os.sep, "/")
-            fig_id = f"fig:{key}"
-            cap = result.caption
-            return f"![{cap}]({rel_png}){{#{fig_id} data-3d-key={key}}}"
+                # Compute the relative path from the markdown file to
+                # the PNG so pandoc resolves it correctly for both
+                # Word/PDF and HTML.
+                png_full = bundle_root / result.png_path
+                try:
+                    rel_png = os.path.relpath(png_full, md_dir)
+                except ValueError:
+                    rel_png = result.png_path
+                # Forward slashes for portability (pandoc + S3).
+                rel_png = rel_png.replace(os.sep, "/")
+                fig_id = f"fig:{sub_key}"
+                markdown_parts.append(
+                    f"![{result.caption}]({rel_png})"
+                    f"{{#{fig_id} data-3d-key={sub_key}}}"
+                )
+
+            return "\n\n".join(markdown_parts)
 
         return preprocess_markdown(md_text, render_block=_render_block)
 
