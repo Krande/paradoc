@@ -86802,7 +86802,7 @@ async function Ife(n, e, t = 0) {
   const i = await n(e.mesh.url), l = (await new HN().parseAsync(i, "")).scene, u = Ofe(l);
   if (!u)
     throw new Error(`fea bundle: no renderable primitive in ${e.mesh.url}`);
-  u.name = rB;
+  u.name = rB, u.userData.feaStreaming = !0;
   const h = Nfe(e, Math.max(0, t | 0));
   if (!h || !h.field.blob)
     throw new Error(
