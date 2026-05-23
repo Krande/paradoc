@@ -17,7 +17,12 @@ type StoreName =
 // after a bundle rebuild — this version bump is the only handle we
 // have today to wipe everyone's IndexedDB without asking them to
 // hit the Clear-cache button in the settings menu).
-const DB_VERSION = 5
+// v6: images are no longer bulk-preloaded into the `images` store —
+// resolveAssetUrl resolves to a direct HTTP URL (static / REST) or
+// reads from the `images` store only as the WS fallback. Bumping the
+// version evicts any stale base64 entries the legacy bulk fetch wrote,
+// so the new direct URL takes priority.
+const DB_VERSION = 6
 const STORE_NAMES: StoreName[] = [
   'sections',
   'manifests',
@@ -386,16 +391,13 @@ export async function loadStaticData(): Promise<{
     }
   }
 
-  // Load images (optional)
-  let images: Record<string, { data: string; mimeType: string }> = {}
-  try {
-    const imagesRes = await fetch(`${basePath}images.json`, { cache: 'no-store' })
-    if (imagesRes.ok) {
-      images = await imagesRes.json()
-    }
-  } catch {
-    // images.json is optional
-  }
+  // Images are no longer bundled into `images.json` (the legacy ~10 MB
+  // base64 dict that gated the page render). The static exporter now
+  // copies each referenced image file to `<basePath>/<path>` and
+  // `resolveAssetUrl` constructs the direct URL on demand, so the
+  // browser fetches them lazily via `<img loading="lazy">`. Kept as an
+  // empty seed for back-compat with the existing call shape.
+  const images: Record<string, { data: string; mimeType: string }> = {}
 
   // Load plots (optional)
   let plots: Record<string, PlotData> = {}

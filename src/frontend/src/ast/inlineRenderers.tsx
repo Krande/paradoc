@@ -43,13 +43,14 @@ export function MathElement({ latex, displayMode }: { latex: string; displayMode
  * Component to render an image with async URL resolution.
  *
  * resolveAssetUrl gives us one of three shapes:
- *   * data: URL (embedded base64 from IndexedDB) — use directly
- *   * absolute http(s):// URL — use directly
- *   * `/api/...` route path (REST mode files/* lookup) — needs the
- *     bearer token, so we authedFetch the bytes and turn them into a
- *     blob: URL. Without this the browser fetches the route as the
- *     anonymous SPA catch-all returns index.html and the <img> fails
- *     to decode HTML as image.
+ *   * data: URL (embedded base64 from IndexedDB, WS embed mode) — use directly.
+ *   * absolute http(s):// URL or static-mode relative path — set as
+ *     src; native ``loading="lazy"`` defers off-screen browser fetches.
+ *   * `/api/...` route path (REST mode) — needs the bearer token, so
+ *     we ``authedFetch`` the bytes per-image and swap to a ``blob:``
+ *     URL. Per-image fetch replaces the legacy ~10 MB bulk preload;
+ *     section-level virtualization in VirtualReader keeps off-screen
+ *     sections (and their <img>s) unmounted so this stays cheap.
  */
 export function AsyncImage({ src, alt, title, className, imgAttrs }: {
   src: string;
@@ -96,7 +97,17 @@ export function AsyncImage({ src, alt, title, className, imgAttrs }: {
     }
   }, [src, docId])
 
-  return <img {...imgAttrs} src={resolvedSrc} alt={alt} title={title} className={className} />
+  return (
+    <img
+      {...imgAttrs}
+      src={resolvedSrc}
+      alt={alt}
+      title={title}
+      className={className}
+      loading="lazy"
+      decoding="async"
+    />
+  )
 }
 
 /**

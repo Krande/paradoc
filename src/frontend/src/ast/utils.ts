@@ -1,5 +1,5 @@
 import type { Attr } from './types'
-import { getEmbeddedImage } from '../sections/store'
+import { getEmbeddedImage, getStaticBasePath, isStaticMode } from '../sections/store'
 import { getRuntimeConfig } from '../transport'
 
 /**
@@ -13,68 +13,72 @@ function joinUrl(base: string, path: string): string {
   return base.replace(/\/?$/, '') + (path.startsWith('/') ? path : '/' + path)
 }
 
+function encodePathSegments(path: string): string {
+  return path.split('/').map(encodeURIComponent).join('/')
+}
+
 /**
  * Resolve an asset URL.
  *
- * Order of preference:
+ * Order of preference (per transport):
  *   1. Absolute / data URLs pass through.
- *   2. Markdown ``files/...`` paths in REST mode → ``/api/docs/{id}/files/{path}``.
- *      Stops the IndexedDB race (sections render before images.json
- *      finished seeding) and avoids paying the embedded-base64 cost
- *      for files that already live in S3.
- *   3. IndexedDB lookup (static-mode SPA + any path that was embedded
- *      via ``images.json``).
- *   4. Whatever ``__PARADOC_ASSET_BASE`` rewriting the host runtime
- *      configured.
+ *   2. REST mode: route any relative path through ``/api/docs/{id}/files/{path}``.
+ *      The endpoint streams the file from the bundle (S3 or local) — fully
+ *      lazy, browser-cacheable. Replaces the IndexedDB-seeded bulk
+ *      ``/images`` fetch.
+ *   3. Static (embed) mode: return ``<basePath><path>`` so the browser
+ *      fetches the file the static exporter copied alongside the SPA.
+ *      ``<img loading="lazy">`` then defers off-screen fetches natively.
+ *   4. WS mode: check IndexedDB for an image pushed via the
+ *      ``embedded_images`` WS protocol (worker fan-in stores by path).
+ *   5. Fall back to ``__PARADOC_ASSET_BASE`` for the WS+HTTP-sidecar
+ *      case where images are served by the side HTTP server.
  */
 export async function resolveAssetUrl(src: string, docId?: string): Promise<string> {
   try {
     if (!src) return src
     if (isAbsoluteOrData(src)) return src
 
-    // REST mode + relative path starting with `files/`: route through
-    // the doc's static-file endpoint. This is the fast path for plain
-    // markdown image references — no IndexedDB round-trip, no race
-    // with the bulk images.json fetch.
     const cfg = getRuntimeConfig()
+    const normalized = src.replace(/^\.\//, '').replace(/^\//, '')
+
+    // REST mode → per-image API endpoint. Handles every relative path
+    // (`files/...`, `_images/...`, etc.), not just `files/*` as the
+    // legacy resolver did — the backend's `_get_file` already serves
+    // any bundle-relative path via `doc_store.get_file_bytes`.
     if (cfg.transport === 'rest' && docId) {
-      const normalized = src.replace(/^\.\//, '').replace(/^\//, '')
-      if (normalized.startsWith('files/')) {
-        const apiBase = cfg.apiBase || ''
-        const rel = normalized.slice('files/'.length)
-        return joinUrl(
-          apiBase,
-          `/api/docs/${encodeURIComponent(docId)}/files/${rel
-            .split('/')
-            .map(encodeURIComponent)
-            .join('/')}`,
-        )
-      }
+      const apiBase = cfg.apiBase || ''
+      return joinUrl(
+        apiBase,
+        `/api/docs/${encodeURIComponent(docId)}/files/${encodePathSegments(normalized)}`,
+      )
     }
 
-    // Try to get embedded image from IndexedDB next (static-mode bundle).
-    if (docId) {
-      // Normalize path: try original, without ./, and without leading /
-      const pathVariants = [
-        src,
-        src.replace(/^\.\//, ''),  // Remove leading ./
-        src.replace(/^\//, ''),     // Remove leading /
-      ]
+    // Static (embed) mode → direct relative URL. The static exporter
+    // copies each referenced image to `<output_dir>/<normalized>`, so
+    // the browser fetches it lazily via the same web root that serves
+    // the SPA.
+    if (cfg.transport === 'static' || isStaticMode()) {
+      const basePath = getStaticBasePath()
+      return basePath + normalized
+    }
 
+    // WS mode → check IndexedDB for an image pushed via the worker's
+    // embedded_images relay. Fall through to __PARADOC_ASSET_BASE for
+    // the embed-images=false case where a sidecar HTTP server serves
+    // the bundle.
+    if (docId) {
+      const pathVariants = [src, normalized]
       for (const path of pathVariants) {
         const embeddedImage = await getEmbeddedImage(docId, path)
-        if (embeddedImage) {
-          return embeddedImage
-        }
+        if (embeddedImage) return embeddedImage
       }
     }
 
-    // Fall back to HTTP server
     const base = (window as any).__PARADOC_ASSET_BASE as string | undefined
     if (!base) return src
     const b = base.endsWith('/') ? base : base + '/'
-    const s = src.startsWith('/') ? src.slice(1) : src.replace(/^\.\//, '')
-    return b + s
+    return b + normalized
   } catch {
     return src
   }

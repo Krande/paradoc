@@ -1081,29 +1081,25 @@ class ASTExporter:
             manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
             logger.info(f"Wrote manifest to {manifest_path}")
 
-            # Write sections and collect images
-            all_embedded_images: Dict[str, Dict[str, str]] = {}
+            # Write sections (image files are copied separately below
+            # so the frontend can lazy-fetch each one via <img src> rather
+            # than waiting on a 10MB images.json on the critical path).
             for bundle in sections:
                 sec = bundle["section"]
                 idx = sec.get("index", 0)
-
-                # Embed images for this section if requested
-                if embed_images:
-                    section_images = self._embed_images_in_bundle(bundle)
-                    all_embedded_images.update(section_images)
-
-                # Write section file
                 section_path = sections_dir / f"{idx}.json"
                 section_path.write_text(json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")
                 logger.debug(f"Wrote section {idx} to {section_path}")
 
             logger.info(f"Wrote {len(sections)} sections to {sections_dir}")
 
-            # Write embedded images
-            if embed_images and all_embedded_images:
-                images_path = output_dir / "images.json"
-                images_path.write_text(json.dumps(all_embedded_images, ensure_ascii=False), encoding="utf-8")
-                logger.info(f"Wrote {len(all_embedded_images)} embedded images to {images_path}")
+            # Copy image files into the static bundle at their markdown-
+            # referenced relative paths so resolveAssetUrl can construct
+            # `<basePath>/<path>` directly. Replaces the legacy bulk
+            # images.json (base64 dict) which gated the React render on
+            # a ~10MB upfront fetch — see plan/v1/notes_frontend_render_pipelines.md.
+            if embed_images:
+                self._export_images_for_static(output_dir, sections)
 
             # Extract and write plot data
             plot_data_dict = self._extract_plot_data_from_db()
@@ -1233,6 +1229,90 @@ class ASTExporter:
             logger.info(f"Wrote {len(presets)} camera preset(s) to {output_dir / 'assets' / 'presets.json'}")
         except Exception as exc:
             logger.warning(f"Failed to export presets.json: {exc}")
+
+    def _export_images_for_static(
+        self, output_dir: pathlib.Path, sections: List[Dict[str, Any]]
+    ) -> None:
+        """Copy referenced image files into the static bundle.
+
+        Each `<img src>` in the markdown maps to a path like
+        ``_images/foo.png`` or ``files/figs/cad.png``. The frontend's
+        ``resolveAssetUrl`` in static mode just appends that path to the
+        base directory, so we copy the source file to exactly that
+        relative location under ``output_dir``. Image resolution reuses
+        the same source-dir / dist-dir / build-dir search strategy that
+        the legacy ``_embed_images_in_bundle`` used.
+        """
+        import shutil
+
+        all_paths: List[Dict[str, str]] = []
+        for bundle in sections:
+            doc = bundle.get("doc", {})
+            blocks = doc.get("blocks", [])
+            all_paths.extend(self._extract_images_with_source(blocks))
+
+        if not all_paths:
+            return
+
+        # Dedupe by (normalized_path, source_dir) — the same image can
+        # be referenced from multiple sections; we only need to copy it
+        # once per destination path.
+        seen: set = set()
+        copied = skipped = 0
+        for img_info in all_paths:
+            img_path = img_info["path"]
+            source_dir = img_info.get("source_dir")
+            normalized_path = img_path.replace("./", "", 1) if img_path.startswith("./") else img_path
+            if normalized_path in seen:
+                continue
+            seen.add(normalized_path)
+
+            resolved: pathlib.Path | None = None
+            if source_dir:
+                source_dir_path = pathlib.Path(source_dir)
+                for variant in (img_path, normalized_path):
+                    candidate = source_dir_path / variant
+                    if candidate.exists() and candidate.is_file():
+                        resolved = candidate
+                        break
+            if resolved is None:
+                for base in (self.one_doc.dist_dir, self.one_doc.build_dir, self.one_doc.source_dir):
+                    for variant in (img_path, normalized_path):
+                        candidate = base / variant
+                        if candidate.exists() and candidate.is_file():
+                            resolved = candidate
+                            break
+                        # Recursive fallback by filename — matches the
+                        # legacy embed path so we don't regress on docs
+                        # that rely on sphinx-style `_images/<name>` refs
+                        # where the source file lives elsewhere on disk.
+                        filename = pathlib.Path(variant).name
+                        for found in base.rglob(filename):
+                            if found.is_file():
+                                resolved = found
+                                break
+                        if resolved is not None:
+                            break
+                    if resolved is not None:
+                        break
+
+            if resolved is None:
+                logger.warning(
+                    f"Could not find image file: {img_path} (source_dir: {source_dir})"
+                )
+                skipped += 1
+                continue
+
+            dest = output_dir / normalized_path
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copyfile(resolved, dest)
+                copied += 1
+            except Exception as exc:
+                logger.warning(f"image copy {resolved} → {dest} failed: {exc}")
+                skipped += 1
+
+        logger.info(f"Copied {copied} images into static bundle ({skipped} skipped)")
 
     def _export_three_d_assets_for_static(self, output_dir: pathlib.Path) -> None:
         """Copy ThreeDData GLBs into the static bundle + write three_d.json.

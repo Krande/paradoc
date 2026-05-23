@@ -65,18 +65,20 @@ export async function loadRestData(apiBase: string, docId: string): Promise<Load
     sections.push((await res.json()) as SectionBundle)
   }
 
-  // Pull plots/tables/images as bulk dicts in parallel — same shape as
-  // static mode's plots.json/tables.json/images.json. Without this seed,
-  // InteractiveFigure/InteractiveTable look for IndexedDB entries that
-  // never get written and silently fall back to non-interactive renders.
-  const [plots, tables, images] = await Promise.all([
+  // Pull plots/tables as bulk dicts in parallel — the InteractiveFigure
+  // / InteractiveTable components look these up by key from IndexedDB,
+  // so we still need the bulk seed.
+  //
+  // Images are NOT bulk-fetched anymore. resolveAssetUrl routes each
+  // `<img src>` through `/api/docs/{id}/files/<path>` for lazy fetching
+  // — this replaces the legacy ~10 MB `/images` blob that gated the
+  // page render. The empty seed keeps the return shape stable for
+  // back-compat with existing call sites.
+  const [plots, tables] = await Promise.all([
     fetchOptionalJson<Record<string, PlotData>>(joinUrl(apiBase, `${docPath}/plots`), {}),
     fetchOptionalJson<Record<string, TableData>>(joinUrl(apiBase, `${docPath}/tables`), {}),
-    fetchOptionalJson<Record<string, { data: string; mimeType: string }>>(
-      joinUrl(apiBase, `${docPath}/images`),
-      {},
-    ),
   ])
+  const images: Record<string, { data: string; mimeType: string }> = {}
 
   return { manifest, sections, images, plots, tables }
 }
