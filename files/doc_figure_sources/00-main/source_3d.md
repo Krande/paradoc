@@ -3,6 +3,7 @@
 This page demonstrates every form of the figure-source / filter system:
 
 - `<!-- paradoc:figure -->` block sugar for one-off CAD figures
+- `<!-- paradoc:figure -->` block sugar for FEA artefact bundles (one figure per mode)
 - Named filter references via `${ filter.attr }`
 - Inline scalars with format specs
 - A standalone rasterized PNG produced by `assembly.render_offscreen()`
@@ -36,6 +37,54 @@ camera_pos: iso_3
 The block above expands to a static PNG plus a `data-3d-key=...` so the
 live-view frontend renders an interactive 3D viewer when the user clicks
 "3D".
+
+## Inline FEA results (comment-block sugar)
+
+The same block-sugar grammar works for FEA mode-shape results — drop a
+solver result file (`.frd` / `.odb` / `.rmed` / `.sif` / `.sin`) into
+the doc bundle, point `source_inp:` at it, and paradoc bakes the
+artefact bundle (`fea.mesh.glb` + per-mode displacement blobs + per-mode
+PNG posters) and emits one figure per mode. The interactive view in
+each figure carries the same bundle so the SimulationControls slider
+switches modes in-place; PDF / DOCX / ODT exports get the static
+counterpart PNG for that mode.
+
+The figure-source handler is registered by adapy via the
+`paradoc.figure_sources` entry-point group — paradoc itself doesn't
+import adapy, the plugin discovery wires them together at first
+lookup. See `ada.fem.results.docs.register_paradoc_block_sugar` for
+the implementation side.
+
+The markdown:
+
+```markdown
+<!-- paradoc:figure
+figure_source: fea_artefact_bundle
+figure_title: Cantilever eigen analysis (Code Aster)
+source_inp: files/cantilever.rmed
+camera_pos: iso_3
+n_modes: 3
+poster_backend: pygfx
+-->
+```
+
+The rendered output below — three figures, one per mode, each with its
+own interactive viewer + static poster:
+
+<!-- paradoc:figure
+figure_source: fea_artefact_bundle
+figure_title: Cantilever eigen analysis (Code Aster)
+source_inp: files/cantilever.rmed
+camera_pos: iso_3
+n_modes: 3
+poster_backend: pygfx
+-->
+
+`n_modes:` caps how many modes get rendered (the demo file ships ~10
+displacement steps; we trim to 3 to keep the page short). Omit it to
+render every mode the bundle carries. `poster_backend:` accepts the
+same `pygfx` / `chromium` split the CAD block sugar exposes; defaults
+to `pygfx`.
 
 ## Named filter references
 

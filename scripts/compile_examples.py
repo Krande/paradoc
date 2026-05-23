@@ -87,11 +87,35 @@ def _setup_doc_figure_sources(od: "pa.OneDoc") -> None:
       ``eigen_freqs`` row to exist when the legacy substituter runs.
 
     Plus a STEP file (already in the repo at ``files/doc_figure_sources/
-    files/cad.stp``) which adapy renders to glb + PNG at compile time.
+    files/cad.stp``) which adapy renders to glb + PNG at compile time,
+    AND a Code Aster eigen-cantilever ``.rmed`` at
+    ``files/cantilever.rmed`` consumed by the new
+    ``figure_source: fea_artefact_bundle`` block.
     """
     import pandas as pd
 
     from paradoc.db import dataframe_to_table_data
+
+    # Force-register adapy's fea_artefact_bundle figure-source handler.
+    #
+    # The plugin would normally be loaded via the
+    # ``paradoc.figure_sources`` entry-point group at first
+    # ``create_figure_source`` lookup — but the demo compile in this
+    # repo runs adapy via PYTHONPATH (no dist-info), so
+    # ``importlib.metadata.entry_points()`` returns nothing for adapy
+    # and the block would fail to parse. Direct call wires the
+    # handler whether or not adapy is pip-installed in the env.
+    #
+    # Swallowed on ImportError (adapy isn't checked out alongside) —
+    # the block will then surface a parse error pointing at the
+    # missing handler, which is the right diagnostic.
+    try:
+        from ada.fem.results.docs import register_paradoc_block_sugar
+        from paradoc.figure_sources._plugins import _DISPATCHER
+
+        register_paradoc_block_sugar(_DISPATCHER)
+    except ImportError:
+        pass
 
     # demo_table — referenced from source_table.md (both new & legacy).
     od.db_manager.add_table(
