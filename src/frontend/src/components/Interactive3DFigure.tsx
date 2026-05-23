@@ -56,6 +56,10 @@ export function Interactive3DFigure({
   // embed's input handler, so dragging never reaches the wrapper.
   const posterRef = React.useRef<HTMLElement | null>(null)
   const [viewerSize, setViewerSize] = React.useState<{width: number; height: number} | null>(null)
+  // Locks viewerSize once the user has dragged the resize handle so
+  // subsequent posterRef reflows don't snap their custom size back to
+  // the auto-measured value.
+  const userResizedRef = React.useRef(false)
   const resizeStartRef = React.useRef<
     {pointerId: number; startX: number; startY: number; baseW: number; baseH: number} | null
   >(null)
@@ -64,13 +68,19 @@ export function Interactive3DFigure({
     const el = posterRef.current
     if (!el) return
     const update = () => {
+      if (userResizedRef.current) return
       const rect = el.getBoundingClientRect()
-      // Only seed once — subsequent poster reflows shouldn't override
-      // a size the user has manually set via the resize handle.
+      // Keep updating until the user takes over via the resize handle.
+      // The previous ``prev ?? …`` seed-once logic locked viewerSize to
+      // the figure's *placeholder* height (~200 px — dashed box + icon
+      // + caption) because that's what was rendered the first time the
+      // effect ran, before the poster image had loaded. The wrapper
+      // then ended up shorter than mountViewer's 400 px min-height
+      // floor, the canvas overflowed, and the intermediate
+      // ``overflow: hidden`` div clipped its bottom — taking the beam
+      // tip with it.
       if (rect.width > 0 && rect.height > 0) {
-        setViewerSize((prev) =>
-          prev ?? {width: Math.round(rect.width), height: Math.round(rect.height)},
-        )
+        setViewerSize({width: Math.round(rect.width), height: Math.round(rect.height)})
       }
     }
     update()
@@ -127,6 +137,9 @@ export function Interactive3DFigure({
 
   const onResizeStart = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!viewerSize) return
+    // Lock auto-measurement so the user's drag isn't fought by the
+    // ResizeObserver loop that's watching the posterRef figure.
+    userResizedRef.current = true
     // Capture so subsequent move / up events fire on the handle even
     // when the pointer leaves it. This is what makes pointer-event
     // resize feel native.
