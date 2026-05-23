@@ -1081,25 +1081,31 @@ class ASTExporter:
             manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
             logger.info(f"Wrote manifest to {manifest_path}")
 
-            # Write sections (image files are copied separately below
-            # so the frontend can lazy-fetch each one via <img src> rather
-            # than waiting on a 10MB images.json on the critical path).
+            # Copy image files into the static bundle and build a
+            # mapping {original_src: output_relpath}. Absolute paths
+            # (e.g. `/work/adapy/.../fea.mesh.png` from FEA report
+            # build) are flattened under `_images/`; relative paths
+            # keep their shape. Each bundle's Image srcs are rewritten
+            # in-place to the new relpaths BEFORE serializing, so the
+            # static-mode frontend resolves to URLs that actually exist
+            # on disk. Replaces the legacy bulk images.json (base64
+            # dict) which gated the React render on a ~10MB upfront
+            # fetch — see plan/v1/notes_frontend_render_pipelines.md.
+            image_mapping: Dict[str, str] = {}
+            if embed_images:
+                image_mapping = self._export_images_for_static(output_dir, sections)
+
+            # Write section bundles (with rewritten image srcs).
             for bundle in sections:
                 sec = bundle["section"]
                 idx = sec.get("index", 0)
+                if image_mapping:
+                    self._rewrite_bundle_image_srcs(bundle, image_mapping)
                 section_path = sections_dir / f"{idx}.json"
                 section_path.write_text(json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")
                 logger.debug(f"Wrote section {idx} to {section_path}")
 
             logger.info(f"Wrote {len(sections)} sections to {sections_dir}")
-
-            # Copy image files into the static bundle at their markdown-
-            # referenced relative paths so resolveAssetUrl can construct
-            # `<basePath>/<path>` directly. Replaces the legacy bulk
-            # images.json (base64 dict) which gated the React render on
-            # a ~10MB upfront fetch — see plan/v1/notes_frontend_render_pipelines.md.
-            if embed_images:
-                self._export_images_for_static(output_dir, sections)
 
             # Extract and write plot data
             plot_data_dict = self._extract_plot_data_from_db()
@@ -1232,17 +1238,27 @@ class ASTExporter:
 
     def _export_images_for_static(
         self, output_dir: pathlib.Path, sections: List[Dict[str, Any]]
-    ) -> None:
+    ) -> Dict[str, str]:
         """Copy referenced image files into the static bundle.
 
-        Each `<img src>` in the markdown maps to a path like
-        ``_images/foo.png`` or ``files/figs/cad.png``. The frontend's
-        ``resolveAssetUrl`` in static mode just appends that path to the
-        base directory, so we copy the source file to exactly that
-        relative location under ``output_dir``. Image resolution reuses
-        the same source-dir / dist-dir / build-dir search strategy that
-        the legacy ``_embed_images_in_bundle`` used.
+        Markdown ``<img src>`` values come in two shapes:
+
+        * **Relative** (``files/foo.png``, ``images/bar.png``) — kept
+          as-is; the file is copied to ``output_dir/<src>`` so the
+          frontend's static-mode ``resolveAssetUrl`` can construct
+          ``<basePath>/<src>`` directly.
+        * **Absolute** to a build-container path
+          (``/work/adapy/.../_assets/case/fea.mesh.png``) — flattened
+          into ``_images/<sha8>-<basename>`` so the static bundle has a
+          sane layout, then the Image src in the bundle JSON is
+          rewritten to the new relpath (see ``_rewrite_bundle_image_srcs``).
+
+        Returns a ``{original_src: output_relpath}`` mapping that the
+        caller must use to rewrite section bundles BEFORE serializing
+        them to JSON. Without the rewrite the frontend sees the old
+        absolute path and can't resolve it.
         """
+        import hashlib
         import shutil
 
         all_paths: List[Dict[str, str]] = []
@@ -1251,41 +1267,40 @@ class ASTExporter:
             blocks = doc.get("blocks", [])
             all_paths.extend(self._extract_images_with_source(blocks))
 
+        mapping: Dict[str, str] = {}
         if not all_paths:
-            return
+            return mapping
 
-        # Dedupe by (normalized_path, source_dir) — the same image can
-        # be referenced from multiple sections; we only need to copy it
-        # once per destination path.
-        seen: set = set()
         copied = skipped = 0
         for img_info in all_paths:
-            img_path = img_info["path"]
+            img_src = img_info["path"]
             source_dir = img_info.get("source_dir")
-            normalized_path = img_path.replace("./", "", 1) if img_path.startswith("./") else img_path
-            if normalized_path in seen:
+            if img_src in mapping:
                 continue
-            seen.add(normalized_path)
+
+            # Strip a leading `./` for resolution, but keep the original
+            # `img_src` as the dict key (we rewrite by exact-match).
+            normalized = img_src.replace("./", "", 1) if img_src.startswith("./") else img_src
 
             resolved: pathlib.Path | None = None
             if source_dir:
                 source_dir_path = pathlib.Path(source_dir)
-                for variant in (img_path, normalized_path):
+                for variant in (img_src, normalized):
                     candidate = source_dir_path / variant
                     if candidate.exists() and candidate.is_file():
                         resolved = candidate
                         break
             if resolved is None:
                 for base in (self.one_doc.dist_dir, self.one_doc.build_dir, self.one_doc.source_dir):
-                    for variant in (img_path, normalized_path):
+                    for variant in (img_src, normalized):
                         candidate = base / variant
                         if candidate.exists() and candidate.is_file():
                             resolved = candidate
                             break
-                        # Recursive fallback by filename — matches the
-                        # legacy embed path so we don't regress on docs
-                        # that rely on sphinx-style `_images/<name>` refs
-                        # where the source file lives elsewhere on disk.
+                        # Recursive filename fallback — preserves the
+                        # legacy embed path's behaviour for sphinx-style
+                        # `_images/<name>` refs whose source lives in a
+                        # different subtree on disk.
                         filename = pathlib.Path(variant).name
                         for found in base.rglob(filename):
                             if found.is_file():
@@ -1298,12 +1313,28 @@ class ASTExporter:
 
             if resolved is None:
                 logger.warning(
-                    f"Could not find image file: {img_path} (source_dir: {source_dir})"
+                    f"Could not find image file: {img_src} (source_dir: {source_dir})"
                 )
                 skipped += 1
                 continue
 
-            dest = output_dir / normalized_path
+            # Decide the output relpath:
+            # * Relative srcs keep their shape so existing markdown refs
+            #   line up with the on-disk layout (predictable, debuggable).
+            # * Absolute srcs are flattened under `_images/` with a short
+            #   content hash to avoid collisions between like-named files
+            #   from different source dirs (e.g. `fea.mesh.png` repeats
+            #   under every `_assets/<case>/`).
+            if normalized.startswith("/"):
+                with open(resolved, "rb") as f:
+                    digest = hashlib.sha256(f.read()).hexdigest()[:8]
+                output_relpath = f"_images/{digest}-{resolved.name}"
+            else:
+                output_relpath = normalized
+
+            mapping[img_src] = output_relpath
+
+            dest = output_dir / output_relpath
             dest.parent.mkdir(parents=True, exist_ok=True)
             try:
                 shutil.copyfile(resolved, dest)
@@ -1313,6 +1344,59 @@ class ASTExporter:
                 skipped += 1
 
         logger.info(f"Copied {copied} images into static bundle ({skipped} skipped)")
+        return mapping
+
+    def _rewrite_bundle_image_srcs(
+        self, bundle: Dict[str, Any], mapping: Dict[str, str]
+    ) -> None:
+        """In-place rewrite Image inline srcs using the mapping.
+
+        Mirrors the block/inline traversal in
+        ``_extract_images_with_source``. Called once per bundle right
+        before serializing to JSON, so the static-mode frontend sees
+        the new flattened paths instead of the original (often
+        absolute) build-container paths.
+        """
+        def rewrite_inlines(inlines):
+            for inline in inlines or []:
+                if not isinstance(inline, dict):
+                    continue
+                if inline.get("t") == "Image":
+                    c = inline.get("c", [])
+                    if isinstance(c, list) and len(c) >= 3:
+                        src_info = c[2]
+                        if isinstance(src_info, list) and len(src_info) >= 1:
+                            src = src_info[0]
+                            if isinstance(src, str) and src in mapping:
+                                src_info[0] = mapping[src]
+
+        def rewrite_blocks(blks):
+            for blk in blks or []:
+                if not isinstance(blk, dict):
+                    continue
+                t = blk.get("t")
+                c = blk.get("c", [])
+                if t == "Para" or t == "Plain":
+                    rewrite_inlines(c)
+                elif t == "Figure":
+                    if isinstance(c, list) and len(c) >= 3:
+                        rewrite_blocks(c[2])
+                elif t == "Div":
+                    if isinstance(c, list) and len(c) >= 2:
+                        rewrite_blocks(c[1])
+                elif t == "BulletList" and isinstance(c, list):
+                    for item in c:
+                        if isinstance(item, list):
+                            rewrite_blocks(item)
+                elif t == "OrderedList" and isinstance(c, list) and len(c) >= 2:
+                    for item in c[1]:
+                        if isinstance(item, list):
+                            rewrite_blocks(item)
+                elif t == "BlockQuote":
+                    rewrite_blocks(c)
+
+        doc = bundle.get("doc", {})
+        rewrite_blocks(doc.get("blocks", []))
 
     def _export_three_d_assets_for_static(self, output_dir: pathlib.Path) -> None:
         """Copy ThreeDData GLBs into the static bundle + write three_d.json.
