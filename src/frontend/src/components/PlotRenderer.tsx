@@ -158,7 +158,16 @@ export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
       <div
         ref={plotRef}
         className="border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 w-full"
-        style={{ minHeight: '320px' }}
+        // ``touchAction: pan-y`` confines the browser's default touch
+        // gestures over the plot area to vertical scrolling; pinch and
+        // horizontal pan are blocked at the OS / browser layer so they
+        // don't double-fire viewport zoom on top of plotly's own zoom
+        // handlers. Without this a two-finger pinch over a plotly chart
+        // on mobile scales the entire page (browser pinch-zoom),
+        // creating the "the whole site zoomed" effect. Plotly still
+        // honours the modeBar's Zoom / Pan / Reset tools because those
+        // use mouse / pointer events, not gesture events.
+        style={{ minHeight: '320px', touchAction: 'pan-y' }}
       />
       {plotData?.caption && (
         <p className="text-sm text-gray-600 dark:text-gray-400 italic mt-2 text-center">
