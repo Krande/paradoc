@@ -2,7 +2,7 @@ import React from 'react'
 import { AboutModal } from './AboutModal'
 import { UserInfoModal } from './UserInfoModal'
 import { BundleFilesModal } from './BundleFilesModal'
-import { useViewerControlsStore } from '../store/viewerControlsStore'
+import { OptionsModal } from './OptionsModal'
 import { clearAllCache } from '../sections/store'
 
 interface OverflowMenuProps {
@@ -20,14 +20,14 @@ interface OverflowMenuProps {
   currentDocId: string
 }
 
-// Settings dropdown (cog icon) that hosts the About / User Info / Admin
-// actions plus the 3D viewer toggle, and re-surfaces the toolbar's
-// inline controls (Source view, document switcher) on small screens
-// where they're hidden by `sm:flex`. The icon was previously a kebab
-// (three vertical dots) — "more" rather than "settings" — but most of
-// the entries are preferences, so a cog reads more truthfully and
-// users find the 3D viewer controls toggle faster. Closes on outside
-// click and Escape.
+// Settings dropdown (cog icon) that hosts About / User info / Bundle
+// files / Admin / Clear-cache actions plus the "Options" entry that
+// opens a dedicated preferences modal (theme, 3D viewer controls). The
+// preferences live in their own panel so this menu stays focused on
+// actions and doesn't grow each time a new toggle is added. Source view
+// is re-surfaced here on mobile (`sm:hidden`) because the toolbar
+// version is hidden at narrow widths. Closes on outside click and
+// Escape.
 export function OverflowMenu({
   sourceDisplayEnabled,
   onToggleSourceDisplay,
@@ -37,9 +37,8 @@ export function OverflowMenu({
   const [aboutOpen, setAboutOpen] = React.useState(false)
   const [userOpen, setUserOpen] = React.useState(false)
   const [filesOpen, setFilesOpen] = React.useState(false)
+  const [optionsOpen, setOptionsOpen] = React.useState(false)
   const ref = React.useRef<HTMLDivElement>(null)
-  const { enabled: viewerControlsEnabled, toggleEnabled: toggleViewerControls } =
-    useViewerControlsStore()
 
   React.useEffect(() => {
     if (!open) return
@@ -95,7 +94,8 @@ export function OverflowMenu({
             role="menu"
             className="absolute right-0 top-full mt-2 w-60 max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg dark:shadow-black/30 z-30 py-1 text-sm text-gray-900 dark:text-gray-100"
           >
-            {/* Mobile-only re-surfaces of toolbar controls. */}
+            {/* Mobile-only re-surface of the toolbar's Source view
+                toggle (toolbar is hidden by `sm:flex` at narrow widths). */}
             <button
               role="menuitem"
               onClick={() => {
@@ -116,28 +116,19 @@ export function OverflowMenu({
               </span>
             </button>
 
-            <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
+            <div className="sm:hidden border-t border-gray-100 dark:border-gray-800 my-1" />
 
             <button
               role="menuitem"
               onClick={() => {
-                toggleViewerControls()
+                setOptionsOpen(true)
+                setOpen(false)
               }}
-              className="cursor-pointer w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-between"
-              title="Show adapy's native viewer controls (top navbar, selection tree, object/group info)"
+              className="cursor-pointer w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+              title="Display theme and 3D viewer preferences"
             >
-              <span>3D viewer controls</span>
-              <span
-                className={`text-xs ${
-                  viewerControlsEnabled
-                    ? 'text-blue-600 dark:text-blue-400 font-medium'
-                    : 'text-gray-400 dark:text-gray-500'
-                }`}
-              >
-                {viewerControlsEnabled ? 'on' : 'off'}
-              </span>
+              Options
             </button>
-
             <button
               role="menuitem"
               onClick={() => {
@@ -204,6 +195,7 @@ export function OverflowMenu({
         )}
       </div>
 
+      <OptionsModal open={optionsOpen} onClose={() => setOptionsOpen(false)} />
       <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <UserInfoModal open={userOpen} onClose={() => setUserOpen(false)} />
       <BundleFilesModal
