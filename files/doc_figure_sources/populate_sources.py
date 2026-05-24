@@ -69,7 +69,18 @@ def write_png(assembly: ada.Assembly, dest: Path) -> None:
 # stitches into a 4×2 visual diff so the reader (and we) can spot
 # framing / FOV / lighting drift between pygfx-offscreen and the
 # chromium-headless screenshot of the live embed.
-_COMPARISON_PRESETS = ("front", "top", "left", "iso_1")
+#
+# Presets duplicate `paradoc.camera.presets.BUILTIN_PRESETS` keys
+# verbatim (CameraPreset's field names match `render_offscreen`'s
+# preset-dict kwargs). Inlining keeps the example self-contained:
+# the `examples-figs` pixi env brings adapy + offscreen renderers
+# but not paradoc itself.
+_COMPARISON_PRESETS: dict[str, dict] = {
+    "front":  {"azimuth_deg": 0,    "elevation_deg": 0},
+    "top":    {"azimuth_deg": 0,    "elevation_deg": 89.9},
+    "left":   {"azimuth_deg": 90,   "elevation_deg": 0},
+    "iso_1":  {"azimuth_deg": 45,   "elevation_deg": 30},
+}
 
 
 def write_comparison_grid(assembly: ada.Assembly) -> None:
@@ -81,10 +92,7 @@ def write_comparison_grid(assembly: ada.Assembly) -> None:
     — same dispatch the figure-sources block sugar uses, so a drift
     seen here is a drift the doc would render anyway.
     """
-    from paradoc.camera.presets import BUILTIN_PRESETS
-
-    for preset_name in _COMPARISON_PRESETS:
-        preset = BUILTIN_PRESETS[preset_name].model_dump()
+    for preset_name, preset in _COMPARISON_PRESETS.items():
         for backend in ("pygfx", "chromium"):
             dest = OUT_DIR / f"beam_{preset_name}_{backend}.png"
             try:
