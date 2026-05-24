@@ -419,6 +419,20 @@ class OneDoc:
             if fp.suffix.lower() in (".yaml", ".py", ".db"):
                 continue
 
+            # Python bytecode caches: ``__pycache__/*.pyc`` and stray
+            # ``.pyo`` files from local ``populate_*.py`` runs. ``.py``
+            # is filtered above; ``.pyc`` slipped through because the
+            # suffix doesn't match. Same idea for OS-level junk
+            # (``.DS_Store`` on macOS, ``Thumbs.db`` on Windows) and
+            # any dotfile. None of these belong in the published bundle.
+            rel = fp.relative_to(self.source_dir)
+            if any(part == "__pycache__" or part.startswith(".") for part in rel.parts):
+                continue
+            if fp.suffix.lower() in (".pyc", ".pyo"):
+                continue
+            if fp.name in ("Thumbs.db",):
+                continue
+
             rel_path = fp.relative_to(self.source_dir)
             # Preserve relative structure; if there is only one segment, keep it
             rel_without_first = pathlib.Path(*rel_path.parts[1:]) if len(rel_path.parts) > 1 else rel_path
@@ -1262,6 +1276,25 @@ class OneDoc:
             )
         except Exception as exc:
             logger.error(f"failed to populate <bundle>/static/: {exc}")
+
+        # Drop the static export's binary mirror of ``assets/`` —
+        # ``_export_three_d_assets_for_static`` copies every GLB +
+        # poster + FEA artefact under ``<output>/assets/3d/`` because
+        # standalone static bundles (no server) need them right there.
+        # In the REST layout the binaries already live at
+        # ``<bundle>/assets/3d/`` and the REST docstore resolves them
+        # from there (``DbManager.glb_path`` is bundle-relative).
+        # Keeping the mirror would 2x the S3 footprint and clutter
+        # ``/api/docs/{id}/manifest/files`` with phantom duplicates.
+        # The JSON manifests under ``static/`` (sections / plots /
+        # tables / images / manifest.json) are kept — those ARE what
+        # the REST server reads.
+        try:
+            static_assets = bundle_root / "static" / "assets"
+            if static_assets.exists():
+                shutil.rmtree(static_assets)
+        except Exception as exc:
+            logger.warning(f"failed to scrub <bundle>/static/assets/: {exc}")
 
     def _discover_filters_once(self) -> None:
         if self._filters_discovered:

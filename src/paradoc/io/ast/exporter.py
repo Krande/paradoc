@@ -1093,7 +1093,9 @@ class ASTExporter:
             # fetch — see plan/v1/notes_frontend_render_pipelines.md.
             image_mapping: Dict[str, str] = {}
             if embed_images:
-                image_mapping = self._export_images_for_static(output_dir, sections)
+                image_mapping = self._export_images_for_static(
+                    output_dir, sections, copy_relative=include_frontend,
+                )
 
             # Write section bundles (with rewritten image srcs).
             for bundle in sections:
@@ -1121,15 +1123,22 @@ class ASTExporter:
                 tables_path.write_text(json.dumps(table_data_dict, ensure_ascii=False, indent=2), encoding="utf-8")
                 logger.info(f"Wrote {len(table_data_dict)} tables to {tables_path}")
 
-            # Copy 3D assets + metadata. WS/REST docstore modes serve these
-            # via the server API; static-web has no server, so we ship the
-            # GLBs alongside the JSON and let the frontend fetch by URL.
-            self._export_three_d_assets_for_static(output_dir)
-
-            # Camera presets. ThreeDRenderer fetches `assets/presets.json`
-            # on mount; without it the renderer falls back to a single
-            # hardcoded `iso_3` and the canvas can't frame the model.
-            self._export_presets_for_static(output_dir)
+            # 3D metadata is always emitted (above as three_d.json); the
+            # binary GLBs + posters + FEA artefacts only need to live next
+            # to ``output_dir`` when the SPA is *also* in ``output_dir``
+            # (standalone static bundles, ``include_frontend=True``).
+            # When ``include_frontend=False`` the caller is a REST host
+            # mounting this as ``<bundle>/static/`` — the binaries are
+            # already at ``<bundle>/assets/3d/`` from the bundle's main
+            # build path and the docstore serves them from there
+            # (``DbManager.glb_path`` is bundle-relative). Mirroring under
+            # ``static/assets/`` would double S3 footprint and surface
+            # phantom duplicates in ``/api/docs/{id}/manifest/files``.
+            # Same logic for camera presets — ``assets/presets.json``
+            # already lives at bundle root, no need for a second copy.
+            if include_frontend:
+                self._export_three_d_assets_for_static(output_dir)
+                self._export_presets_for_static(output_dir)
 
             # Copy frontend files if requested
             if include_frontend:
@@ -1237,7 +1246,11 @@ class ASTExporter:
             logger.warning(f"Failed to export presets.json: {exc}")
 
     def _export_images_for_static(
-        self, output_dir: pathlib.Path, sections: List[Dict[str, Any]]
+        self,
+        output_dir: pathlib.Path,
+        sections: List[Dict[str, Any]],
+        *,
+        copy_relative: bool = True,
     ) -> Dict[str, str]:
         """Copy referenced image files into the static bundle.
 
@@ -1333,6 +1346,18 @@ class ASTExporter:
                 output_relpath = normalized
 
             mapping[img_src] = output_relpath
+
+            # ``copy_relative=False`` is the REST-bundle case: relative
+            # markdown refs already line up with files on disk at
+            # ``<bundle>/<rel>`` (copied there by ``_prep_compilation``).
+            # Copying them into ``<bundle>/static/<rel>`` would double
+            # the bundle size and clutter the
+            # ``/api/docs/{id}/manifest/files`` payload with phantom
+            # duplicates the REST docstore never reads. Absolute paths
+            # still need the copy — they're flattened into ``_images/``
+            # and exist nowhere else in the bundle.
+            if not copy_relative and not normalized.startswith("/"):
+                continue
 
             dest = output_dir / output_relpath
             dest.parent.mkdir(parents=True, exist_ok=True)
