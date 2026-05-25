@@ -1,15 +1,34 @@
-"""Task primitives — placeholder for Phase 9 (real runner).
+"""Task primitives — the declarative side of paradoc's build system.
 
-The plan calls out a follow-up PR to integrate pixi-tasks (or a similar
-input/output-hashing runner). This module ships the *type surface* for
-that work so other code (Filter.task, FEAModelResults.task_id) can
-reference it today without binding to an implementation.
+Scaffolding scope: this module ships the @task decorator + registry +
+discovery so authors can write `<doc>/tasks.py` and have it loaded by
+paradoc. The runner that turns a validated registry into actual cell
+execution (with cache, fanout expansion, subprocess marshaling, env
+selection) lives in the next phase.
 
-The Task object today is purely declarative: declaring `inputs`,
-`outputs`, `env_lock`, and `solver_version` is enough to plan the cache
-key. The runner that actually executes tasks lives in a follow-up PR.
+The legacy file-centric `Task` BaseModel is preserved under
+`LegacyTaskSpec` (and aliased as `Task` for backwards compat) until
+`Filter.task` and `FEAModelResults.task_id` migrate to `TaskHandle`.
 """
 
-from .models import Task
+from .decorator import is_task, task
+from .discovery import discover_tasks
+from .models import LegacyTaskSpec, Task, TaskFn, TaskHandle
+from .registry import (
+    TaskRegistry,
+    get_default_registry,
+    reset_default_registry,
+)
 
-__all__ = ["Task"]
+__all__ = [
+    "task",
+    "is_task",
+    "discover_tasks",
+    "TaskFn",
+    "TaskHandle",
+    "TaskRegistry",
+    "get_default_registry",
+    "reset_default_registry",
+    "LegacyTaskSpec",
+    "Task",
+]
