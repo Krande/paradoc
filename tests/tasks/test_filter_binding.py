@@ -179,6 +179,32 @@ def test_bound_filter_filter_coords():
     assert result == {"v": 1, "geom_repr": "solid", "elem_order": 2}
 
 
+def test_handle_results_returns_executed_cell_outputs():
+    reg, *_ = _build_registry()
+    runner = Runner(reg)
+    runner.run()
+
+    freg = FilterRegistry()
+    freg.register(_MeshFilter(name="m", task=TaskHandle.unbound("mesh")))
+    bind_filter_handles(freg, runner)
+
+    handle = freg.get("m").task
+    # All 4 mesh cells produced a result dict; filter coords narrow it.
+    all_results = handle.results()
+    assert len(all_results) == 4
+    assert all("geom_repr" in r for r in all_results)
+
+    solid_o2 = handle.results(geom_repr="solid", elem_order=2)
+    assert len(solid_o2) == 1
+    assert solid_o2[0] == {"v": 1, "geom_repr": "solid", "elem_order": 2}
+
+
+def test_handle_results_unbound_raises():
+    h = TaskHandle.unbound("nope")
+    with pytest.raises(RuntimeError, match="unbound"):
+        h.results()
+
+
 # ---------------- Runner.cells_for tolerates bare names ----------------
 
 

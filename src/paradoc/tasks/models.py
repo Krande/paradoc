@@ -132,6 +132,22 @@ class TaskHandle:
             )
         return self._runner.cells_for(self.qualname, **filter_coords)
 
+    def results(self, **filter_coords: Any) -> "list[Any]":
+        """Return the executed cell results matching filter_coords.
+
+        Convenience wrapper over `cells(...)` + `runner.result_for(...)`.
+        Filter `@attr` methods typically want results, not Cell objects;
+        this saves the back-channel access through the runner. Cells
+        without a recorded result (eg before `runner.run()` finished)
+        raise KeyError — the message points at the missing run() call.
+        """
+        if self._runner is None:
+            raise RuntimeError(
+                f"TaskHandle({self.qualname!r}) is unbound; "
+                f"the Runner must bind it before results() is callable."
+            )
+        return [self._runner.result_for(c) for c in self.cells(**filter_coords)]
+
     @classmethod
     def unbound(cls, qualname: str) -> "TaskHandle":
         """Create a handle without a runner; the resolver binds it later."""
