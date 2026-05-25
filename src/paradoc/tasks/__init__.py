@@ -39,6 +39,7 @@ from .registry import (
     reset_default_registry,
 )
 from .runner import Runner
+from .serializers import PickleSerializer, Serializer
 from .source_hash import ast_source_hash
 
 __all__ = [
@@ -73,4 +74,6 @@ __all__ = [
     "CacheKey",
     "compute_cache_key",
     "ast_source_hash",
+    "Serializer",
+    "PickleSerializer",
 ]

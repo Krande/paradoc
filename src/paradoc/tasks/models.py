@@ -55,7 +55,8 @@ class TaskFn:
 
     Holds the original function plus everything the runner needs to plan
     a DAG execution: parent reference, fanout matrix, env alias, skip
-    predicate, version-probe callable, explicit depends_on.
+    predicate, version-probe callable, explicit depends_on, optional
+    serializer for the cache layer.
 
     Created by `@task(...)`; collected by the registry as the module is
     imported. The runner (next phase) walks the registry, expands fanout,
@@ -70,6 +71,11 @@ class TaskFn:
     skip_if: Optional[Callable[..., bool]] = None
     version_probe: Optional[Callable[[dict[str, Any]], str]] = None
     depends_on: list[Callable[..., Any]] = field(default_factory=list)
+    serializer: Optional[Any] = None
+    """Optional `Serializer` (Protocol from `paradoc.tasks.serializers`).
+    When set, the runner uses it instead of the cache's default for this
+    task's cell results. Useful for tasks producing large object graphs
+    where pickle is too expensive."""
 
     @property
     def qualname(self) -> str:

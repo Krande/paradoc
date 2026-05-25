@@ -26,18 +26,16 @@ What's deliberately deferred (per Q4 hard cuts):
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import json
 import logging
-import pickle
-import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
 from .models import TaskFn
+from .serializers import PickleSerializer, Serializer
 from .source_hash import ast_source_hash
 
 logger = logging.getLogger(__name__)
@@ -129,27 +127,38 @@ class CacheEntry:
 
 
 class TaskCache:
-    """On-disk pickle cache, keyed by `<qualname>/<hex_digest>`."""
+    """On-disk cache, keyed by `<qualname>/<hex_digest>.<serializer.ext>`.
 
-    def __init__(self, cache_dir: Path) -> None:
+    Per-cell I/O is delegated to a `Serializer` — by default a
+    `PickleSerializer`. Tasks declaring `@task(serializer=...)` override
+    per cell; the runner threads their serializer through `has` / `get`
+    / `put` so each cell uses the right format.
+
+    File-layout consequence: a task that switches serializers gets a
+    fresh cache miss because the old extension's file doesn't match
+    the new serializer's `.extension`. The orphaned old file remains
+    on disk until manually cleared.
+    """
+
+    def __init__(self, cache_dir: Path, *, default_serializer: Optional[Serializer] = None) -> None:
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.default_serializer: Serializer = default_serializer or PickleSerializer()
 
-    def _pkl_path(self, key: CacheKey) -> Path:
-        return self.cache_dir / key.qualname / f"{key.hex}.pkl"
+    def _payload_path(self, key: CacheKey, serializer: Serializer) -> Path:
+        return self.cache_dir / key.qualname / f"{key.hex}.{serializer.extension}"
 
     def _meta_path(self, key: CacheKey) -> Path:
         return self.cache_dir / key.qualname / f"{key.hex}.meta"
 
-    def has(self, key: CacheKey) -> bool:
-        return self._pkl_path(key).exists()
+    def has(self, key: CacheKey, *, serializer: Optional[Serializer] = None) -> bool:
+        s = serializer or self.default_serializer
+        return self._payload_path(key, s).exists()
 
-    def get(self, key: CacheKey) -> Any:
+    def get(self, key: CacheKey, *, serializer: Optional[Serializer] = None) -> Any:
         """Load a cached result. Raises FileNotFoundError on miss."""
-        path = self._pkl_path(key)
-        with path.open("rb") as fh:
-            with _bumped_recursion_limit(50_000):
-                return pickle.load(fh)
+        s = serializer or self.default_serializer
+        return s.load(self._payload_path(key, s))
 
     def put(
         self,
@@ -159,33 +168,29 @@ class TaskCache:
         kwargs: Optional[dict[str, Any]] = None,
         parent_key: Optional[CacheKey] = None,
         version_probe: Optional[str] = None,
+        serializer: Optional[Serializer] = None,
     ) -> None:
-        """Write a result + sidecar metadata atomically (write-then-rename)."""
+        """Write a result + sidecar metadata. Serializer handles atomicity."""
+        s = serializer or self.default_serializer
         task_dir = self.cache_dir / key.qualname
         task_dir.mkdir(parents=True, exist_ok=True)
 
-        pkl = self._pkl_path(key)
-        meta = self._meta_path(key)
+        s.dump(result, self._payload_path(key, s))
 
-        tmp_pkl = pkl.with_suffix(".pkl.tmp")
-        tmp_meta = meta.with_suffix(".meta.tmp")
-
-        with tmp_pkl.open("wb") as fh:
-            with _bumped_recursion_limit(50_000):
-                pickle.dump(result, fh, protocol=pickle.HIGHEST_PROTOCOL)
         meta_doc = {
             "qualname": key.qualname,
             "hex": key.hex,
             "kwargs": _meta_safe(kwargs or {}),
             "parent_hex": parent_key.hex if parent_key else None,
             "version_probe": version_probe,
+            "serializer": type(s).__name__,
+            "extension": s.extension,
             "timestamp": time.time(),
         }
+        meta = self._meta_path(key)
+        tmp_meta = meta.with_suffix(".meta.tmp")
         with tmp_meta.open("w") as fh:
             json.dump(meta_doc, fh, indent=2, default=str)
-
-        # Atomic publish — readers never see a half-written .pkl.
-        tmp_pkl.replace(pkl)
         tmp_meta.replace(meta)
 
     def clear(self) -> None:
@@ -198,24 +203,6 @@ class TaskCache:
         for child in sorted(self.cache_dir.rglob("*"), reverse=True):
             if child.is_dir():
                 child.rmdir()
-
-
-@contextlib.contextmanager
-def _bumped_recursion_limit(target: int):
-    """Bump sys.recursionlimit for the duration of a pickle round-trip.
-
-    Mesh-rich Assembly graphs (eg adapy's 8k-node verification mesh)
-    blow past Python's default 1000-frame limit during the recursive
-    __reduce__ traversal. The bump is contained to the with-block so
-    nothing else in the process sees the elevated limit.
-    """
-    old = sys.getrecursionlimit()
-    if target > old:
-        sys.setrecursionlimit(target)
-    try:
-        yield
-    finally:
-        sys.setrecursionlimit(old)
 
 
 def _meta_safe(d: dict[str, Any]) -> dict[str, Any]:

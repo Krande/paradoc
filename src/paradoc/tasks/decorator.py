@@ -48,6 +48,7 @@ def task(  # @task(...)
     skip_if: Optional[Callable[..., bool]] = None,
     version_probe: Optional[Callable[[dict[str, Any]], str]] = None,
     depends_on: Optional[list[Callable[..., Any]]] = None,
+    serializer: Optional[Any] = None,
 ) -> Callable[[Callable[..., Any]], TaskFn]: ...
 
 
@@ -62,6 +63,7 @@ def task(  # type: ignore[misc]
     skip_if: Optional[Callable[..., bool]] = None,
     version_probe: Optional[Callable[[dict[str, Any]], str]] = None,
     depends_on: Optional[list[Callable[..., Any]]] = None,
+    serializer: Optional[Any] = None,
 ):
     """Mark a callable as a paradoc task. See module docstring for usage."""
 
@@ -75,6 +77,7 @@ def task(  # type: ignore[misc]
             skip_if=skip_if,
             version_probe=version_probe,
             depends_on=depends_on or [],
+            serializer=serializer,
         )
         # functools.wraps copies __name__, __doc__, __module__, etc. onto
         # the TaskFn so introspection (and the qualname property) behaves

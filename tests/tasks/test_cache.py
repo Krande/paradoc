@@ -338,6 +338,120 @@ def test_cached_result_short_circuits_executor(tmp_path: Path):
     Runner(reg, executor=_ExplodingExecutor(), cache=cache).run()
 
 
+def test_serializer_protocol_runtime_check():
+    """`Serializer` is a runtime_checkable Protocol — duck-typing works."""
+    from paradoc.tasks import PickleSerializer, Serializer
+
+    assert isinstance(PickleSerializer(), Serializer)
+
+    class _Custom:
+        extension = "bin"
+
+        def dump(self, obj, path):
+            pass
+
+        def load(self, path):
+            return None
+
+    assert isinstance(_Custom(), Serializer)
+
+
+def test_pickle_serializer_round_trip(tmp_path: Path):
+    from paradoc.tasks import PickleSerializer
+
+    s = PickleSerializer()
+    path = tmp_path / "blob.pkl"
+    s.dump({"a": 1, "b": [2, 3]}, path)
+    assert s.load(path) == {"a": 1, "b": [2, 3]}
+
+
+def test_pickle_serializer_atomic_publish(tmp_path: Path):
+    """No `.tmp` file should remain after dump completes."""
+    from paradoc.tasks import PickleSerializer
+
+    PickleSerializer().dump("hi", tmp_path / "out.pkl")
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_cache_uses_task_serializer_for_extension(tmp_path: Path):
+    """A task declaring serializer=... routes its cell results
+    through that serializer's extension."""
+    from paradoc.tasks import (
+        Cell,
+        CacheKey,
+        TaskCache,
+        TaskFn,
+        compute_cache_key,
+    )
+
+    captures: list = []
+
+    class _Recording:
+        extension = "myext"
+
+        def dump(self, obj, path):
+            captures.append(("dump", path, obj))
+            path.write_bytes(b"sentinel")
+
+        def load(self, path):
+            captures.append(("load", path))
+            return "from-recording"
+
+    def _design():
+        return None
+
+    tfn = TaskFn(fn=_design, name="design", serializer=_Recording())
+    tfn.fn.__module__ = "test_cache"
+
+    cache = TaskCache(tmp_path)
+    key = compute_cache_key(tfn, {})
+    assert cache.has(key, serializer=tfn.serializer) is False
+
+    cache.put(key, "result-payload", serializer=tfn.serializer)
+    # File written with the custom extension.
+    assert (tmp_path / key.qualname / f"{key.hex}.myext").exists()
+    # Meta sidecar records the serializer.
+    import json as _json
+
+    meta = _json.loads((tmp_path / key.qualname / f"{key.hex}.meta").read_text())
+    assert meta["serializer"] == "_Recording"
+    assert meta["extension"] == "myext"
+
+    assert cache.has(key, serializer=tfn.serializer) is True
+    assert cache.get(key, serializer=tfn.serializer) == "from-recording"
+    # _Recording's dump + load were both invoked.
+    assert any(c[0] == "dump" for c in captures)
+    assert any(c[0] == "load" for c in captures)
+
+
+def test_runner_threads_per_task_serializer(tmp_path: Path):
+    """End-to-end: a task with `serializer=` writes/loads through it."""
+    from paradoc.tasks import Runner, TaskCache, TaskRegistry
+
+    class _Tag:
+        extension = "tag"
+
+        def dump(self, obj, path):
+            path.write_bytes(b"TAG:" + str(obj).encode())
+
+        def load(self, path):
+            return path.read_bytes()
+
+    @task(serializer=_Tag())
+    def tagged_design():
+        return 42
+
+    reg = TaskRegistry()
+    reg.register(tagged_design)
+    cache = TaskCache(tmp_path)
+
+    Runner(reg, cache=cache).run()
+
+    # The on-disk extension reflects the task's serializer.
+    pkls = list(tmp_path.rglob("*.tag"))
+    assert len(pkls) == 1, list(tmp_path.rglob("*"))
+
+
 def test_runner_without_cache_skips_key_construction(tmp_path: Path):
     """No cache wired -> Runner must not compute keys (which would call
     inspect.getsource on every task)."""

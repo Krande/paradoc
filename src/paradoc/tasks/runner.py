@@ -168,8 +168,9 @@ class Runner:
                         ast_hash_memo=self._ast_hash_memo,
                     )
                     self._cache_keys[id(cell)] = key
-                    if self.cache.has(key):
-                        self._results[id(cell)] = self.cache.get(key)
+                    serializer = cell.task.serializer  # None => cache default
+                    if self.cache.has(key, serializer=serializer):
+                        self._results[id(cell)] = self.cache.get(key, serializer=serializer)
                         self.cache_hits += 1
                         logger.debug(f"cache hit  {key!r}")
                         continue
@@ -196,6 +197,7 @@ class Runner:
                         kwargs=cell.kwargs,
                         parent_key=parent_key,
                         version_probe=version_probe_val,
+                        serializer=cell.task.serializer,
                     )
         self._ran = True
         return {
