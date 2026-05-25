@@ -69,41 +69,65 @@ class TaskRegistry:
         Returns None if the task has no parent. Raises KeyError if the
         parent is a string that doesn't match any registered task.
         """
-        parent = task.parent
-        if parent is None:
+        return self._resolve_ref(task, task.parent, kind="parent")
+
+    def resolve_consumes(self, task: TaskFn) -> Optional[TaskFn]:
+        """Resolve `task.consumes` to a concrete upstream TaskFn.
+
+        Returns None for non-aggregator tasks. Raises KeyError when
+        the upstream reference doesn't match any registered task.
+        """
+        return self._resolve_ref(task, task.consumes, kind="consumes")
+
+    def resolve_dependency(self, task: TaskFn) -> Optional[TaskFn]:
+        """Resolve whichever upstream edge `task` declared (parent OR consumes).
+
+        Used by the topo sort and the DAG executor — both treat
+        `consumes` as an upstream edge of the same shape as `parent`,
+        just with N:1 cardinality at the cell level.
+        """
+        return self.resolve_consumes(task) or self.resolve_parent(task)
+
+    def _resolve_ref(
+        self,
+        task: TaskFn,
+        ref: Optional[Any],
+        *,
+        kind: str,
+    ) -> Optional[TaskFn]:
+        if ref is None:
             return None
-        if isinstance(parent, TaskFn):
-            return parent
-        if isinstance(parent, str):
-            # Try qualname first, then bare name.
-            if parent in self._tasks:
-                return self._tasks[parent]
+        if isinstance(ref, TaskFn):
+            return ref
+        if isinstance(ref, str):
+            if ref in self._tasks:
+                return self._tasks[ref]
             for t in self._tasks.values():
-                if t.name == parent:
+                if t.name == ref:
                     return t
             raise KeyError(
-                f"Task {task.qualname!r} declares parent={parent!r} "
+                f"Task {task.qualname!r} declares {kind}={ref!r} "
                 f"but no task with that name is registered. "
                 f"Known: {self.known_qualnames()!r}"
             )
-        # Some other callable — assume the caller knows what they're doing
-        # (e.g. a directly-imported TaskFn from another module).
-        return parent  # type: ignore[return-value]
+        return ref  # type: ignore[return-value]
 
     def validate(self) -> None:
-        """Check structural invariants: parent refs resolve, no cycles.
+        """Check structural invariants: parent/consumes refs resolve, no cycles.
 
         Called by the discovery loader after every task module has been
-        imported. The runner (next phase) assumes a validated registry.
+        imported. The runner assumes a validated registry.
         """
-        # Resolve all parents — KeyError on unknown strings.
+        # Resolve all parents + consumes refs — KeyError on unknown strings.
         for t in self.all_tasks():
             self.resolve_parent(t)
+            self.resolve_consumes(t)
 
-        # Cycle detection (Kahn-style).
+        # Cycle detection (Kahn-style). `consumes` and `parent` are
+        # both upstream edges; either one counts.
         deps: dict[str, set[str]] = {}
         for t in self.all_tasks():
-            p = self.resolve_parent(t)
+            p = self.resolve_dependency(t)
             deps[t.qualname] = {p.qualname} if isinstance(p, TaskFn) else set()
 
         # All names with no deps left.

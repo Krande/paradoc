@@ -66,6 +66,19 @@ class TaskFn:
     fn: Callable[..., Any]
     name: str
     parent: Union[Callable[..., Any], str, None] = None
+    consumes: Union[Callable[..., Any], str, None] = None
+    """N:1 dependency on every cell of an upstream task. The body's first
+    positional arg is the list of upstream cell results (Nones filtered
+    out by the runner). Mutually exclusive with `parent`; for v0 also
+    mutually exclusive with `fanout`.
+
+    Use case: comparison tables / aggregate plots that fold over a
+    fanout matrix of upstream runs. E.g.::
+
+        @task(consumes="run_eig")
+        def eig_compare_solid_o1(results):
+            return TableOutcome(...)
+    """
     fanout: dict[str, list[Any]] = field(default_factory=dict)
     env: Union[str, Callable[[dict[str, Any]], str], None] = None
     skip_if: Optional[Callable[..., bool]] = None

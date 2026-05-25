@@ -65,9 +65,22 @@ def compute_cache_key(
     kwargs: dict[str, Any],
     *,
     parent_key: Optional[CacheKey] = None,
+    upstream_keys: Optional[list[CacheKey]] = None,
     ast_hash_memo: Optional[dict[int, bytes]] = None,
 ) -> CacheKey:
     """Construct a stable cache key for a single cell.
+
+    `parent_key` applies to regular (1:1 / 1:N) tasks: the parent cell's
+    own cache key folds in so a parent change invalidates the child.
+
+    `upstream_keys` applies to aggregator (`consumes=`) tasks: the list
+    of every upstream cell's cache key folds in *sorted* so the order
+    in which the runner iterated cells doesn't affect the digest. Any
+    change to any upstream cell invalidates the aggregator.
+
+    A cell has either `parent_key` or `upstream_keys`, never both —
+    these are the two shapes of "upstream dependency" and `@task`
+    validates that they're mutually exclusive at decoration time.
 
     `ast_hash_memo` is an optional dict the runner passes in to avoid
     re-hashing the same TaskFn across many fanout cells. The per-task
@@ -99,6 +112,11 @@ def compute_cache_key(
 
     if parent_key is not None:
         h.update(parent_key.digest)
+
+    if upstream_keys:
+        # Sort by digest so cell-iteration order doesn't affect the hash.
+        for uk in sorted(upstream_keys, key=lambda k: k.digest):
+            h.update(uk.digest)
 
     return CacheKey(qualname=task.qualname, digest=h.digest())
 

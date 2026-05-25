@@ -27,11 +27,19 @@ from .models import TaskFn
 
 @dataclass
 class Cell:
-    """One fanout instance of a task."""
+    """One fanout instance of a task.
+
+    `parent` is set for 1:1 / 1:N tasks (`@task(parent=...)`).
+    `upstream` is set for aggregator tasks (`@task(consumes=...)`):
+    the list of every cell of the consumed upstream task. The two
+    fields are mutually exclusive — a cell has either a single parent
+    or an aggregator's upstream list, never both.
+    """
 
     task: TaskFn
     kwargs: dict[str, Any] = field(default_factory=dict)
     parent: Optional["Cell"] = None
+    upstream: list["Cell"] = field(default_factory=list)
 
     @property
     def task_qualname(self) -> str:

@@ -43,6 +43,7 @@ def task(  # @task(...)
     *,
     name: Optional[str] = None,
     parent: Union[Callable[..., Any], str, None] = None,
+    consumes: Union[Callable[..., Any], str, None] = None,
     fanout: Optional[dict[str, list[Any]]] = None,
     env: Union[str, Callable[[dict[str, Any]], str], None] = None,
     skip_if: Optional[Callable[..., bool]] = None,
@@ -58,6 +59,7 @@ def task(  # type: ignore[misc]
     *,
     name: Optional[str] = None,
     parent: Union[Callable[..., Any], str, None] = None,
+    consumes: Union[Callable[..., Any], str, None] = None,
     fanout: Optional[dict[str, list[Any]]] = None,
     env: Union[str, Callable[[dict[str, Any]], str], None] = None,
     skip_if: Optional[Callable[..., bool]] = None,
@@ -68,10 +70,25 @@ def task(  # type: ignore[misc]
     """Mark a callable as a paradoc task. See module docstring for usage."""
 
     def decorate(target: Callable[..., Any]) -> TaskFn:
+        if consumes is not None and parent is not None:
+            raise ValueError(
+                f"@task on {target.__name__}: `parent=` and `consumes=` are "
+                "mutually exclusive (a task depends on a single parent OR "
+                "aggregates over an upstream task, not both)."
+            )
+        if consumes is not None and fanout:
+            raise ValueError(
+                f"@task on {target.__name__}: `consumes=` and `fanout=` are "
+                "mutually exclusive in v0 (an aggregator task has one cell). "
+                "If you need per-axis aggregation, declare multiple "
+                "aggregator tasks each filtering the upstream list."
+            )
+
         task_fn = TaskFn(
             fn=target,
             name=name or target.__name__,
             parent=parent,
+            consumes=consumes,
             fanout=fanout or {},
             env=env,
             skip_if=skip_if,

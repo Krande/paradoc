@@ -79,13 +79,20 @@ class Runner:
             return
         self.registry.validate()
         for task in self._topo_sorted():
-            parent_task = self.registry.resolve_parent(task)
-            parent_cells: list[Optional[Cell]]
-            if parent_task is None:
-                parent_cells = []
+            if task.consumes is not None:
+                upstream_task = self.registry.resolve_consumes(task)
+                upstream_cells = list(self._cells_by_task.get(upstream_task.qualname, []))
+                self._cells_by_task[task.qualname] = self._aggregator_cells_for_task(
+                    task, upstream_cells
+                )
             else:
-                parent_cells = list(self._cells_by_task.get(parent_task.qualname, []))
-            self._cells_by_task[task.qualname] = self._cells_for_task(task, parent_cells)
+                parent_task = self.registry.resolve_parent(task)
+                parent_cells: list[Optional[Cell]]
+                if parent_task is None:
+                    parent_cells = []
+                else:
+                    parent_cells = list(self._cells_by_task.get(parent_task.qualname, []))
+                self._cells_by_task[task.qualname] = self._cells_for_task(task, parent_cells)
         self._expanded = True
 
     def _cells_for_task(self, task: TaskFn, parent_cells: list[Optional[Cell]]) -> list[Cell]:
@@ -109,6 +116,29 @@ class Runner:
                     continue
                 cells.append(candidate)
         return cells
+
+    def _aggregator_cells_for_task(self, task: TaskFn, upstream_cells: list[Cell]) -> list[Cell]:
+        """Build the single cell for an aggregator task.
+
+        `consumes` and `fanout` are mutually exclusive in v0 (validated at
+        decoration time), so an aggregator always produces exactly one
+        cell. skip_if is honored too — when the upstream task produced
+        zero cells, the aggregator can opt out cleanly via
+        `skip_if=lambda upstream: not upstream` if that's the right
+        semantic for its body.
+        """
+        candidate = Cell(task=task, kwargs={}, upstream=list(upstream_cells))
+        if task.skip_if is not None:
+            # Aggregator skip predicates take the upstream list, not kwargs.
+            try:
+                should_skip = task.skip_if(upstream_cells)
+            except TypeError:
+                # Fall back to no-args predicate for symmetry with regular
+                # tasks that use skip_if=lambda **kw: ...
+                should_skip = task.skip_if(**candidate.full_kwargs)
+            if should_skip:
+                return []
+        return [candidate]
 
     def cells_for(self, task: TaskFn | str, **filter_coords: Any) -> list[Cell]:
         """Return cells of `task` whose kwargs match all `filter_coords`.
@@ -154,17 +184,36 @@ class Runner:
         self.expand()
         for task in self._topo_sorted():
             for cell in self._cells_by_task[task.qualname]:
-                parent_result = (
-                    self._results.get(id(cell.parent)) if cell.parent is not None else None
-                )
+                # Resolve the body's first-positional input:
+                # - aggregator: list of upstream results, Nones filtered out
+                # - regular task with a parent: single result (or None)
+                # - root task: None
+                if cell.upstream:
+                    upstream_results = [
+                        self._results[id(uc)]
+                        for uc in cell.upstream
+                        if id(uc) in self._results
+                    ]
+                    parent_result: Any = [r for r in upstream_results if r is not None]
+                else:
+                    parent_result = (
+                        self._results.get(id(cell.parent)) if cell.parent is not None else None
+                    )
+
                 if self.cache is not None:
                     parent_key = (
                         self._cache_keys.get(id(cell.parent)) if cell.parent is not None else None
+                    )
+                    upstream_keys = (
+                        [self._cache_keys[id(uc)] for uc in cell.upstream if id(uc) in self._cache_keys]
+                        if cell.upstream
+                        else None
                     )
                     key = compute_cache_key(
                         cell.task,
                         cell.kwargs,
                         parent_key=parent_key,
+                        upstream_keys=upstream_keys,
                         ast_hash_memo=self._ast_hash_memo,
                     )
                     self._cache_keys[id(cell)] = key
@@ -219,12 +268,16 @@ class Runner:
     # ---------------- helpers ----------------
 
     def _topo_sorted(self) -> list[TaskFn]:
-        """Tasks ordered so every task's parent appears earlier in the list."""
+        """Tasks ordered so every upstream dep appears earlier in the list.
+
+        Upstream = `parent` OR `consumes` (whichever the task declared;
+        they're mutually exclusive).
+        """
         tasks = self.registry.all_tasks()
-        # Build adjacency: child -> parent qualname.
+        # Build adjacency: child -> upstream qualname (parent or consumes).
         parent_of: dict[str, Optional[str]] = {}
         for t in tasks:
-            p = self.registry.resolve_parent(t)
+            p = self.registry.resolve_dependency(t)
             parent_of[t.qualname] = p.qualname if p else None
 
         # Kahn's algorithm: roots first, then anyone whose parent is
