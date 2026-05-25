@@ -153,13 +153,21 @@ def build_document(
         # Resolve output formats:
         # 1. Explicit `export_format=` from the caller wins.
         # 2. Else use `[build.<profile>] outputs = [...]` from paradoc.toml.
-        # 3. Else fall through to OneDoc.compile()'s default (DOCX).
+        # 3. Else SKIP `one.compile()` entirely.
+        #
+        # Rationale for (3): a doc that doesn't declare any outputs in
+        # paradoc.toml typically only wants a static web bundle, which
+        # `postcompile(one).export_static(...)` produces directly. The
+        # legacy "default to DOCX" fallback was forcing a pandoc/docx
+        # roundtrip for users who didn't want one — particularly nasty
+        # for the verification report whose markdown trips the docx
+        # reference helper.
         if export_format is not None:
             formats: list[Any] = [export_format]
         elif config.outputs:
             formats = list(config.outputs)
         else:
-            formats = [None]
+            formats = []
 
         for fmt in formats:
             compile_kwargs: dict[str, Any] = {"auto_open": auto_open}

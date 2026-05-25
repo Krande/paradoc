@@ -132,26 +132,52 @@ def build(
             typer.secho("(--inspect: skipping execution)", fg=typer.colors.CYAN)
             return
 
-        results = runner.run()
-        _print_run_summary(runner, results)
+        if no_compile:
+            # Run without compile to keep the legacy --no-compile path
+            # working (used by tests scaffolding tasks-only docs).
+            results = runner.run()
+            _print_run_summary(runner, results)
+            if bind_filters:
+                _bind_filters(doc_root, runner)
+            return
 
-        if bind_filters:
-            _bind_filters(doc_root, runner)
-
-        if not no_compile:
-            _compile_with_runner(
-                doc_root,
-                runner,
-                output_name=output_name,
-                work_dir=work_dir,
-                auto_open=auto_open,
-                outputs=config.outputs,
-            )
-    finally:
+        # Full path: delegate to the orchestrator, which threads
+        # source_dir / filter discovery / build_hooks / multi-output
+        # compile end-to-end. The orchestrator constructs its own
+        # runner from the same registry+cache+executor we have here;
+        # the redundant DAG-expand is cheap (it's the actual cell
+        # execution that's costly, and the cache short-circuits that).
         runner.shutdown()
+        from .orchestrator import build_document
+
+        typer.echo("delegating to build_document for compile + hooks...")
+        new_runner, one = build_document(
+            doc_root,
+            profile=profile,
+            output_name=output_name,
+            no_cache=no_cache,
+            cache_dir=cache_dir,
+            work_dir=work_dir,
+            auto_open=auto_open,
+        )
+        typer.echo(
+            f"runner: {new_runner.cache_hits} cache hit"
+            f"{'s' if new_runner.cache_hits != 1 else ''}, "
+            f"{new_runner.cache_misses} miss"
+            f"{'es' if new_runner.cache_misses != 1 else ''}"
+        )
+        if one is not None:
+            typer.secho("compile: done", fg=typer.colors.GREEN)
+        new_runner.shutdown()
+        return
+    finally:
+        try:
+            runner.shutdown()
+        except Exception:  # noqa: BLE001
+            pass
 
 
-def _compile_with_runner(
+def _compile_with_runner(  # kept for any external imports that referenced it
     doc_root: Path,
     runner: Runner,
     *,
@@ -160,11 +186,11 @@ def _compile_with_runner(
     auto_open: bool,
     outputs: list,
 ) -> None:
-    """Hand the populated runner to OneDoc and compile.
+    """Deprecated thin shim; the CLI now delegates to build_document.
 
-    OneDoc's `_discover_filters_once` does the filter discovery +
-    TaskHandle binding intrinsically when a `runner=` is set, so the
-    CLI doesn't need to drive that explicitly.
+    Kept callable so anything that imported it from this module doesn't
+    immediately break. Just calls one.compile() per requested format,
+    same as before.
     """
     try:
         from paradoc.document import OneDoc
