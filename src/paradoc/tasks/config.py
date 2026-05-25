@@ -66,6 +66,28 @@ class _StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class StaticExportConfig(_StrictModel):
+    """`[build.<profile>.static]` — config for the `"static"` output type.
+
+    `target` is the destination directory for the bundle. Relative paths
+    resolve against the doc_root (paradoc.toml's directory). Defaults to
+    `static_output` next to the doc.
+
+    `header_links` are forwarded straight to
+    `OneDoc.export_static(header_links=...)` — list of `{label, href,
+    target?, rel?}` dicts. Hosts that embed the bundle (Sphinx, MkDocs)
+    use this for "back to docs" affordances.
+
+    `embed_images` / `include_frontend` map 1:1 to the same-named
+    kwargs on `OneDoc.export_static`.
+    """
+
+    target: str = "static_output"
+    header_links: Optional[list[dict[str, str]]] = None
+    embed_images: bool = True
+    include_frontend: bool = True
+
+
 class BuildProfile(_StrictModel):
     """One `[build.<name>]` section.
 
@@ -76,14 +98,19 @@ class BuildProfile(_StrictModel):
     `envs` maps env alias -> pixi env name, overriding the top-level
     `[paradoc.envs]` for this profile only.
 
-    `outputs` is a list of export formats (eg `["docx", "pdf"]`) the
-    orchestrator should produce per build. Empty list means "let the
-    caller pick one format" — the CLI's `--format` flag in that case.
+    `outputs` is a list of export formats (eg `["docx", "pdf",
+    "static"]`) the orchestrator should produce per build. Empty list
+    means "let the caller pick one format" — the CLI's `--format` flag
+    in that case. The `"static"` output type calls
+    `OneDoc.export_static`; its config lives in `[build.<profile>.static]`.
+
+    `static` is the optional `[build.<profile>.static]` subtable.
     """
 
     fanout: dict[str, dict[str, list[Any]]] = Field(default_factory=dict)
     envs: dict[str, str] = Field(default_factory=dict)
     outputs: list[str] = Field(default_factory=list)
+    static: Optional[StaticExportConfig] = None
 
 
 class TasksToml(_StrictModel):
@@ -95,9 +122,9 @@ class TasksToml(_StrictModel):
     `source_dir` overrides where OneDoc looks for markdown. Defaults to
     the doc_root (paradoc.toml's directory). Set this when the doc
     layout puts markdown in a subdirectory while `tasks.py` /
-    `filters.py` / `paradoc.toml` / `build_hooks.py` stay at the doc
-    root (eg the adapy verification layout where markdown is at
-    `verification/report/` but tasks live at `verification/`).
+    `filters.py` / `paradoc.toml` stay at the doc root (eg the adapy
+    verification layout where markdown is at `verification/report/`
+    but tasks live at `verification/`).
     """
 
     pixi_toml: Optional[Path] = None
@@ -122,6 +149,7 @@ class TaskConfig:
     fanout_overrides: dict[str, dict[str, list[Any]]]
     source_dir: Optional[Path] = None
     outputs: list[str] = field(default_factory=list)
+    static: Optional[StaticExportConfig] = None
     profile: str = "default"
 
 
@@ -182,6 +210,7 @@ def load_task_config(
         fanout_overrides=profile_cfg.fanout,
         source_dir=source_dir_resolved,
         outputs=profile_cfg.outputs,
+        static=profile_cfg.static,
         profile=profile,
     )
 

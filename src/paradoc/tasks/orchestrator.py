@@ -21,9 +21,8 @@ import logging
 from pathlib import Path
 from typing import Any, Optional
 
-from .build_hooks import load_build_hooks
 from .cache import TaskCache
-from .config import build_executor_from_config, load_task_config
+from .config import StaticExportConfig, build_executor_from_config, load_task_config
 from .context import BuildContext
 from .discovery import discover_tasks
 from .filter_binding import bind_filter_handles
@@ -32,6 +31,30 @@ from .registry import TaskRegistry, reset_default_registry
 from .runner import Runner
 
 logger = logging.getLogger(__name__)
+
+
+def _dispatch_static(
+    one: Any,
+    doc_root: Path,
+    static_cfg: Optional[StaticExportConfig],
+) -> None:
+    """Dispatch `outputs = ["static"]` to `OneDoc.export_static(...)`.
+
+    Falls back to defaults (`static_output/` under doc_root) when no
+    `[build.<profile>.static]` table is present. Relative targets
+    resolve against the doc_root.
+    """
+    cfg = static_cfg if static_cfg is not None else StaticExportConfig()
+    target = Path(cfg.target)
+    if not target.is_absolute():
+        target = doc_root / target
+    logger.info(f"exporting static web bundle to {target}")
+    one.export_static(
+        target,
+        header_links=cfg.header_links,
+        embed_images=cfg.embed_images,
+        include_frontend=cfg.include_frontend,
+    )
 
 
 def build_document(
@@ -138,8 +161,8 @@ def build_document(
 
         # source_dir defaults to doc_root, but paradoc.toml can override
         # for layouts where markdown lives in a subdir (eg
-        # `verification/report/`) while tasks.py / filters.py /
-        # build_hooks.py stay at the doc root.
+        # `verification/report/`) while tasks.py / filters.py stay at
+        # the doc root.
         source_dir = config.source_dir or doc_root
 
         one = OneDoc(source_dir=source_dir, work_dir=work_dir, runner=runner)
@@ -160,18 +183,6 @@ def build_document(
         bind_filter_handles(one._filter_registry, runner)
         one._filters_discovered = True
 
-        # Load optional build hooks at `<doc_root>/build_hooks.py`.
-        # `setup(one, runner)` runs before compile (asset baking,
-        # db_manager registration); `postcompile(one)` runs after.
-        # The Outcomes path covers most of what setup hooks used to
-        # do — build_hooks is kept for residual side effects (eg
-        # writing markdown source files, the verification report's
-        # _regenerate_results_detailed_md) that don't fit the
-        # data-producing-task shape.
-        hooks = load_build_hooks(doc_root)
-        if hooks.setup is not None:
-            hooks.setup(one, runner)
-
         name = output_name or doc_root.name
 
         # Resolve output formats:
@@ -180,8 +191,7 @@ def build_document(
         # 3. Else SKIP `one.compile()` entirely.
         #
         # Rationale for (3): a doc that doesn't declare any outputs in
-        # paradoc.toml typically only wants a static web bundle, which
-        # `postcompile(one).export_static(...)` produces directly. The
+        # paradoc.toml typically only wants a static web bundle. The
         # legacy "default to DOCX" fallback was forcing a pandoc/docx
         # roundtrip for users who didn't want one — particularly nasty
         # for the verification report whose markdown trips the docx
@@ -194,13 +204,13 @@ def build_document(
             formats = []
 
         for fmt in formats:
+            if isinstance(fmt, str) and fmt == "static":
+                _dispatch_static(one, doc_root, config.static)
+                continue
             compile_kwargs: dict[str, Any] = {"auto_open": auto_open}
             if fmt is not None:
                 compile_kwargs["export_format"] = fmt
             one.compile(name, **compile_kwargs)
-
-        if hooks.postcompile is not None:
-            hooks.postcompile(one)
 
         return runner, one
     finally:

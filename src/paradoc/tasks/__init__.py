@@ -11,7 +11,6 @@ The legacy file-centric `Task` BaseModel is preserved under
 `Filter.task` and `FEAModelResults.task_id` migrate to `TaskHandle`.
 """
 
-from .build_hooks import BuildHooks, load_build_hooks
 from .cache import CacheKey, TaskCache, compute_cache_key
 from .cells import Cell, cells_for, expand_fanout
 from .context import BuildContext, ctx_param_name
@@ -28,6 +27,7 @@ from .outcomes import (
 from .orchestrator import build_document
 from .config import (
     BuildProfile,
+    StaticExportConfig,
     TaskConfig,
     TasksToml,
     build_executor_from_config,
@@ -77,6 +77,7 @@ __all__ = [
     "TaskConfig",
     "TasksToml",
     "BuildProfile",
+    "StaticExportConfig",
     "load_task_config",
     "build_executor_from_config",
     "merge_fanout",
@@ -87,8 +88,6 @@ __all__ = [
     "ast_source_hash",
     "Serializer",
     "PickleSerializer",
-    "BuildHooks",
-    "load_build_hooks",
     "BuildContext",
     "ctx_param_name",
     "Outcome",

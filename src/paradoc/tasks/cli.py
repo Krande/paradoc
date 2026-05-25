@@ -142,15 +142,15 @@ def build(
             return
 
         # Full path: delegate to the orchestrator, which threads
-        # source_dir / filter discovery / build_hooks / multi-output
-        # compile end-to-end. The orchestrator constructs its own
+        # source_dir / filter discovery / multi-output compile (incl.
+        # `"static"`) end-to-end. The orchestrator constructs its own
         # runner from the same registry+cache+executor we have here;
         # the redundant DAG-expand is cheap (it's the actual cell
         # execution that's costly, and the cache short-circuits that).
         runner.shutdown()
         from .orchestrator import build_document
 
-        typer.echo("delegating to build_document for compile + hooks...")
+        typer.echo("delegating to build_document for compile...")
         new_runner, one = build_document(
             doc_root,
             profile=profile,
