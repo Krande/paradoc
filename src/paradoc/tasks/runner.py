@@ -28,7 +28,8 @@ import logging
 from typing import Any, Optional
 
 from .cache import CacheKey, TaskCache, compute_cache_key
-from .cells import Cell, cells_for
+from .cells import Cell, expand_fanout
+from .config import merge_fanout
 from .executors import Executor, InProcessExecutor
 from .models import TaskFn
 from .registry import TaskRegistry
@@ -44,10 +45,14 @@ class Runner:
         registry: TaskRegistry,
         executor: Optional[Executor] = None,
         cache: Optional[TaskCache] = None,
+        fanout_overrides: Optional[dict[str, dict[str, list[Any]]]] = None,
     ) -> None:
         self.registry = registry
         self.executor = executor if executor is not None else InProcessExecutor()
         self.cache = cache
+        # task qualname (or bare name) -> { axis: [values] }
+        # Per-axis replacement, not merge — see config.merge_fanout.
+        self.fanout_overrides: dict[str, dict[str, list[Any]]] = fanout_overrides or {}
         # qualname -> list[Cell]
         self._cells_by_task: dict[str, list[Cell]] = {}
         # id(Cell) -> result
@@ -80,8 +85,29 @@ class Runner:
                 parent_cells = []
             else:
                 parent_cells = list(self._cells_by_task.get(parent_task.qualname, []))
-            self._cells_by_task[task.qualname] = cells_for(task, parent_cells=parent_cells)
+            self._cells_by_task[task.qualname] = self._cells_for_task(task, parent_cells)
         self._expanded = True
+
+    def _cells_for_task(self, task: TaskFn, parent_cells: list[Optional[Cell]]) -> list[Cell]:
+        """Inline cell-building with profile fanout overrides applied.
+
+        We don't reuse `cells.cells_for(...)` here because the override
+        layer is per-runner state; the module-level helper stays
+        runner-agnostic for direct use.
+        """
+        if not parent_cells:
+            parent_cells = [None]
+
+        override = self.fanout_overrides.get(task.qualname) or self.fanout_overrides.get(task.name)
+        resolved = merge_fanout(task.fanout, override)
+
+        cells: list[Cell] = []
+        for parent in parent_cells:
+            for kwargs in expand_fanout(resolved):
+                if task.skip_if is not None and task.skip_if(**kwargs):
+                    continue
+                cells.append(Cell(task=task, kwargs=kwargs, parent=parent))
+        return cells
 
     def cells_for(self, task: TaskFn | str, **filter_coords: Any) -> list[Cell]:
         """Return cells of `task` whose kwargs match all `filter_coords`.

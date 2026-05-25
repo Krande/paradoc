@@ -226,3 +226,35 @@ class PixiSubprocessExecutor:
                 return pickle.load(fh)
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+class HybridExecutor:
+    """Routes cells between in-process and pixi-subprocess execution.
+
+    Tasks with no `env=` declared (or `env=None`) run in the controlling
+    Python process via `InProcessExecutor` — no subprocess overhead.
+    Tasks with `env=<alias>` run via `PixiSubprocessExecutor`.
+
+    This is the default executor when paradoc builds a runner from
+    `paradoc.toml`: most utility tasks don't need env isolation, only
+    the heavy solver tasks do. Without this route, every `paradoc
+    build` invocation would shell out to pixi for every cell, even
+    cells that just glue results together.
+
+    Constructor takes both inner executors explicitly so they can be
+    configured independently (different `max_workers`, swapped for
+    NatsExecutor in the future, etc.).
+    """
+
+    def __init__(self, in_process: Executor, pixi: Executor) -> None:
+        self.in_process = in_process
+        self.pixi = pixi
+
+    def submit(self, cell: Cell, parent_result: Any) -> Future:
+        if cell.task.env is None:
+            return self.in_process.submit(cell, parent_result)
+        return self.pixi.submit(cell, parent_result)
+
+    def shutdown(self) -> None:
+        self.in_process.shutdown()
+        self.pixi.shutdown()

@@ -13,10 +13,19 @@ The legacy file-centric `Task` BaseModel is preserved under
 
 from .cache import CacheKey, TaskCache, compute_cache_key
 from .cells import Cell, cells_for, expand_fanout
+from .config import (
+    BuildProfile,
+    TaskConfig,
+    TasksToml,
+    build_executor_from_config,
+    load_task_config,
+    merge_fanout,
+)
 from .decorator import is_task, task
 from .discovery import discover_tasks
 from .executors import (
     Executor,
+    HybridExecutor,
     InProcessExecutor,
     PixiSubprocessError,
     PixiSubprocessExecutor,
@@ -45,9 +54,16 @@ __all__ = [
     "cells_for",
     "expand_fanout",
     "Executor",
+    "HybridExecutor",
     "InProcessExecutor",
     "PixiSubprocessError",
     "PixiSubprocessExecutor",
+    "TaskConfig",
+    "TasksToml",
+    "BuildProfile",
+    "load_task_config",
+    "build_executor_from_config",
+    "merge_fanout",
     "Runner",
     "TaskCache",
     "CacheKey",
