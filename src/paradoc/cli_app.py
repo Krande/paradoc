@@ -3,12 +3,19 @@ import typer
 from paradoc import OneDoc
 from paradoc.cli.publish import app as publish_app
 from paradoc.common import ExportFormats
+from paradoc.tasks.cli import build as build_command
 
 app = typer.Typer()
 # `paradoc publish <doc_dir>` — compile and upload a bundle to a
 # running paradoc-serve. Lives in its own module so the heavy
 # paradoc.OneDoc compile path stays out of `paradoc --help`.
 app.add_typer(publish_app, name="publish")
+# `paradoc build <doc_id>` — run the document's task DAG. The full
+# OneDoc.compile() integration lands later (filter wiring); for now
+# this exercises the @task / Runner / cache / executor pipeline.
+# Registered as a flat command, not a Typer group, so the surface is
+# `paradoc build <doc_id>` rather than `paradoc build build <doc_id>`.
+app.command("build")(build_command)
 
 
 @app.command("paradoc")
