@@ -262,5 +262,55 @@ def _print_run_summary(runner: Runner, results: dict) -> None:
         )
 
 
+@app.command("dev")
+def dev(
+    doc_id: str = typer.Argument(..., help="Document directory or id (eg 'verification')."),
+    profile: str = typer.Option("default", "--profile", "-p"),
+    port: int = typer.Option(8765, "--port", help="HTTP port for the static bundle."),
+    ws_port: Optional[int] = typer.Option(
+        None,
+        "--ws-port",
+        help="WebSocket port for reload signals. Default: --port + 1 (or OS-assigned if busy).",
+    ),
+    work_dir: Optional[Path] = typer.Option(None, "--work-dir"),
+    no_cache: bool = typer.Option(False, "--no-cache"),
+    debounce_ms: int = typer.Option(
+        300, "--debounce-ms", help="Coalesce filesystem events within this window."
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Build, serve, watch, and live-reload `<doc_id>` on file changes.
+
+    Watches tasks.py, filters.py, paradoc.toml, and the markdown
+    report/ tree. On change, runs an incremental rebuild through
+    paradoc.tasks (the task cache makes unchanged cells skip
+    re-execution) and tells the browser to reload via WebSocket.
+
+    Stops on Ctrl-C.
+    """
+    import asyncio
+
+    from .dev import serve_and_watch
+
+    _configure_logging(verbose)
+
+    doc_root = _resolve_doc_root(doc_id)
+
+    try:
+        asyncio.run(
+            serve_and_watch(
+                doc_root,
+                port=port,
+                ws_port=ws_port,
+                profile=profile,
+                no_cache=no_cache,
+                work_dir=work_dir,
+                debounce_ms=debounce_ms,
+            )
+        )
+    except KeyboardInterrupt:
+        typer.secho("\nstopped.", fg=typer.colors.CYAN)
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()

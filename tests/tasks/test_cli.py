@@ -69,7 +69,7 @@ _SIMPLE_TASKS_PY = """
 def test_build_full_run(tmp_path: Path):
     doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY)
 
-    result = runner.invoke(build_app, [str(doc_root), "--no-compile"])
+    result = runner.invoke(build_app, ["build", str(doc_root), "--no-compile"])
 
     assert result.exit_code == 0, result.output
     # 1 design + 4 mesh + 4 analyze = 9 cells
@@ -82,7 +82,7 @@ def test_build_full_run(tmp_path: Path):
 def test_build_inspect_skips_execution(tmp_path: Path):
     doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY)
 
-    result = runner.invoke(build_app, [str(doc_root), "--inspect"])
+    result = runner.invoke(build_app, ["build", str(doc_root), "--inspect"])
 
     assert result.exit_code == 0, result.output
     assert "skipping execution" in result.output
@@ -92,7 +92,7 @@ def test_build_inspect_skips_execution(tmp_path: Path):
 def test_build_dag_output_shows_cell_counts(tmp_path: Path):
     doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY)
 
-    result = runner.invoke(build_app, [str(doc_root), "--inspect"])
+    result = runner.invoke(build_app, ["build", str(doc_root), "--inspect"])
 
     assert "(1 cell)" in result.output  # design
     assert "(4 cells)" in result.output  # mesh and analyze
@@ -101,12 +101,12 @@ def test_build_dag_output_shows_cell_counts(tmp_path: Path):
 def test_build_cache_hits_on_second_run(tmp_path: Path):
     doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY)
 
-    first = runner.invoke(build_app, [str(doc_root), "--no-compile"])
+    first = runner.invoke(build_app, ["build", str(doc_root), "--no-compile"])
     assert first.exit_code == 0
     assert "9 misses" in first.output
     assert "0 hits" in first.output
 
-    second = runner.invoke(build_app, [str(doc_root), "--no-compile"])
+    second = runner.invoke(build_app, ["build", str(doc_root), "--no-compile"])
     assert second.exit_code == 0
     assert "9 hits" in second.output
     assert "0 misses" in second.output
@@ -115,7 +115,7 @@ def test_build_cache_hits_on_second_run(tmp_path: Path):
 def test_build_no_cache_flag(tmp_path: Path):
     doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY)
 
-    result = runner.invoke(build_app, [str(doc_root), "--no-cache", "--no-compile"])
+    result = runner.invoke(build_app, ["build", str(doc_root), "--no-cache", "--no-compile"])
 
     assert result.exit_code == 0
     # No cache line printed.
@@ -132,7 +132,7 @@ def test_build_profile_applies_fanout_overrides(tmp_path: Path):
     """
     doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY, toml_body=toml)
 
-    result = runner.invoke(build_app, [str(doc_root), "--profile", "smoke", "--inspect"])
+    result = runner.invoke(build_app, ["build", str(doc_root), "--profile", "smoke", "--inspect"])
 
     assert result.exit_code == 0, result.output
     # mesh: 1 geom x 1 order = 1 cell instead of 4
@@ -147,7 +147,7 @@ def test_build_profile_applies_fanout_overrides(tmp_path: Path):
 
 
 def test_build_missing_doc_dir(tmp_path: Path):
-    result = runner.invoke(build_app, [str(tmp_path / "nope")])
+    result = runner.invoke(build_app, ["build", str(tmp_path / "nope")])
     assert result.exit_code == 2
     assert "document directory not found" in result.output
 
@@ -157,7 +157,7 @@ def test_build_no_tasks_discovered(tmp_path: Path):
     doc_root.mkdir()
     (doc_root / "paradoc.toml").write_text("")
 
-    result = runner.invoke(build_app, [str(doc_root), "--no-compile"])
+    result = runner.invoke(build_app, ["build", str(doc_root), "--no-compile"])
     assert result.exit_code == 1
     assert "no tasks discovered" in result.output
 
@@ -168,7 +168,7 @@ def test_build_unknown_profile_raises(tmp_path: Path):
     """
     doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY, toml_body=toml)
 
-    result = runner.invoke(build_app, [str(doc_root), "--profile", "full"])
+    result = runner.invoke(build_app, ["build", str(doc_root), "--profile", "full"])
     # KeyError from load_task_config -> Typer wraps as an uncaught exception
     # (exit 1) unless we wrap it; for now we just assert non-zero exit.
     assert result.exit_code != 0
@@ -178,7 +178,7 @@ def test_build_in_process_only_when_no_pixi_toml(tmp_path: Path):
     """A doc with no [paradoc] section should still build — defaults to
     InProcessExecutor for everything."""
     doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY)  # toml is empty
-    result = runner.invoke(build_app, [str(doc_root), "--no-compile"])
+    result = runner.invoke(build_app, ["build", str(doc_root), "--no-compile"])
 
     assert result.exit_code == 0
     assert "(none — in-process only)" in result.output
@@ -201,7 +201,7 @@ def test_build_bind_filters_no_filters_py(tmp_path: Path):
     """--bind-filters is fine when no filters.py exists; just warns."""
     doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY)
 
-    result = runner.invoke(build_app, [str(doc_root), "--bind-filters", "--no-compile"])
+    result = runner.invoke(build_app, ["build", str(doc_root), "--bind-filters", "--no-compile"])
 
     assert result.exit_code == 0, result.output
     assert "no filters discovered" in result.output
@@ -226,7 +226,7 @@ def test_build_bind_filters_binds_taskhandle(tmp_path: Path):
         ).lstrip()
     )
 
-    result = runner.invoke(build_app, [str(doc_root), "--bind-filters", "--no-compile"])
+    result = runner.invoke(build_app, ["build", str(doc_root), "--bind-filters", "--no-compile"])
 
     assert result.exit_code == 0, result.output
     assert "bound 1 TaskHandle" in result.output
@@ -237,7 +237,7 @@ def test_build_custom_cache_dir(tmp_path: Path):
     custom_cache = tmp_path / "elsewhere"
 
     result = runner.invoke(
-        build_app, [str(doc_root), "--cache-dir", str(custom_cache), "--no-compile"]
+        build_app, ["build", str(doc_root), "--cache-dir", str(custom_cache), "--no-compile"]
     )
 
     assert result.exit_code == 0, result.output
