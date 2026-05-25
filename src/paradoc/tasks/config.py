@@ -92,10 +92,17 @@ class TasksToml(_StrictModel):
     `pixi_toml` is resolved relative to the location of paradoc.toml.
     `envs` is the global alias -> pixi env name mapping; profiles can
     override per-key.
+    `source_dir` overrides where OneDoc looks for markdown. Defaults to
+    the doc_root (paradoc.toml's directory). Set this when the doc
+    layout puts markdown in a subdirectory while `tasks.py` /
+    `filters.py` / `paradoc.toml` / `build_hooks.py` stay at the doc
+    root (eg the adapy verification layout where markdown is at
+    `verification/report/` but tasks live at `verification/`).
     """
 
     pixi_toml: Optional[Path] = None
     envs: dict[str, str] = Field(default_factory=dict)
+    source_dir: Optional[Path] = None
 
 
 @dataclass
@@ -113,6 +120,7 @@ class TaskConfig:
     pixi_toml: Optional[Path]
     envs: dict[str, str]
     fanout_overrides: dict[str, dict[str, list[Any]]]
+    source_dir: Optional[Path] = None
     outputs: list[str] = field(default_factory=list)
     profile: str = "default"
 
@@ -149,6 +157,11 @@ def load_task_config(
     else:
         pixi_toml_resolved = None
 
+    if paradoc_cfg.source_dir is not None:
+        source_dir_resolved = (toml_path.parent / paradoc_cfg.source_dir).resolve()
+    else:
+        source_dir_resolved = None
+
     build_sections: dict[str, Any] = data.get("build", {}) or {}
     if build_sections and profile not in build_sections:
         raise KeyError(
@@ -167,6 +180,7 @@ def load_task_config(
         pixi_toml=pixi_toml_resolved,
         envs=resolved_envs,
         fanout_overrides=profile_cfg.fanout,
+        source_dir=source_dir_resolved,
         outputs=profile_cfg.outputs,
         profile=profile,
     )

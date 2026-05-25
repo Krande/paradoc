@@ -21,9 +21,11 @@ import logging
 from pathlib import Path
 from typing import Any, Optional
 
+from .build_hooks import load_build_hooks
 from .cache import TaskCache
 from .config import build_executor_from_config, load_task_config
 from .discovery import discover_tasks
+from .filter_binding import bind_filter_handles
 from .registry import TaskRegistry, reset_default_registry
 from .runner import Runner
 
@@ -119,8 +121,33 @@ def build_document(
         # Lazy import — keep paradoc.tasks importable without pulling in
         # the heavy OneDoc compile path (pandoc, docx, db, ...).
         from paradoc.document import OneDoc
+        from paradoc.filters import discover_filters
 
-        one = OneDoc(source_dir=doc_root, work_dir=work_dir, runner=runner)
+        # source_dir defaults to doc_root, but paradoc.toml can override
+        # for layouts where markdown lives in a subdir (eg
+        # `verification/report/`) while tasks.py / filters.py /
+        # build_hooks.py stay at the doc root.
+        source_dir = config.source_dir or doc_root
+
+        one = OneDoc(source_dir=source_dir, work_dir=work_dir, runner=runner)
+
+        # Pre-register filters from doc_root (not source_dir) so the
+        # convention `<doc_root>/filters.py` works even when markdown
+        # lives elsewhere. Setting `_filters_discovered=True` short-
+        # circuits OneDoc's lazy lookup against `source_dir/filters.py`
+        # which would otherwise re-fire and either find nothing or
+        # collide on duplicate names.
+        discover_filters(doc_root=doc_root, registry=one._filter_registry)
+        bind_filter_handles(one._filter_registry, runner)
+        one._filters_discovered = True
+
+        # Load optional build hooks at `<doc_root>/build_hooks.py`.
+        # `setup(one, runner)` runs before compile (asset baking,
+        # db_manager registration); `postcompile(one)` runs after.
+        hooks = load_build_hooks(doc_root)
+        if hooks.setup is not None:
+            hooks.setup(one, runner)
+
         name = output_name or doc_root.name
 
         # Resolve output formats:
@@ -139,6 +166,10 @@ def build_document(
             if fmt is not None:
                 compile_kwargs["export_format"] = fmt
             one.compile(name, **compile_kwargs)
+
+        if hooks.postcompile is not None:
+            hooks.postcompile(one)
+
         return runner, one
     finally:
         # Caller may want to inspect runner.cells_for(...) post-build,
