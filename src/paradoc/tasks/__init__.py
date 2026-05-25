@@ -11,6 +11,7 @@ The legacy file-centric `Task` BaseModel is preserved under
 `Filter.task` and `FEAModelResults.task_id` migrate to `TaskHandle`.
 """
 
+from .cache import CacheKey, TaskCache, compute_cache_key
 from .cells import Cell, cells_for, expand_fanout
 from .decorator import is_task, task
 from .discovery import discover_tasks
@@ -22,6 +23,7 @@ from .registry import (
     reset_default_registry,
 )
 from .runner import Runner
+from .source_hash import ast_source_hash
 
 __all__ = [
     "task",
@@ -40,4 +42,8 @@ __all__ = [
     "Executor",
     "InProcessExecutor",
     "Runner",
+    "TaskCache",
+    "CacheKey",
+    "compute_cache_key",
+    "ast_source_hash",
 ]

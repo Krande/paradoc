@@ -24,13 +24,16 @@ runner when the integration lands.
 
 from __future__ import annotations
 
-from collections import defaultdict
+import logging
 from typing import Any, Optional
 
+from .cache import CacheKey, TaskCache, compute_cache_key
 from .cells import Cell, cells_for
 from .executors import Executor, InProcessExecutor
 from .models import TaskFn
 from .registry import TaskRegistry
+
+logger = logging.getLogger(__name__)
 
 
 class Runner:
@@ -40,15 +43,24 @@ class Runner:
         self,
         registry: TaskRegistry,
         executor: Optional[Executor] = None,
+        cache: Optional[TaskCache] = None,
     ) -> None:
         self.registry = registry
         self.executor = executor if executor is not None else InProcessExecutor()
+        self.cache = cache
         # qualname -> list[Cell]
         self._cells_by_task: dict[str, list[Cell]] = {}
         # id(Cell) -> result
         self._results: dict[int, Any] = {}
+        # id(Cell) -> CacheKey (populated lazily, top-down, only if cache set)
+        self._cache_keys: dict[int, CacheKey] = {}
+        # id(TaskFn) -> bytes (ast hash memo, reused across all cells of a task)
+        self._ast_hash_memo: dict[int, bytes] = {}
         self._expanded = False
         self._ran = False
+        # Counters for observability of cache hit-rate.
+        self.cache_hits = 0
+        self.cache_misses = 0
 
     # ---------------- expansion ----------------
 
@@ -90,15 +102,59 @@ class Runner:
     # ---------------- execution ----------------
 
     def run(self) -> dict[str, list[Any]]:
-        """Execute every cell in topological order. Returns qualname -> results."""
+        """Execute every cell in topological order. Returns qualname -> results.
+
+        If a TaskCache is wired, each cell's result is keyed via
+        `compute_cache_key` (Q4 Option C — AST source hash + call-graph
+        walk + parent_key + version_probe). Cache hits short-circuit the
+        executor entirely; misses run normally and write back.
+        """
         self.expand()
         for task in self._topo_sorted():
             for cell in self._cells_by_task[task.qualname]:
                 parent_result = (
                     self._results.get(id(cell.parent)) if cell.parent is not None else None
                 )
+                if self.cache is not None:
+                    parent_key = (
+                        self._cache_keys.get(id(cell.parent)) if cell.parent is not None else None
+                    )
+                    key = compute_cache_key(
+                        cell.task,
+                        cell.kwargs,
+                        parent_key=parent_key,
+                        ast_hash_memo=self._ast_hash_memo,
+                    )
+                    self._cache_keys[id(cell)] = key
+                    if self.cache.has(key):
+                        self._results[id(cell)] = self.cache.get(key)
+                        self.cache_hits += 1
+                        logger.debug(f"cache hit  {key!r}")
+                        continue
+                    self.cache_misses += 1
+                    logger.debug(f"cache miss {key!r}")
+
                 future = self.executor.submit(cell, parent_result)
-                self._results[id(cell)] = future.result()
+                result = future.result()
+                self._results[id(cell)] = result
+
+                if self.cache is not None:
+                    parent_key = (
+                        self._cache_keys.get(id(cell.parent)) if cell.parent is not None else None
+                    )
+                    version_probe_val: Optional[str] = None
+                    if cell.task.version_probe is not None:
+                        try:
+                            version_probe_val = str(cell.task.version_probe(cell.kwargs))
+                        except Exception:  # noqa: BLE001
+                            version_probe_val = None
+                    self.cache.put(
+                        self._cache_keys[id(cell)],
+                        result,
+                        kwargs=cell.kwargs,
+                        parent_key=parent_key,
+                        version_probe=version_probe_val,
+                    )
         self._ran = True
         return {
             qn: [self._results[id(c)] for c in cells]
