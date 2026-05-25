@@ -26,6 +26,7 @@ from .cache import TaskCache
 from .config import build_executor_from_config, load_task_config
 from .discovery import discover_tasks
 from .filter_binding import bind_filter_handles
+from .outcomes import dispatch_outcomes
 from .registry import TaskRegistry, reset_default_registry
 from .runner import Runner
 
@@ -133,17 +134,28 @@ def build_document(
 
         # Pre-register filters from doc_root (not source_dir) so the
         # convention `<doc_root>/filters.py` works even when markdown
-        # lives elsewhere. Setting `_filters_discovered=True` short-
-        # circuits OneDoc's lazy lookup against `source_dir/filters.py`
-        # which would otherwise re-fire and either find nothing or
-        # collide on duplicate names.
+        # lives elsewhere. Outcomes from tasks get dispatched here too
+        # (FilterOutcome → registry.register) BEFORE binding, so
+        # task-produced filters get their TaskHandles bound right
+        # alongside file-declared ones. Setting `_filters_discovered=
+        # True` short-circuits OneDoc's lazy lookup against
+        # `source_dir/filters.py` which would otherwise re-fire and
+        # either find nothing or collide on duplicate names.
         discover_filters(doc_root=doc_root, registry=one._filter_registry)
+        n_outcomes = dispatch_outcomes(runner, one)
+        if n_outcomes:
+            logger.info(f"registered {n_outcomes} task-produced outcome(s) on OneDoc")
         bind_filter_handles(one._filter_registry, runner)
         one._filters_discovered = True
 
         # Load optional build hooks at `<doc_root>/build_hooks.py`.
         # `setup(one, runner)` runs before compile (asset baking,
         # db_manager registration); `postcompile(one)` runs after.
+        # The Outcomes path covers most of what setup hooks used to
+        # do — build_hooks is kept for residual side effects (eg
+        # writing markdown source files, the verification report's
+        # _regenerate_results_detailed_md) that don't fit the
+        # data-producing-task shape.
         hooks = load_build_hooks(doc_root)
         if hooks.setup is not None:
             hooks.setup(one, runner)

@@ -15,6 +15,15 @@ from .build_hooks import BuildHooks, load_build_hooks
 from .cache import CacheKey, TaskCache, compute_cache_key
 from .cells import Cell, cells_for, expand_fanout
 from .filter_binding import bind_filter_handles
+from .outcomes import (
+    FilterOutcome,
+    Outcome,
+    PlotOutcome,
+    TableOutcome,
+    ThreeDOutcome,
+    dispatch_outcomes,
+    iter_outcomes,
+)
 from .orchestrator import build_document
 from .config import (
     BuildProfile,
@@ -79,4 +88,11 @@ __all__ = [
     "PickleSerializer",
     "BuildHooks",
     "load_build_hooks",
+    "Outcome",
+    "TableOutcome",
+    "PlotOutcome",
+    "ThreeDOutcome",
+    "FilterOutcome",
+    "iter_outcomes",
+    "dispatch_outcomes",
 ]
