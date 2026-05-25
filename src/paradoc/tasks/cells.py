@@ -38,6 +38,31 @@ class Cell:
         return self.task.qualname
 
     @property
+    def full_kwargs(self) -> dict[str, Any]:
+        """Merge this cell's kwargs with every ancestor's, in root-to-leaf order.
+
+        Use case: skip rules that span multiple task levels. For the adapy
+        verification matrix, `run_eig` cells need to inspect both their own
+        `solver` kwarg AND the mesh's `geom_repr` / `elem_order` to decide
+        validity (eg `calculix + line` is unsupported). The runner calls
+        `skip_if(**cell.full_kwargs)` so a single predicate can see all
+        relevant axes.
+
+        Children override parents on key collision (which is the right
+        semantic but should also be vanishingly rare — disjoint axes per
+        task is the norm).
+        """
+        chain: list[Cell] = []
+        cell: Optional[Cell] = self
+        while cell is not None:
+            chain.append(cell)
+            cell = cell.parent
+        out: dict[str, Any] = {}
+        for c in reversed(chain):
+            out.update(c.kwargs)
+        return out
+
+    @property
     def coords_key(self) -> str:
         """Canonical key for this cell's coordinates.
 
@@ -87,7 +112,8 @@ def cells_for(
     cells: list[Cell] = []
     for parent in parent_cells:
         for kwargs in expand_fanout(task.fanout):
-            if task.skip_if is not None and task.skip_if(**kwargs):
+            candidate = Cell(task=task, kwargs=kwargs, parent=parent)
+            if task.skip_if is not None and task.skip_if(**candidate.full_kwargs):
                 continue
-            cells.append(Cell(task=task, kwargs=kwargs, parent=parent))
+            cells.append(candidate)
     return cells

@@ -270,6 +270,61 @@ def test_runner_uses_swapped_executor():
     assert first_parent is None
 
 
+def test_skip_if_sees_ancestor_kwargs():
+    """Skip rules that span both parent and child axes — the verification
+    matrix's `calculix + line` invalid combo is the canonical case."""
+
+    @task(fanout={"geom_repr": ["line", "shell", "solid"]})
+    def mesh(*, geom_repr):
+        return geom_repr
+
+    @task(
+        parent=mesh,
+        fanout={"solver": ["calculix", "abaqus"]},
+        skip_if=lambda **kw: kw["geom_repr"] == "line" and kw["solver"] == "calculix",
+    )
+    def analyze(parent, *, solver):
+        return (parent, solver)
+
+    reg = TaskRegistry()
+    reg.register(mesh)
+    reg.register(analyze)
+    runner = Runner(reg)
+    runner.expand()
+
+    # 3 mesh cells x 2 solvers = 6, minus 1 skipped (line + calculix) = 5
+    cells = runner.cells_for(analyze)
+    assert len(cells) == 5
+    # The dropped cell was line + calculix.
+    line_cells = [c for c in cells if c.full_kwargs["geom_repr"] == "line"]
+    assert all(c.kwargs["solver"] == "abaqus" for c in line_cells)
+
+
+def test_full_kwargs_merges_ancestor_chain():
+    """Cell.full_kwargs walks the parent chain and merges, root-first."""
+
+    @task(fanout={"a": [1]})
+    def root_t(*, a):
+        return a
+
+    @task(parent=root_t, fanout={"b": [10]})
+    def mid_t(_p, *, b):
+        return b
+
+    @task(parent=mid_t, fanout={"c": [100]})
+    def leaf_t(_p, *, c):
+        return c
+
+    reg = TaskRegistry()
+    for t in (root_t, mid_t, leaf_t):
+        reg.register(t)
+    runner = Runner(reg)
+    runner.expand()
+
+    leaf = runner.cells_for(leaf_t)[0]
+    assert leaf.full_kwargs == {"a": 1, "b": 10, "c": 100}
+
+
 def test_executor_protocol_runtime_check():
     """`Executor` is a runtime_checkable Protocol — duck-typing works."""
     from paradoc.tasks import Executor

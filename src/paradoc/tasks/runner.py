@@ -104,9 +104,10 @@ class Runner:
         cells: list[Cell] = []
         for parent in parent_cells:
             for kwargs in expand_fanout(resolved):
-                if task.skip_if is not None and task.skip_if(**kwargs):
+                candidate = Cell(task=task, kwargs=kwargs, parent=parent)
+                if task.skip_if is not None and task.skip_if(**candidate.full_kwargs):
                     continue
-                cells.append(Cell(task=task, kwargs=kwargs, parent=parent))
+                cells.append(candidate)
         return cells
 
     def cells_for(self, task: TaskFn | str, **filter_coords: Any) -> list[Cell]:
