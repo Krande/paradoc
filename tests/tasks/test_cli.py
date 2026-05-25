@@ -197,6 +197,41 @@ def test_build_wired_into_parent_cli_app(tmp_path: Path):
     assert "task DAG" in result.output
 
 
+def test_build_bind_filters_no_filters_py(tmp_path: Path):
+    """--bind-filters is fine when no filters.py exists; just warns."""
+    doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY)
+
+    result = runner.invoke(build_app, [str(doc_root), "--bind-filters"])
+
+    assert result.exit_code == 0, result.output
+    assert "no filters discovered" in result.output
+
+
+def test_build_bind_filters_binds_taskhandle(tmp_path: Path):
+    """End-to-end: tasks.py + filters.py with TaskHandle bound to runner."""
+    doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY)
+    (doc_root / "filters.py").write_text(
+        textwrap.dedent(
+            """
+            from paradoc.filters import Filter, attr
+            from paradoc.tasks import TaskHandle
+
+            class _M(Filter):
+                @attr
+                def n(self) -> int:
+                    return len(self.task.cells())
+
+            mesh_filter = _M(name="mesh_filter", task=TaskHandle.unbound("mesh"))
+            """
+        ).lstrip()
+    )
+
+    result = runner.invoke(build_app, [str(doc_root), "--bind-filters"])
+
+    assert result.exit_code == 0, result.output
+    assert "bound 1 TaskHandle" in result.output
+
+
 def test_build_custom_cache_dir(tmp_path: Path):
     doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY)
     custom_cache = tmp_path / "elsewhere"

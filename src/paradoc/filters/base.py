@@ -17,7 +17,7 @@ import inspect
 from typing import Any, Callable, ClassVar, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
-    from paradoc.tasks import Task
+    from paradoc.tasks import Task, TaskHandle
 
 
 _ATTR_MARKER = "__paradoc_attr__"
@@ -55,21 +55,26 @@ class Filter:
     name : str
         Unique registry name. By convention matches the variable that
         holds the instance in the project's `filters.py`.
-    task : Task | None
-        Optional declarative reference to an upstream `paradoc.tasks.Task`.
-        The runtime does not yet execute tasks; this slot is reserved so
-        filter authors can declare task dependencies today and the future
-        runner can wire them up additively.
+    task : Task | TaskHandle | None
+        Optional declarative reference to an upstream task. Two shapes
+        are accepted:
+
+        - `TaskHandle.unbound(qualname)` — the modern shape. The Runner
+          binds the handle to itself after `run()` finishes (via
+          `paradoc.tasks.bind_filter_handles`); the filter then calls
+          `self.task.cells(**filter_coords)` to pull live cell results.
+        - `Task(...)` — the legacy file-centric BaseModel. Pre-runner
+          declarative-only shape kept for backwards compat.
     """
 
     name: str
-    task: Optional["Task"]
+    task: Optional[Any]
 
     # Subclasses may set this to `True` to opt out of strict-arg-validation,
     # e.g. for filters that pass through arbitrary kwargs to a downstream tool.
     relaxed_args: ClassVar[bool] = False
 
-    def __init__(self, name: str, task: Optional["Task"] = None) -> None:
+    def __init__(self, name: str, task: Optional[Any] = None) -> None:
         if not name.isidentifier():
             raise ValueError(f"Filter name {name!r} must be a valid Python identifier")
         self.name = name

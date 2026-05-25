@@ -31,6 +31,7 @@ import typer
 from .cache import TaskCache
 from .config import build_executor_from_config, load_task_config
 from .discovery import discover_tasks
+from .filter_binding import bind_filter_handles
 from .registry import TaskRegistry, reset_default_registry
 from .runner import Runner
 
@@ -55,6 +56,11 @@ def build(
         help="Print task DAG + cell counts without executing.",
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
+    bind_filters: bool = typer.Option(
+        False,
+        "--bind-filters",
+        help="After the DAG runs, discover filters.py and bind any TaskHandles.",
+    ),
 ) -> None:
     """Execute the task DAG for `<doc_id>`."""
     _configure_logging(verbose)
@@ -108,8 +114,29 @@ def build(
 
         results = runner.run()
         _print_run_summary(runner, results)
+
+        if bind_filters:
+            _bind_filters(doc_root, runner)
     finally:
         runner.shutdown()
+
+
+def _bind_filters(doc_root: Path, runner: Runner) -> None:
+    """Discover this doc's filters.py and bind TaskHandles to the runner.
+
+    Imported lazily so the build command stays usable when paradoc.filters
+    pulls in heavy dependencies that aren't needed for a pure task run.
+    """
+    from paradoc.filters import FilterRegistry, discover_filters
+
+    filter_registry = FilterRegistry()
+    discover_filters(doc_root=doc_root, registry=filter_registry)
+    if not filter_registry.known_names():
+        typer.secho("no filters discovered; nothing to bind.", fg=typer.colors.YELLOW)
+        return
+
+    bound = bind_filter_handles(filter_registry, runner)
+    typer.echo(f"bound {bound} TaskHandle{'s' if bound != 1 else ''} to runner")
 
 
 def _resolve_doc_root(doc_id: str) -> Path:

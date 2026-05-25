@@ -13,6 +13,7 @@ The legacy file-centric `Task` BaseModel is preserved under
 
 from .cache import CacheKey, TaskCache, compute_cache_key
 from .cells import Cell, cells_for, expand_fanout
+from .filter_binding import bind_filter_handles
 from .config import (
     BuildProfile,
     TaskConfig,
@@ -53,6 +54,7 @@ __all__ = [
     "Cell",
     "cells_for",
     "expand_fanout",
+    "bind_filter_handles",
     "Executor",
     "HybridExecutor",
     "InProcessExecutor",

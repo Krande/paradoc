@@ -112,18 +112,33 @@ class Runner:
     def cells_for(self, task: TaskFn | str, **filter_coords: Any) -> list[Cell]:
         """Return cells of `task` whose kwargs match all `filter_coords`.
 
-        `task` accepts either the TaskFn itself or its qualname. Filter
+        `task` accepts either the TaskFn itself, its qualname, or its
+        bare name (decouples filters from specific module paths). Filter
         coords with no match yield an empty list; the filter resolver
         treats that as "no cell selected" and may either error or render
         a placeholder per author preference.
         """
         if not self._expanded:
             self.expand()
-        qualname = task.qualname if isinstance(task, TaskFn) else task
+        if isinstance(task, TaskFn):
+            qualname = task.qualname
+        elif task in self._cells_by_task:
+            qualname = task
+        else:
+            qualname = self._resolve_bare_name(task)
         cells = self._cells_by_task.get(qualname, [])
         if not filter_coords:
             return list(cells)
         return [c for c in cells if all(c.kwargs.get(k) == v for k, v in filter_coords.items())]
+
+    def _resolve_bare_name(self, name: str) -> str:
+        """Map a bare task name to its qualname. Returns `name` unchanged
+        if no match — caller gets an empty cells list, which is the right
+        shape for downstream filter rendering."""
+        for t in self.registry.all_tasks():
+            if t.name == name:
+                return t.qualname
+        return name
 
     # ---------------- execution ----------------
 
