@@ -3,13 +3,21 @@
 Schema (Q5/Q6 from the design doc):
 
     [paradoc]
-    pixi_toml = "../adapy/pixi.toml"   # relative to paradoc.toml
+    # Path to the pixi.toml for this document's build env(s),
+    # resolved relative to paradoc.toml. The recommended layout is
+    # one pixi.toml per document — the doc owns its build env so it
+    # stays reproducible without coupling to sibling packages. Only
+    # docs that *intentionally* verify an external package against
+    # its own pixi env (eg adapy's verification report, which both
+    # tests adapy and uses adapy in its output) should reach across
+    # directories.
+    pixi_toml = "pixi.toml"
 
     [paradoc.envs]
-    default  = "tests"        # alias used by @task(env="default") or env=None
+    default  = "docs"         # alias used by @task(env="default") or env=None
                               # in `PixiSubprocessExecutor`-pure mode
-    meshing  = "fem-deps"     # alias referenced by @task(env="meshing")
-    calculix = "calculix-deps"
+    meshing  = "meshing"      # alias referenced by @task(env="meshing")
+    calculix = "calculix"
 
     # One or more profiles. Profile name = the `paradoc build` argument.
     [build.verification]

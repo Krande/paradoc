@@ -120,8 +120,11 @@ class PixiSubprocessExecutor:
     Constructor args
     ----------------
     pixi_toml : Path
-        Manifest passed to `pixi run --manifest-path`. Usually the
-        consumer repo's pixi.toml.
+        Manifest passed to `pixi run --manifest-path`. By convention
+        sits next to the document's `paradoc.toml` so the doc owns
+        its build env. Cross-directory references are supported (eg
+        a verification report whose env *is* the package under test)
+        but should be the exception, not the default.
     env_map : Mapping[str, str]
         Alias -> pixi env name. The future paradoc.toml `[paradoc.envs]`
         section populates this. `"default"` is the fallback when
