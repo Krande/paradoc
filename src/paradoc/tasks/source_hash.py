@@ -189,14 +189,23 @@ def _is_builtin(obj: Any) -> bool:
 
 
 def _module_fingerprint(obj: Any) -> str:
-    """Module-level proxy for C-extension callables.
+    """Stable identity proxy for non-Python-callable references.
 
-    Prefer `__version__`; fall back to module name.
-    """
+    Prefer `<module>@<version>`. Fall back to the type's
+    qualified name when the object has no module attribute (typical
+    of plain dicts / lists / instances). Using `repr(obj)` here would
+    embed memory addresses (eg `<function ... at 0x7f1...>`) into the
+    hash and make cache keys drift between process invocations — that
+    bug was the original motivation for this branch."""
     mod = inspect.getmodule(obj)
-    if mod is None:
-        return repr(obj)
-    version = getattr(mod, "__version__", None)
-    if version:
-        return f"{mod.__name__}@{version}"
-    return mod.__name__
+    if mod is not None:
+        version = getattr(mod, "__version__", None)
+        if version:
+            return f"{mod.__name__}@{version}"
+        return mod.__name__
+    # No module → typically an instance. Fingerprint by its *type*
+    # path; the textual reference in source AST already covers the
+    # value-level identity in practice. For cases that need stricter
+    # invalidation, authors use `@task(depends_on=[...])`.
+    tp = type(obj)
+    return f"<instance:{tp.__module__}.{tp.__qualname__}>"

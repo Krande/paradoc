@@ -105,6 +105,25 @@ def test_ast_hash_module_fingerprint_fallback_for_c_extension():
     assert h1 == h2
 
 
+def test_ast_hash_stable_for_instance_references():
+    """Functions referencing non-callable instances (eg `copy.deepcopy`,
+    which transitively references a dict like `_deepcopy_dispatch`) must
+    hash deterministically across calls. Earlier, the fallback path used
+    `repr(obj)` for objects without a `__module__`, which embeds memory
+    addresses (`<function ... at 0x7f1...>`) and shifted the digest
+    between processes — silently invalidating every parent_key-bearing
+    cache entry on every build."""
+    import copy
+
+    def uses_deepcopy(x):
+        return copy.deepcopy(x)
+
+    h1 = ast_source_hash(uses_deepcopy)
+    h2 = ast_source_hash(uses_deepcopy)
+    h3 = ast_source_hash(uses_deepcopy)
+    assert h1 == h2 == h3
+
+
 def test_ast_hash_cycle_guard():
     """A function that references itself shouldn't recurse infinitely."""
 
