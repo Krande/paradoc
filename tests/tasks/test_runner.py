@@ -243,7 +243,12 @@ class _RecordingExecutor:
     def __init__(self) -> None:
         self.submitted: list[tuple[Cell, Any]] = []
 
-    def submit(self, cell: Cell, parent_result: Any) -> Future:
+    def submit(
+        self,
+        cell: Cell,
+        parent_result: Any,
+        extra_kwargs: Any = None,
+    ) -> Future:
         self.submitted.append((cell, parent_result))
         fut: Future = Future()
         # Return a deterministic synthetic result so downstream cells have

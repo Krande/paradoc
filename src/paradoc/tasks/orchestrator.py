@@ -24,6 +24,7 @@ from typing import Any, Optional
 from .build_hooks import load_build_hooks
 from .cache import TaskCache
 from .config import build_executor_from_config, load_task_config
+from .context import BuildContext
 from .discovery import discover_tasks
 from .filter_binding import bind_filter_handles
 from .outcomes import dispatch_outcomes
@@ -102,12 +103,22 @@ def build_document(
         cache = TaskCache(cache_dir or (doc_root / ".paradoc-cache"))
 
     executor = build_executor_from_config(config)
+    # Compose the BuildContext from doc_root + cache + work_dir. OneDoc
+    # resolves the default work_dir lazily inside its constructor; when
+    # the caller passes an explicit one we surface it to tasks now.
+    context = BuildContext(
+        doc_root=doc_root,
+        cache_dir=(cache.cache_dir if cache is not None else None),
+        work_dir=(Path(work_dir).resolve() if work_dir is not None else None),
+        assets_dir=(doc_root / "assets"),
+    )
     runner = Runner(
         registry,
         executor=executor,
         cache=cache,
         fanout_overrides=config.fanout_overrides,
         doc_root=doc_root,
+        context=context,
     )
 
     try:

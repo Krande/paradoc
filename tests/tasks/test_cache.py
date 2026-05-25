@@ -321,7 +321,7 @@ def test_cached_result_short_circuits_executor(tmp_path: Path):
     from concurrent.futures import Future
 
     class _ExplodingExecutor:
-        def submit(self, cell, parent_result):
+        def submit(self, cell, parent_result, extra_kwargs=None):
             raise RuntimeError("executor must not be called on a cache hit")
 
         def shutdown(self):

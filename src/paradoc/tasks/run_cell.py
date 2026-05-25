@@ -33,12 +33,14 @@ def main(tmpdir: Path) -> int:
         payload = pickle.load(fh)
     cell = payload["cell"]
     parent_result = payload["parent_result"]
+    extra_kwargs = payload.get("extra_kwargs") or {}
 
     try:
+        merged_kwargs = {**cell.kwargs, **extra_kwargs}
         if parent_result is None:
-            result = cell.task(**cell.kwargs)
+            result = cell.task(**merged_kwargs)
         else:
-            result = cell.task(parent_result, **cell.kwargs)
+            result = cell.task(parent_result, **merged_kwargs)
     except BaseException as exc:
         # Pickle the exception so the controlling side can re-raise.
         # If the exception itself isn't picklable (rare — most are), fall

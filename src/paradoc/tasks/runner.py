@@ -31,6 +31,7 @@ from typing import Any, Optional
 from .cache import CacheKey, TaskCache, compute_cache_key
 from .cells import Cell, expand_fanout
 from .config import merge_fanout
+from .context import BuildContext, ctx_param_name
 from .executors import Executor, InProcessExecutor
 from .models import TaskFn
 from .registry import TaskRegistry
@@ -48,6 +49,7 @@ class Runner:
         cache: Optional[TaskCache] = None,
         fanout_overrides: Optional[dict[str, dict[str, list[Any]]]] = None,
         doc_root: Optional[Path] = None,
+        context: Optional[BuildContext] = None,
     ) -> None:
         self.registry = registry
         self.executor = executor if executor is not None else InProcessExecutor()
@@ -56,6 +58,18 @@ class Runner:
         # `@task(outputs=...)` declarations. The orchestrator passes
         # this through; standalone Runner usage defaults to CWD.
         self.doc_root = Path(doc_root).resolve() if doc_root is not None else None
+        # BuildContext is injected into tasks whose signature declares
+        # a `ctx: BuildContext` parameter. Explicit context wins; else
+        # synthesize one from doc_root + cache so simple uses work.
+        if context is not None:
+            self.context: Optional[BuildContext] = context
+        elif self.doc_root is not None:
+            self.context = BuildContext(
+                doc_root=self.doc_root,
+                cache_dir=(cache.cache_dir if cache is not None else None),
+            )
+        else:
+            self.context = None
         # task qualname (or bare name) -> { axis: [values] }
         # Per-axis replacement, not merge — see config.merge_fanout.
         self.fanout_overrides: dict[str, dict[str, list[Any]]] = fanout_overrides or {}
@@ -67,6 +81,8 @@ class Runner:
         self._cache_keys: dict[int, CacheKey] = {}
         # id(TaskFn) -> bytes (ast hash memo, reused across all cells of a task)
         self._ast_hash_memo: dict[int, bytes] = {}
+        # qualname -> Optional[str] (memoized ctx-parameter discovery)
+        self._ctx_param_memo: dict[str, Optional[str]] = {}
         self._expanded = False
         self._ran = False
         # Counters for observability of cache hit-rate.
@@ -210,6 +226,23 @@ class Runner:
         """Return the subset of declared outputs that don't exist on disk."""
         return [p for p in self._resolve_outputs(cell, parent_result) if not p.exists()]
 
+    def _extra_kwargs_for(self, cell: Cell) -> dict[str, Any]:
+        """Resolve injectable kwargs for a cell.
+
+        Currently the only injectable is `BuildContext`: if the task body
+        declares a parameter annotated `BuildContext`, the runner's
+        context is passed under that name. Discovery is memoized per
+        task qualname since `inspect.signature` is not free."""
+        if self.context is None:
+            return {}
+        qn = cell.task.qualname
+        if qn not in self._ctx_param_memo:
+            self._ctx_param_memo[qn] = ctx_param_name(cell.task.fn)
+        name = self._ctx_param_memo[qn]
+        if name is None:
+            return {}
+        return {name: self.context}
+
     def _resolve_bare_name(self, name: str) -> str:
         """Map a bare task name to its qualname. Returns `name` unchanged
         if no match — caller gets an empty cells list, which is the right
@@ -287,7 +320,8 @@ class Runner:
                         self.cache_misses += 1
                         logger.debug(f"cache miss {key!r}")
 
-                future = self.executor.submit(cell, parent_result)
+                extra_kwargs = self._extra_kwargs_for(cell)
+                future = self.executor.submit(cell, parent_result, extra_kwargs or None)
                 result = future.result()
                 self._results[id(cell)] = result
 

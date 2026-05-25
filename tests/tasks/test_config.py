@@ -176,7 +176,7 @@ def test_hybrid_routes_envless_task_in_process():
         def __init__(self, sink):
             self.sink = sink
 
-        def submit(self, cell, parent_result):
+        def submit(self, cell, parent_result, extra_kwargs=None):
             from concurrent.futures import Future
             self.sink.append(cell)
             f = Future()
@@ -201,7 +201,7 @@ def test_hybrid_shutdown_propagates():
         def __init__(self, name):
             self.name = name
 
-        def submit(self, cell, parent_result):
+        def submit(self, cell, parent_result, extra_kwargs=None):
             from concurrent.futures import Future
             f = Future()
             f.set_result(None)

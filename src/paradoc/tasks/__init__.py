@@ -14,6 +14,7 @@ The legacy file-centric `Task` BaseModel is preserved under
 from .build_hooks import BuildHooks, load_build_hooks
 from .cache import CacheKey, TaskCache, compute_cache_key
 from .cells import Cell, cells_for, expand_fanout
+from .context import BuildContext, ctx_param_name
 from .filter_binding import bind_filter_handles
 from .outcomes import (
     FilterOutcome,
@@ -88,6 +89,8 @@ __all__ = [
     "PickleSerializer",
     "BuildHooks",
     "load_build_hooks",
+    "BuildContext",
+    "ctx_param_name",
     "Outcome",
     "TableOutcome",
     "PlotOutcome",

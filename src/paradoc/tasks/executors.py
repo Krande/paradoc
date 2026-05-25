@@ -57,8 +57,20 @@ logger = logging.getLogger(__name__)
 class Executor(Protocol):
     """Submit-and-await interface for cell evaluation."""
 
-    def submit(self, cell: Cell, parent_result: Any) -> Future:
-        """Schedule the cell for execution and return a Future of its result."""
+    def submit(
+        self,
+        cell: Cell,
+        parent_result: Any,
+        extra_kwargs: Optional[Mapping[str, Any]] = None,
+    ) -> Future:
+        """Schedule the cell for execution and return a Future of its result.
+
+        `extra_kwargs` are merged into `cell.kwargs` at call time but are
+        *not* part of the cell identity — the runner uses this slot to
+        inject the BuildContext into tasks that ask for it (see
+        `paradoc.tasks.context`). They are kept out of `cell.kwargs`
+        proper because they would otherwise pollute cache keys.
+        """
 
     def shutdown(self) -> None:
         """Release any executor-held resources (workers, sockets, ...)."""
@@ -73,13 +85,19 @@ class InProcessExecutor:
     - Debug runs where stack traces should land in the runner's process.
     """
 
-    def submit(self, cell: Cell, parent_result: Any) -> Future:
+    def submit(
+        self,
+        cell: Cell,
+        parent_result: Any,
+        extra_kwargs: Optional[Mapping[str, Any]] = None,
+    ) -> Future:
         future: Future = Future()
         try:
+            kwargs = {**cell.kwargs, **(extra_kwargs or {})}
             if parent_result is None:
-                result = cell.task(**cell.kwargs)
+                result = cell.task(**kwargs)
             else:
-                result = cell.task(parent_result, **cell.kwargs)
+                result = cell.task(parent_result, **kwargs)
             future.set_result(result)
         except BaseException as exc:  # noqa: BLE001 — explicit propagation through Future
             future.set_exception(exc)
@@ -160,8 +178,13 @@ class PixiSubprocessExecutor:
         self.extra_env = dict(extra_env or {})
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="paradoc-pixi")
 
-    def submit(self, cell: Cell, parent_result: Any) -> Future:
-        return self._pool.submit(self._run_one, cell, parent_result)
+    def submit(
+        self,
+        cell: Cell,
+        parent_result: Any,
+        extra_kwargs: Optional[Mapping[str, Any]] = None,
+    ) -> Future:
+        return self._pool.submit(self._run_one, cell, parent_result, dict(extra_kwargs or {}))
 
     def shutdown(self) -> None:
         self._pool.shutdown(wait=True)
@@ -182,7 +205,12 @@ class PixiSubprocessExecutor:
             )
         return self.env_map[raw]
 
-    def _run_one(self, cell: Cell, parent_result: Any) -> Any:
+    def _run_one(
+        self,
+        cell: Cell,
+        parent_result: Any,
+        extra_kwargs: dict[str, Any],
+    ) -> Any:
         env = self._resolve_env(cell)
         tmpdir = Path(tempfile.mkdtemp(prefix="paradoc-cell-"))
         try:
@@ -192,7 +220,11 @@ class PixiSubprocessExecutor:
 
             with input_path.open("wb") as fh:
                 pickle.dump(
-                    {"cell": cell, "parent_result": parent_result},
+                    {
+                        "cell": cell,
+                        "parent_result": parent_result,
+                        "extra_kwargs": extra_kwargs,
+                    },
                     fh,
                     protocol=pickle.HIGHEST_PROTOCOL,
                 )
@@ -253,10 +285,15 @@ class HybridExecutor:
         self.in_process = in_process
         self.pixi = pixi
 
-    def submit(self, cell: Cell, parent_result: Any) -> Future:
+    def submit(
+        self,
+        cell: Cell,
+        parent_result: Any,
+        extra_kwargs: Optional[Mapping[str, Any]] = None,
+    ) -> Future:
         if cell.task.env is None:
-            return self.in_process.submit(cell, parent_result)
-        return self.pixi.submit(cell, parent_result)
+            return self.in_process.submit(cell, parent_result, extra_kwargs)
+        return self.pixi.submit(cell, parent_result, extra_kwargs)
 
     def shutdown(self) -> None:
         self.in_process.shutdown()
