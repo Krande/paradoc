@@ -11,14 +11,17 @@ The legacy file-centric `Task` BaseModel is preserved under
 `Filter.task` and `FEAModelResults.task_id` migrate to `TaskHandle`.
 """
 
+from .cells import Cell, cells_for, expand_fanout
 from .decorator import is_task, task
 from .discovery import discover_tasks
+from .executors import Executor, InProcessExecutor
 from .models import LegacyTaskSpec, Task, TaskFn, TaskHandle
 from .registry import (
     TaskRegistry,
     get_default_registry,
     reset_default_registry,
 )
+from .runner import Runner
 
 __all__ = [
     "task",
@@ -31,4 +34,10 @@ __all__ = [
     "reset_default_registry",
     "LegacyTaskSpec",
     "Task",
+    "Cell",
+    "cells_for",
+    "expand_fanout",
+    "Executor",
+    "InProcessExecutor",
+    "Runner",
 ]

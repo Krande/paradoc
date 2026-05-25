@@ -147,9 +147,9 @@ def test_cycle_detection():
         reg.validate()
 
 
-def test_task_handle_cells_not_yet_implemented():
-    h = TaskHandle(qualname="some.task")
-    with pytest.raises(NotImplementedError, match="requires the task runner"):
+def test_task_handle_unbound_raises():
+    h = TaskHandle.unbound("some.task")
+    with pytest.raises(RuntimeError, match="unbound"):
         h.cells(geom_repr="solid")
 
 

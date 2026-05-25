@@ -65,30 +65,38 @@ class TaskFn:
         return self.fn(*args, **kwargs)
 
 
-@dataclass(frozen=True)
+@dataclass
 class TaskHandle:
-    """Lightweight read-only reference to a TaskFn.
+    """Lightweight reference to a TaskFn, bound to a Runner.
 
-    What filters store in `Filter.task`. Cheap to construct, safe to copy,
-    exposes lookup methods (`.cells(...)`) without giving filters write
-    access to the registry. The actual cells iterator is implemented by
-    the runner — this v0 handle is the type surface.
+    What filters store in `Filter.task`. Created by the Runner during
+    build setup once the cell DAG is expanded; filters then call
+    `.cells(**filter_coords)` to pull the cells that match their
+    pin/override coords (Q1 hybrid).
+
+    The `_runner` back-reference is set by the Runner factory; if
+    `cells()` is called before binding, raises with a clear message.
+    Filters that need a TaskHandle at module import time can use
+    `TaskHandle.unbound(qualname)` and the resolver will bind it later.
     """
 
     qualname: str
+    _runner: Optional[Any] = None  # Runner — Any to avoid circular import
 
     def cells(self, **filter_coords: Any) -> "list[Any]":
-        """Return cells matching the filter coords. Runner-backed.
+        """Return cells matching the filter coords. Runner-backed."""
+        if self._runner is None:
+            raise RuntimeError(
+                f"TaskHandle({self.qualname!r}) is unbound; "
+                f"the Runner must bind it before cells() is callable. "
+                f"This happens automatically during a paradoc build."
+            )
+        return self._runner.cells_for(self.qualname, **filter_coords)
 
-        Not implemented in the scaffolding phase; raises until the runner
-        ships. Filter authors can already reference the handle at module
-        import time; the markdown resolver will defer evaluation until the
-        runner is wired up.
-        """
-        raise NotImplementedError(
-            "TaskHandle.cells() requires the task runner (next phase). "
-            "Scaffolding only collects the declarative surface."
-        )
+    @classmethod
+    def unbound(cls, qualname: str) -> "TaskHandle":
+        """Create a handle without a runner; the resolver binds it later."""
+        return cls(qualname=qualname, _runner=None)
 
 
 # ---------------------------------------------------------------------------

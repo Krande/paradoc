@@ -1,0 +1,150 @@
+"""Runner — walks a TaskRegistry, expands fanout, executes via Executor.
+
+The Runner is the single piece of orchestration code in paradoc.tasks. It:
+
+1. Topologically orders the registered tasks by parent reference.
+2. Expands each task's fanout matrix into Cells (one per parent x fanout
+   combination, with `skip_if` rejections dropped).
+3. Submits each cell to the configured Executor and awaits the result,
+   threading the parent cell's result into the child call.
+4. Stores results keyed by Cell identity so downstream tasks +
+   TaskHandle.cells() lookups can read them.
+
+Scope kept narrow for the v0 cut: no cache (Q4), no subprocess isolation
+(Q8 Option B is enabled by the executor swap, not the runner), no
+version_probe folding (waits for the cache phase that needs it). What it
+does ship is the seam every later feature plugs into.
+
+Filter-side wiring (`Filter.task = TaskHandle(...)`) reads from the
+runner via `runner.cells_for(task, **filter_coords)`. There's no
+module-level singleton runner — multiple concurrent builds each
+construct their own. The filter resolver will be passed the active
+runner when the integration lands.
+"""
+
+from __future__ import annotations
+
+from collections import defaultdict
+from typing import Any, Optional
+
+from .cells import Cell, cells_for
+from .executors import Executor, InProcessExecutor
+from .models import TaskFn
+from .registry import TaskRegistry
+
+
+class Runner:
+    """Walks a TaskRegistry, expands cells, drives the Executor."""
+
+    def __init__(
+        self,
+        registry: TaskRegistry,
+        executor: Optional[Executor] = None,
+    ) -> None:
+        self.registry = registry
+        self.executor = executor if executor is not None else InProcessExecutor()
+        # qualname -> list[Cell]
+        self._cells_by_task: dict[str, list[Cell]] = {}
+        # id(Cell) -> result
+        self._results: dict[int, Any] = {}
+        self._expanded = False
+        self._ran = False
+
+    # ---------------- expansion ----------------
+
+    def expand(self) -> None:
+        """Build the cell DAG without running anything.
+
+        Safe to call separately from `run()` for tooling that wants to
+        introspect the matrix (eg `paradoc inspect-cells`). Idempotent.
+        """
+        if self._expanded:
+            return
+        self.registry.validate()
+        for task in self._topo_sorted():
+            parent_task = self.registry.resolve_parent(task)
+            parent_cells: list[Optional[Cell]]
+            if parent_task is None:
+                parent_cells = []
+            else:
+                parent_cells = list(self._cells_by_task.get(parent_task.qualname, []))
+            self._cells_by_task[task.qualname] = cells_for(task, parent_cells=parent_cells)
+        self._expanded = True
+
+    def cells_for(self, task: TaskFn | str, **filter_coords: Any) -> list[Cell]:
+        """Return cells of `task` whose kwargs match all `filter_coords`.
+
+        `task` accepts either the TaskFn itself or its qualname. Filter
+        coords with no match yield an empty list; the filter resolver
+        treats that as "no cell selected" and may either error or render
+        a placeholder per author preference.
+        """
+        if not self._expanded:
+            self.expand()
+        qualname = task.qualname if isinstance(task, TaskFn) else task
+        cells = self._cells_by_task.get(qualname, [])
+        if not filter_coords:
+            return list(cells)
+        return [c for c in cells if all(c.kwargs.get(k) == v for k, v in filter_coords.items())]
+
+    # ---------------- execution ----------------
+
+    def run(self) -> dict[str, list[Any]]:
+        """Execute every cell in topological order. Returns qualname -> results."""
+        self.expand()
+        for task in self._topo_sorted():
+            for cell in self._cells_by_task[task.qualname]:
+                parent_result = (
+                    self._results.get(id(cell.parent)) if cell.parent is not None else None
+                )
+                future = self.executor.submit(cell, parent_result)
+                self._results[id(cell)] = future.result()
+        self._ran = True
+        return {
+            qn: [self._results[id(c)] for c in cells]
+            for qn, cells in self._cells_by_task.items()
+        }
+
+    def result_for(self, cell: Cell) -> Any:
+        """Look up a previously-computed result. Raises if cell wasn't run."""
+        key = id(cell)
+        if key not in self._results:
+            raise KeyError(f"no result recorded for {cell!r}; did you call run()?")
+        return self._results[key]
+
+    def shutdown(self) -> None:
+        """Release executor resources."""
+        self.executor.shutdown()
+
+    # ---------------- helpers ----------------
+
+    def _topo_sorted(self) -> list[TaskFn]:
+        """Tasks ordered so every task's parent appears earlier in the list."""
+        tasks = self.registry.all_tasks()
+        # Build adjacency: child -> parent qualname.
+        parent_of: dict[str, Optional[str]] = {}
+        for t in tasks:
+            p = self.registry.resolve_parent(t)
+            parent_of[t.qualname] = p.qualname if p else None
+
+        # Kahn's algorithm: roots first, then anyone whose parent is
+        # already resolved.
+        resolved: list[TaskFn] = []
+        remaining = dict(parent_of)
+        by_qn: dict[str, TaskFn] = {t.qualname: t for t in tasks}
+        ready = [qn for qn, p in remaining.items() if p is None]
+        # Stable order: sort the initial roots and each batch of newly-ready
+        # tasks by qualname so the same registry produces the same plan.
+        ready.sort()
+        while ready:
+            cur = ready.pop(0)
+            resolved.append(by_qn[cur])
+            del remaining[cur]
+            newly_ready = sorted(qn for qn, p in remaining.items() if p == cur)
+            ready.extend(newly_ready)
+            for qn in newly_ready:
+                remaining[qn] = None  # mark "no remaining parent dep" so we don't re-list it
+        if remaining:
+            # validate() catches cycles, so this should be unreachable; defensive.
+            raise RuntimeError(f"topological sort stalled, unresolved: {sorted(remaining)!r}")
+        return resolved
