@@ -32,6 +32,7 @@ from .cache import TaskCache
 from .config import build_executor_from_config, load_task_config
 from .discovery import discover_tasks
 from .filter_binding import bind_filter_handles
+from .orchestrator import build_document
 from .registry import TaskRegistry, reset_default_registry
 from .runner import Runner
 
@@ -59,10 +60,29 @@ def build(
     bind_filters: bool = typer.Option(
         False,
         "--bind-filters",
-        help="After the DAG runs, discover filters.py and bind any TaskHandles.",
+        help="(legacy) Discover + bind filters without compiling. "
+        "`--compile` is now the default and does this automatically.",
     ),
+    no_compile: bool = typer.Option(
+        False,
+        "--no-compile",
+        help="Skip OneDoc.compile(); just run the task DAG. "
+        "Useful for quick `--inspect` follow-ups or when the doc has "
+        "no markdown yet.",
+    ),
+    output_name: Optional[str] = typer.Option(
+        None,
+        "--name",
+        help="Output file stem. Defaults to the doc directory name.",
+    ),
+    work_dir: Optional[Path] = typer.Option(
+        None,
+        "--work-dir",
+        help="OneDoc work directory. Defaults to temp/<doc>.",
+    ),
+    auto_open: bool = typer.Option(False, "--auto-open"),
 ) -> None:
-    """Execute the task DAG for `<doc_id>`."""
+    """Execute the task DAG for `<doc_id>` and compile the document."""
     _configure_logging(verbose)
 
     doc_root = _resolve_doc_root(doc_id)
@@ -117,8 +137,55 @@ def build(
 
         if bind_filters:
             _bind_filters(doc_root, runner)
+
+        if not no_compile:
+            _compile_with_runner(
+                doc_root,
+                runner,
+                output_name=output_name,
+                work_dir=work_dir,
+                auto_open=auto_open,
+                outputs=config.outputs,
+            )
     finally:
         runner.shutdown()
+
+
+def _compile_with_runner(
+    doc_root: Path,
+    runner: Runner,
+    *,
+    output_name: Optional[str],
+    work_dir: Optional[Path],
+    auto_open: bool,
+    outputs: list,
+) -> None:
+    """Hand the populated runner to OneDoc and compile.
+
+    OneDoc's `_discover_filters_once` does the filter discovery +
+    TaskHandle binding intrinsically when a `runner=` is set, so the
+    CLI doesn't need to drive that explicitly.
+    """
+    try:
+        from paradoc.document import OneDoc
+    except ImportError as exc:
+        typer.secho(
+            f"compile skipped — paradoc.document not importable: {exc}",
+            fg=typer.colors.YELLOW,
+        )
+        return
+
+    name = output_name or doc_root.name
+    typer.echo(f"compile:  {name}  formats={outputs or '(default)'}")
+    one = OneDoc(source_dir=doc_root, work_dir=work_dir, runner=runner)
+
+    formats: list = list(outputs) if outputs else [None]
+    for fmt in formats:
+        compile_kwargs: dict = {"auto_open": auto_open}
+        if fmt is not None:
+            compile_kwargs["export_format"] = fmt
+        one.compile(name, **compile_kwargs)
+    typer.secho("compile: done", fg=typer.colors.GREEN)
 
 
 def _bind_filters(doc_root: Path, runner: Runner) -> None:

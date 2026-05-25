@@ -149,8 +149,16 @@ class OneDoc:
         use_default_html_style=True,
         bibliography_file=None,
         shelf_base_url=None,
+        runner=None,
         **kwargs,
     ):
+        # `runner` is an optional `paradoc.tasks.Runner` whose DAG has
+        # already executed. When set, `_discover_filters_once()` also
+        # binds every Filter's TaskHandle to it, so `${ eig.cells(...) }`
+        # resolves through the runner's expanded cells. Left None for
+        # backward compat — existing OneDoc users (the legacy compile
+        # path, manual driver scripts) keep working unchanged.
+        self.runner = runner
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
         if work_dir is None:
             work_dir = pathlib.Path("temp") / self.source_dir.name
@@ -1305,6 +1313,17 @@ class OneDoc:
             discover_filters(doc_root=self.source_dir, registry=self._filter_registry)
         except Exception as exc:  # discovery failure should not crash the build
             logger.error(f"filter discovery failed: {exc}")
+        if self.runner is not None:
+            try:
+                from paradoc.tasks import bind_filter_handles
+
+                bind_filter_handles(self._filter_registry, self.runner)
+            except Exception as exc:
+                # A bad TaskHandle reference is a build error, not a
+                # warning — surface it after the existing discovery
+                # error path so users see the right cause.
+                logger.error(f"task-handle binding failed: {exc}")
+                raise
         self._filters_discovered = True
 
     def _resolve_filter_call(self, sub, mdf: MarkDownFile) -> Optional[str]:

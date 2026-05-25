@@ -75,10 +75,15 @@ class BuildProfile(_StrictModel):
 
     `envs` maps env alias -> pixi env name, overriding the top-level
     `[paradoc.envs]` for this profile only.
+
+    `outputs` is a list of export formats (eg `["docx", "pdf"]`) the
+    orchestrator should produce per build. Empty list means "let the
+    caller pick one format" — the CLI's `--format` flag in that case.
     """
 
     fanout: dict[str, dict[str, list[Any]]] = Field(default_factory=dict)
     envs: dict[str, str] = Field(default_factory=dict)
+    outputs: list[str] = Field(default_factory=list)
 
 
 class TasksToml(_StrictModel):
@@ -108,6 +113,7 @@ class TaskConfig:
     pixi_toml: Optional[Path]
     envs: dict[str, str]
     fanout_overrides: dict[str, dict[str, list[Any]]]
+    outputs: list[str] = field(default_factory=list)
     profile: str = "default"
 
 
@@ -161,6 +167,7 @@ def load_task_config(
         pixi_toml=pixi_toml_resolved,
         envs=resolved_envs,
         fanout_overrides=profile_cfg.fanout,
+        outputs=profile_cfg.outputs,
         profile=profile,
     )
 
