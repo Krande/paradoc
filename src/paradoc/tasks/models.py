@@ -16,6 +16,7 @@ runner that turns metadata into a DAG execution lives in the next phase.
 
 from __future__ import annotations
 
+import importlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
@@ -25,6 +26,27 @@ from pydantic import BaseModel, Field
 
 # Sentinel for "no value supplied" so callers can pass None explicitly.
 _UNSET: Any = object()
+
+
+def _resolve_task_by_qualname(qualname: str) -> "TaskFn":
+    """Module-level helper so `TaskFn.__reduce__` is picklable.
+
+    Importing the module by name re-runs its top-level @task decorations,
+    leaving the same TaskFn at the same module attribute. Returning that
+    object preserves identity for the controlling side that pickled it.
+    """
+    module_name, _, name = qualname.rpartition(".")
+    if not module_name:
+        raise ValueError(f"task qualname {qualname!r} has no module")
+    module = importlib.import_module(module_name)
+    target = module
+    for part in name.split("."):
+        target = getattr(target, part)
+    if not isinstance(target, TaskFn):
+        raise TypeError(
+            f"qualname {qualname!r} resolved to {type(target).__name__}, not TaskFn"
+        )
+    return target
 
 
 @dataclass
@@ -63,6 +85,23 @@ class TaskFn:
         upstream of the function call, not inside it.
         """
         return self.fn(*args, **kwargs)
+
+    def __reduce__(self) -> tuple:
+        """Pickle by module-level qualname.
+
+        Without this, pickle would try to serialize the inner `fn` field
+        by `fn.__module__` + `fn.__qualname__`. But `@task` rebinds the
+        module-level name to the TaskFn wrapper, so pickle's
+        identity-check fails ("not the same object as ..."). Reducing
+        through the TaskFn's own qualname dodges the issue entirely:
+        the worker re-imports the module and gets back the same TaskFn
+        instance.
+
+        Decorated callables must be defined at module top level for this
+        to work — closure-scoped @task functions can't be pickled. That
+        constraint matches every other pickle-via-name shape in Python.
+        """
+        return (_resolve_task_by_qualname, (self.qualname,))
 
 
 @dataclass

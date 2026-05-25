@@ -15,7 +15,12 @@ from .cache import CacheKey, TaskCache, compute_cache_key
 from .cells import Cell, cells_for, expand_fanout
 from .decorator import is_task, task
 from .discovery import discover_tasks
-from .executors import Executor, InProcessExecutor
+from .executors import (
+    Executor,
+    InProcessExecutor,
+    PixiSubprocessError,
+    PixiSubprocessExecutor,
+)
 from .models import LegacyTaskSpec, Task, TaskFn, TaskHandle
 from .registry import (
     TaskRegistry,
@@ -41,6 +46,8 @@ __all__ = [
     "expand_fanout",
     "Executor",
     "InProcessExecutor",
+    "PixiSubprocessError",
+    "PixiSubprocessExecutor",
     "Runner",
     "TaskCache",
     "CacheKey",
