@@ -26,10 +26,12 @@ What's deliberately deferred (per Q4 hard cuts):
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
 import pickle
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -146,7 +148,8 @@ class TaskCache:
         """Load a cached result. Raises FileNotFoundError on miss."""
         path = self._pkl_path(key)
         with path.open("rb") as fh:
-            return pickle.load(fh)
+            with _bumped_recursion_limit(50_000):
+                return pickle.load(fh)
 
     def put(
         self,
@@ -168,7 +171,8 @@ class TaskCache:
         tmp_meta = meta.with_suffix(".meta.tmp")
 
         with tmp_pkl.open("wb") as fh:
-            pickle.dump(result, fh, protocol=pickle.HIGHEST_PROTOCOL)
+            with _bumped_recursion_limit(50_000):
+                pickle.dump(result, fh, protocol=pickle.HIGHEST_PROTOCOL)
         meta_doc = {
             "qualname": key.qualname,
             "hex": key.hex,
@@ -194,6 +198,24 @@ class TaskCache:
         for child in sorted(self.cache_dir.rglob("*"), reverse=True):
             if child.is_dir():
                 child.rmdir()
+
+
+@contextlib.contextmanager
+def _bumped_recursion_limit(target: int):
+    """Bump sys.recursionlimit for the duration of a pickle round-trip.
+
+    Mesh-rich Assembly graphs (eg adapy's 8k-node verification mesh)
+    blow past Python's default 1000-frame limit during the recursive
+    __reduce__ traversal. The bump is contained to the with-block so
+    nothing else in the process sees the elevated limit.
+    """
+    old = sys.getrecursionlimit()
+    if target > old:
+        sys.setrecursionlimit(target)
+    try:
+        yield
+    finally:
+        sys.setrecursionlimit(old)
 
 
 def _meta_safe(d: dict[str, Any]) -> dict[str, Any]:
