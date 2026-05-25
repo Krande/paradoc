@@ -89,6 +89,23 @@ class TaskFn:
     When set, the runner uses it instead of the cache's default for this
     task's cell results. Useful for tasks producing large object graphs
     where pickle is too expensive."""
+    outputs: Optional[Any] = None
+    """Optional declaration of file paths this task produces on disk.
+
+    Accepts:
+    - `list[str | Path]` — static paths (relative to doc_root).
+    - `Callable[..., list[str | Path]]` — per-cell paths. Called with
+      the same arguments the task body receives (parent_result or
+      upstream_list as first positional, then **cell.kwargs).
+
+    Used by the runner as a pre-flight check on cache hits: if the
+    cache key matches but any declared output is missing on disk, the
+    cell is re-executed. Solves the "task wrote a file last build, then
+    user deleted the file, now the cache lies" failure mode.
+
+    None means "no file outputs declared" — the cache is purely the
+    pickled return value.
+    """
 
     @property
     def qualname(self) -> str:

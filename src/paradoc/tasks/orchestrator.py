@@ -107,6 +107,7 @@ def build_document(
         executor=executor,
         cache=cache,
         fanout_overrides=config.fanout_overrides,
+        doc_root=doc_root,
     )
 
     try:

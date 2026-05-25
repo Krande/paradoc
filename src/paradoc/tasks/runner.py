@@ -25,6 +25,7 @@ runner when the integration lands.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any, Optional
 
 from .cache import CacheKey, TaskCache, compute_cache_key
@@ -46,10 +47,15 @@ class Runner:
         executor: Optional[Executor] = None,
         cache: Optional[TaskCache] = None,
         fanout_overrides: Optional[dict[str, dict[str, list[Any]]]] = None,
+        doc_root: Optional[Path] = None,
     ) -> None:
         self.registry = registry
         self.executor = executor if executor is not None else InProcessExecutor()
         self.cache = cache
+        # doc_root is the base for resolving relative paths in
+        # `@task(outputs=...)` declarations. The orchestrator passes
+        # this through; standalone Runner usage defaults to CWD.
+        self.doc_root = Path(doc_root).resolve() if doc_root is not None else None
         # task qualname (or bare name) -> { axis: [values] }
         # Per-axis replacement, not merge — see config.merge_fanout.
         self.fanout_overrides: dict[str, dict[str, list[Any]]] = fanout_overrides or {}
@@ -162,6 +168,48 @@ class Runner:
             return list(cells)
         return [c for c in cells if all(c.kwargs.get(k) == v for k, v in filter_coords.items())]
 
+    def _resolve_outputs(self, cell: Cell, parent_result: Any) -> list[Path]:
+        """Resolve `task.outputs` to a list of concrete Paths.
+
+        Static list: paths used as-is (after Path-wrapping). Callable:
+        invoked with the same first positional arg the task body would
+        receive (parent_result or the filtered upstream list) plus
+        `**cell.kwargs`. Returns absolute paths anchored at
+        `self.doc_root` when set, else as-is (Path.exists resolves
+        against CWD).
+        """
+        outputs = cell.task.outputs
+        if outputs is None:
+            return []
+
+        if isinstance(outputs, (list, tuple)):
+            raw = outputs
+        elif callable(outputs):
+            if cell.upstream:
+                # parent_result is the filtered upstream list for aggregators
+                raw = outputs(parent_result, **cell.kwargs)
+            elif cell.parent is not None:
+                raw = outputs(parent_result, **cell.kwargs)
+            else:
+                raw = outputs(**cell.kwargs)
+        else:
+            raise TypeError(
+                f"@task(outputs=...) on {cell.task.qualname!r} must be a "
+                f"list or callable, got {type(outputs).__name__}"
+            )
+
+        resolved: list[Path] = []
+        for p in raw:
+            path = Path(p)
+            if not path.is_absolute() and self.doc_root is not None:
+                path = self.doc_root / path
+            resolved.append(path)
+        return resolved
+
+    def _missing_outputs(self, cell: Cell, parent_result: Any) -> list[Path]:
+        """Return the subset of declared outputs that don't exist on disk."""
+        return [p for p in self._resolve_outputs(cell, parent_result) if not p.exists()]
+
     def _resolve_bare_name(self, name: str) -> str:
         """Map a bare task name to its qualname. Returns `name` unchanged
         if no match — caller gets an empty cells list, which is the right
@@ -219,12 +267,25 @@ class Runner:
                     self._cache_keys[id(cell)] = key
                     serializer = cell.task.serializer  # None => cache default
                     if self.cache.has(key, serializer=serializer):
-                        self._results[id(cell)] = self.cache.get(key, serializer=serializer)
-                        self.cache_hits += 1
-                        logger.debug(f"cache hit  {key!r}")
-                        continue
-                    self.cache_misses += 1
-                    logger.debug(f"cache miss {key!r}")
+                        # Pre-flight: if the task declared file outputs,
+                        # verify they all exist on disk. A cache key that
+                        # matches data but points at deleted files is a
+                        # stale-cache footgun; re-execute to regenerate.
+                        missing = self._missing_outputs(cell, parent_result)
+                        if missing:
+                            self.cache_misses += 1
+                            logger.debug(
+                                f"cache miss (outputs missing) {key!r}: "
+                                f"{[str(p) for p in missing]}"
+                            )
+                        else:
+                            self._results[id(cell)] = self.cache.get(key, serializer=serializer)
+                            self.cache_hits += 1
+                            logger.debug(f"cache hit  {key!r}")
+                            continue
+                    else:
+                        self.cache_misses += 1
+                        logger.debug(f"cache miss {key!r}")
 
                 future = self.executor.submit(cell, parent_result)
                 result = future.result()

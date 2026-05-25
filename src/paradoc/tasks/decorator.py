@@ -50,6 +50,7 @@ def task(  # @task(...)
     version_probe: Optional[Callable[[dict[str, Any]], str]] = None,
     depends_on: Optional[list[Callable[..., Any]]] = None,
     serializer: Optional[Any] = None,
+    outputs: Optional[Any] = None,
 ) -> Callable[[Callable[..., Any]], TaskFn]: ...
 
 
@@ -66,6 +67,7 @@ def task(  # type: ignore[misc]
     version_probe: Optional[Callable[[dict[str, Any]], str]] = None,
     depends_on: Optional[list[Callable[..., Any]]] = None,
     serializer: Optional[Any] = None,
+    outputs: Optional[Any] = None,
 ):
     """Mark a callable as a paradoc task. See module docstring for usage."""
 
@@ -83,6 +85,12 @@ def task(  # type: ignore[misc]
                 "If you need per-axis aggregation, declare multiple "
                 "aggregator tasks each filtering the upstream list."
             )
+        if outputs is not None and not (callable(outputs) or isinstance(outputs, (list, tuple))):
+            raise TypeError(
+                f"@task on {target.__name__}: `outputs=` must be a list of "
+                f"paths or a callable returning a list, got "
+                f"{type(outputs).__name__}."
+            )
 
         task_fn = TaskFn(
             fn=target,
@@ -95,6 +103,7 @@ def task(  # type: ignore[misc]
             version_probe=version_probe,
             depends_on=depends_on or [],
             serializer=serializer,
+            outputs=outputs,
         )
         # functools.wraps copies __name__, __doc__, __module__, etc. onto
         # the TaskFn so introspection (and the qualname property) behaves
