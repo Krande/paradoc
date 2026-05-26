@@ -150,6 +150,7 @@ class OneDoc:
         bibliography_file=None,
         shelf_base_url=None,
         runner=None,
+        doc_root=None,
         **kwargs,
     ):
         # `runner` is an optional `paradoc.tasks.Runner` whose DAG has
@@ -160,6 +161,15 @@ class OneDoc:
         # path, manual driver scripts) keep working unchanged.
         self.runner = runner
         self.source_dir = pathlib.Path().resolve().absolute() if source_dir is None else pathlib.Path(source_dir)
+        # `doc_root` is the dir containing paradoc.toml / tasks.py /
+        # filters.py / _assets/ — equals source_dir for flat layouts and
+        # source_dir.parent when paradoc.toml's source_dir points at a
+        # subdir (e.g. `verification/` doc_root with markdown under
+        # `verification/report/`). Figure-source filters that need to
+        # read pre-baked artefacts from the source tree resolve them
+        # against this path. Falls back to source_dir for backward
+        # compat with callers that don't pass a value.
+        self.doc_root = pathlib.Path(doc_root).resolve() if doc_root is not None else self.source_dir
         if work_dir is None:
             work_dir = pathlib.Path("temp") / self.source_dir.name
         self.work_dir = pathlib.Path(work_dir).resolve().absolute()
@@ -1151,7 +1161,7 @@ class OneDoc:
         """
         from paradoc.db.models import ThreeDData
         from paradoc.figure_sources.filters import get_filter_for
-        from paradoc.figure_sources.filters.base import RenderResult
+        from paradoc.figure_sources.filters.base import MarkdownChunk, RenderResult
         from paradoc.figure_sources.preprocessor import preprocess_markdown
 
         bundle_root = self.build_dir
@@ -1161,36 +1171,48 @@ class OneDoc:
             key = self._allocate_figure_source_key(spec.figure_source)
             try:
                 filter_cls = get_filter_for(spec.figure_source)
-                filter_inst = filter_cls(bundle_root=bundle_root)
+                filter_inst = filter_cls(
+                    bundle_root=bundle_root,
+                    doc_root=self.doc_root,
+                )
                 raw = filter_inst.render(spec, key=key)
             except Exception as exc:
                 logger.error(f'figure-source filter failed for key {key!r}: {exc}')
                 return f"<!-- paradoc:figure ERROR: {exc} -->"
 
-            # Multi-figure filters (FEA artefact-bundle's `per_mode`
-            # layout, future history-output series) return a list of
-            # RenderResults. Normalise to a list so single-figure
-            # filters keep working through the same code path. One
-            # markdown image tag + one ThreeDData row per result;
-            # derived keys preserve uniqueness in the asset store.
-            if isinstance(raw, RenderResult):
-                results = [raw]
+            # Filters return either a single entry, or a list of entries.
+            # Entries are RenderResult (one figure) or MarkdownChunk (raw
+            # text spliced as-is — used by per-case grouping filters to
+            # interleave headings between figures). Normalise to a list.
+            if isinstance(raw, (RenderResult, MarkdownChunk)):
+                entries = [raw]
             else:
-                results = list(raw)
-            if not results:
+                entries = list(raw)
+            if not entries:
                 logger.warning(
-                    f'figure-source filter for key {key!r} returned no results'
+                    f'figure-source filter for key {key!r} returned no entries'
                 )
                 return f"<!-- paradoc:figure {key} produced no results -->"
 
             markdown_parts: list[str] = []
-            for i, result in enumerate(results):
-                # First row keeps the allocated key (back-compat with
-                # single-figure flows + matches the key the static
-                # export uses for the canonical figure); subsequent
-                # rows get the `_2`, `_3` suffix the FEA bake convention
-                # already produces for mode-view ThreeDData rows.
-                sub_key = key if i == 0 else f"{key}_{i + 1}"
+            result_idx = 0
+            for entry in entries:
+                if isinstance(entry, MarkdownChunk):
+                    # Splice raw text. Filter owns its own whitespace —
+                    # the outer "\n\n".join still applies between entries,
+                    # so a chunk that ends with "\n" sits one blank line
+                    # before the next entry, which is what pandoc
+                    # expects between block-level constructs.
+                    markdown_parts.append(entry.text)
+                    continue
+
+                # RenderResult: register a ThreeDData row + emit an image
+                # tag. Sub-key index advances only across RenderResults so
+                # interleaved chunks don't bump it (a `<key>` / `<key>_2`
+                # / `<key>_3` sequence stays gap-free).
+                result = entry
+                sub_key = key if result_idx == 0 else f"{key}_{result_idx + 1}"
+                result_idx += 1
                 self.db_manager.add_three_d(
                     ThreeDData(
                         key=sub_key,

@@ -165,7 +165,12 @@ def build_document(
         # the doc root.
         source_dir = config.source_dir or doc_root
 
-        one = OneDoc(source_dir=source_dir, work_dir=work_dir, runner=runner)
+        one = OneDoc(
+            source_dir=source_dir,
+            work_dir=work_dir,
+            runner=runner,
+            doc_root=doc_root,
+        )
 
         # Pre-register filters from doc_root (not source_dir) so the
         # convention `<doc_root>/filters.py` works even when markdown
