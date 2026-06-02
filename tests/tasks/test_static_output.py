@@ -231,7 +231,7 @@ def test_orchestrator_static_target_absolute_passes_through(tmp_path: Path):
         outputs = ["static"]
 
         [build.default.static]
-        target = "{abs_target}"
+        target = "{abs_target.as_posix()}"
         """,
     )
 
