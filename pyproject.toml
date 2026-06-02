@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paradoc"
-version = "0.5.0"
+version = "0.6.0"
 authors = [
     { name = "Kristoffer H. Andersen", email = "kristoffer_andersen@outlook.com" },
 ]
@@ -34,6 +34,7 @@ paradoc-serve = "paradoc.serve.cli:app"
 [project.urls]
 "Homepage" = "https://github.com/Krande/paradoc"
 "Bug Tracker" = "https://github.com/Krande/paradoc/issues"
+
 
 [tool.setuptools.packages.find]
 where = ["src"]

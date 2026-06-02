@@ -2,6 +2,23 @@
 
 
 
+## v0.6.0 (2026-06-02)
+
+### Chore
+
+* chore: Bump prefix-dev/setup-pixi from 0.9.3 to 0.9.4 in the dependencies group (#27)
+
+Signed-off-by: dependabot[bot] &lt;support@github.com&gt;
+Co-authored-by: dependabot[bot] &lt;49699333+dependabot[bot]@users.noreply.github.com&gt;
+Co-authored-by: Kristoffer Andersen &lt;kristoffer_andersen@outlook.com&gt; ([`10ab7c4`](https://github.com/Krande/paradoc/commit/10ab7c413af54777e4dd735c21f63a9aa96fc767))
+
+### Feature
+
+* feat: figure sources (#30)
+
+Co-authored-by: Claude Opus 4.7 (1M context) &lt;noreply@anthropic.com&gt; ([`3786431`](https://github.com/Krande/paradoc/commit/378643111a63c0de783008ff060052b3cf58791b))
+
+
 ## v0.5.0 (2026-02-04)
 
 ### Chore
