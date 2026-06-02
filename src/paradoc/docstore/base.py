@@ -5,7 +5,7 @@ Phase 5 and Phase 10 both consume this. The two implementations
 small enough to be obvious but specific enough to support chunked
 binary streaming.
 
-Each read method takes a :class:`paradoc.serve.scope.Scope` so the
+Each read method takes a :class:`paradoc.docstore.scope.Scope` so the
 DocStore can resolve to ``<root>/<scope.prefix()>/<doc_id>/...``.
 ``Scope.shared()`` is the default for backwards-compat with single-doc
 deployments; ``user`` and ``project`` scopes only make sense for
@@ -20,22 +20,15 @@ from typing import TYPE_CHECKING, AsyncIterator, Optional
 
 from paradoc.db.models import PlotData, TableData, ThreeDData
 
-if TYPE_CHECKING:
-    from paradoc.serve.scope import Scope
+from .scope import Scope
 
+if TYPE_CHECKING:
     from .manifest import BundleManifest
 
 
-def _default_shared_scope() -> "Scope":
-    """Local helper avoiding a top-level import of paradoc.serve.scope.
-
-    ``paradoc.serve`` depends on ``paradoc.docstore``, so importing
-    ``Scope`` at module top would create a cycle. Each method that wants
-    a default reaches for this — cheap and obvious.
-    """
-    from paradoc.serve.scope import Scope as _Scope
-
-    return _Scope.shared()
+def _default_shared_scope() -> Scope:
+    """Default scope for backwards-compat single-doc deployments."""
+    return Scope.shared()
 
 
 @dataclass(frozen=True)

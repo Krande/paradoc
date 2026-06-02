@@ -28,4 +28,8 @@ jobs:
           cache: true
 
       - name: Runs Tests
-        run: pixi run test
+        # Explicit env: the `test` task is also provided by the `e2e`
+        # environment (it shares the `test` feature), so a bare
+        # `pixi run test` is ambiguous. Serve/e2e-only tests skip
+        # cleanly here via `pytest.importorskip` (fastapi/uvicorn).
+        run: pixi run -e test test

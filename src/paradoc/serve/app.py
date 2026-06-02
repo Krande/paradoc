@@ -23,9 +23,47 @@ from typing import Any, Optional
 from paradoc.docstore import DocStore
 
 from .auth import AuthConfig, User
-from .scope import Scope, scope_from_path
+from .scope import Scope, ScopeParseError, can_access, parse_scope, resolve_project_slug
 
 logger = logging.getLogger(__name__)
+
+
+def scope_from_path():
+    """Build a FastAPI dependency that resolves the ``{scope}`` path
+    segment into a :class:`Scope`, slug-resolves it, and enforces
+    :func:`can_access`. Routes hang off this dep:
+
+        @app.get("/api/scopes/{scope}/things")
+        async def list_things(s: Scope = Depends(scope_from_path())):
+            ...
+
+    Lives here in the web layer (not in :mod:`paradoc.serve.scope`)
+    because it's the only piece that needs FastAPI's ``Request`` /
+    ``Depends``. The pure scope domain logic it calls stays fastapi-free.
+    """
+    from fastapi import Depends, HTTPException, Request
+
+    from . import auth as auth_module
+
+    async def _dep(
+        scope: str,
+        request: Request,
+        user: User = Depends(auth_module.current_user),
+    ) -> Scope:
+        try:
+            s = parse_scope(scope, user)
+        except ScopeParseError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        pool = getattr(request.app.state, "db_pool", None)
+        try:
+            s = await resolve_project_slug(pool, s)
+        except PermissionError:
+            raise HTTPException(status_code=403, detail="forbidden")
+        if not await can_access(user, s, pool):
+            raise HTTPException(status_code=403, detail="forbidden")
+        return s
+
+    return _dep
 
 
 def _pkg_version(name: str) -> Optional[str]:

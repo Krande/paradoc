@@ -12,7 +12,16 @@ import json
 
 import pytest
 
-from paradoc.serve.auth import TokenError, User, _bearer_token, load_config_from_env
+# paradoc.serve.auth imports fastapi at module load, so skip this whole
+# module in the lightweight `test` env (fastapi only ships in serve/e2e).
+pytest.importorskip("fastapi")
+
+from paradoc.serve.auth import (  # noqa: E402
+    TokenError,
+    User,
+    _bearer_token,
+    load_config_from_env,
+)
 
 
 class _CaseInsensitiveHeaders(dict):

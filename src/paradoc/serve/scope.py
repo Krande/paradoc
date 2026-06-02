@@ -1,16 +1,16 @@
-"""Storage scopes for paradoc-serve.
+"""Scope authorization + URL parsing for paradoc-serve.
 
-Three tiers, each mapped to a stable URL/storage prefix:
+The :class:`Scope` value type itself lives in
+:mod:`paradoc.docstore.scope` (fastapi-free, so the docstore layer can
+depend on it); it is re-exported here for convenience. This module adds
+the serve-layer concerns that the docstore does not need: parsing a URL
+scope segment, slug→uuid resolution against the DB, and the
+authorization predicate.
 
-* ``shared``                — any authenticated user can read; admin
-  writes (admin role checked at the route level via :func:`require_admin`).
-* ``projects/<project_id>`` — visible to members of the project.
-* ``users/<user_id>``       — owner-only.
-
-Derived blobs inherit their source's scope. The DocStore layer takes a
-:class:`Scope` per call and builds the on-bucket prefix; this module
-owns only the scope→prefix mapping, the URL-segment parser, and the
-authorization predicate. DB queries live in :mod:`db.py`.
+The FastAPI dependency that wires these into routes (`scope_from_path`)
+lives in the app factory (:mod:`paradoc.serve.app`), where the hard
+fastapi import belongs — keeping this module importable without the
+serve extras.
 
 URL convention for routes that operate on a scope:
 
@@ -28,57 +28,21 @@ audit separately.
 from __future__ import annotations
 
 import uuid as _uuid
-from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import TYPE_CHECKING
 
-# Request must be resolvable as a module-global so FastAPI's
-# get_type_hints() can evaluate the string-form annotations on the
-# inner _dep below (forced into strings by ``from __future__ import
-# annotations``).
-from fastapi import Request
+from ..docstore.scope import Scope, ScopeKind
 
-from .auth import User
+if TYPE_CHECKING:
+    from .auth import User
 
-ScopeKind = Literal["shared", "project", "user"]
-
-
-@dataclass(frozen=True)
-class Scope:
-    kind: ScopeKind
-    # project_id (uuid string) for ``project``, user_id (uuid string) for
-    # ``user``, None for ``shared``. Stored as a plain string so it
-    # round-trips cleanly through URL paths regardless of source.
-    id: Optional[str] = None
-
-    def __post_init__(self) -> None:
-        if self.kind == "shared":
-            if self.id is not None:
-                raise ValueError("shared scope has no id")
-        else:
-            if not self.id:
-                raise ValueError(f"{self.kind} scope requires an id")
-
-    def prefix(self) -> str:
-        """Bucket-relative prefix this scope occupies. No leading slash."""
-        if self.kind == "shared":
-            return "shared"
-        if self.kind == "project":
-            return f"projects/{self.id}"
-        if self.kind == "user":
-            return f"users/{self.id}"
-        raise AssertionError(f"unknown scope kind {self.kind!r}")
-
-    @classmethod
-    def shared(cls) -> "Scope":
-        return cls(kind="shared")
-
-    @classmethod
-    def project(cls, project_id: str) -> "Scope":
-        return cls(kind="project", id=project_id)
-
-    @classmethod
-    def user(cls, user_id: str) -> "Scope":
-        return cls(kind="user", id=user_id)
+__all__ = [
+    "Scope",
+    "ScopeKind",
+    "ScopeParseError",
+    "parse_scope",
+    "resolve_project_slug",
+    "can_access",
+]
 
 
 class ScopeParseError(ValueError):
@@ -86,7 +50,7 @@ class ScopeParseError(ValueError):
     by the FastAPI dep that consumes :func:`parse_scope`."""
 
 
-def parse_scope(raw: str, user: User) -> Scope:
+def parse_scope(raw: str, user: "User") -> Scope:
     """Parse a URL scope segment into a :class:`Scope`.
 
     Accepted forms:
@@ -137,7 +101,7 @@ async def resolve_project_slug(pool, scope: Scope) -> Scope:
     return Scope.project(resolved)
 
 
-async def can_access(user: User, scope: Scope, db_pool=None) -> bool:
+async def can_access(user: "User", scope: Scope, db_pool=None) -> bool:
     """Authorization predicate.
 
     * ``shared`` — any authenticated user (read).
@@ -160,44 +124,3 @@ async def can_access(user: User, scope: Scope, db_pool=None) -> bool:
 
         return await db_module.is_project_member(db_pool, project_id=scope.id or "", user_id=user.id)
     return False
-
-
-# ── FastAPI dependency helper ────────────────────────────────────────
-
-
-def scope_from_path():
-    """Build a FastAPI dependency that resolves the ``{scope}`` path
-    segment into a :class:`Scope`, slug-resolves it, and enforces
-    :func:`can_access`. Routes hang off this dep:
-
-        @app.get("/api/scopes/{scope}/things")
-        async def list_things(s: Scope = Depends(scope_from_path())):
-            ...
-
-    The factory shape mirrors how FastAPI prefers dep wiring — the
-    returned function reads the path parameter ``scope`` and the
-    current user / request via FastAPI's own injection.
-    """
-    from fastapi import Depends, HTTPException
-
-    from . import auth as auth_module
-
-    async def _dep(
-        scope: str,
-        request: Request,
-        user: User = Depends(auth_module.current_user),
-    ) -> Scope:
-        try:
-            s = parse_scope(scope, user)
-        except ScopeParseError as exc:
-            raise HTTPException(status_code=400, detail=str(exc))
-        pool = getattr(request.app.state, "db_pool", None)
-        try:
-            s = await resolve_project_slug(pool, s)
-        except PermissionError:
-            raise HTTPException(status_code=403, detail="forbidden")
-        if not await can_access(user, s, pool):
-            raise HTTPException(status_code=403, detail="forbidden")
-        return s
-
-    return _dep

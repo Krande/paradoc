@@ -8,6 +8,7 @@ import pytest
 
 from paradoc.db import DbManager, ThreeDData, dataframe_to_table_data
 from paradoc.docstore import LocalDocStore, write_manifest
+from paradoc.docstore.scope import Scope
 
 
 def _build_single_doc_bundle(tmp_path, doc_id="my_doc"):
@@ -86,10 +87,12 @@ def test_open_binary_unknown_key(tmp_path):
 
 
 def test_traversal_attempt_rejected(tmp_path):
-    bundle, _, _ = _build_single_doc_bundle(tmp_path)
-    store = LocalDocStore(bundle)
+    # Multi-doc store: an empty root (no db file) keeps `_is_single_doc()`
+    # False, so the scope-relative traversal guard in `_bundle_dir` runs
+    # (single-doc mode treats the root as the bundle and ignores doc_id).
+    store = LocalDocStore(tmp_path)
     with pytest.raises((PermissionError, FileNotFoundError)):
-        store._bundle_dir("../escape")
+        store._bundle_dir("../escape", Scope.shared())
 
 
 def test_list_doc_ids_single(tmp_path):

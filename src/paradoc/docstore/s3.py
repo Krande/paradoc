@@ -31,7 +31,7 @@ from .base import DocStore, _default_shared_scope
 from .manifest import BundleManifest
 
 if TYPE_CHECKING:
-    from paradoc.serve.scope import Scope
+    from .scope import Scope
 
 
 def _env_first(*names: str) -> Optional[str]:

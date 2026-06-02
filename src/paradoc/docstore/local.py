@@ -31,9 +31,8 @@ from .base import DocStore, _default_shared_scope
 from .manifest import read_manifest
 
 if TYPE_CHECKING:
-    from paradoc.serve.scope import Scope
-
     from .manifest import BundleManifest
+    from .scope import Scope
 
 
 class LocalDocStore(DocStore):
