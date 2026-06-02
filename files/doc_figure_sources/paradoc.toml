@@ -1,0 +1,8 @@
+[tasks]
+
+# Custom camera presets — referenced from markdown as `camera_pos: detail_iso`.
+[cameras.custom.detail_iso]
+azimuth_deg = 45.0
+elevation_deg = 20.0
+distance = 0.6
+fov_deg = 35.0

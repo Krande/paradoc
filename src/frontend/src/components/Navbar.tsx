@@ -1,0 +1,126 @@
+import React, { useEffect } from 'react'
+
+export type TocItem = {
+  id: string
+  text: string
+  level: number // 0-based: h1 -> 0
+  number?: string // Optional heading number (e.g., "1.1", "A.2")
+}
+
+type NavbarProps = {
+  toc: TocItem[]
+  open: boolean
+  onClose: () => void
+}
+
+export function Navbar({ toc, open, onClose }: NavbarProps) {
+  const NavList = (
+    <nav className="p-2">
+      <ul className="space-y-1">
+        {toc.map((item) => (
+          <li key={item.id}>
+            <a
+              className="cursor-pointer block text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded px-2 py-1"
+              style={{ paddingLeft: `${item.level * 16 + 8}px` }}
+              href={`#${item.id}`}
+              onClick={(e) => {
+                e.preventDefault()
+                const el = document.getElementById(item.id)
+                if (el) {
+                  // Find the reader's overflow-auto container explicitly
+                  // (it carries `data-search-root`). Scroll *only* that
+                  // container — neither `window.scrollTo` (worked on
+                  // desktop, triggered the visual-viewport pinch-zoom
+                  // heuristic on mobile) nor `scrollIntoView` (walks
+                  // multiple scroll ancestors on iOS / Android Chrome,
+                  // shifting the page chrome and pushing the topbar
+                  // out of view).
+                  const scroller = el.closest('[data-search-root]') as HTMLElement | null
+                  if (scroller) {
+                    const elRect = el.getBoundingClientRect()
+                    const scRect = scroller.getBoundingClientRect()
+                    const target = elRect.top - scRect.top + scroller.scrollTop - 16
+                    scroller.scrollTo({
+                      top: Math.max(0, target),
+                      behavior: 'smooth',
+                    })
+                  } else {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                }
+                onClose()
+              }}
+              aria-label={`Go to ${item.text}`}
+            >
+              {item.number && <span className="mr-2 text-gray-500 dark:text-gray-400">{item.number}</span>}
+              {item.text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+
+  useEffect(() => {
+    if (!open) {
+      const panel = document.getElementById('paradoc-mobile-drawer')
+      const active = document.activeElement as HTMLElement | null
+      if (panel && active && panel.contains(active)) {
+        try { active.blur() } catch {}
+      }
+    }
+  }, [open])
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside className={`${open ? 'md:flex' : 'md:hidden'} hidden flex-col w-72 shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-gray-950/60 backdrop-blur sticky top-0 h-dvh overflow-auto`}>
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Outline</div>
+        </div>
+        {NavList}
+      </aside>
+
+      {/* Mobile drawer */}
+      <div
+        id="paradoc-mobile-drawer-root"
+        className={`fixed inset-0 z-40 md:hidden ${open ? 'pointer-events-auto' : 'pointer-events-none'}`}
+        {...(!open ? ({ inert: true } as any) : {})}
+      >
+        {/* Backdrop */}
+        <div
+          className={`absolute inset-0 bg-black/20 transition-opacity ${open ? 'opacity-100' : 'opacity-0'}`}
+          onClick={onClose}
+        />
+        {/* Panel. Tailwind v4 dropped the `transform` helper class —
+            it still emits a CSS rule but the rule references legacy
+            `--tw-rotate` / `--tw-skew-*` vars that don't exist in v4,
+            so the resulting `transform: translate(…) rotate(…) skew(…)`
+            value is invalid and the browser falls back to `none`. The
+            v4-correct utilities (`-translate-x-full` / `translate-x-0`)
+            already set the CSS `translate` property directly, so we
+            need `transition-[translate]` to animate that property
+            instead of the old `transition-transform`. */}
+        <aside
+          className={`absolute left-0 top-0 bottom-0 w-72 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 shadow-xl transition-[translate] duration-150 ease-out ${open ? 'translate-x-0' : '-translate-x-full'}`}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+            <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Outline</div>
+            <button
+              className="cursor-pointer inline-flex items-center justify-center rounded p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              onClick={onClose}
+              aria-label="Close contents"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+          <div className="h-full overflow-auto">{NavList}</div>
+        </aside>
+      </div>
+    </>
+  )
+}

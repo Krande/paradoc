@@ -1,0 +1,71 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "paradoc-frontend.fullname" . }}
+  labels:
+    {{- include "paradoc-frontend.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "paradoc-frontend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "paradoc-frontend.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.hostAliases }}
+      hostAliases: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: paradoc
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: PARADOC_HOST
+              value: "0.0.0.0"
+            - name: PARADOC_PORT
+              value: "{{ .Values.service.port }}"
+            - name: PARADOC_BUNDLE
+              {{- if eq .Values.bundle.source "s3" }}
+              value: {{ .Values.bundle.s3Url | quote }}
+              {{- else }}
+              value: {{ .Values.bundle.localPath | quote }}
+              {{- end }}
+            {{- if and (eq .Values.bundle.source "s3") .Values.s3.region }}
+            - name: AWS_REGION
+              value: {{ .Values.s3.region | quote }}
+            {{- end }}
+            {{- if and (eq .Values.bundle.source "s3") .Values.s3.endpoint }}
+            - name: AWS_ENDPOINT_URL
+              value: {{ .Values.s3.endpoint | quote }}
+            {{- end }}
+            {{- include "paradoc-frontend.authEnv" . | nindent 12 }}
+            {{- include "paradoc-frontend.databaseEnv" . | nindent 12 }}
+          {{- if and (eq .Values.bundle.source "s3") .Values.s3.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.s3.existingSecret }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          # Note: the legacy `--require-auth` arg was removed when the
+          # OIDC bearer-token layer landed (Phase 1a). Auth posture is now
+          # controlled entirely by PARADOC_AUTH_ENABLED + PARADOC_OIDC_*
+          # env vars. The `auth.requireAuth` value still parses for
+          # backwards-compat with deployed values files but is otherwise
+          # a no-op until the helm-chart OIDC wiring lands.
+{{- end }}

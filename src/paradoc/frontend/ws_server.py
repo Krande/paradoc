@@ -49,6 +49,22 @@ logger.addHandler(console_handler)
 ProtocolType = _Any
 CLIENTS: Set[ProtocolType] = set()
 
+# Optional DocStore attached to the server for binary asset fetches.
+# Set via `set_doc_store()` so the WS server stays general-purpose; tests
+# and the future `paradoc serve` CLI both wire one in.
+DOC_STORE: _Any = None
+
+
+def set_doc_store(store: _Any) -> None:
+    """Attach a `paradoc.docstore.DocStore` for binary fetch handling."""
+    global DOC_STORE
+    DOC_STORE = store
+
+
+def get_doc_store() -> _Any:
+    return DOC_STORE
+
+
 # Track connected frontends with their metadata
 # Structure: {frontend_id: {"ws": websocket, "last_heartbeat": timestamp}}
 CONNECTED_FRONTENDS: Dict[str, Dict[str, _Any]] = {}
@@ -155,6 +171,13 @@ async def _handle_client(ws: ProtocolType) -> None:
                             await ws.send(json.dumps(process_info))
                             continue
 
+                        # Handle binary asset fetch (3D glb, etc.) — never broadcast.
+                        if kind == "binary_fetch_request":
+                            from .binary_relay import handle_binary_fetch_request
+
+                            asyncio.create_task(handle_binary_fetch_request(ws=ws, msg=obj, doc_store=DOC_STORE))
+                            continue
+
                         # Handle shutdown request
                         if kind == "shutdown":
                             logger.warning(f"Shutdown requested from {client_addr}")
@@ -180,6 +203,13 @@ async def _handle_client(ws: ProtocolType) -> None:
         logger.error(f"Error handling client {client_addr}: {e}", exc_info=True)
     finally:
         CLIENTS.discard(ws)
+        # Drop any per-client binary-fetch lock so memory doesn't leak.
+        try:
+            from .binary_relay import release_client_lock
+
+            release_client_lock(ws)
+        except Exception:
+            pass
         # Remove frontend from tracking when connection closes
         if client_frontend_id:
             CONNECTED_FRONTENDS.pop(client_frontend_id, None)

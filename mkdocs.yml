@@ -5,6 +5,9 @@ edit_uri: edit/main/docs/
 
 nav:
   - Home: index.md
+  - Substitution syntax: substitution.md
+  - Filter authoring: filters.md
+  - Bundle layout: bundle_layout.md
   - Tables: table_database.md
   - Reference Helper: reference_helper.md
   - Caching System: caching_system.md

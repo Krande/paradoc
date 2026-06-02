@@ -4,12 +4,12 @@ Some text before the table
 
 Here is a table with index:
 
-{{__my_table__}}{tbl:index:yes}
+${ my_table(show_index=True) }
 
 And here is a table without index:
 
-{{__my_table__}}{tbl:index:no}
+${ my_table(show_index=False) }
 
-{{__my_table_3__}}
+${ my_table_3 }
 
 And some text after

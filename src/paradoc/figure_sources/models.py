@@ -1,0 +1,142 @@
+"""Typed specs for figure-source comment blocks.
+
+Each `figure_source: <type>` value maps to one of these subclasses. The
+`figure_source` literal acts as the discriminator.
+"""
+
+from __future__ import annotations
+
+from enum import Enum
+from pathlib import Path
+from typing import Literal, Optional, Union
+
+from pydantic import BaseModel, Field
+
+
+class CameraPosition(str, Enum):
+    """Camera preset names. Mirrors `paradoc.camera.presets.BUILTIN_PRESETS`.
+
+    Custom presets defined in `paradoc.toml [cameras.custom.<name>]` are
+    accepted at runtime (we don't enum-restrict them); this enum just lists
+    the always-available builtins for IDE completion.
+    """
+
+    ISO_1 = "iso_1"
+    ISO_2 = "iso_2"
+    ISO_3 = "iso_3"
+    ISO_4 = "iso_4"
+    TOP = "top"
+    BOTTOM = "bottom"
+    FRONT = "front"
+    BACK = "back"
+    LEFT = "left"
+    RIGHT = "right"
+
+
+class FEAFormat(str, Enum):
+    ABAQUS = "abaqus"
+    SESAM = "sesam"
+    ANSYS = "ansys"
+    NASTRAN = "nastran"
+
+
+class BaseFigureSource(BaseModel):
+    """Common fields across all figure-source specs."""
+
+    figure_source: str
+    figure_title: str
+    camera_pos: str = Field("iso_3", description="Camera preset name (built-in or custom).")
+    renderer: Literal["pygfx", "chromium"] = Field(
+        "pygfx",
+        description=(
+            "Offscreen backend used to bake the static poster PNG. "
+            "`pygfx` (default) is fast, pure-Python wgpu render. "
+            "`chromium` mounts the production adapy embed in headless "
+            "Chromium via Playwright, producing a PNG bit-identical to "
+            "what the live 3D viewer renders."
+        ),
+    )
+
+    model_config = {"frozen": False}
+
+
+class CADModelFile(BaseFigureSource):
+    figure_source: Literal["cad_model_file"] = "cad_model_file"
+    source_inp: Path = Field(..., description="Path to the CAD model file (STEP, IFC, etc.).")
+
+
+class FEAModel(BaseFigureSource):
+    figure_source: Literal["fea_model"] = "fea_model"
+    fea_format: FEAFormat
+    source_inp: Path = Field(..., description="Path to the FEA model input file.")
+
+
+class FEAModelResults(BaseFigureSource):
+    figure_source: Literal["fea_model_results"] = "fea_model_results"
+    fea_format: FEAFormat
+    source_inp: Path = Field(..., description="Path to the FEA model input file.")
+    output_file: Path = Field(..., description="Path to the results file (ODB, SIN, RMED).")
+    field: str = Field(..., description="Field variable to visualize (e.g. 'S' for stress).")
+    task_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Reserved (Phase 7): task identifier producing `output_file`. "
+            "Used by the future task runner to ensure the result is up-to-date."
+        ),
+    )
+
+
+FigureSourceSpec = Union[CADModelFile, FEAModel, FEAModelResults]
+
+
+# Registry mapping each ``figure_source`` literal to the spec subclass
+# that validates its kwargs. Built-in types seed the registry; plugins
+# add to it via :func:`register_spec`, called by the
+# ``paradoc.figure_sources`` entry-point dispatcher
+# (see ``_plugins.py``). The registry is one-way — once added, a spec
+# stays for the rest of the process. Re-registration with the same
+# name overwrites silently to let dev iteration (reload a plugin)
+# behave as the user expects.
+_SPEC_REGISTRY: dict[str, type[BaseFigureSource]] = {
+    "cad_model_file": CADModelFile,
+    "fea_model": FEAModel,
+    "fea_model_results": FEAModelResults,
+}
+
+
+def register_spec(figure_source: str, spec_cls: type[BaseFigureSource]) -> None:
+    """Register a spec class for the given ``figure_source`` literal.
+
+    Called by plugins from their entry-point handler:
+
+    .. code-block:: python
+
+        def register_paradoc_block_sugar(dispatcher):
+            dispatcher.register_spec("my_source", MySpec)
+            dispatcher.register_filter(MyFilter)
+
+    Overwriting an existing entry is allowed (dev-loop ergonomics) but
+    rare in practice — built-in spec types are seeded at module load
+    and plugins typically register new discriminators.
+    """
+    _SPEC_REGISTRY[figure_source] = spec_cls
+
+
+def create_figure_source(data: dict) -> FigureSourceSpec:
+    """Dispatch on ``figure_source`` to the right subclass.
+
+    Lazily fires ``paradoc.figure_sources`` plugin discovery on first
+    call so a doc that only uses the built-in types never pays the
+    entry-point import cost. Plugins that fail to load log a warning
+    rather than aborting the build.
+    """
+    from ._plugins import ensure_plugins_loaded
+
+    ensure_plugins_loaded()
+
+    figure_source_type = data.get("figure_source")
+    spec_cls = _SPEC_REGISTRY.get(figure_source_type)
+    if spec_cls is None:
+        supported = ", ".join(sorted(_SPEC_REGISTRY))
+        raise ValueError(f"Unknown figure_source type: {figure_source_type!r}. " f"Supported: {supported}.")
+    return spec_cls(**data)

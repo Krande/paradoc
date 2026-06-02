@@ -2,10 +2,10 @@
 
 Some text before the table
 
-{{__my_table_2__}}
+${ my_table_2 }
 
-{{__my_table_4__}}
+${ my_table_4 }
 
-{{__my_table_5__}}
+${ my_table_5 }
 
 and some text after

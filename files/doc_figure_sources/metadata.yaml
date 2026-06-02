@@ -1,0 +1,7 @@
+lang: en-GB
+linkReferences: true
+nameInLink: true
+figureTitle: "Figure"
+tableTitle: "Table"
+figPrefix: "Figure"
+tblPrefix: "Table"

@@ -1,0 +1,133 @@
+name: Build paradoc image
+
+# Runs only on the self-hosted runner labelled `docker-build`. GitHub Actions
+# does not have that label, so this workflow is a no-op when the branch is
+# pushed to GitHub. All registry/gitops endpoints come from secrets so the
+# workflow file itself reveals no infrastructure details.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/figure-sources]
+    paths:
+      - 'src/paradoc/**'
+      - 'src/frontend/**'
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - 'pixi.toml'
+      - 'pixi.lock'
+      - '.forgejo/workflows/build-paradoc.yaml'
+
+jobs:
+  build:
+    runs-on: docker-build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to registry
+        run: |
+          mkdir -p ~/.docker
+          printf '%s' '${{ secrets.REGISTRY_DOCKER_CONFIG }}' > ~/.docker/config.json
+
+      - name: Build and push paradoc image
+        env:
+          REGISTRY_IMAGE: ${{ secrets.PARADOC_REGISTRY_IMAGE }}
+        run: |
+          if [ -z "$REGISTRY_IMAGE" ]; then
+            echo "::error::PARADOC_REGISTRY_IMAGE secret is not set on this repo. Configure it (and REGISTRY_DOCKER_CONFIG) under Settings → Actions → Secrets before re-running."
+            exit 1
+          fi
+          TAG="sha-${GITHUB_SHA::7}"
+          BRANCH_TAG="branch-$(printf '%s' "$GITHUB_REF_NAME" | tr '/' '-')"
+          BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          docker build \
+            -f Dockerfile \
+            --build-arg BUILD_SHA="${GITHUB_SHA}" \
+            --build-arg BUILD_TAG="${TAG}" \
+            --build-arg BUILD_TIME="${BUILD_TIME}" \
+            -t "${REGISTRY_IMAGE}:${TAG}" \
+            -t "${REGISTRY_IMAGE}:${BRANCH_TAG}" \
+            .
+          docker push "${REGISTRY_IMAGE}:${TAG}"
+          docker push "${REGISTRY_IMAGE}:${BRANCH_TAG}"
+
+      - name: Update gitops manifest
+        env:
+          GITOPS_REMOTE: ${{ secrets.GITOPS_REMOTE }}
+          GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+          GITOPS_BRANCH: ${{ secrets.GITOPS_BRANCH }}
+          GITOPS_MANIFEST: ${{ secrets.PARADOC_GITOPS_MANIFEST }}
+          PARADOC_IMAGE: ${{ secrets.PARADOC_REGISTRY_IMAGE }}
+        run: |
+          # Skip cleanly if the gitops core isn't configured. POSIX-only
+          # — runner default shell is sh.
+          MISSING=""
+          for v in GITOPS_REMOTE GITOPS_TOKEN GITOPS_BRANCH GITOPS_MANIFEST; do
+            eval "val=\$$v"
+            [ -z "$val" ] && MISSING="$MISSING $v"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "Missing gitops secrets:$MISSING — skipping write-back."
+            exit 0
+          fi
+
+          TAG="sha-${GITHUB_SHA::7}"
+          WORK=$(mktemp -d)
+          cd "$WORK"
+          git clone --branch "$GITOPS_BRANCH" \
+            "https://x-access-token:${GITOPS_TOKEN}@${GITOPS_REMOTE}" .
+          git config user.name "Forgejo CI"
+          git config user.email "ci@local"
+
+          if [ ! -f "$GITOPS_MANIFEST" ]; then
+            echo "$GITOPS_MANIFEST not present yet; skipping."
+            exit 0
+          fi
+
+          # Bump a specific image:tag line in the shared manifest. The
+          # image-targeted form is unambiguous when paradoc shares a
+          # manifest with other apps.
+          apply_bump() {
+            image="$1"
+            label="$2"
+            if [ -z "$image" ]; then
+              return 0
+            fi
+            if grep -qF "image: ${image}:" "$GITOPS_MANIFEST"; then
+              sed -i "s|image: ${image}:.*|image: ${image}:${TAG}|" "$GITOPS_MANIFEST"
+            else
+              echo "No image: ${image} line in $GITOPS_MANIFEST — skipping $label."
+            fi
+          }
+
+          # Helm values fallback: when the manifest uses `tag: sha-XXX`
+          # without an inline image: ref, rewrite that line.
+          apply_helm_tag_fallback() {
+            if grep -qE "^[[:space:]]+tag:[[:space:]]+sha-" "$GITOPS_MANIFEST"; then
+              sed -i "s|^\([[:space:]]*tag:[[:space:]]*\)sha-[a-f0-9]*|\1${TAG}|" "$GITOPS_MANIFEST"
+            fi
+          }
+
+          i=1
+          while [ "$i" -le 3 ]; do
+            git pull --rebase origin "$GITOPS_BRANCH"
+
+            apply_bump "$PARADOC_IMAGE" "paradoc"
+            apply_helm_tag_fallback
+
+            git add "$GITOPS_MANIFEST"
+            if git diff --cached --quiet; then
+              echo "No image changes to commit."
+              exit 0
+            fi
+            git commit -m "[skip ci] ci: update paradoc to ${TAG}"
+            if git push origin "HEAD:$GITOPS_BRANCH"; then
+              exit 0
+            fi
+            echo "Push failed (attempt $i), retrying..."
+            git reset --hard "origin/$GITOPS_BRANCH"
+            sleep 2
+            i=$((i+1))
+          done
+          echo "Failed to push after 3 attempts" >&2
+          exit 1

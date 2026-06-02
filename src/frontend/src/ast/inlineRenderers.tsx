@@ -1,0 +1,213 @@
+import React from 'react'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
+import type { PandocInline } from './types'
+import { attrs, resolveAssetUrl } from './utils'
+import { useDocId } from './context'
+import { authedFetch } from '../services/auth/oidc'
+
+/**
+ * Component to render LaTeX math using KaTeX
+ */
+export function MathElement({ latex, displayMode }: { latex: string; displayMode: boolean }): React.ReactElement {
+  const elementRef = React.useRef<HTMLSpanElement>(null)
+
+  React.useEffect(() => {
+    if (elementRef.current) {
+      try {
+        katex.render(latex, elementRef.current, {
+          displayMode,
+          throwOnError: false,
+          errorColor: '#cc0000',
+          strict: false,
+        })
+      } catch (error) {
+        console.error('KaTeX rendering error:', error)
+        // Fallback: show the raw LaTeX if rendering fails
+        if (elementRef.current) {
+          elementRef.current.textContent = displayMode ? `\\[${latex}\\]` : `\\(${latex}\\)`
+        }
+      }
+    }
+  }, [latex, displayMode])
+
+  return (
+    <span
+      ref={elementRef}
+      className={displayMode ? "block my-4 text-center" : "inline-block mx-0.5"}
+    />
+  )
+}
+
+/**
+ * Component to render an image with async URL resolution.
+ *
+ * resolveAssetUrl gives us one of three shapes:
+ *   * data: URL (embedded base64 from IndexedDB, WS embed mode) — use directly.
+ *   * absolute http(s):// URL or static-mode relative path — set as
+ *     src; native ``loading="lazy"`` defers off-screen browser fetches.
+ *   * `/api/...` route path (REST mode) — needs the bearer token, so
+ *     we ``authedFetch`` the bytes per-image and swap to a ``blob:``
+ *     URL. Per-image fetch replaces the legacy ~10 MB bulk preload;
+ *     section-level virtualization in VirtualReader keeps off-screen
+ *     sections (and their <img>s) unmounted so this stays cheap.
+ */
+export function AsyncImage({ src, alt, title, className, imgAttrs }: {
+  src: string;
+  alt: string;
+  title: string;
+  className?: string;
+  imgAttrs?: any;
+}): React.ReactElement {
+  const docId = useDocId()
+  const [resolvedSrc, setResolvedSrc] = React.useState<string>(src)
+
+  React.useEffect(() => {
+    let cancelled = false
+    let blobUrl: string | null = null
+    ;(async () => {
+      try {
+        const resolved = await resolveAssetUrl(src, docId)
+        if (cancelled) return
+        // API-routed images go through authedFetch so the bearer
+        // token reaches the server. We swap to a blob: URL so the
+        // browser caches it and the <img> can decode normally.
+        if (resolved.startsWith('/api/') || resolved.includes('/api/docs/')) {
+          try {
+            const res = await authedFetch(resolved)
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            const blob = await res.blob()
+            if (cancelled) return
+            blobUrl = URL.createObjectURL(blob)
+            setResolvedSrc(blobUrl)
+            return
+          } catch {
+            if (!cancelled) setResolvedSrc(resolved)
+            return
+          }
+        }
+        setResolvedSrc(resolved)
+      } catch {
+        if (!cancelled) setResolvedSrc(src)
+      }
+    })()
+    return () => {
+      cancelled = true
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    }
+  }, [src, docId])
+
+  return (
+    <img
+      {...imgAttrs}
+      src={resolvedSrc}
+      alt={alt}
+      title={title}
+      className={className}
+      loading="lazy"
+      decoding="async"
+    />
+  )
+}
+
+/**
+ * Render inline elements (text, emphasis, links, images, etc.)
+ */
+export function renderInlines(xs: PandocInline[]): React.ReactNode {
+  const out: React.ReactNode[] = []
+  xs.forEach((x, i) => {
+    switch (x.t) {
+      case 'Str': out.push(x.c); break
+      case 'Space': out.push(' '); break
+      case 'SoftBreak': out.push('\n'); break
+      case 'LineBreak': out.push(<br key={i} />); break
+      case 'Emph': out.push(<em key={i}>{renderInlines(x.c)}</em>); break
+      case 'Strong': out.push(<strong key={i}>{renderInlines(x.c)}</strong>); break
+      case 'Code': {
+        const [a, code] = x.c
+        const codeAttrs = attrs(a)
+        // Inline className wins over the @layer base `code { ... }`
+        // rule, so the dark variants have to live here too — otherwise
+        // inline tokens like `${ name(.attr)?(args)? }` render with a
+        // light-gray fill against dark-mode body text and become
+        // unreadable.
+        out.push(
+          <code
+            key={i}
+            {...codeAttrs}
+            className={
+              'px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 ' +
+              (codeAttrs.className || '')
+            }
+          >
+            {code}
+          </code>,
+        )
+        break
+      }
+      case 'Link': {
+        const [a, content, [href, title]] = x.c
+        const linkAttrs = attrs(a)
+        // Check if this is an internal anchor link (starts with #)
+        const isInternalLink = href.startsWith('#')
+        const handleClick = isInternalLink ? (e: React.MouseEvent<HTMLAnchorElement>) => {
+          e.preventDefault()
+          const targetId = href.slice(1) // Remove the '#'
+          // Use querySelector with attribute selector to handle IDs with special characters like colons
+          // This works reliably for IDs like "tbl:table-name", "fig:figure-name", "eq:equation-name"
+          const el = document.querySelector(`[id="${targetId}"]`) as HTMLElement | null
+          if (el) {
+            const topbar = document.getElementById('paradoc-topbar')
+            const offset = topbar ? topbar.getBoundingClientRect().height : 0
+            const top = window.scrollY + el.getBoundingClientRect().top - offset - 8
+            window.scrollTo({ top, behavior: 'smooth' })
+          }
+        } : undefined
+        out.push(
+          <a
+            key={i}
+            {...linkAttrs}
+            href={href}
+            title={title}
+            className={'text-blue-600 dark:text-blue-400 hover:underline cursor-pointer ' + (linkAttrs.className || '')}
+            onClick={handleClick}
+          >
+            {renderInlines(content)}
+          </a>
+        )
+        break
+      }
+      case 'Image': {
+        const [a, alt, [src, title]] = x.c
+        const imgAttrs = attrs(a)
+        out.push(<AsyncImage key={i} imgAttrs={imgAttrs} src={src} alt={String(renderInlines(alt))} title={title} className={'max-w-full ' + (imgAttrs.className || '')} />)
+        break
+      }
+      case 'Span': {
+        const [a, content] = (x as any).c
+        const spanAttrs = attrs(a)
+        out.push(<span key={i} {...spanAttrs}>{renderInlines(content)}</span>)
+        break
+      }
+      case 'Math': {
+        // Math: c = [{t: 'InlineMath'|'DisplayMath'}, latex_string]
+        const [mathType, latex] = (x as any).c
+        const isDisplay = mathType && typeof mathType === 'object' && mathType.t === 'DisplayMath'
+        out.push(<MathElement key={i} latex={latex} displayMode={isDisplay} />)
+        break
+      }
+      default:
+        // Handle RawInline and other types
+        if ((x as any).t === 'RawInline') {
+          const [, rawContent] = (x as any).c
+          if (rawContent && rawContent.includes('\\appendix')) {
+            // Skip rendering this inline element
+            break
+          }
+          out.push(<span key={i} dangerouslySetInnerHTML={{ __html: rawContent }} />)
+        }
+        break
+    }
+  })
+  return out
+}

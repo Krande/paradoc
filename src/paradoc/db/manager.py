@@ -14,6 +14,7 @@ from .models import (
     TableData,
     TableFilterConfig,
     TableSortConfig,
+    ThreeDData,
 )
 
 
@@ -116,6 +117,25 @@ class DbManager:
                 width INTEGER,
                 height INTEGER,
                 custom_function_name TEXT,
+                metadata TEXT DEFAULT '{}',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """
+        )
+
+        # 3D figure assets — index only; bytes live on disk under glb_path.
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS three_d (
+                key TEXT PRIMARY KEY,
+                glb_path TEXT NOT NULL,
+                format TEXT NOT NULL DEFAULT 'glb',
+                camera_pos TEXT NOT NULL,
+                caption TEXT NOT NULL DEFAULT '',
+                sha256 TEXT NOT NULL,
+                size INTEGER NOT NULL,
+                source_type TEXT NOT NULL,
                 metadata TEXT DEFAULT '{}',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -442,6 +462,71 @@ class DbManager:
 
         cursor = self.connection.cursor()
         cursor.execute("DELETE FROM plots WHERE key = ?", (key,))
+        self.connection.commit()
+
+    # ---------------- 3D figure assets ----------------
+
+    def add_three_d(self, three_d: ThreeDData) -> None:
+        """Add or update a 3D figure index row."""
+        self._init_db()
+        cursor = self.connection.cursor()
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO three_d
+              (key, glb_path, format, camera_pos, caption, sha256, size, source_type, metadata, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (
+                three_d.key,
+                three_d.glb_path,
+                three_d.format,
+                three_d.camera_pos,
+                three_d.caption,
+                three_d.sha256,
+                three_d.size,
+                three_d.source_type,
+                json.dumps(three_d.metadata),
+            ),
+        )
+        self.connection.commit()
+
+    def get_three_d(self, key: str) -> Optional[ThreeDData]:
+        """Look up a 3D figure index row by key."""
+        self._ensure_connection()
+        if self.connection is None:
+            return None
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT * FROM three_d WHERE key = ?", (key,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return ThreeDData(
+            key=row["key"],
+            glb_path=row["glb_path"],
+            format=row["format"],
+            camera_pos=row["camera_pos"],
+            caption=row["caption"],
+            sha256=row["sha256"],
+            size=row["size"],
+            source_type=row["source_type"],
+            metadata=json.loads(row["metadata"]),
+        )
+
+    def list_three_d(self) -> List[str]:
+        """All 3D keys, sorted."""
+        self._ensure_connection()
+        if self.connection is None:
+            return []
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT key FROM three_d ORDER BY key")
+        return [row["key"] for row in cursor.fetchall()]
+
+    def delete_three_d(self, key: str) -> None:
+        self._ensure_connection()
+        if self.connection is None:
+            return
+        cursor = self.connection.cursor()
+        cursor.execute("DELETE FROM three_d WHERE key = ?", (key,))
         self.connection.commit()
 
     def close(self):

@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+/* Tailwind v4: opt the dark: variant onto the `.dark` class set on
+   <html> by the pre-paint script in index.html. Without this directive
+   v4 defaults to media-query mode which can't be overridden by a manual
+   toggle.
+   We deliberately do NOT use `:where()` here. Wrapping `.dark` in
+   `:where()` strips the class's specificity to zero, so `dark:bg-x`
+   tied with any plain `.bg-x` rule on cascade order — meaning any
+   stylesheet declared LATER (e.g. the adapy embed's Tailwind reset
+   when the 3D viewer mounts) clobbered paradoc's dark mode. Plain
+   `.dark &` gives the variant a real selector and a true (0,2,0)
+   specificity that wins over single-class collisions. */
+@custom-variant dark (.dark &);
+
+/* Global gray tones theme and sensible defaults */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    /* Global gray theme baseline */
+    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply dark:bg-gray-950 dark:text-gray-100;
+  }
+  /* Typography defaults */
+  h1 { @apply text-3xl font-semibold text-gray-900 dark:text-gray-100; }
+  h2 { @apply text-2xl font-semibold text-gray-900 dark:text-gray-100; }
+  h3 { @apply text-xl font-semibold text-gray-900 dark:text-gray-100; }
+  h4 { @apply text-lg font-semibold text-gray-900 dark:text-gray-100; }
+  h5 { @apply text-base font-semibold text-gray-900 dark:text-gray-100; }
+  h6 { @apply text-sm font-semibold text-gray-900 dark:text-gray-100; }
+  /* Topbar is `sticky top-0 h-14`. When a TOC link scrolls a heading
+     into view, the heading would otherwise tuck under the topbar; the
+     scroll-margin-top tells the browser to leave room. Section
+     wrappers already carry `scroll-mt-14` from VirtualReader; this
+     covers sub-headings (h2..h6) inside a section that the TOC also
+     links to. */
+  h1, h2, h3, h4, h5, h6 { scroll-margin-top: 4rem; }
+
+  p { @apply text-gray-800 dark:text-gray-200; }
+  a { @apply text-blue-600 dark:text-blue-400 hover:underline cursor-pointer; }
+  code { @apply bg-gray-100 dark:bg-gray-800 rounded px-1 py-0.5; }
+  pre { @apply bg-gray-100 dark:bg-gray-800 text-sm rounded p-3 overflow-auto; }
+  hr { @apply border-gray-200 dark:border-gray-800 my-6; }
+  blockquote { @apply border-l-4 border-gray-200 dark:border-gray-800 pl-4 text-gray-700 dark:text-gray-300; }
+}
+
+/* Component defaults to keep UI cohesive in grayscale */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 bg-gray-900 text-white hover:bg-gray-800 active:bg-gray-700 cursor-pointer;
+  }
+  .card {
+    @apply rounded-lg border border-gray-200 bg-white shadow-sm;
+  }
+  .muted {
+    @apply text-gray-500;
+  }
+}

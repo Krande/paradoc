@@ -21,11 +21,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      - uses: prefix-dev/setup-pixi@v0.9.4 # https://github.com/prefix-dev/setup-pixi
+      - uses: prefix-dev/setup-pixi@v0.9.6 # https://github.com/prefix-dev/setup-pixi
         with:
-          pixi-version: v0.55.0
+          pixi-version: v0.68.0
           environments: test
           cache: true
 
       - name: Runs Tests
-        run: pixi run test
+        # Explicit env: the `test` task is also provided by the `e2e`
+        # environment (it shares the `test` feature), so a bare
+        # `pixi run test` is ambiguous. Serve/e2e-only tests skip
+        # cleanly here via `pytest.importorskip` (fastapi/uvicorn).
+        run: pixi run -e test test

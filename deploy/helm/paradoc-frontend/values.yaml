@@ -1,0 +1,90 @@
+enabled: false
+
+image:
+  repository: ghcr.io/krande/paradoc
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Where to read compiled bundles from. Either an s3:// URL (requires the
+# `serve` extras pulled into the image) or an in-pod path that a
+# PersistentVolume / configMap mounts.
+bundle:
+  source: "s3"             # s3 | local
+  s3Url: ""                # e.g. s3://my-bucket/reports
+  localPath: "/data/bundle"
+
+# Auth posture.
+#
+# The legacy header-trust mode (X-Auth-Request-User) was replaced by an
+# OIDC bearer-token verifier in the app layer. When auth.enabled is
+# false, paradoc-serve uses a synthetic local-dev admin user — fine for
+# public-bundle deployments where the ingress fronts no identity layer
+# at all. When true, the app verifies bearer JWTs against the trusted
+# IdPs declared in PARADOC_OIDC_PROVIDERS_JSON.
+#
+# `auth.requireAuth` is preserved as a deprecated no-op so existing
+# values files keep validating during the transition.
+auth:
+  enabled: false
+  # Name of a Kubernetes Secret holding the multi-IdP config under
+  # `PARADOC_OIDC_PROVIDERS_JSON`. Materialised via ExternalSecret in
+  # the consuming namespace (see workloads/paradoc/externalsecret-oidc.yaml
+  # in k8s-gitops for the canonical shape).
+  providersExistingSecret: ""
+  providersExistingSecretKey: PARADOC_OIDC_PROVIDERS_JSON
+  # Exact group name (Authentik) or object id (Azure AD) that grants
+  # admin role. Matched against the verified token's `groups` claim.
+  adminGroup: ""
+  # Deprecated; no-op since the OIDC layer landed. Removed in a future
+  # cleanup pass.
+  requireAuth: false
+
+# Optional Postgres control plane (users, projects, project_members).
+# When unset, paradoc-serve runs in shared-only mode: anyone authenticated
+# reads from the `shared/` bundle prefix; admin endpoints return 503.
+database:
+  # Existing Kubernetes Secret in the same namespace holding the full DSN.
+  # Preferred for prod — usually backed by an ExternalSecret pulling from
+  # Vault. The secret's `PARADOC_DATABASE_URL` key (or whatever `existingSecretKey`
+  # points at) gets surfaced as the env var of the same name.
+  existingSecret: ""
+  existingSecretKey: PARADOC_DATABASE_URL
+  # Inline DSN literal — only for local dev / test rigs. Lands in the
+  # rendered manifest verbatim, so don't put production credentials here.
+  url: ""
+
+# Read-only credentials for S3 access. Set these via a Kubernetes Secret
+# referenced as `existingSecret` rather than inline.
+s3:
+  existingSecret: ""        # name of a Secret holding AWS_* env vars
+  region: ""
+  endpoint: ""              # leave blank for AWS S3 proper
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Map externally-resolvable hostnames to in-cluster service IPs.
+# Required when paradoc-serve has to call IdP discovery / JWKS
+# endpoints that live behind the same Traefik ingress that fronts
+# the pod — kube-dns doesn't resolve those publicly-routed names
+# from inside the cluster (Tailscale DNS, no split DNS).
+#
+# Find the Traefik service ClusterIP with:
+#   kubectl -n traefik get svc traefik -o jsonpath='{.spec.clusterIP}'
+hostAliases: []
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []

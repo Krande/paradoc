@@ -8,7 +8,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor i
 
 Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. The detailed system architecture is illustrated in [@fig:system_architecture].
 
-{{__system_architecture__}}
+${ system_architecture }
 
 Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
@@ -16,13 +16,13 @@ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
 
 Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium. Detailed component specifications are provided in [@tbl:component_specs].
 
-{{__component_specs__}}
+${ component_specs }
 
 ### Performance Benchmarks
 
 Totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.
 
-{{__performance_benchmarks__}}
+${ performance_benchmarks }
 
 As shown in [@fig:performance_benchmarks], the performance characteristics vary significantly across different configurations. Sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.
 
@@ -34,15 +34,15 @@ At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praese
 
 Complete experimental datasets are presented in [@tbl:raw_data_set1] and [@tbl:raw_data_set2].
 
-{{__raw_data_set1__}}
+${ raw_data_set1 }
 
-{{__raw_data_set2__}}
+${ raw_data_set2 }
 
 ### Time Series Analysis
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.
 
-{{__time_series__}}
+${ time_series }
 
 The time series data in [@fig:time_series] reveals important temporal patterns. Vestibulum tortor quam, feugiat vitae, ultricies eget, tempor sit amet, ante.
 
@@ -79,7 +79,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. The complete derivation
 
 Aenean fermentum, elit eget tincidunt condimentum, eros ipsum rutrum orci, sagittis tempus lacus enim ac dui.
 
-{{__computational_results__}}
+${ computational_results }
 
 The computational results shown in [@fig:computational_results] validate the theoretical framework. Donec non enim in turpis pulvinar facilisis.
 
@@ -87,7 +87,7 @@ The computational results shown in [@fig:computational_results] validate the the
 
 Ut velit mauris, egestas sed, gravida nec, ornare ut, mi. Aenean ut orci vel massa suscipit pulvinar. Performance metrics are detailed in [@tbl:algorithm_performance].
 
-{{__algorithm_performance__}}
+${ algorithm_performance }
 
 # Additional Figures and Charts
 
@@ -97,15 +97,15 @@ Proin sodales libero eget ante. Nulla quam. Aenean laoreet. Vestibulum nisi lect
 
 Ut orci risus, accumsan porttitor, cursus quis, aliquet eget, justo. Sed pretium blandit orci.
 
-{{__correlation_matrix__}}
+${ correlation_matrix }
 
 The correlation matrix in [@fig:correlation_matrix] shows the relationships between all measured variables. Ut eu diam at pede suscipit sodales.
 
-{{__distributions__}}
+${ distributions }
 
 Parameter distributions displayed in [@fig:distributions] indicate normal behavior across most variables. Aenean lectus elit, fermentum non, convallis id, sagittis at, purus.
 
-{{__surface_plot__}}
+${ surface_plot }
 
 The three-dimensional visualization in [@fig:surface_plot] illustrates the complex interaction effects. Suspendisse mauris. Fusce accumsan mollis eros.
 
@@ -113,7 +113,7 @@ The three-dimensional visualization in [@fig:surface_plot] illustrates the compl
 
 Pellentesque sed dolor. Aliquam congue fermentum nisl. Mauris accumsan nulla vel diam.
 
-{{__box_plots__}}
+${ box_plots }
 
 The box plots in [@fig:box_plots] show the statistical distributions across different conditions and groups. Nam liber tempor cum soluta nobis eleifend option congue nihil imperdiet doming.
 

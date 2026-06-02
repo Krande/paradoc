@@ -1,0 +1,230 @@
+[workspace]
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64"]
+
+[feature.test.tasks]
+pre-install = { cmd = "python -c \"from plotly.io._kaleido import plotly_get_chrome; plotly_get_chrome()\"", outputs = ["$PIXI_HOME/envs/test/Lib/site-packages/choreographer/cli/browser_exe/chrome-win64/chrome.exe"] }
+test = { cmd = "pytest tests --durations=0" }
+test-doc = { cmd = "python cli_document_tester.py", cwd = "examples" }
+
+[feature.frontend.tasks]
+npm = { cmd = "npm", cwd = "src/frontend" }
+winstall = { cmd = "npm install", cwd = "src/frontend", outputs = ["$PIXI_PROJECT_ROOT/src/frontend/node_modules"] }
+wdev = { cmd = "npm run dev --prefix src/frontend", depends-on = ["winstall"] }
+wbuild = { cmd = "npm run build:standalone", cwd = "src/frontend", depends-on = ["winstall"], outputs = ["$PIXI_PROJECT_ROOT/src/paradoc/frontend/resources/frontend.zip"] }
+
+[feature.profile.tasks]
+test-doc-profile = { cmd = ["pyinstrument", "-r", "html", "-o", "profile_doc.html", "$PIXI_PROJECT_ROOT/examples/cli_document_tester.py"], cwd= "examples" }
+test-profile = { cmd = "pyinstrument -r html -o profile_tests.html -m pytest tests" }
+test-profile-json = { cmd = "pyinstrument -r json -o profile_tests.json -m pytest tests" }
+
+[feature.lint.tasks]
+lint = "black . --config pyproject.toml && ruff check . --fix && isort ."
+
+[feature.docs.tasks]
+build = { cmd = "mkdocs build", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
+serve = { cmd = "mkdocs serve -a localhost:8080", env = { "PYTHONPATH" = "$PIXI_PROJECT_ROOT/src" } }
+
+[environments]
+prod = { features = ["prod"], solve-group = "prod", no-default-feature = true }
+# `serve` is the runtime env baked into the paradoc-serve container image
+# (see Dockerfile). Shares solve-group "prod" so overlapping deps (pydantic,
+# typer, …) resolve to the same versions that local `prod` uses — i.e. the
+# pixi.lock is the single source of truth for both local and image.
+serve = { features = ["serve"], solve-group = "prod", no-default-feature = true }
+# `examples` env: `prod` (compile deps) + obstore for the uploader.
+examples = { features = ["examples", "prod"], solve-group = "prod", no-default-feature = true }
+# `examples-figs` env: same as `examples` plus ada-py for the
+# figure-sources example (STEP → glb + PNG rendering at compile time).
+# Walled off so the lightweight `examples` env stays slim and the
+# heavy CAD/OCC stack only inflates the one env that actually needs it.
+examples-figs = { features = ["examples", "examples-figs", "prod"], solve-group = "prod", no-default-feature = true }
+test-core = { features = ["test-core"], solve-group = "prod", no-default-feature = true }
+test = { features = ["test", "test-core", "prod"], solve-group = "prod", no-default-feature = true }
+# `e2e` env: superset of `test` that also pulls `serve` so REST-mode
+# Playwright tests (which boot paradoc-serve in-process) can run
+# alongside the static-mode tests in one env. Same solve-group so
+# overlapping deps stay locked to the same versions.
+e2e = { features = ["test", "test-core", "prod", "serve"], solve-group = "prod", no-default-feature = true }
+profile = { features = ["profile", "prod","test-core"], solve-group = "prod", no-default-feature = true }
+dev = { features = ["dev", "test-core", "prod"], solve-group = "dev", no-default-feature = true }
+
+lint = { features = ["lint"], no-default-feature = true }
+frontend = { features = ["frontend"], no-default-feature = true }
+docs = { features = ["docs", "test-core"], no-default-feature = true }
+
+[feature.prod.dependencies]
+pandoc = "==3.8.2"
+pandoc-crossref = "==0.3.22"
+pypandoc = "==1.15"
+python-docx = "*"
+typer = "*"
+numpy = "*"
+pandas = "*"
+openpyxl = "*"
+tabulate = "*"
+svgwrite = "*"
+pytexit = "*"
+nomkl = "*"
+websocket-client = "*"
+websockets = "*"
+watchdog = "*"
+plotly = "*"
+python-kaleido = "*"
+pydantic = ">=2.0"
+playwright = "*"
+
+[feature.examples.dependencies]
+# obstore for uploading compiled bundles to the configured object store.
+# Inherits everything else (pandoc, plotly, …) from the prod feature so
+# `OneDoc.compile()` can run end-to-end.
+obstore = ">=0.3"
+
+[feature.examples.tasks]
+# Pull headless Chrome before compiling. Plotly's `fig.write_image` calls
+# kaleido, which launches Chrome via choreographer; without this prefetch
+# the first plot render fails inside the Docker build and lands as the
+# `[Error rendering plot: KEY]` placeholder in the markdown — which then
+# strips the `{#fig:KEY}` anchor and breaks every downstream `[@fig:KEY]`
+# crossref. We call `get_chrome()` (the API) rather than the
+# `plotly_get_chrome` CLI wrapper because the wrapper prompts on stdin
+# and CI builds run non-interactively. Idempotent.
+chrome-prefetch = { cmd = "python -c \"from plotly.io import get_chrome; get_chrome()\"" }
+compile-examples = { cmd = "python scripts/compile_examples.py", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }, depends-on = ["chrome-prefetch"] }
+upload-examples = { cmd = "python scripts/upload_examples.py", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }, depends-on = ["compile-examples"] }
+
+[feature.examples-figs.dependencies]
+# adapy (STEP/IFC → glb + PNG) straight from conda-forge — replaces the
+# former editable `../adapy` path dependency now that adapy ships proper
+# releases. conda `ada-py` pulls its own OCC stack transitively; the
+# explicit natives below are kept as floors for paradoc's own headless
+# render pipeline (scipy, wgpu, …), which the offscreen path needs
+# regardless of what adapy happens to require.
+ada-py = "*"
+# Pin ruff to match `feature.lint` (CI's lint version): ada-py → xsdata
+# declares `ruff >=0.9.8`, which otherwise floats to 0.15.x here. 0.12.8
+# satisfies that floor and keeps one ruff across the workspace.
+ruff = "==0.12.8"
+pythonocc-core = "*"
+occt = "*"
+ifcopenshell = "*"
+bcf-client = "*"
+python-gmsh = "*"
+hdf5 = "*"
+h5py = "*"
+trimesh = "*"
+# scipy: trimesh routines that pygfx's `geometry_from_trimesh` reaches
+# into (sparse-index ops, face neighbours) silently fall back to an
+# error stub if scipy is missing, producing a blank offscreen render.
+# Adding it explicitly here keeps the populate script's CAD → PNG
+# pipeline working at compile time.
+scipy = "*"
+meshio = "*"
+send2trash = "*"
+pyparsing = "*"
+glfw = "==3.4"
+pyglfw = "*"
+pygfx = ">=0.16"
+# pygfx 0.16 transitively requires wgpu ≥ 0.21 (where the legacy
+# `wgpu.gui.offscreen` module was dropped in favour of
+# `rendercanvas.offscreen.OffscreenRenderCanvas`). Pin explicit
+# lower bounds so the solver doesn't downgrade to a wgpu where the
+# render-offscreen path can't import.
+wgpu-py = ">=0.31"
+rendercanvas = ">=2.6"
+flatbuffers = "*"
+python-flatbuffers = "*"
+lark = "*"
+pillow = "*"
+# Pure-python deps adapy expects. They're on conda-forge so we get
+# binary wheels via the OCC channel rather than pip building from sdist.
+pyquaternion = "*"
+
+[feature.examples-figs.pypi-dependencies]
+# playwright Python package + chromium binary (installed via the
+# `playwright-install` task below) so the figure-source `renderer:
+# chromium` option can spin up headless chrome and screenshot the
+# production adapy embed. Conda-forge ships only the Node SDK under
+# `node_modules`, hence the pypi entry.
+playwright = "*"
+
+[feature.examples-figs.tasks]
+# Pull the chromium binary playwright drives so the populate script's
+# `render_offscreen(backend="chromium")` call works the first time.
+# Cached in the playwright browsers dir, so subsequent runs no-op.
+playwright-install = { cmd = "playwright install chromium" }
+# Builds JUST doc_figure_sources into dist/examples/. The
+# `compile-examples` task above bakes the lightweight set; this task
+# bakes the figure-sources example. Both write into the same
+# dist/examples/ tree so `upload-examples` picks them up together.
+# Same chrome-prefetch dependency as the lightweight compile.
+compile-examples-figs = { cmd = "python scripts/compile_examples.py doc_figure_sources", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }, depends-on = ["chrome-prefetch", "playwright-install"] }
+
+[feature.serve.dependencies]
+# Runtime deps for `paradoc-serve` — kept to a minimum so the container
+# image stays slim. typer + pydantic are explicit (don't lean on transitive
+# pulls from fastapi). obstore is what handles s3:// bundle URLs.
+# asyncpg drives the optional Postgres control plane (users, projects,
+# memberships) — when PARADOC_DATABASE_URL is unset the pool stays None
+# and paradoc-serve runs in shared-only mode.
+python = "3.12.*"
+fastapi = ">=0.115"
+uvicorn = ">=0.30"
+typer = "*"
+pydantic = ">=2.0"
+obstore = ">=0.3"
+asyncpg = ">=0.29"
+# pyjwt + httpx drive the OIDC verifier — JWT decode/signature checks
+# and JWKS fetching against Authentik / Azure AD discovery endpoints.
+pyjwt = ">=2.8"
+httpx = ">=0.27"
+cryptography = "*"
+
+[feature.test-core.pypi-dependencies]
+pytest-playwright = "*"
+
+[feature.prod.target.win-64.dependencies]
+pywin32 = "*"
+types-pywin32 = "*"
+
+[feature.test-core.dependencies]
+pytest = "*"
+
+[feature.dev.dependencies]
+ada-py = "*"
+# Pin ruff to match `feature.lint` (== the CI lint version). ada-py pulls
+# xsdata, which declares `ruff >=0.9.8` and otherwise floats to 0.15.x —
+# so an IDE pointed at this env would lint differently from CI. 0.12.8
+# still satisfies xsdata's floor.
+ruff = "==0.12.8"
+
+[feature.frontend.dependencies]
+nodejs = "*"
+
+[feature.lint.dependencies]
+black = "==24.4.2"
+isort = "==5.13.2"
+ruff = "==0.12.8"
+
+[feature.profile.dependencies]
+pytest = "*"
+pytest-benchmark = "*"
+pytest-asyncio = "*"
+pyinstrument = "*"
+
+[feature.docs.dependencies]
+mkdocs = "==1.6.1"
+mkdocstrings = "*"
+mkdocstrings-python = "*"
+mkdocs-material = "*"
+mkdocs-jupyter = "*"
+mkdocs-glightbox = "*"
+
+[feature.prod.target.win-64.activation.env]
+PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
+
+[feature.test.target.win-64.activation.env]
+PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
+
+[feature.profile.target.win-64.activation.env]
+PYTHONPATH="%PIXI_PROJECT_ROOT%/src"

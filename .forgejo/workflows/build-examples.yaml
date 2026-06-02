@@ -1,0 +1,70 @@
+name: Build & upload example bundles
+
+# Compiles the curated paradoc example docs and uploads each bundle to
+# the configured object store. Mirrors build-paradoc.yaml — every
+# infrastructure detail (endpoint, bucket, credentials) comes from
+# Forgejo secrets so the workflow file itself reveals nothing.
+#
+# The act-style runner is minimal (no curl, no host bind-mounts that
+# the outer docker daemon can see), but it does have docker. Compile
+# inside an image built from Dockerfile.examples; upload by `docker run`
+# of that same image with the secrets passed as env. Skipped cleanly
+# when the upload secrets aren't configured.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/figure-sources]
+    paths:
+      - 'files/**'
+      - 'scripts/compile_examples.py'
+      - 'scripts/upload_examples.py'
+      - 'src/paradoc/**'
+      - 'pixi.toml'
+      - 'pixi.lock'
+      - 'pyproject.toml'
+      - 'Dockerfile.examples'
+      - '.forgejo/workflows/build-examples.yaml'
+
+jobs:
+  build-and-upload:
+    runs-on: docker-build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build examples image (compiles bundles in-layer)
+        # ada-py now resolves from conda-forge via pixi.lock, so the
+        # build needs no sibling adapy clone or cache-bust plumbing —
+        # the `COPY pixi.lock` layer invalidates naturally whenever the
+        # pinned adapy version changes.
+        run: |
+          docker build \
+            -f Dockerfile.examples \
+            -t paradoc-examples:ci .
+
+      - name: Upload bundles to object store
+        env:
+          S3_ENDPOINT_URL: ${{ secrets.EXAMPLES_S3_ENDPOINT_URL }}
+          S3_BUCKET: ${{ secrets.EXAMPLES_S3_BUCKET }}
+          S3_PREFIX: ${{ secrets.EXAMPLES_S3_PREFIX }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.EXAMPLES_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.EXAMPLES_AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.EXAMPLES_AWS_REGION }}
+        run: |
+          MISSING=""
+          for v in S3_ENDPOINT_URL S3_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+            eval "val=\$$v"
+            [ -z "$val" ] && MISSING="$MISSING $v"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "Missing upload secrets:$MISSING — skipping upload (compile artifacts kept in image)."
+            exit 0
+          fi
+          docker run --rm \
+            -e S3_ENDPOINT_URL -e S3_BUCKET -e S3_PREFIX \
+            -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_REGION \
+            paradoc-examples:ci
+
+      - name: Clean up image
+        if: always()
+        run: docker rmi paradoc-examples:ci || true

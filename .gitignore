@@ -6,3 +6,5 @@ node_modules/
 .pixi/
 tex2pdf*/
 profile_tests*
+__pycache__/
+*.pyc

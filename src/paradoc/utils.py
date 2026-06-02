@@ -19,9 +19,35 @@ if TYPE_CHECKING:
 
 
 def copy_figures_to_dist(one: OneDoc, dest_dir: pathlib.Path):
-    # iterate figures and copy them to the destination folder
+    """Copy each rendered figure into `dest_dir`.
+
+    A figure can come from one of two places:
+
+    * source-side: an `.md`-adjacent image the author committed with the
+      doc (sits next to the markdown in `source_dir`).
+    * build-side: a DB-backed plot that `_get_plot_markdown_from_db`
+      rendered into `build_dir/<md_rel>/images/<key>.png`.
+
+    Probe source first (cheap and the historical default), then fall
+    back to the matching build-dir path. Skipping when neither exists
+    instead of raising so a single missing image doesn't kill the rest
+    of the export — the html will just have a broken `<img>` ref.
+    """
+    source_dir = pathlib.Path(one.source_dir)
+    build_dir = pathlib.Path(one.build_dir)
     for fig in one.figures.values():
-        source_path = fig.md_instance.path.parent / fig.file_path
+        md_path = fig.md_instance.path
+        candidates = [md_path.parent / fig.file_path]
+        try:
+            md_rel = md_path.relative_to(source_dir).parent
+            candidates.append(build_dir / md_rel / fig.file_path)
+        except ValueError:
+            pass
+
+        source_path = next((p for p in candidates if p.exists()), None)
+        if source_path is None:
+            continue
+
         new_fig_path = dest_dir / fig.file_path
         if not new_fig_path.parent.exists():
             new_fig_path.parent.mkdir(parents=True)

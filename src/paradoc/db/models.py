@@ -164,6 +164,36 @@ class PlotData(BaseModel):
         return v
 
 
+class ThreeDData(BaseModel):
+    """Index row for a 3D figure asset.
+
+    The actual glb bytes live on disk at `<doc_build>/<glb_path>`. We store
+    only the metadata + content hash here so the bundle stays portable
+    (sqlite + sidecar files, no absolute paths).
+    """
+
+    key: str = Field(..., description="Unique key for the 3D asset (matches data-3d-key in markdown).")
+    glb_path: str = Field(..., description="Bundle-relative path to the .glb file.")
+    format: str = "glb"
+    camera_pos: str = Field("iso_3", description="Camera preset name.")
+    caption: str = ""
+    sha256: str = Field(..., description="Hex sha256 of the glb file (for cache addressing).")
+    size: int = Field(..., description="Glb file size in bytes.")
+    source_type: str = Field(..., description="figure_source value, e.g. 'cad_model_file'.")
+    metadata: dict = Field(default_factory=dict)
+
+    model_config = {"frozen": False}
+
+    @field_validator("key")
+    @classmethod
+    def validate_key(cls, v: str) -> str:
+        if v.startswith("__") or v.endswith("__"):
+            raise ValueError("3D key should not contain __ markers")
+        if not v.replace("_", "").replace("-", "").isalnum():
+            raise ValueError(f"3D key {v!r} must be alphanumeric (with _ or -)")
+        return v
+
+
 class PlotAnnotation(BaseModel):
     """Custom annotations for plot display options."""
 

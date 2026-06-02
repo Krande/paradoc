@@ -1,0 +1,196 @@
+// REST-backed `AssetTransport`.
+//
+// Used in cloud deployments where a paradoc REST server is up. The
+// frontend does not know S3 exists — the server abstracts it via the
+// REST API mirroring `DocStore`.
+
+import { dbGet, dbPut } from '../sections/store'
+import type { PlotData, TableData } from '../sections/store'
+import { authedFetch } from '../services/auth/oidc'
+import type {
+  AssetTransport,
+  BinaryFetchProgress,
+  ThreeDMeta,
+  ThreeDPayload,
+} from './base'
+
+export interface RESTTransportOptions {
+  /** Base URL of the paradoc REST server, e.g. https://reports.example.com */
+  apiBase: string
+}
+
+export class RESTTransport implements AssetTransport {
+  readonly kind = 'rest'
+
+  constructor(private readonly opts: RESTTransportOptions) {}
+
+  private url(path: string): string {
+    return this.opts.apiBase.replace(/\/?$/, '') + path
+  }
+
+  async getTableData(docId: string, key: string): Promise<TableData | undefined> {
+    const res = await authedFetch(this.url(`/api/docs/${encodeURIComponent(docId)}/tables/${encodeURIComponent(key)}`))
+    if (res.status === 404) return undefined
+    if (!res.ok) throw new Error(`table fetch failed: ${res.status}`)
+    return (await res.json()) as TableData
+  }
+
+  async getPlotData(docId: string, key: string): Promise<PlotData | undefined> {
+    const res = await authedFetch(this.url(`/api/docs/${encodeURIComponent(docId)}/plots/${encodeURIComponent(key)}`))
+    if (res.status === 404) return undefined
+    if (!res.ok) throw new Error(`plot fetch failed: ${res.status}`)
+    return (await res.json()) as PlotData
+  }
+
+  async getThreeDMeta(docId: string, key: string): Promise<ThreeDMeta | undefined> {
+    const res = await authedFetch(this.url(`/api/docs/${encodeURIComponent(docId)}/3d/${encodeURIComponent(key)}/meta`))
+    if (res.status === 404) return undefined
+    if (!res.ok) throw new Error(`3d meta fetch failed: ${res.status}`)
+    const body = await res.json()
+    // `image_path` is the bundle-relative poster path the backend
+    // promotes from the ThreeDData metadata dict. The dedicated
+    // `/3d/{key}/poster` endpoint serves it through the docstore —
+    // the generic /files endpoint is scoped to <bundle>/files/ and
+    // can't reach posters under <bundle>/assets/3d/. Falls back to
+    // undefined when the bundle was baked before the figure-source
+    // filters started writing image_path — the figure component then
+    // shows its cube-icon placeholder.
+    const imageUrl = body.image_path
+      ? this.url(`/api/docs/${encodeURIComponent(docId)}/3d/${encodeURIComponent(key)}/poster`)
+      : undefined
+
+    // FEA artefact bundle: the backend exposes its files via
+    // `/api/docs/{docId}/3d/{key}/fea/{filename:path}`. We pass the
+    // manifest URL up to the renderer; the renderer also builds a
+    // matching per-filename fetcher when it dispatches to the
+    // artefact-aware mount path.
+    const feaBundleDir = body.fea_bundle_dir as string | undefined
+    // Mode-view rows point at the canonical bundle key under
+    // `assets/3d/<bundle_key>/`; the REST fetch endpoint is keyed by
+    // the BUNDLE key, not the mode-view's own key, so we route the
+    // manifest URL there. `_get_3d_meta` already returns
+    // `fea_bundle_key` for mode-view rows so the renderer can build
+    // the right URL.
+    const feaBundleKey = (body.fea_bundle_key as string | undefined) || key
+    const feaManifestUrl = feaBundleDir
+      ? this.url(`/api/docs/${encodeURIComponent(docId)}/3d/${encodeURIComponent(feaBundleKey)}/fea/fea.manifest.json`)
+      : undefined
+    const feaModeIndex = typeof body.fea_mode_index === 'number'
+      ? body.fea_mode_index
+      : undefined
+
+    return {
+      key: body.key,
+      format: body.format,
+      cameraPos: body.camera_pos,
+      caption: body.caption,
+      sha256: body.sha256,
+      size: body.size,
+      imageUrl,
+      feaBundleDir,
+      feaManifestUrl,
+      feaModeIndex,
+    }
+  }
+
+  async fetchBinary(
+    docId: string,
+    key: string,
+    options?: { sha256Hint?: string; onProgress?: (p: BinaryFetchProgress) => void },
+  ): Promise<ThreeDPayload> {
+    const requestId = `rest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    const onProgress = options?.onProgress
+    const cacheKey = `${docId}:${key}`
+
+    let knownSha = options?.sha256Hint
+    if (!knownSha) {
+      const meta = await this.getThreeDMeta(docId, key)
+      knownSha = meta?.sha256
+    }
+
+    // Only send If-None-Match when we actually have the blob locally.
+    // The server returns 304 purely on header match — without a cached
+    // blob, that 304 leaves us with nothing to render and an error
+    // ("cache hit but local cache missing"). Probing IndexedDB first
+    // costs one DB read but keeps the round-trip safe even after the
+    // user wipes site data or visits the doc for the first time.
+    const url = this.url(`/api/docs/${encodeURIComponent(docId)}/3d/${encodeURIComponent(key)}/blob`)
+    const headers: HeadersInit = {}
+    const cachedBlob = knownSha
+      ? await dbGet<ArrayBuffer>('three_d_blob' as any, knownSha)
+      : undefined
+    if (knownSha && cachedBlob) headers['If-None-Match'] = `"${knownSha}"`
+
+    const res = await authedFetch(url, { headers })
+
+    if (res.status === 304) {
+      // We only sent the header when cachedBlob was present, so this
+      // branch is the happy path: serve the cached bytes back.
+      const meta = await this.getThreeDMeta(docId, key)
+      if (!cachedBlob || !meta) {
+        throw new Error('server reported cache hit but local cache is missing')
+      }
+      return { ...meta, bytes: new Uint8Array(cachedBlob) }
+    }
+
+    if (!res.ok) throw new Error(`3d blob fetch failed: ${res.status}`)
+
+    const sha256 = (res.headers.get('etag') || '').replace(/"/g, '') ||
+      res.headers.get('x-paradoc-sha256') || ''
+    const cameraPos = res.headers.get('x-paradoc-camera-pos') || 'iso_3'
+    const totalSize = Number(res.headers.get('content-length') || 0)
+
+    const reader = res.body?.getReader()
+    if (!reader) {
+      const ab = await res.arrayBuffer()
+      const meta = await this.getThreeDMeta(docId, key)
+      const bytes = new Uint8Array(ab)
+      const out: ThreeDMeta = meta || {
+        key,
+        format: 'glb',
+        cameraPos,
+        caption: '',
+        sha256,
+        size: bytes.byteLength,
+      }
+      await dbPut('three_d_blob' as any, sha256, ab)
+      await dbPut('three_d_meta' as any, cacheKey, out)
+      return { ...out, bytes }
+    }
+
+    const chunks: Uint8Array[] = []
+    let received = 0
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (value) {
+        chunks.push(value)
+        received += value.byteLength
+        if (onProgress) onProgress({ requestId, bytesReceived: received, totalSize })
+      }
+    }
+
+    const merged = new Uint8Array(received)
+    let offset = 0
+    for (const c of chunks) {
+      merged.set(c, offset)
+      offset += c.byteLength
+    }
+
+    const meta = await this.getThreeDMeta(docId, key)
+    const out: ThreeDMeta = meta || {
+      key,
+      format: 'glb',
+      cameraPos,
+      caption: '',
+      sha256,
+      size: received,
+    }
+    await dbPut('three_d_blob' as any, sha256 || cacheKey, merged.buffer)
+    await dbPut('three_d_meta' as any, cacheKey, out)
+    window.dispatchEvent(
+      new CustomEvent('paradoc:3d-data-stored', { detail: { docId, key, sha256 } }),
+    )
+    return { ...out, bytes: merged }
+  }
+}

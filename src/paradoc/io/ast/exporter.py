@@ -1,16 +1,48 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import mimetypes
+import os
 import pathlib
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
 import pypandoc
 
+from paradoc.citation import FILTER_PATH as SHELF_CITATION_FILTER
 from paradoc.config import logger
 
 if TYPE_CHECKING:
     from paradoc import OneDoc
+
+
+@contextlib.contextmanager
+def _shelf_citation_env(one: "OneDoc"):
+    """Set env vars consumed by the shelf-citation pandoc filter.
+
+    Mirrors HTMLExporter's helper — kept inline rather than shared so
+    the two exporters' contracts stay independent.
+    """
+    keys = ("PARADOC_BIBLIOGRAPHY", "PARADOC_SHELF_BASE_URL")
+    prior = {k: os.environ.get(k) for k in keys}
+    bib = getattr(one, "bibliography_file", None)
+    if bib is not None:
+        os.environ["PARADOC_BIBLIOGRAPHY"] = str(bib)
+    else:
+        os.environ.pop("PARADOC_BIBLIOGRAPHY", None)
+    shelf_url = getattr(one, "shelf_base_url", "")
+    if shelf_url:
+        os.environ["PARADOC_SHELF_BASE_URL"] = shelf_url
+    else:
+        os.environ.pop("PARADOC_SHELF_BASE_URL", None)
+    try:
+        yield
+    finally:
+        for k, v in prior.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
 def _reset_kaleido_scope():
@@ -87,19 +119,22 @@ class ASTExporter:
 
         combined_str = "\n\n".join(md_parts)
 
-        ast_json = pypandoc.convert_text(
-            combined_str,
-            to="json",
-            format="markdown",
-            extra_args=[
-                "-M2GB",
-                "+RTS",
-                "-K64m",
-                "-RTS",
-                f"--metadata-file={one.metadata_file}",
-            ],
-            filters=["pandoc-crossref"],
-        )
+        with _shelf_citation_env(one):
+            ast_json = pypandoc.convert_text(
+                combined_str,
+                to="json",
+                format="markdown",
+                extra_args=[
+                    "-M2GB",
+                    "+RTS",
+                    "-K64m",
+                    "-RTS",
+                    f"--metadata-file={one.metadata_file}",
+                ],
+                # Shelf citation filter appended after pandoc-crossref;
+                # it's a no-op when bibliography_file is unset.
+                filters=["pandoc-crossref", str(SHELF_CITATION_FILTER)],
+            )
         try:
             ast = json.loads(ast_json)
         except Exception as e:
@@ -961,6 +996,7 @@ class ASTExporter:
         output_dir: pathlib.Path,
         embed_images: bool = True,
         include_frontend: bool = True,
+        header_links: List[Dict[str, str]] | None = None,
     ) -> bool:
         """
         Export document to static JSON files for static web hosting.
@@ -986,7 +1022,9 @@ class ASTExporter:
             │   └── ...
             ├── images.json         # Embedded images (if embed_images=True)
             ├── plots.json          # Plot data for Plotly.js
-            └── tables.json         # Table data
+            ├── tables.json         # Table data
+            ├── three_d.json        # 3D asset metadata (key → camera/caption/sha)
+            └── assets/3d/<key>.glb # Copied 3D assets (one per ThreeDData row)
         """
 
         try:
@@ -999,6 +1037,42 @@ class ASTExporter:
             manifest, sections = self.slice_sections(ast)
             _doc_id = manifest.get("docId") or self._infer_doc_id()
 
+            # Stamp the manifest with the same `published_at` /
+            # `paradoc_version` the BundleManifest carries — frontend
+            # uses it for per-docId IndexedDB invalidation:
+            # `fetchManifest` compares the fresh value to the cached
+            # one and wipes manifests / sections / images / plots /
+            # tables / 3d-meta entries scoped to this doc when they
+            # differ. Without this, a rebuilt bundle keeps serving
+            # last week's AST out of the visitor's IndexedDB.
+            from datetime import datetime, timezone
+
+            from paradoc.docstore._git import extract as _git_extract
+            from paradoc.docstore._git import find_repo_root
+            from paradoc.docstore.manifest import _detect_paradoc_version
+
+            now = datetime.now(timezone.utc).isoformat()
+            manifest.setdefault("published_at", now)
+            manifest.setdefault("paradoc_version", _detect_paradoc_version())
+
+            # Git provenance — mirrors BundleManifest.git so the SPA's
+            # AboutModal can display "branch@short_sha" + commit + dirty
+            # status in static (embed) mode where there's no /api/info
+            # to call. Sourced from the project's source_dir (same
+            # convention as Document._write_bundle_artifacts) so the
+            # provenance reflects the project repo, not paradoc itself.
+            if "git" not in manifest:
+                try:
+                    source_dir = getattr(self.one_doc, "source_dir", None)
+                    search_from = source_dir if source_dir else output_dir.parent
+                    repo = find_repo_root(search_from)
+                    if repo is not None:
+                        g = _git_extract(repo)
+                        if g is not None:
+                            manifest["git"] = g.to_dict()
+                except Exception as exc:
+                    logger.warning("git provenance extract failed: %s", exc)
+
             # Create sections directory
             sections_dir = output_dir / "sections"
             sections_dir.mkdir(exist_ok=True)
@@ -1008,29 +1082,35 @@ class ASTExporter:
             manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
             logger.info(f"Wrote manifest to {manifest_path}")
 
-            # Write sections and collect images
-            all_embedded_images: Dict[str, Dict[str, str]] = {}
+            # Copy image files into the static bundle and build a
+            # mapping {original_src: output_relpath}. Absolute paths
+            # (e.g. `/work/adapy/.../fea.mesh.png` from FEA report
+            # build) are flattened under `_images/`; relative paths
+            # keep their shape. Each bundle's Image srcs are rewritten
+            # in-place to the new relpaths BEFORE serializing, so the
+            # static-mode frontend resolves to URLs that actually exist
+            # on disk. Replaces the legacy bulk images.json (base64
+            # dict) which gated the React render on a ~10MB upfront
+            # fetch — see plan/v1/notes_frontend_render_pipelines.md.
+            image_mapping: Dict[str, str] = {}
+            if embed_images:
+                image_mapping = self._export_images_for_static(
+                    output_dir,
+                    sections,
+                    copy_relative=include_frontend,
+                )
+
+            # Write section bundles (with rewritten image srcs).
             for bundle in sections:
                 sec = bundle["section"]
                 idx = sec.get("index", 0)
-
-                # Embed images for this section if requested
-                if embed_images:
-                    section_images = self._embed_images_in_bundle(bundle)
-                    all_embedded_images.update(section_images)
-
-                # Write section file
+                if image_mapping:
+                    self._rewrite_bundle_image_srcs(bundle, image_mapping)
                 section_path = sections_dir / f"{idx}.json"
                 section_path.write_text(json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")
                 logger.debug(f"Wrote section {idx} to {section_path}")
 
             logger.info(f"Wrote {len(sections)} sections to {sections_dir}")
-
-            # Write embedded images
-            if embed_images and all_embedded_images:
-                images_path = output_dir / "images.json"
-                images_path.write_text(json.dumps(all_embedded_images, ensure_ascii=False), encoding="utf-8")
-                logger.info(f"Wrote {len(all_embedded_images)} embedded images to {images_path}")
 
             # Extract and write plot data
             plot_data_dict = self._extract_plot_data_from_db()
@@ -1046,9 +1126,43 @@ class ASTExporter:
                 tables_path.write_text(json.dumps(table_data_dict, ensure_ascii=False, indent=2), encoding="utf-8")
                 logger.info(f"Wrote {len(table_data_dict)} tables to {tables_path}")
 
+            # 3D metadata is always emitted (above as three_d.json); the
+            # binary GLBs + posters + FEA artefacts only need to live next
+            # to ``output_dir`` when the SPA is *also* in ``output_dir``
+            # (standalone static bundles, ``include_frontend=True``).
+            # When ``include_frontend=False`` the caller is a REST host
+            # mounting this as ``<bundle>/static/`` — the binaries are
+            # already at ``<bundle>/assets/3d/`` from the bundle's main
+            # build path and the docstore serves them from there
+            # (``DbManager.glb_path`` is bundle-relative). Mirroring under
+            # ``static/assets/`` would double S3 footprint and surface
+            # phantom duplicates in ``/api/docs/{id}/manifest/files``.
+            # Same logic for camera presets — ``assets/presets.json``
+            # already lives at bundle root, no need for a second copy.
+            if include_frontend:
+                self._export_three_d_assets_for_static(output_dir)
+                self._export_presets_for_static(output_dir)
+
             # Copy frontend files if requested
             if include_frontend:
                 self._copy_frontend_for_static(output_dir)
+                self._inject_static_runtime_config(
+                    output_dir,
+                    header_links=header_links or None,
+                )
+
+            # Bundle-files manifest for the static-mode "Bundle files"
+            # panel. REST mode hits the server's
+            # /api/docs/{id}/manifest/files endpoint; static-served
+            # bundles have no server to query, so we enumerate every
+            # shipped file here and write the same JSON shape the
+            # backend would emit. Walk after the frontend has been
+            # extracted so the index also covers the SPA assets and
+            # the user can see exactly what nginx is serving. Excludes
+            # the manifest_files.json itself to keep the list stable
+            # across re-runs (otherwise the file would grow / shrink
+            # depending on whether the prior export wrote it).
+            self._export_bundle_files_manifest(output_dir)
 
             logger.info(f"Successfully exported static files to {output_dir}")
             return True
@@ -1056,6 +1170,40 @@ class ASTExporter:
         except Exception as e:
             logger.error(f"Failed to export static files: {e}", exc_info=True)
             return False
+
+    def _export_bundle_files_manifest(self, output_dir: pathlib.Path) -> None:
+        """Write `manifest_files.json` with every file under `output_dir`.
+
+        Mirrors the REST-mode `/api/docs/{id}/manifest/files` payload so
+        the frontend's BundleFilesModal can use the same `{files: [
+        {rel_path, size, content_type}]}` shape in both modes — no
+        separate code path to maintain.
+        """
+        import mimetypes
+
+        out_path = output_dir / "manifest_files.json"
+        entries: list[dict] = []
+        for path in sorted(output_dir.rglob("*")):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(output_dir).as_posix()
+            # Skip the manifest itself so re-runs are idempotent — the
+            # list shouldn't shift just because a previous export
+            # left a `manifest_files.json` behind.
+            if rel == "manifest_files.json":
+                continue
+            try:
+                size = path.stat().st_size
+            except OSError:
+                continue
+            ctype, _ = mimetypes.guess_type(rel)
+            entries.append({"rel_path": rel, "size": int(size), "content_type": ctype or ""})
+        doc_id = self.one_doc.source_dir.name or "doc"
+        out_path.write_text(
+            json.dumps({"doc_id": doc_id, "files": entries}, indent=2),
+            encoding="utf-8",
+        )
+        logger.info(f"Wrote {len(entries)} bundle file entries to {out_path}")
 
     def _copy_frontend_for_static(self, output_dir: pathlib.Path):
         """
@@ -1080,3 +1228,436 @@ class ASTExporter:
             logger.info(f"Extracted frontend to {output_dir}")
         except Exception as e:
             logger.warning(f"Failed to extract frontend: {e}")
+
+    def _export_presets_for_static(self, output_dir: pathlib.Path) -> None:
+        """Write `assets/presets.json` next to the 3D assets.
+
+        `compile()` routes this through `_write_bundle_artifacts`, but the
+        static export goes straight from `build_ast` to the JSON dump and
+        skipped this step — leaving the frontend with a 404 and a single
+        hardcoded fallback preset that can't frame arbitrary models.
+        """
+        from paradoc.camera.presets import export_presets_json, load_camera_presets
+
+        try:
+            paradoc_toml = self.one_doc.source_dir / "paradoc.toml"
+            presets = load_camera_presets(paradoc_toml if paradoc_toml.exists() else None)
+            export_presets_json(presets, output_dir / "assets" / "presets.json")
+            logger.info(f"Wrote {len(presets)} camera preset(s) to {output_dir / 'assets' / 'presets.json'}")
+        except Exception as exc:
+            logger.warning(f"Failed to export presets.json: {exc}")
+
+    def _export_images_for_static(
+        self,
+        output_dir: pathlib.Path,
+        sections: List[Dict[str, Any]],
+        *,
+        copy_relative: bool = True,
+    ) -> Dict[str, str]:
+        """Copy referenced image files into the static bundle.
+
+        Markdown ``<img src>`` values come in two shapes:
+
+        * **Relative** (``files/foo.png``, ``images/bar.png``) — kept
+          as-is; the file is copied to ``output_dir/<src>`` so the
+          frontend's static-mode ``resolveAssetUrl`` can construct
+          ``<basePath>/<src>`` directly.
+        * **Absolute** to a build-container path
+          (``/work/adapy/.../_assets/case/fea.mesh.png``) — flattened
+          into ``_images/<sha8>-<basename>`` so the static bundle has a
+          sane layout, then the Image src in the bundle JSON is
+          rewritten to the new relpath (see ``_rewrite_bundle_image_srcs``).
+
+        Returns a ``{original_src: output_relpath}`` mapping that the
+        caller must use to rewrite section bundles BEFORE serializing
+        them to JSON. Without the rewrite the frontend sees the old
+        absolute path and can't resolve it.
+        """
+        import hashlib
+        import shutil
+
+        all_paths: List[Dict[str, str]] = []
+        for bundle in sections:
+            doc = bundle.get("doc", {})
+            blocks = doc.get("blocks", [])
+            all_paths.extend(self._extract_images_with_source(blocks))
+
+        mapping: Dict[str, str] = {}
+        if not all_paths:
+            return mapping
+
+        copied = skipped = 0
+        for img_info in all_paths:
+            img_src = img_info["path"]
+            source_dir = img_info.get("source_dir")
+            if img_src in mapping:
+                continue
+
+            # Strip a leading `./` for resolution, but keep the original
+            # `img_src` as the dict key (we rewrite by exact-match).
+            normalized = img_src.replace("./", "", 1) if img_src.startswith("./") else img_src
+
+            resolved: pathlib.Path | None = None
+            if source_dir:
+                source_dir_path = pathlib.Path(source_dir)
+                for variant in (img_src, normalized):
+                    candidate = source_dir_path / variant
+                    if candidate.exists() and candidate.is_file():
+                        resolved = candidate
+                        break
+            if resolved is None:
+                for base in (self.one_doc.dist_dir, self.one_doc.build_dir, self.one_doc.source_dir):
+                    for variant in (img_src, normalized):
+                        candidate = base / variant
+                        if candidate.exists() and candidate.is_file():
+                            resolved = candidate
+                            break
+                        # Recursive filename fallback — preserves the
+                        # legacy embed path's behaviour for sphinx-style
+                        # `_images/<name>` refs whose source lives in a
+                        # different subtree on disk.
+                        filename = pathlib.Path(variant).name
+                        for found in base.rglob(filename):
+                            if found.is_file():
+                                resolved = found
+                                break
+                        if resolved is not None:
+                            break
+                    if resolved is not None:
+                        break
+
+            if resolved is None:
+                logger.warning(f"Could not find image file: {img_src} (source_dir: {source_dir})")
+                skipped += 1
+                continue
+
+            # Decide the output relpath:
+            # * Relative srcs keep their shape so existing markdown refs
+            #   line up with the on-disk layout (predictable, debuggable).
+            # * Absolute srcs are flattened under `_images/` with a short
+            #   content hash to avoid collisions between like-named files
+            #   from different source dirs (e.g. `fea.mesh.png` repeats
+            #   under every `_assets/<case>/`).
+            if normalized.startswith("/"):
+                with open(resolved, "rb") as f:
+                    digest = hashlib.sha256(f.read()).hexdigest()[:8]
+                output_relpath = f"_images/{digest}-{resolved.name}"
+            else:
+                output_relpath = normalized
+
+            mapping[img_src] = output_relpath
+
+            # ``copy_relative=False`` is the REST-bundle case: relative
+            # markdown refs already line up with files on disk at
+            # ``<bundle>/<rel>`` (copied there by ``_prep_compilation``).
+            # Copying them into ``<bundle>/static/<rel>`` would double
+            # the bundle size and clutter the
+            # ``/api/docs/{id}/manifest/files`` payload with phantom
+            # duplicates the REST docstore never reads. Absolute paths
+            # still need the copy — they're flattened into ``_images/``
+            # and exist nowhere else in the bundle.
+            if not copy_relative and not normalized.startswith("/"):
+                continue
+
+            dest = output_dir / output_relpath
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copyfile(resolved, dest)
+                copied += 1
+            except Exception as exc:
+                logger.warning(f"image copy {resolved} → {dest} failed: {exc}")
+                skipped += 1
+
+        logger.info(f"Copied {copied} images into static bundle ({skipped} skipped)")
+        return mapping
+
+    def _rewrite_bundle_image_srcs(self, bundle: Dict[str, Any], mapping: Dict[str, str]) -> None:
+        """In-place rewrite Image inline srcs using the mapping.
+
+        Mirrors the block/inline traversal in
+        ``_extract_images_with_source``. Called once per bundle right
+        before serializing to JSON, so the static-mode frontend sees
+        the new flattened paths instead of the original (often
+        absolute) build-container paths.
+        """
+
+        def rewrite_inlines(inlines):
+            for inline in inlines or []:
+                if not isinstance(inline, dict):
+                    continue
+                if inline.get("t") == "Image":
+                    c = inline.get("c", [])
+                    if isinstance(c, list) and len(c) >= 3:
+                        src_info = c[2]
+                        if isinstance(src_info, list) and len(src_info) >= 1:
+                            src = src_info[0]
+                            if isinstance(src, str) and src in mapping:
+                                src_info[0] = mapping[src]
+
+        def rewrite_blocks(blks):
+            for blk in blks or []:
+                if not isinstance(blk, dict):
+                    continue
+                t = blk.get("t")
+                c = blk.get("c", [])
+                if t == "Para" or t == "Plain":
+                    rewrite_inlines(c)
+                elif t == "Figure":
+                    if isinstance(c, list) and len(c) >= 3:
+                        rewrite_blocks(c[2])
+                elif t == "Div":
+                    if isinstance(c, list) and len(c) >= 2:
+                        rewrite_blocks(c[1])
+                elif t == "BulletList" and isinstance(c, list):
+                    for item in c:
+                        if isinstance(item, list):
+                            rewrite_blocks(item)
+                elif t == "OrderedList" and isinstance(c, list) and len(c) >= 2:
+                    for item in c[1]:
+                        if isinstance(item, list):
+                            rewrite_blocks(item)
+                elif t == "BlockQuote":
+                    rewrite_blocks(c)
+
+        doc = bundle.get("doc", {})
+        rewrite_blocks(doc.get("blocks", []))
+
+    def _export_three_d_assets_for_static(self, output_dir: pathlib.Path) -> None:
+        """Copy ThreeDData GLBs into the static bundle + write three_d.json.
+
+        The DbManager carries `glb_path` strings that are usually bundle-
+        relative (`assets/3d/<key>.glb` written by figure-source filters)
+        but legacy / external producers may register paths relative to
+        the source dir or as absolute paths. Try several base dirs to
+        locate the GLB on disk; skip with a warning if none resolve.
+        """
+        import shutil
+
+        try:
+            keys = self.one_doc.db_manager.list_three_d()
+        except Exception as exc:
+            logger.warning(f"list_three_d() failed: {exc}; skipping 3D asset export")
+            return
+        if not keys:
+            return
+
+        assets_dir = output_dir / "assets" / "3d"
+        assets_dir.mkdir(parents=True, exist_ok=True)
+
+        manifest: Dict[str, Dict[str, Any]] = {}
+
+        search_bases: List[pathlib.Path] = []
+        for cand in (
+            self.one_doc.build_dir,
+            self.one_doc.source_dir,
+            getattr(self.one_doc.source_dir, "parent", None),
+            self.one_doc.dist_dir,
+        ):
+            if cand is None:
+                continue
+            p = pathlib.Path(cand).resolve()
+            if p not in search_bases:
+                search_bases.append(p)
+
+        copied = skipped = 0
+        for key in keys:
+            try:
+                meta = self.one_doc.db_manager.get_three_d(key)
+            except Exception as exc:
+                logger.warning(f"get_three_d({key!r}) failed: {exc}; skipping")
+                skipped += 1
+                continue
+            if meta is None:
+                logger.warning(f"3d key {key!r} listed but get_three_d returned None")
+                skipped += 1
+                continue
+
+            src = pathlib.Path(meta.glb_path)
+            resolved: pathlib.Path | None = None
+            if src.is_absolute():
+                if src.exists():
+                    resolved = src
+            else:
+                for base in search_bases:
+                    candidate = (base / src).resolve()
+                    if candidate.exists():
+                        resolved = candidate
+                        break
+
+            if resolved is None:
+                logger.warning(
+                    f"3d asset {key!r}: glb_path {meta.glb_path!r} not found "
+                    f"(searched: {[str(b) for b in search_bases]})"
+                )
+                skipped += 1
+                continue
+
+            dest = assets_dir / f"{key}.glb"
+            try:
+                shutil.copyfile(resolved, dest)
+            except Exception as exc:
+                logger.warning(f"copy {resolved} → {dest} failed: {exc}; skipping")
+                skipped += 1
+                continue
+
+            # Optional poster PNG sibling: the producer may have rendered
+            # a raster preview alongside the GLB (e.g. via pygfx
+            # offscreen). Two sources, in order: an explicit `image_path`
+            # in the metadata dict, then a same-name `.png` next to the
+            # GLB. If found, copy as `<key>.png` and record the relative
+            # URL in the manifest so the frontend can use it as a poster.
+            poster_src: pathlib.Path | None = None
+            meta_image = (meta.metadata or {}).get("image_path") if hasattr(meta, "metadata") else None
+            if meta_image:
+                im_path = pathlib.Path(meta_image)
+                if im_path.is_absolute() and im_path.exists():
+                    poster_src = im_path
+                else:
+                    for base in search_bases:
+                        cand = (base / im_path).resolve()
+                        if cand.exists():
+                            poster_src = cand
+                            break
+            if poster_src is None:
+                sibling = resolved.with_suffix(".png")
+                if sibling.exists():
+                    poster_src = sibling
+
+            poster_url: str | None = None
+            if poster_src is not None:
+                poster_dest = assets_dir / f"{key}.png"
+                try:
+                    shutil.copyfile(poster_src, poster_dest)
+                    poster_url = f"assets/3d/{key}.png"
+                except Exception as exc:
+                    logger.warning(f"poster copy {poster_src} → {poster_dest} failed: {exc}")
+
+            manifest[key] = {
+                "key": key,
+                "format": meta.format or "glb",
+                "camera_pos": meta.camera_pos or "iso_3",
+                "caption": meta.caption or "",
+                "sha256": meta.sha256 or "",
+                "size": meta.size or dest.stat().st_size,
+                "source_type": meta.source_type or "",
+            }
+            if poster_url is not None:
+                manifest[key]["image_path"] = poster_url
+
+            # FEA artefact bundle: the writer ships a sibling directory
+            # next to the mesh GLB (`fea.manifest.json`, `fea.<field>.bin`,
+            # etc.) that drives the streaming-FEA viewer. Copy the whole
+            # directory under `assets/3d/<key>/` so paradoc-serve can
+            # expose it via the doc-files endpoint and the frontend's
+            # `load_fea_streaming.ts` mount path can hit it. Recorded in
+            # the three_d manifest as `fea_bundle_dir` so the frontend
+            # knows to dispatch to the artefact path instead of plain
+            # `mountViewer`.
+            if (meta.source_type or "") == "fea_artefact_bundle":
+                bundle_src = resolved.parent
+                bundle_dest = assets_dir / key
+                try:
+                    if bundle_dest.exists():
+                        shutil.rmtree(bundle_dest)
+                    shutil.copytree(bundle_src, bundle_dest)
+                    bundle_url = f"assets/3d/{key}"
+                    manifest[key]["fea_bundle_dir"] = bundle_url
+                    manifest[key]["fea_manifest_path"] = f"{bundle_url}/fea.manifest.json"
+                except Exception as exc:
+                    logger.warning(f"FEA artefact bundle copy {bundle_src} → {bundle_dest} failed: {exc}")
+
+            # Mode-view row: share the canonical bundle's files (no
+            # extra copy — that's the whole point of the artefact
+            # design) and surface `fea_bundle_key` + `fea_mode_index`
+            # so the renderer can build a manifest URL pointing at
+            # the bundle's directory and ask the embed to render the
+            # right mode. Bundle key + mode index live in the row's
+            # ``metadata`` dict; the adapy bake writes them when it
+            # registers per-mode views alongside the canonical bundle
+            # row.
+            if (meta.source_type or "") == "fea_artefact_bundle_mode_view":
+                md = meta.metadata if isinstance(meta.metadata, dict) else {}
+                bundle_key = md.get("fea_bundle_key")
+                mode_idx = md.get("fea_mode_index")
+                if bundle_key:
+                    bundle_url = f"assets/3d/{bundle_key}"
+                    manifest[key]["fea_bundle_dir"] = bundle_url
+                    manifest[key]["fea_manifest_path"] = f"{bundle_url}/fea.manifest.json"
+                    manifest[key]["fea_bundle_key"] = bundle_key
+                if isinstance(mode_idx, int):
+                    manifest[key]["fea_mode_index"] = mode_idx
+            copied += 1
+
+        if manifest:
+            three_d_path = output_dir / "three_d.json"
+            three_d_path.write_text(
+                json.dumps(manifest, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            logger.info(f"Wrote {copied} 3D asset(s) → {assets_dir} (skipped {skipped}) and {three_d_path}")
+        elif skipped:
+            logger.info(f"3D export: {skipped} key(s) skipped, none successfully copied")
+
+    def _inject_static_runtime_config(
+        self,
+        output_dir: pathlib.Path,
+        header_links: List[Dict[str, str]] | None,
+    ) -> None:
+        """Seed ``window.__PARADOC_CONFIG__`` in the bundled ``index.html``.
+
+        Always sets ``transport: 'static'`` so the React app picks the
+        ``StaticTransport`` (relative-URL fetches for plots/tables/3D)
+        instead of trying to open a WebSocket to a non-existent server.
+        Optionally also seeds ``headerLinks`` for host-supplied nav.
+
+        The bundled frontend ``index.html`` is a single self-contained
+        file; we splice an inline script right after the first ``<head>``
+        tag so the config is set before any module script executes.
+        """
+        index_path = output_dir / "index.html"
+        if not index_path.exists():
+            logger.warning("Cannot inject runtime config — %s not found.", index_path)
+            return
+
+        cfg: Dict[str, Any] = {"transport": "static"}
+
+        if header_links:
+            clean_links: List[Dict[str, str]] = []
+            for raw in header_links:
+                if not isinstance(raw, dict) or "label" not in raw or "href" not in raw:
+                    logger.warning("Skipping malformed header link: %r", raw)
+                    continue
+                entry: Dict[str, str] = {"label": str(raw["label"]), "href": str(raw["href"])}
+                if raw.get("target"):
+                    entry["target"] = str(raw["target"])
+                if raw.get("rel"):
+                    entry["rel"] = str(raw["rel"])
+                clean_links.append(entry)
+            if clean_links:
+                cfg["headerLinks"] = clean_links
+
+        payload = json.dumps(cfg, ensure_ascii=False)
+        snippet = (
+            "<script>"
+            "(function(){var c=window.__PARADOC_CONFIG__=window.__PARADOC_CONFIG__||{};"
+            f"Object.assign(c,{payload});"
+            "})();"
+            "</script>"
+        )
+
+        html = index_path.read_text(encoding="utf-8")
+        head_open = html.find("<head")
+        if head_open == -1:
+            logger.warning("Cannot inject runtime config — no <head> tag in %s.", index_path)
+            return
+        head_close = html.find(">", head_open)
+        if head_close == -1:
+            logger.warning("Cannot inject runtime config — malformed <head> in %s.", index_path)
+            return
+        new_html = html[: head_close + 1] + snippet + html[head_close + 1 :]
+        index_path.write_text(new_html, encoding="utf-8")
+        logger.info(
+            "Injected runtime config (transport=static, %d headerLinks) into %s",
+            len(cfg.get("headerLinks", [])),
+            index_path,
+        )
