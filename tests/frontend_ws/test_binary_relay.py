@@ -56,7 +56,32 @@ def _build_bundle(tmp_path, glb_bytes: bytes, key: str = "fig1", doc_id: str = "
 
 
 def _run(coro):
-    return asyncio.run(coro)
+    """Drive an async coroutine to completion from a sync test.
+
+    Runs on a dedicated thread rather than calling ``asyncio.run()``
+    directly. Playwright's sync API — kept open for the whole session by
+    the ``browser`` fixture in tests/frontend — leaves a running event
+    loop registered on the main thread, so once any browser test has run
+    earlier in the session a bare ``asyncio.run()`` here raises
+    "cannot be called from a running event loop". A fresh thread has no
+    such ambient loop, so this is robust regardless of test ordering.
+    """
+    import threading
+
+    box: dict[str, Any] = {}
+
+    def _worker() -> None:
+        try:
+            box["result"] = asyncio.run(coro)
+        except BaseException as exc:  # surfaced on the calling thread below
+            box["error"] = exc
+
+    thread = threading.Thread(target=_worker)
+    thread.start()
+    thread.join()
+    if "error" in box:
+        raise box["error"]
+    return box.get("result")
 
 
 def test_meta_then_binary_chunks_then_done(tmp_path):
