@@ -10,16 +10,12 @@ Covers:
 
 from __future__ import annotations
 
-import pickle
-import textwrap
 from pathlib import Path
 
 import pytest
 
 from paradoc.tasks import (
     CacheKey,
-    Cell,
-    InProcessExecutor,
     Runner,
     TaskCache,
     TaskFn,
@@ -89,11 +85,10 @@ def test_ast_hash_walks_helper_fn():
 
 def test_ast_hash_module_fingerprint_fallback_for_c_extension():
     """C extensions have no source; fingerprint is module name (+ version if any)."""
-    import json
-
     # json.dumps is a Python function in stdlib, but io.BytesIO is a class
     # backed by C — pick one that's reliably non-Python-source.
     import io
+    import json
 
     fingerprint = ast_source_hash(io.BytesIO)
     # Just confirming it doesn't crash and produces a deterministic digest.
@@ -337,7 +332,6 @@ def test_runner_cache_invalidates_when_task_body_changes(tmp_path: Path):
 
 def test_cached_result_short_circuits_executor(tmp_path: Path):
     """A cache hit must not invoke the executor."""
-    from concurrent.futures import Future
 
     class _ExplodingExecutor:
         def submit(self, cell, parent_result, extra_kwargs=None):
@@ -395,13 +389,7 @@ def test_pickle_serializer_atomic_publish(tmp_path: Path):
 def test_cache_uses_task_serializer_for_extension(tmp_path: Path):
     """A task declaring serializer=... routes its cell results
     through that serializer's extension."""
-    from paradoc.tasks import (
-        Cell,
-        CacheKey,
-        TaskCache,
-        TaskFn,
-        compute_cache_key,
-    )
+    from paradoc.tasks import TaskCache, TaskFn, compute_cache_key
 
     captures: list = []
 

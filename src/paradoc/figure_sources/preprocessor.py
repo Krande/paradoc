@@ -60,11 +60,7 @@ def _fenced_code_ranges(text: str) -> list[tuple[int, int]]:
             # at least as long, nothing but the fence char + optional
             # trailing whitespace on the line).
             line_no_ws = stripped.rstrip()
-            if (
-                line_no_ws
-                and line_no_ws == open_char * len(line_no_ws)
-                and len(line_no_ws) >= open_len
-            ):
+            if line_no_ws and line_no_ws == open_char * len(line_no_ws) and len(line_no_ws) >= open_len:
                 ranges.append((open_offset, cursor + len(line)))
                 open_char = None
                 open_len = 0
@@ -135,10 +131,7 @@ def preprocess_markdown(
             spec = create_figure_source(data)
             replacement = render_block(spec)
         except Exception as exc:
-            replacement = (
-                f"<!-- paradoc:figure ERROR: {exc} -->\n"
-                f"`figure-source error: {exc}`"
-            )
+            replacement = f"<!-- paradoc:figure ERROR: {exc} -->\n" f"`figure-source error: {exc}`"
         out.append(replacement)
         last = end
     out.append(text[last:])

@@ -13,18 +13,6 @@ The legacy file-centric `Task` BaseModel is preserved under
 
 from .cache import CacheKey, TaskCache, compute_cache_key
 from .cells import Cell, cells_for, expand_fanout
-from .context import BuildContext, ctx_param_name
-from .filter_binding import bind_filter_handles
-from .outcomes import (
-    FilterOutcome,
-    Outcome,
-    PlotOutcome,
-    TableOutcome,
-    ThreeDOutcome,
-    dispatch_outcomes,
-    iter_outcomes,
-)
-from .orchestrator import build_document
 from .config import (
     BuildProfile,
     StaticExportConfig,
@@ -34,6 +22,7 @@ from .config import (
     load_task_config,
     merge_fanout,
 )
+from .context import BuildContext, ctx_param_name
 from .decorator import is_task, task
 from .discovery import discover_tasks
 from .executors import (
@@ -43,12 +32,19 @@ from .executors import (
     PixiSubprocessError,
     PixiSubprocessExecutor,
 )
+from .filter_binding import bind_filter_handles
 from .models import LegacyTaskSpec, Task, TaskFn, TaskHandle
-from .registry import (
-    TaskRegistry,
-    get_default_registry,
-    reset_default_registry,
+from .orchestrator import build_document
+from .outcomes import (
+    FilterOutcome,
+    Outcome,
+    PlotOutcome,
+    TableOutcome,
+    ThreeDOutcome,
+    dispatch_outcomes,
+    iter_outcomes,
 )
+from .registry import TaskRegistry, get_default_registry, reset_default_registry
 from .runner import Runner
 from .serializers import PickleSerializer, Serializer
 from .source_hash import ast_source_hash

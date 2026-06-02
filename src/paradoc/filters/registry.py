@@ -39,8 +39,7 @@ class FilterRegistry:
             if existing is instance:
                 return
             raise ValueError(
-                f"Filter name {instance.name!r} is already registered "
-                f"(existing: {existing!r}, new: {instance!r})"
+                f"Filter name {instance.name!r} is already registered " f"(existing: {existing!r}, new: {instance!r})"
             )
         self._filters[instance.name] = instance
 

@@ -68,10 +68,7 @@ class LocalDocStore(DocStore):
             # scope makes sense here; non-shared requests will miss when
             # the docs aren't actually in that scope.
             if scope.kind != "shared":
-                raise FileNotFoundError(
-                    f"single-doc deployment only serves shared scope; "
-                    f"got {scope.kind!r}"
-                )
+                raise FileNotFoundError(f"single-doc deployment only serves shared scope; " f"got {scope.kind!r}")
             return self.root
 
         scope_root = self._scope_root(scope)
@@ -151,9 +148,7 @@ class LocalDocStore(DocStore):
         # Single-doc deployments shouldn't be uploaded into via the
         # CLI; the file layout has no per-doc subdirectory.
         if self._is_single_doc():
-            raise PermissionError(
-                "uploads not supported on single-doc deployments"
-            )
+            raise PermissionError("uploads not supported on single-doc deployments")
         scope_root = self._scope_root(s)
         bundle_root = (scope_root / doc_id).resolve()
         if not bundle_root.is_relative_to(scope_root):
@@ -164,9 +159,7 @@ class LocalDocStore(DocStore):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
 
-    def get_bundle_manifest(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional["BundleManifest"]:
+    def get_bundle_manifest(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional["BundleManifest"]:
         s = scope if scope is not None else _default_shared_scope()
         try:
             bundle = self._bundle_dir(doc_id, s)
@@ -177,38 +170,31 @@ class LocalDocStore(DocStore):
         except (FileNotFoundError, Exception):
             return None
 
-    def get_table(
-        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[TableData]:
+    def get_table(self, doc_id: str, key: str, *, scope: Optional["Scope"] = None) -> Optional[TableData]:
         s = scope if scope is not None else _default_shared_scope()
         try:
             return self._db(doc_id, s).get_table(key)
         except FileNotFoundError:
             return None
 
-    def get_plot(
-        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[PlotData]:
+    def get_plot(self, doc_id: str, key: str, *, scope: Optional["Scope"] = None) -> Optional[PlotData]:
         s = scope if scope is not None else _default_shared_scope()
         try:
             return self._db(doc_id, s).get_plot(key)
         except FileNotFoundError:
             return None
 
-    def get_three_d_meta(
-        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[ThreeDData]:
+    def get_three_d_meta(self, doc_id: str, key: str, *, scope: Optional["Scope"] = None) -> Optional[ThreeDData]:
         s = scope if scope is not None else _default_shared_scope()
         try:
             return self._db(doc_id, s).get_three_d(key)
         except FileNotFoundError:
             return None
 
-    def list_bundle_files(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> list:
-        from .base import BundleFileEntry
+    def list_bundle_files(self, doc_id: str, *, scope: Optional["Scope"] = None) -> list:
         import mimetypes
+
+        from .base import BundleFileEntry
 
         s = scope if scope is not None else _default_shared_scope()
         try:
@@ -254,9 +240,7 @@ class LocalDocStore(DocStore):
             return None
         return candidate.read_bytes()
 
-    def get_three_d_poster(
-        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_three_d_poster(self, doc_id: str, key: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         s = scope if scope is not None else _default_shared_scope()
         meta = self.get_three_d_meta(doc_id, key, scope=s)
         if meta is None or not isinstance(meta.metadata, dict):
@@ -279,36 +263,24 @@ class LocalDocStore(DocStore):
             return None
         return candidate.read_bytes()
 
-    def get_static_manifest_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_manifest_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         return self._read_static(doc_id, "manifest.json", scope)
 
-    def get_static_section_bytes(
-        self, doc_id: str, idx: int, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_section_bytes(self, doc_id: str, idx: int, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         if idx < 0:
             return None
         return self._read_static(doc_id, f"sections/{idx}.json", scope)
 
-    def get_static_plots_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_plots_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         return self._read_static(doc_id, "plots.json", scope)
 
-    def get_static_tables_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_tables_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         return self._read_static(doc_id, "tables.json", scope)
 
-    def get_static_images_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_images_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         return self._read_static(doc_id, "images.json", scope)
 
-    def get_presets_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_presets_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         s = scope if scope is not None else _default_shared_scope()
         try:
             bundle = self._bundle_dir(doc_id, s)
@@ -321,9 +293,7 @@ class LocalDocStore(DocStore):
             return None
         return path.read_bytes()
 
-    def _read_static(
-        self, doc_id: str, rel: str, scope: Optional["Scope"]
-    ) -> Optional[bytes]:
+    def _read_static(self, doc_id: str, rel: str, scope: Optional["Scope"]) -> Optional[bytes]:
         s = scope if scope is not None else _default_shared_scope()
         try:
             bundle = self._bundle_dir(doc_id, s)

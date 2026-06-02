@@ -13,20 +13,15 @@ ARG PIXI_VERSION=0.68.0
 FROM ghcr.io/prefix-dev/pixi:${PIXI_VERSION}
 WORKDIR /work
 
-# Two reasons we need apt here:
-#   1. `git` — pixi clones the ada-py source via a git pin in
-#      `[feature.examples-figs.pypi-dependencies]` and the prefix-dev
-#      pixi image ships no git, so resolution aborts with
-#      "Git executable not found".
-#   2. Headless-Chrome shared libs — kaleido renders plot PNGs by
-#      driving Chromium via choreographer, and Chromium hard-links
-#      against libnss3 / libatk / libgtk / etc. None of those ship in
-#      the slim pixi base; without them every plot fails at compile
-#      time with kaleido's "missing common dependencies" message,
-#      which lands as `[Error rendering plot: KEY]` in the markdown
-#      and pulls the `{#fig:KEY}` anchor with it.
-# The dep list mirrors choreographer's bundled `chrome-linux64/deb.deps`
-# (with noble's t64-renamed libasound2/libcurl4 substituted).
+# apt is needed for the headless-Chrome shared libs: kaleido renders
+# plot PNGs by driving Chromium via choreographer, and Chromium
+# hard-links against libnss3 / libatk / libgtk / etc. None of those
+# ship in the slim pixi base; without them every plot fails at compile
+# time with kaleido's "missing common dependencies" message, which
+# lands as `[Error rendering plot: KEY]` in the markdown and pulls the
+# `{#fig:KEY}` anchor with it. The dep list mirrors choreographer's
+# bundled `chrome-linux64/deb.deps` (with noble's t64-renamed
+# libasound2/libcurl4 substituted).
 #
 # Rewrite Ubuntu's mirrors to HTTPS first: the Forgejo runner's build
 # sandbox blocks plain-HTTP egress (so `http://archive.ubuntu.com`
@@ -36,7 +31,6 @@ WORKDIR /work
 RUN sed -i 's|http://archive.ubuntu.com|https://archive.ubuntu.com|g; s|http://security.ubuntu.com|https://security.ubuntu.com|g' /etc/apt/sources.list.d/*.sources \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-        git \
         fonts-liberation \
         libasound2t64 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 \
         libcairo2 libcups2 libcurl4t64 libdbus-1-3 libexpat1 libgbm1 \
@@ -45,29 +39,10 @@ RUN sed -i 's|http://archive.ubuntu.com|https://archive.ubuntu.com|g; s|http://s
         libxext6 libxfixes3 libxkbcommon0 libxrandr2 \
     && rm -rf /var/lib/apt/lists/*
 
-# Sibling adapy checkout — required by the `examples-figs` env's
-# `ada-py = { path = "../adapy", editable = true }` entry. The clone
-# has to land *before* `pixi install` because pixi reads the package
-# metadata off disk at resolve time. URL comes from a workflow secret
-# (no source-host hostname in this file); the repo is public-readable
-# so no token is needed. Mirrors adapy/Dockerfile.docs' inverse clone.
-ARG ADAPY_GIT_URL
-ARG ADAPY_REF=main
-# CACHE_BUST forces a fresh clone when ``ADAPY_REF`` is a moving
-# branch; without it Docker would reuse whatever HEAD was cloned the
-# first time. Workflow passes ``${{ github.run_id }}`` so every run
-# fetches the latest tip.
-ARG CACHE_BUST=""
-RUN test -n "$ADAPY_GIT_URL" \
-        || (echo "::error::ADAPY_GIT_URL build-arg is required" >&2; exit 1) \
-    && echo "cache-bust: $CACHE_BUST" \
-    && git clone --depth 1 --branch "$ADAPY_REF" "$ADAPY_GIT_URL" /adapy
-
 # Solve envs first so source-only edits don't bust the heavy layer
 # cache. Two envs: `examples` for the lightweight set, `examples-figs`
-# for the figure-sources example (it pulls ada-py + native CAD libs).
-# pixi resolves `../adapy` relative to the workdir, so the sibling
-# layout has to land before this RUN — see the clone above.
+# for the figure-sources example (it pulls ada-py + native CAD libs
+# from conda-forge via the lockfile — no sibling checkout needed).
 COPY pixi.toml pixi.lock pyproject.toml ./
 RUN pixi install --environment examples --locked && \
     pixi install --environment examples-figs --locked

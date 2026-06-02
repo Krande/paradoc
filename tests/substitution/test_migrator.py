@@ -36,7 +36,7 @@ def test_basic_rewrites(legacy, expected):
 
 
 def test_idempotent():
-    text = '${ my_table } and ${ p(width=800) } and ${ x.y(k=1):.2f }'
+    text = "${ my_table } and ${ p(width=800) } and ${ x.y(k=1):.2f }"
     out, n, warnings = migrate_text(text)
     assert out == text
     assert n == 0

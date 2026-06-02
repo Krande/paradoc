@@ -34,16 +34,9 @@ from paradoc.figure_sources import models as figmod
 from paradoc.figure_sources.filters import register_filter
 from paradoc.figure_sources.filters.base import FigureSourceFilter, RenderResult
 
-
 # Real 1-triangle CAD-shaped GLB so adapy's GLTFLoader + prepareLoadedModel
 # accept it. 4.5KB; checked in under `files/doc_figure_sources/files/`.
-_FIXTURE_GLB = (
-    Path(__file__).parent.parent.parent
-    / "files"
-    / "doc_figure_sources"
-    / "files"
-    / "cad.glb"
-)
+_FIXTURE_GLB = Path(__file__).parent.parent.parent / "files" / "doc_figure_sources" / "files" / "cad.glb"
 
 _MIN_PNG = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00"
@@ -112,6 +105,7 @@ def _serve_dir(directory: Path) -> tuple[str, threading.Thread, socketserver.TCP
     static bundle must be served over HTTP — matches how the bundle
     is hosted in production (nginx, GitHub Pages, etc.).
     """
+
     class _QuietHandler(http.server.SimpleHTTPRequestHandler):
         def log_message(self, format, *args):
             return
@@ -191,18 +185,14 @@ def _attach_recorders(page):
     )
     page.on(
         "response",
-        lambda res: failed_requests.append((res.url, f"HTTP {res.status}"))
-        if res.status >= 400
-        else None,
+        lambda res: failed_requests.append((res.url, f"HTTP {res.status}")) if res.status >= 400 else None,
     )
     page.on("websocket", lambda ws: ws_attempts.append(ws.url))
 
     return console_messages, failed_requests, ws_attempts
 
 
-def test_static_export_3d_viewer_mounts_without_presets_404(
-    static_bundle, page, wait_for_frontend
-):
+def test_static_export_3d_viewer_mounts_without_presets_404(static_bundle, page, wait_for_frontend):
     """The original ada-docs incident: `presets.json` is 404, the
     fallback preset only ships `iso_3`, and the canvas can't frame a
     model whose registered `camera_pos` isn't in the fallback set.
@@ -229,23 +219,16 @@ def test_static_export_3d_viewer_mounts_without_presets_404(
     # Give the lazy ThreeDRenderer time to fire its presets fetch.
     page.wait_for_timeout(500)
 
-    presets_404s = [
-        url for url, reason in failed_requests if "presets.json" in url and "404" in reason
-    ]
+    presets_404s = [url for url, reason in failed_requests if "presets.json" in url and "404" in reason]
     assert not presets_404s, f"presets.json 404'd: {presets_404s}"
 
     fallback_warnings = [
-        text for kind, text in console_messages
-        if kind == "warning" and "failed to load presets" in text
+        text for kind, text in console_messages if kind == "warning" and "failed to load presets" in text
     ]
-    assert not fallback_warnings, (
-        f"ThreeDRenderer fell back to hardcoded preset: {fallback_warnings}"
-    )
+    assert not fallback_warnings, f"ThreeDRenderer fell back to hardcoded preset: {fallback_warnings}"
 
 
-def test_static_export_3d_viewer_does_not_hijack_page_scroll(
-    static_bundle, page, wait_for_frontend
-):
+def test_static_export_3d_viewer_does_not_hijack_page_scroll(static_bundle, page, wait_for_frontend):
     """The bug from paradoc.krande.no: enabling the viewer makes the
     surrounding paradoc page un-scrollable.
 
@@ -282,9 +265,7 @@ def test_static_export_3d_viewer_does_not_hijack_page_scroll(
     # below). The desktop sidebar occupies the left ~288px on desktop
     # viewports — wheel from the reader's own bounding rect so the test
     # is layout-independent.
-    reader_rect = page.evaluate(
-        "() => document.querySelector('[data-search-root]').getBoundingClientRect().toJSON()"
-    )
+    reader_rect = page.evaluate("() => document.querySelector('[data-search-root]').getBoundingClientRect().toJSON()")
     page.evaluate("document.querySelector('[data-search-root]').scrollTop = 0")
     initial = page.evaluate("document.querySelector('[data-search-root]').scrollTop")
     # Bottom-right area of the reader, well past the canvas region.
@@ -300,9 +281,7 @@ def test_static_export_3d_viewer_does_not_hijack_page_scroll(
     )
 
 
-def test_static_export_3d_viewer_canvas_stays_within_container(
-    static_bundle, page, wait_for_frontend
-):
+def test_static_export_3d_viewer_canvas_stays_within_container(static_bundle, page, wait_for_frontend):
     """Canvas height should match the 4:3 container, not blow up to
     window.innerHeight × something. The "FEA viewer black screen"
     bug had the canvas growing past 5000px tall.
@@ -329,14 +308,10 @@ def test_static_export_3d_viewer_canvas_stays_within_container(
     )
     assert rect is not None, "no canvas in DOM after mount"
     vh = page.evaluate("window.innerHeight")
-    assert rect["height"] < vh * 2, (
-        f"canvas exceeds 2× viewport height: {rect['height']}px vs vp {vh}px"
-    )
+    assert rect["height"] < vh * 2, f"canvas exceeds 2× viewport height: {rect['height']}px vs vp {vh}px"
 
 
-def test_static_export_scroll_survives_showControls_toggle(
-    static_bundle, page, wait_for_frontend
-):
+def test_static_export_scroll_survives_showControls_toggle(static_bundle, page, wait_for_frontend):
     """The 3D-viewer-controls toggle disposes and re-mounts the
     viewer with `showControls` flipped. Either state can have its own
     scroll bug:
@@ -387,9 +362,7 @@ def test_static_export_scroll_survives_showControls_toggle(
     # Scroll test in the toggled state. Wheel from the reader's own
     # rect to stay layout-independent of the (now visible) desktop
     # sidebar.
-    reader_rect = page.evaluate(
-        "() => document.querySelector('[data-search-root]').getBoundingClientRect().toJSON()"
-    )
+    reader_rect = page.evaluate("() => document.querySelector('[data-search-root]').getBoundingClientRect().toJSON()")
     page.evaluate("document.querySelector('[data-search-root]').scrollTop = 0")
     initial = page.evaluate("document.querySelector('[data-search-root]').scrollTop")
     wheel_x = int(reader_rect["x"] + reader_rect["width"] - 20)
@@ -405,9 +378,7 @@ def test_static_export_scroll_survives_showControls_toggle(
     )
 
 
-def test_static_export_does_not_attempt_websocket(
-    static_bundle, page, wait_for_frontend
-):
+def test_static_export_does_not_attempt_websocket(static_bundle, page, wait_for_frontend):
     """Static-export mode injects `transport: 'static'` in
     `window.__PARADOC_CONFIG__`. Verify the WS path is genuinely
     inert — no `ws://...` connection attempts.

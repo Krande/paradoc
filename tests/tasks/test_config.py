@@ -16,7 +16,9 @@ from paradoc.tasks import (
     Runner,
     TaskConfig,
     TaskRegistry,
-    _test_fixtures as fx,
+)
+from paradoc.tasks import _test_fixtures as fx
+from paradoc.tasks import (
     build_executor_from_config,
     load_task_config,
     merge_fanout,
@@ -178,6 +180,7 @@ def test_hybrid_routes_envless_task_in_process():
 
         def submit(self, cell, parent_result, extra_kwargs=None):
             from concurrent.futures import Future
+
             self.sink.append(cell)
             f = Future()
             f.set_result(None)
@@ -203,6 +206,7 @@ def test_hybrid_shutdown_propagates():
 
         def submit(self, cell, parent_result, extra_kwargs=None):
             from concurrent.futures import Future
+
             f = Future()
             f.set_result(None)
             return f

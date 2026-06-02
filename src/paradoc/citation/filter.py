@@ -60,9 +60,7 @@ def _load_bibliography(path: Optional[str]) -> dict[str, dict[str, Any]]:
         # pyyaml is a transitive dep of pandoc/paradoc deployments
         # already; warn (to stderr — stdout is reserved for the AST)
         # and no-op when missing rather than crashing the compile.
-        sys.stderr.write(
-            "[shelf-citation] pyyaml not installed; skipping bibliography load\n"
-        )
+        sys.stderr.write("[shelf-citation] pyyaml not installed; skipping bibliography load\n")
         return {}
     try:
         data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
@@ -93,10 +91,11 @@ def _inline_to_text(inlines: list[dict[str, Any]]) -> str:
             parts.append(" ")
         elif t == "LineBreak":
             parts.append("\n")
-        elif t in ("Emph", "Strong", "Strikeout", "Subscript", "Superscript",
-                   "SmallCaps", "Span", "Quoted"):
+        elif t in ("Emph", "Strong", "Strikeout", "Subscript", "Superscript", "SmallCaps", "Span", "Quoted"):
             child = node.get("c")
-            inner = child[1] if (t == "Span" or t == "Quoted") and isinstance(child, list) and len(child) >= 2 else child
+            inner = (
+                child[1] if (t == "Span" or t == "Quoted") and isinstance(child, list) and len(child) >= 2 else child
+            )
             if isinstance(inner, list):
                 parts.append(_inline_to_text(inner))
         elif t == "Code":

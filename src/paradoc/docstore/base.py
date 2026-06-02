@@ -80,9 +80,7 @@ class DocStore(ABC):
     def list_doc_ids(self, scope: Optional["Scope"] = None) -> list[str]:
         """All doc IDs the store can serve within ``scope``."""
 
-    def list_bundle_files(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> list[BundleFileEntry]:
+    def list_bundle_files(self, doc_id: str, *, scope: Optional["Scope"] = None) -> list[BundleFileEntry]:
         """Enumerate every file inside the doc's bundle directory.
 
         Used by the options-panel "Files" view so users can inspect
@@ -128,9 +126,7 @@ class DocStore(ABC):
         """
         return None
 
-    def get_bundle_manifest(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional["BundleManifest"]:
+    def get_bundle_manifest(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional["BundleManifest"]:
         """Return the parsed ``<bundle>/manifest.json`` for ``doc_id``.
 
         Used by aggregation endpoints (``/api/landing``) that want
@@ -156,22 +152,13 @@ class DocStore(ABC):
         ]
 
     @abstractmethod
-    def get_table(
-        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[TableData]:
-        ...
+    def get_table(self, doc_id: str, key: str, *, scope: Optional["Scope"] = None) -> Optional[TableData]: ...
 
     @abstractmethod
-    def get_plot(
-        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[PlotData]:
-        ...
+    def get_plot(self, doc_id: str, key: str, *, scope: Optional["Scope"] = None) -> Optional[PlotData]: ...
 
     @abstractmethod
-    def get_three_d_meta(
-        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[ThreeDData]:
-        ...
+    def get_three_d_meta(self, doc_id: str, key: str, *, scope: Optional["Scope"] = None) -> Optional[ThreeDData]: ...
 
     @abstractmethod
     async def open_binary(
@@ -205,9 +192,7 @@ class DocStore(ABC):
         """
         return None
 
-    def get_three_d_poster(
-        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_three_d_poster(self, doc_id: str, key: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         """Return the poster PNG bytes for a 3D asset, or None.
 
         Reads `metadata.image_path` from the ThreeDData row (set by the
@@ -220,9 +205,7 @@ class DocStore(ABC):
         """
         return None
 
-    def get_static_manifest_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_manifest_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         """Return the raw bytes of the doc's static manifest.json.
 
         That's the DocManifest the frontend's static-mode loader expects
@@ -232,37 +215,27 @@ class DocStore(ABC):
         """
         return None
 
-    def get_static_section_bytes(
-        self, doc_id: str, idx: int, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_section_bytes(self, doc_id: str, idx: int, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         """Return the raw bytes of a section JSON (export_static layout)."""
         return None
 
-    def get_static_plots_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_plots_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         """Return the raw bytes of `static/plots.json` (pre-rendered Plotly
         figures keyed by plot key) — what the static-mode loader fetches as
         `plots.json` and the REST loader now consumes via the bulk endpoint.
         """
         return None
 
-    def get_static_tables_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_tables_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         """Return the raw bytes of `static/tables.json`."""
         return None
 
-    def get_static_images_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_images_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         """Return the raw bytes of `static/images.json` (embedded base64 image
         payloads keyed by image path)."""
         return None
 
-    def get_presets_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_presets_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         """Return the raw bytes of `assets/presets.json` — the camera
         preset map adapy emits at compile time. The 3D viewer needs this
         to mirror the static PNG's camera framing (preset names alone

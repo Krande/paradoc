@@ -11,7 +11,6 @@ import pytest
 
 from paradoc.tasks import (
     FilterOutcome,
-    Outcome,
     PlotOutcome,
     Runner,
     TableOutcome,
@@ -84,14 +83,13 @@ def test_iter_outcomes_only_one_level_deep():
 def test_dispatch_routes_each_outcome_kind(monkeypatch):
     """One TableOutcome, one PlotOutcome, one ThreeDOutcome, one FilterOutcome
     → matching add_* / register calls."""
-    from paradoc.filters import Filter, attr
-    import paradoc.tasks.outcomes as outcomes_mod
-
     # Mock paradoc.db boundaries so MagicMock figs/dfs don't trip JSON
     # serialization inside plotly_figure_to_plot_data /
     # dataframe_to_table_data — we're testing the dispatch routing, not
     # those converters.
     import paradoc.db as db_mod
+    from paradoc.filters import Filter, attr
+
     monkeypatch.setattr(db_mod, "dataframe_to_table_data", lambda **kw: ("table_data", kw))
     monkeypatch.setattr(db_mod, "plotly_figure_to_plot_data", lambda **kw: ("plot_data", kw))
 
@@ -142,6 +140,7 @@ def test_dispatch_flattens_lists(monkeypatch):
     """A single cell returning [TableOutcome, ThreeDOutcome] gets both
     routed."""
     import paradoc.db as db_mod
+
     monkeypatch.setattr(db_mod, "dataframe_to_table_data", lambda **kw: kw)
 
     @task

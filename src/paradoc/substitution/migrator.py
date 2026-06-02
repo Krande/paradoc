@@ -57,7 +57,7 @@ def migrate_text(text: str, *, source: str | None = None) -> tuple[str, int, lis
         m = _LEGACY_KEY_RE.search(text, pos)
         if m is None:
             break
-        out.append(text[pos:m.start()])
+        out.append(text[pos : m.start()])
         key = m.group(1)
         end = m.end()
 
@@ -69,10 +69,10 @@ def migrate_text(text: str, *, source: str | None = None) -> tuple[str, int, lis
                     f"unclosed annotation after {{{{__{key}__}}}} at offset {m.start()}"
                     + (f" in {source}" if source else "")
                 )
-                out.append(text[m.start():end])
+                out.append(text[m.start() : end])
                 pos = end
                 continue
-            anno = text[end:anno_close + 1]
+            anno = text[end : anno_close + 1]
             kwargs = _annotation_to_kwargs(anno, warnings=warnings, source=source)
             end = anno_close + 1
 
@@ -128,9 +128,7 @@ def _find_matching_brace(text: str, start: int) -> int:
     return -1
 
 
-def _annotation_to_kwargs(
-    anno: str, *, warnings: list[str], source: str | None
-) -> dict[str, str]:
+def _annotation_to_kwargs(anno: str, *, warnings: list[str], source: str | None) -> dict[str, str]:
     """Map a `{tbl:...}` or `{plt:...}` annotation to kwargs for the new syntax."""
     body = anno
     if body.startswith("{") and body.endswith("}"):
@@ -145,9 +143,7 @@ def _annotation_to_kwargs(
     return {}
 
 
-def _table_flags_to_kwargs(
-    body: str, *, warnings: list[str], source: str | None
-) -> dict[str, str]:
+def _table_flags_to_kwargs(body: str, *, warnings: list[str], source: str | None) -> dict[str, str]:
     kwargs: dict[str, str] = {}
     for part in body.split(";"):
         part = part.strip()
@@ -173,15 +169,11 @@ def _table_flags_to_kwargs(
         elif flag == "nocaption":
             kwargs["no_caption"] = "True"
         else:
-            warnings.append(
-                f"unknown table flag {flag!r}" + (f" in {source}" if source else "")
-            )
+            warnings.append(f"unknown table flag {flag!r}" + (f" in {source}" if source else ""))
     return kwargs
 
 
-def _plot_flags_to_kwargs(
-    body: str, *, warnings: list[str], source: str | None
-) -> dict[str, str]:
+def _plot_flags_to_kwargs(body: str, *, warnings: list[str], source: str | None) -> dict[str, str]:
     kwargs: dict[str, str] = {}
     for part in body.split(";"):
         part = part.strip()
@@ -196,8 +188,7 @@ def _plot_flags_to_kwargs(
                     kwargs[flag] = tokens[1]
                 except ValueError:
                     warnings.append(
-                        f"non-integer value for {flag} flag: {tokens[1]!r}"
-                        + (f" in {source}" if source else "")
+                        f"non-integer value for {flag} flag: {tokens[1]!r}" + (f" in {source}" if source else "")
                     )
         elif flag == "nocaption":
             kwargs["no_caption"] = "True"
@@ -205,9 +196,7 @@ def _plot_flags_to_kwargs(
             if len(tokens) > 1:
                 kwargs["format"] = _quote(tokens[1])
         else:
-            warnings.append(
-                f"unknown plot flag {flag!r}" + (f" in {source}" if source else "")
-            )
+            warnings.append(f"unknown plot flag {flag!r}" + (f" in {source}" if source else ""))
     return kwargs
 
 

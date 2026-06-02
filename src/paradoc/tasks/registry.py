@@ -18,7 +18,7 @@ a single `tasks.py` work without ordering constraints.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from .models import TaskFn
 
@@ -38,10 +38,7 @@ class TaskRegistry:
             existing = self._tasks[key]
             if existing is task:
                 return
-            raise ValueError(
-                f"Task {key!r} is already registered "
-                f"(existing: {existing!r}, new: {task!r})"
-            )
+            raise ValueError(f"Task {key!r} is already registered " f"(existing: {existing!r}, new: {task!r})")
         self._tasks[key] = task
 
     def unregister(self, qualname: str) -> None:

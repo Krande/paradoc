@@ -56,7 +56,6 @@ async def init_pool(database_url: str) -> Optional[asyncpg.Pool]:
     if not database_url:
         logger.info("db: PARADOC_DATABASE_URL not set — running in shared-only mode")
         return None
-    last_exc: Optional[Exception] = None
     delay = 1.0
     deadline = 60.0
     waited = 0.0
@@ -70,16 +69,19 @@ async def init_pool(database_url: str) -> Optional[asyncpg.Pool]:
             )
             break
         except (OSError, asyncpg.exceptions.PostgresError) as exc:
-            last_exc = exc
             if waited >= deadline:
                 logger.error(
                     "db: pool init still failing after %.0fs — giving up: %s",
-                    waited, exc,
+                    waited,
+                    exc,
                 )
                 raise
             logger.warning(
                 "db: pool init failed (%s); retry in %.1fs (waited %.1fs/%.0fs)",
-                exc, delay, waited, deadline,
+                exc,
+                delay,
+                waited,
+                deadline,
             )
             await asyncio.sleep(delay)
             waited += delay
@@ -105,9 +107,7 @@ async def _apply_migrations(pool: asyncpg.Pool) -> None:
     discover the migrations are already applied and become a no-op.
     """
     files = sorted(
-        p
-        for p in importlib.resources.files("paradoc.serve.migrations").iterdir()
-        if p.name.endswith(".sql")
+        p for p in importlib.resources.files("paradoc.serve.migrations").iterdir() if p.name.endswith(".sql")
     )
 
     async with pool.acquire() as conn:
@@ -121,10 +121,7 @@ async def _apply_migrations(pool: asyncpg.Pool) -> None:
                 )
                 """
             )
-            applied = {
-                r["version"]
-                for r in await conn.fetch("SELECT version FROM schema_version")
-            }
+            applied = {r["version"] for r in await conn.fetch("SELECT version FROM schema_version")}
             for path in files:
                 version = path.stem
                 if version in applied:
@@ -133,9 +130,7 @@ async def _apply_migrations(pool: asyncpg.Pool) -> None:
                 sql = path.read_text(encoding="utf-8")
                 async with conn.transaction():
                     await conn.execute(sql)
-                    await conn.execute(
-                        "INSERT INTO schema_version(version) VALUES ($1)", version
-                    )
+                    await conn.execute("INSERT INTO schema_version(version) VALUES ($1)", version)
         finally:
             await conn.execute("SELECT pg_advisory_unlock($1)", _MIGRATION_LOCK_ID)
 
@@ -199,9 +194,7 @@ async def list_user_projects(pool: asyncpg.Pool, user_id: str) -> list[Project]:
     ]
 
 
-async def is_project_member(
-    pool: asyncpg.Pool, *, project_id: str, user_id: str
-) -> bool:
+async def is_project_member(pool: asyncpg.Pool, *, project_id: str, user_id: str) -> bool:
     row = await pool.fetchrow(
         """
         SELECT 1 FROM project_members
@@ -310,8 +303,7 @@ async def update_project(
     if not sets:
         # Nothing to update; treat as "fetch current row".
         row = await pool.fetchrow(
-            "SELECT id, slug, name, shelf_base_url, created_at, archived_at "
-            "FROM projects WHERE id = $1::uuid",
+            "SELECT id, slug, name, shelf_base_url, created_at, archived_at " "FROM projects WHERE id = $1::uuid",
             project_id,
         )
         return _project_row_to_dict(row) if row else None
@@ -332,17 +324,14 @@ async def archive_project(pool: asyncpg.Pool, project_id: str) -> bool:
     as a future admin tool. Hard-delete intentionally not exposed.
     """
     row = await pool.fetchrow(
-        "UPDATE projects SET archived_at = NOW() "
-        "WHERE id = $1::uuid AND archived_at IS NULL RETURNING id",
+        "UPDATE projects SET archived_at = NOW() " "WHERE id = $1::uuid AND archived_at IS NULL RETURNING id",
         project_id,
     )
     return row is not None
 
 
 async def project_exists(pool: asyncpg.Pool, project_id: str) -> bool:
-    row = await pool.fetchrow(
-        "SELECT 1 FROM projects WHERE id = $1::uuid", project_id
-    )
+    row = await pool.fetchrow("SELECT 1 FROM projects WHERE id = $1::uuid", project_id)
     return row is not None
 
 
@@ -373,9 +362,7 @@ async def list_project_members(pool: asyncpg.Pool, project_id: str) -> list[dict
     ]
 
 
-async def add_project_member(
-    pool: asyncpg.Pool, project_id: str, user_id: str, role: str = "member"
-) -> bool:
+async def add_project_member(pool: asyncpg.Pool, project_id: str, user_id: str, role: str = "member") -> bool:
     """Idempotent membership add. Returns True on insert, False on duplicate.
 
     The user must already exist (we don't pre-seed placeholder rows
@@ -396,12 +383,9 @@ async def add_project_member(
     return row is not None
 
 
-async def remove_project_member(
-    pool: asyncpg.Pool, project_id: str, user_id: str
-) -> bool:
+async def remove_project_member(pool: asyncpg.Pool, project_id: str, user_id: str) -> bool:
     row = await pool.fetchrow(
-        "DELETE FROM project_members "
-        "WHERE project_id = $1::uuid AND user_id = $2::uuid RETURNING user_id",
+        "DELETE FROM project_members " "WHERE project_id = $1::uuid AND user_id = $2::uuid RETURNING user_id",
         project_id,
         user_id,
     )
@@ -433,9 +417,7 @@ async def list_users(pool: asyncpg.Pool, *, limit: int = 200) -> list[dict]:
 
 
 async def user_exists(pool: asyncpg.Pool, user_id: str) -> bool:
-    row = await pool.fetchrow(
-        "SELECT 1 FROM users WHERE id = $1::uuid", user_id
-    )
+    row = await pool.fetchrow("SELECT 1 FROM users WHERE id = $1::uuid", user_id)
     return row is not None
 
 
@@ -496,9 +478,7 @@ async def list_api_tokens(pool: asyncpg.Pool, user_id: str) -> list[dict]:
     ]
 
 
-async def revoke_api_token(
-    pool: asyncpg.Pool, *, token_id: str, user_id: str
-) -> bool:
+async def revoke_api_token(pool: asyncpg.Pool, *, token_id: str, user_id: str) -> bool:
     """Mark a user's token revoked. Returns whether anything changed."""
     row = await pool.fetchrow(
         """

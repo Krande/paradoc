@@ -32,7 +32,6 @@ from .cache import TaskCache
 from .config import build_executor_from_config, load_task_config
 from .discovery import discover_tasks
 from .filter_binding import bind_filter_handles
-from .orchestrator import build_document
 from .registry import TaskRegistry, reset_default_registry
 from .runner import Runner
 
@@ -300,9 +299,7 @@ def dev(
     ),
     work_dir: Optional[Path] = typer.Option(None, "--work-dir"),
     no_cache: bool = typer.Option(False, "--no-cache"),
-    debounce_ms: int = typer.Option(
-        300, "--debounce-ms", help="Coalesce filesystem events within this window."
-    ),
+    debounce_ms: int = typer.Option(300, "--debounce-ms", help="Coalesce filesystem events within this window."),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Build, serve, watch, and live-reload `<doc_id>` on file changes.

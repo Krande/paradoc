@@ -94,13 +94,13 @@ compile-examples = { cmd = "python scripts/compile_examples.py", env = { PYTHONP
 upload-examples = { cmd = "python scripts/upload_examples.py", env = { PYTHONPATH = "$PIXI_PROJECT_ROOT/src" }, depends-on = ["compile-examples"] }
 
 [feature.examples-figs.dependencies]
-# adapy's native runtime — copied from ../adapy/pixi.toml's `prod`
-# feature, minus the jupyter GUI bits we don't need for a headless
-# compile-time render. We can't depend on conda `ada-py` directly
-# because pixi then refuses to override it with a pypi git source
-# (warns "already selected as a conda package"). Listing the natives
-# explicitly gives us the OCC/render stack while leaving the `ada-py`
-# name free for the git pin in [pypi-dependencies].
+# adapy (STEP/IFC → glb + PNG) straight from conda-forge — replaces the
+# former editable `../adapy` path dependency now that adapy ships proper
+# releases. conda `ada-py` pulls its own OCC stack transitively; the
+# explicit natives below are kept as floors for paradoc's own headless
+# render pipeline (scipy, wgpu, …), which the offscreen path needs
+# regardless of what adapy happens to require.
+ada-py = "*"
 pythonocc-core = "*"
 occt = "*"
 ifcopenshell = "*"
@@ -137,18 +137,6 @@ pillow = "*"
 pyquaternion = "*"
 
 [feature.examples-figs.pypi-dependencies]
-# Editable install from a sibling adapy checkout. Replaces the old git
-# SHA pin: local dev now picks up adapy edits immediately, and CI clones
-# adapy into `../adapy` before `pixi install` (see Dockerfile.examples).
-# The path must exist at resolve time — `pixi install -e examples-figs`
-# fails fast if you don't have ../adapy checked out alongside this repo.
-#
-# Why pypi (not conda): we can't depend on conda `ada-py` directly
-# because pixi then refuses to override it with a path/git source
-# (warns "already selected as a conda package"). The native OCC / wgpu
-# stack lives in [feature.examples-figs.dependencies] above; this
-# entry just supplies the Python package.
-ada-py = { path = "../adapy", editable = true }
 # playwright Python package + chromium binary (installed via the
 # `playwright-install` task below) so the figure-source `renderer:
 # chromium` option can spin up headless chrome and screenshot the

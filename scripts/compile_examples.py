@@ -111,6 +111,7 @@ def _setup_doc_figure_sources(od: "pa.OneDoc") -> None:
     # missing handler, which is the right diagnostic.
     try:
         from ada.fem.results.docs import register_paradoc_block_sugar
+
         from paradoc.figure_sources._plugins import _DISPATCHER
 
         register_paradoc_block_sugar(_DISPATCHER)

@@ -17,13 +17,7 @@ from .cache import AttrCache
 from .discovery import discover_filters
 from .linter import lint_unresolved_substitutions
 from .registry import FilterRegistry
-from .views import (
-    FigureView,
-    ScalarValue,
-    TableView,
-    ThreeDView,
-    ViewBase,
-)
+from .views import FigureView, ScalarValue, TableView, ThreeDView, ViewBase
 
 __all__ = [
     "Filter",

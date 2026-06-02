@@ -23,7 +23,7 @@ class TestParseBody:
         assert sub.attr == "first_freq"
 
     def test_kwargs_only(self):
-        sub = parse_substitution_body("my_table(sort_by=\"col_a\", show_index=False)")
+        sub = parse_substitution_body('my_table(sort_by="col_a", show_index=False)')
         assert sub.name == "my_table"
         assert sub.kwargs == {"sort_by": "col_a", "show_index": False}
 
@@ -54,7 +54,7 @@ class TestParseBody:
             ("k=True", True),
             ("k=False", False),
             ("k=None", None),
-            ("k=\"hello\"", "hello"),
+            ('k="hello"', "hello"),
             ("k='single'", "single"),
         ],
     )
@@ -131,4 +131,4 @@ class TestFindSubstitutions:
     def test_span_is_exact(self):
         text = "before ${x.y} after"
         sub = next(find_substitutions(text))
-        assert text[sub.span[0]:sub.span[1]] == "${x.y}"
+        assert text[sub.span[0] : sub.span[1]] == "${x.y}"

@@ -63,9 +63,7 @@ def find_repo_root(start: pathlib.Path) -> pathlib.Path | None:
 
 
 def _run(args: list[str], cwd: pathlib.Path) -> str:
-    return subprocess.check_output(
-        ["git", *args], cwd=cwd, text=True, stderr=subprocess.DEVNULL
-    ).strip()
+    return subprocess.check_output(["git", *args], cwd=cwd, text=True, stderr=subprocess.DEVNULL).strip()
 
 
 def extract(repo: pathlib.Path) -> GitProvenance | None:

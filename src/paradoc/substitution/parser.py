@@ -117,7 +117,7 @@ def parse_substitution_body(
         raise SubstitutionError(f"could not parse substitution body {body!r}", source=raw)
     name = header.group("name")
     attr = header.group("attr")
-    rest = body[header.end():]
+    rest = body[header.end() :]
 
     args_src: str | None = None
     fmtspec: str | None = None

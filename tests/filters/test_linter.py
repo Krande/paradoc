@@ -1,13 +1,6 @@
 """Linter surfaces unresolved substitutions with suggestions."""
 
-import textwrap
-
-from paradoc.filters import (
-    Filter,
-    FilterRegistry,
-    attr,
-    lint_unresolved_substitutions,
-)
+from paradoc.filters import Filter, FilterRegistry, attr, lint_unresolved_substitutions
 
 
 class _Demo(Filter):
@@ -58,9 +51,7 @@ def test_extra_known_names_skip_linter(tmp_path):
     md.write_text("${ db_table_key }")
 
     reg = FilterRegistry()
-    issues = lint_unresolved_substitutions(
-        md_files=[md], registry=reg, extra_known_names=["db_table_key"]
-    )
+    issues = lint_unresolved_substitutions(md_files=[md], registry=reg, extra_known_names=["db_table_key"])
     assert issues == []
 
 

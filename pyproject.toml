@@ -50,6 +50,11 @@ src = ["src"]
 [tool.ruff.lint]
 ignore = ["E741"]
 
+[tool.ruff.lint.per-file-ignores]
+# __init__.py modules re-export names that are wired into a dynamically built
+# __all__ (PEP 562 lazy loading), which Ruff can't trace statically.
+"__init__.py" = ["F401"]
+
 [tool.isort]
 profile = "black"
 skip = [".pixi", "node_modules", "temp", "examples"]

@@ -20,7 +20,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from ._git import GitProvenance as _GitProvenance, extract as _git_extract, find_repo_root
+from ._git import extract as _git_extract
+from ._git import find_repo_root
 
 # Bump when we make a breaking change to the bundle layout.
 BUNDLE_VERSION = 2

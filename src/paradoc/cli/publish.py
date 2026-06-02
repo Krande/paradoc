@@ -15,10 +15,10 @@ from __future__ import annotations
 import os
 import sys
 import urllib.parse
+import urllib.request
 from pathlib import Path
 
 import typer
-import urllib.request
 
 app = typer.Typer(add_completion=False, help="Compile and publish a paradoc bundle.")
 
@@ -106,9 +106,7 @@ def publish(
     # paradoc-serve expects under each scope/<doc_id>/.
     bundle_root = Path(one.build_dir)
     if not (bundle_root / "manifest.json").is_file():
-        sys.stderr.write(
-            f"compiled bundle missing manifest.json at {bundle_root}\n"
-        )
+        sys.stderr.write(f"compiled bundle missing manifest.json at {bundle_root}\n")
         raise typer.Exit(2)
 
     scope_segment = urllib.parse.quote(scope, safe=":")
@@ -118,10 +116,7 @@ def publish(
             continue
         rel = fp.relative_to(bundle_root).as_posix()
         encoded = "/".join(urllib.parse.quote(seg) for seg in rel.split("/"))
-        url = (
-            f"{base}/api/scopes/{scope_segment}/docs/"
-            f"{urllib.parse.quote(resolved_doc_id)}/bundle/{encoded}"
-        )
+        url = f"{base}/api/scopes/{scope_segment}/docs/" f"{urllib.parse.quote(resolved_doc_id)}/bundle/{encoded}"
         _put(url, token, fp.read_bytes())
         uploaded += 1
         typer.echo(f"  PUT {rel}")

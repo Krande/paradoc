@@ -112,9 +112,7 @@ class PixiSubprocessError(RuntimeError):
 
     def __init__(self, returncode: int, stderr: str, cmd: list[str]) -> None:
         super().__init__(
-            f"pixi worker exited {returncode} with no error.pkl\n"
-            f"cmd: {' '.join(cmd)}\n"
-            f"stderr:\n{stderr}"
+            f"pixi worker exited {returncode} with no error.pkl\n" f"cmd: {' '.join(cmd)}\n" f"stderr:\n{stderr}"
         )
         self.returncode = returncode
         self.stderr = stderr

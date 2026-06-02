@@ -95,9 +95,7 @@ async def handle_binary_fetch_request(
 
     lock = _client_lock(ws)
     if lock.locked():
-        await _send_error(
-            ws, request_id, "another binary fetch is already in flight on this connection"
-        )
+        await _send_error(ws, request_id, "another binary fetch is already in flight on this connection")
         return
 
     async with lock:

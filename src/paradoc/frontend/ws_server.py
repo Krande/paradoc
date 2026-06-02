@@ -64,6 +64,7 @@ def set_doc_store(store: _Any) -> None:
 def get_doc_store() -> _Any:
     return DOC_STORE
 
+
 # Track connected frontends with their metadata
 # Structure: {frontend_id: {"ws": websocket, "last_heartbeat": timestamp}}
 CONNECTED_FRONTENDS: Dict[str, Dict[str, _Any]] = {}
@@ -174,11 +175,7 @@ async def _handle_client(ws: ProtocolType) -> None:
                         if kind == "binary_fetch_request":
                             from .binary_relay import handle_binary_fetch_request
 
-                            asyncio.create_task(
-                                handle_binary_fetch_request(
-                                    ws=ws, msg=obj, doc_store=DOC_STORE
-                                )
-                            )
+                            asyncio.create_task(handle_binary_fetch_request(ws=ws, msg=obj, doc_store=DOC_STORE))
                             continue
 
                         # Handle shutdown request

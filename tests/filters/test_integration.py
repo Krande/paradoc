@@ -56,9 +56,7 @@ def test_filter_returning_table_view(tmp_path):
         """,
     )
     df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
-    one.db_manager.add_table(
-        dataframe_to_table_data(key="my_table", df=df, caption="hidden", show_index=False)
-    )
+    one.db_manager.add_table(dataframe_to_table_data(key="my_table", df=df, caption="hidden", show_index=False))
     one.compile("Out", export_format="html")
     text = (tmp_path / "work" / "_build" / "00-main" / "test.md").read_text()
     assert "${" not in text

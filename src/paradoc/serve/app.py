@@ -31,7 +31,8 @@ logger = logging.getLogger(__name__)
 def _pkg_version(name: str) -> Optional[str]:
     """Best-effort package version lookup; returns None if not installed."""
     try:
-        from importlib.metadata import PackageNotFoundError, version as _v
+        from importlib.metadata import PackageNotFoundError
+        from importlib.metadata import version as _v
 
         try:
             return _v(name)
@@ -89,8 +90,7 @@ def create_app(
         from fastapi.responses import JSONResponse, Response, StreamingResponse
     except ImportError as exc:
         raise RuntimeError(
-            "FastAPI is required for `paradoc serve`. Install the `serve` extra "
-            "(pip install paradoc[serve])."
+            "FastAPI is required for `paradoc serve`. Install the `serve` extra " "(pip install paradoc[serve])."
         ) from exc
 
     db_url = database_url or os.environ.get("PARADOC_DATABASE_URL", "")
@@ -99,6 +99,7 @@ def create_app(
     async def lifespan(app):
         from . import auth as auth_module
         from . import db as db_module
+
         try:
             app.state.db_pool = await db_module.init_pool(db_url)
         except Exception:
@@ -126,6 +127,7 @@ def create_app(
     # returns the synthetic local-dev principal so dev paths stay
     # untouched.
     from . import auth as auth_module
+
     auth_module.install(app)
 
     # Compute build info once at app create. Env vars don't change after
@@ -187,9 +189,7 @@ def create_app(
     # brute-forcing the hash is not a realistic attack.
 
     @app.get("/api/me/tokens")
-    async def list_my_tokens(
-        request: Request, user: User = Depends(auth_module.current_user)
-    ) -> dict[str, Any]:
+    async def list_my_tokens(request: Request, user: User = Depends(auth_module.current_user)) -> dict[str, Any]:
         pool = getattr(request.app.state, "db_pool", None)
         if pool is None:
             raise HTTPException(
@@ -197,6 +197,7 @@ def create_app(
                 detail="api-token feature requires a Postgres-backed deployment",
             )
         from . import db as _db
+
         return {"tokens": await _db.list_api_tokens(pool, user.id)}
 
     @app.post("/api/me/tokens")
@@ -235,9 +236,8 @@ def create_app(
         digest = hashlib.sha256(plaintext.encode("utf-8")).digest()
 
         from . import db as _db
-        row = await _db.create_api_token(
-            pool, user_id=user.id, name=name, token_hash=digest
-        )
+
+        row = await _db.create_api_token(pool, user_id=user.id, name=name, token_hash=digest)
         # Plaintext returned exactly once. The client is expected to
         # stash it immediately; subsequent GETs only see the metadata.
         return {**row, "token": plaintext}
@@ -255,11 +255,13 @@ def create_app(
                 detail="api-token feature requires a Postgres-backed deployment",
             )
         import uuid as _uuid
+
         try:
             _uuid.UUID(token_id)
         except (ValueError, AttributeError, TypeError):
             raise HTTPException(status_code=400, detail="invalid token id")
         from . import db as _db
+
         ok = await _db.revoke_api_token(pool, token_id=token_id, user_id=user.id)
         if not ok:
             raise HTTPException(status_code=404, detail="token not found")
@@ -284,10 +286,7 @@ def create_app(
         groups = doc_store.list_doc_groups()
         return {
             "docs": doc_store.list_doc_ids(scope),
-            "groups": [
-                {"key": g.key, "label": g.label, "docs": list(g.doc_ids)}
-                for g in groups
-            ],
+            "groups": [{"key": g.key, "label": g.label, "docs": list(g.doc_ids)} for g in groups],
         }
 
     def _get_manifest(doc_id: str, scope: Scope):
@@ -491,57 +490,39 @@ def create_app(
         return _list_docs(_shared)
 
     @app.get("/api/docs/{doc_id}/manifest")
-    async def get_manifest(
-        doc_id: str, user: User = Depends(auth_module.current_user)
-    ):
+    async def get_manifest(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_manifest(doc_id, _shared)
 
     @app.get("/api/docs/{doc_id}/sections/{idx}")
-    async def get_section(
-        doc_id: str, idx: int, user: User = Depends(auth_module.current_user)
-    ):
+    async def get_section(doc_id: str, idx: int, user: User = Depends(auth_module.current_user)):
         return _get_section(doc_id, idx, _shared)
 
     @app.get("/api/docs/{doc_id}/plots")
-    async def get_all_plots(
-        doc_id: str, user: User = Depends(auth_module.current_user)
-    ):
+    async def get_all_plots(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_all_plots(doc_id, _shared)
 
     @app.get("/api/docs/{doc_id}/tables")
-    async def get_all_tables(
-        doc_id: str, user: User = Depends(auth_module.current_user)
-    ):
+    async def get_all_tables(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_all_tables(doc_id, _shared)
 
     @app.get("/api/docs/{doc_id}/images")
-    async def get_all_images(
-        doc_id: str, user: User = Depends(auth_module.current_user)
-    ):
+    async def get_all_images(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_all_images(doc_id, _shared)
 
     @app.get("/api/docs/{doc_id}/tables/{key}")
-    async def get_table(
-        doc_id: str, key: str, user: User = Depends(auth_module.current_user)
-    ):
+    async def get_table(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
         return _get_table(doc_id, key, _shared)
 
     @app.get("/api/docs/{doc_id}/plots/{key}")
-    async def get_plot(
-        doc_id: str, key: str, user: User = Depends(auth_module.current_user)
-    ):
+    async def get_plot(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
         return _get_plot(doc_id, key, _shared)
 
     @app.get("/api/docs/{doc_id}/presets")
-    async def get_presets(
-        doc_id: str, user: User = Depends(auth_module.current_user)
-    ):
+    async def get_presets(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_presets(doc_id, _shared)
 
     @app.get("/api/docs/{doc_id}/3d/{key}/meta")
-    async def get_3d_meta(
-        doc_id: str, key: str, user: User = Depends(auth_module.current_user)
-    ):
+    async def get_3d_meta(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
         return _get_3d_meta(doc_id, key, _shared)
 
     @app.get("/api/docs/{doc_id}/3d/{key}/blob")
@@ -554,9 +535,7 @@ def create_app(
         return await _get_3d_blob(doc_id, key, _shared, request)
 
     @app.get("/api/docs/{doc_id}/3d/{key}/poster")
-    async def get_3d_poster(
-        doc_id: str, key: str, user: User = Depends(auth_module.current_user)
-    ):
+    async def get_3d_poster(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
         return _get_3d_poster(doc_id, key, _shared)
 
     @app.get("/api/docs/{doc_id}/3d/{key}/fea/{filename:path}")
@@ -577,9 +556,7 @@ def create_app(
         return _get_file(doc_id, rel_path, _shared)
 
     @app.get("/api/docs/{doc_id}/manifest/files")
-    async def list_doc_files(
-        doc_id: str, user: User = Depends(auth_module.current_user)
-    ):
+    async def list_doc_files(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _list_bundle_files(doc_id, _shared)
 
     # ── Scope-aware /api/scopes/{scope}/docs/... routes ──────────────
@@ -593,9 +570,7 @@ def create_app(
         return _get_manifest(doc_id, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/sections/{idx}")
-    async def s_get_section(
-        doc_id: str, idx: int, scope_obj: Scope = Depends(_scope_dep)
-    ):
+    async def s_get_section(doc_id: str, idx: int, scope_obj: Scope = Depends(_scope_dep)):
         return _get_section(doc_id, idx, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/plots")
@@ -611,15 +586,11 @@ def create_app(
         return _get_all_images(doc_id, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/tables/{key}")
-    async def s_get_table(
-        doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)
-    ):
+    async def s_get_table(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_table(doc_id, key, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/plots/{key}")
-    async def s_get_plot(
-        doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)
-    ):
+    async def s_get_plot(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_plot(doc_id, key, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/presets")
@@ -627,9 +598,7 @@ def create_app(
         return _get_presets(doc_id, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/3d/{key}/meta")
-    async def s_get_3d_meta(
-        doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)
-    ):
+    async def s_get_3d_meta(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_3d_meta(doc_id, key, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/3d/{key}/blob")
@@ -642,9 +611,7 @@ def create_app(
         return await _get_3d_blob(doc_id, key, scope_obj, request)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/3d/{key}/poster")
-    async def s_get_3d_poster(
-        doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)
-    ):
+    async def s_get_3d_poster(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_3d_poster(doc_id, key, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/3d/{key}/fea/{filename:path}")
@@ -665,9 +632,7 @@ def create_app(
         return _get_file(doc_id, rel_path, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/manifest/files")
-    async def s_list_doc_files(
-        doc_id: str, scope_obj: Scope = Depends(_scope_dep)
-    ):
+    async def s_list_doc_files(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
         return _list_bundle_files(doc_id, scope_obj)
 
     # ── Bundle upload (paradoc publish CLI) ───────────────────────────
@@ -760,6 +725,7 @@ def create_app(
         pool = getattr(request.app.state, "db_pool", None)
         if pool is not None and user.id and not user.id.startswith("00000000"):
             from . import db as _db
+
             user_projects = await _db.list_user_projects(pool, user.id)
             for p in user_projects:
                 try:
@@ -808,13 +774,13 @@ def create_app(
         if pool is None:
             raise HTTPException(
                 status_code=503,
-                detail="admin endpoints require a Postgres-backed deployment "
-                "(set PARADOC_DATABASE_URL)",
+                detail="admin endpoints require a Postgres-backed deployment " "(set PARADOC_DATABASE_URL)",
             )
         return pool
 
     def _validate_uuid(value: str, what: str = "id") -> str:
         import uuid as _uuid
+
         try:
             return str(_uuid.UUID(value))
         except (ValueError, AttributeError, TypeError) as exc:
@@ -845,6 +811,7 @@ def create_app(
         if not slug or not name:
             raise HTTPException(status_code=400, detail="slug and name required")
         import re
+
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}", slug):
             raise HTTPException(
                 status_code=400,
@@ -889,7 +856,8 @@ def create_app(
                 clear = True
                 shelf_url = None
         updated = await db_module.update_project(
-            pool, pid,
+            pool,
+            pid,
             name=name,
             shelf_base_url=shelf_url,
             clear_shelf_base_url=clear,
@@ -919,9 +887,7 @@ def create_app(
         pid = _validate_uuid(project_id, "project_id")
         if not await db_module.project_exists(pool, pid):
             raise HTTPException(status_code=404, detail="project not found")
-        return JSONResponse(
-            {"members": await db_module.list_project_members(pool, pid)}
-        )
+        return JSONResponse({"members": await db_module.list_project_members(pool, pid)})
 
     @admin.post("/projects/{project_id}/members")
     async def admin_project_members_add(
@@ -976,7 +942,6 @@ def create_app(
     # itself. Without the fallback, StaticFiles would 404 because no
     # /admin file exists on disk.
     if static_dir is not None and static_dir.is_dir():
-        from fastapi.staticfiles import StaticFiles
 
         _index_path = (static_dir / "index.html").resolve()
         _static_dir = Path(static_dir).resolve()
@@ -988,10 +953,7 @@ def create_app(
             # resolve. The API routes above the mount win their paths
             # via FastAPI's route-resolution order.
             candidate = (static_dir / full_path).resolve()
-            if (
-                candidate.is_relative_to(_static_dir)
-                and candidate.is_file()
-            ):
+            if candidate.is_relative_to(_static_dir) and candidate.is_file():
                 return Response(
                     content=candidate.read_bytes(),
                     media_type=_guess_media_type(candidate.name),

@@ -226,8 +226,6 @@ def test_concurrent_fetch_locked_out(tmp_path):
 
     # At least one error referencing the "second" request.
     error_msgs = [
-        json.loads(m[1])
-        for m in ws.sent
-        if m[0] == "text" and json.loads(m[1]).get("kind") == "binary_fetch_error"
+        json.loads(m[1]) for m in ws.sent if m[0] == "text" and json.loads(m[1]).get("kind") == "binary_fetch_error"
     ]
     assert any(e["request_id"] == "second" for e in error_msgs)

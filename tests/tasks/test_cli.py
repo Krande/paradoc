@@ -236,9 +236,7 @@ def test_build_custom_cache_dir(tmp_path: Path):
     doc_root = _scaffold_doc(tmp_path, _SIMPLE_TASKS_PY)
     custom_cache = tmp_path / "elsewhere"
 
-    result = runner.invoke(
-        build_app, ["build", str(doc_root), "--cache-dir", str(custom_cache), "--no-compile"]
-    )
+    result = runner.invoke(build_app, ["build", str(doc_root), "--cache-dir", str(custom_cache), "--no-compile"])
 
     assert result.exit_code == 0, result.output
     assert custom_cache.exists()

@@ -104,9 +104,7 @@ class Runner:
             if task.consumes is not None:
                 upstream_task = self.registry.resolve_consumes(task)
                 upstream_cells = list(self._cells_by_task.get(upstream_task.qualname, []))
-                self._cells_by_task[task.qualname] = self._aggregator_cells_for_task(
-                    task, upstream_cells
-                )
+                self._cells_by_task[task.qualname] = self._aggregator_cells_for_task(task, upstream_cells)
             else:
                 parent_task = self.registry.resolve_parent(task)
                 parent_cells: list[Optional[Cell]]
@@ -270,21 +268,13 @@ class Runner:
                 # - regular task with a parent: single result (or None)
                 # - root task: None
                 if cell.upstream:
-                    upstream_results = [
-                        self._results[id(uc)]
-                        for uc in cell.upstream
-                        if id(uc) in self._results
-                    ]
+                    upstream_results = [self._results[id(uc)] for uc in cell.upstream if id(uc) in self._results]
                     parent_result: Any = [r for r in upstream_results if r is not None]
                 else:
-                    parent_result = (
-                        self._results.get(id(cell.parent)) if cell.parent is not None else None
-                    )
+                    parent_result = self._results.get(id(cell.parent)) if cell.parent is not None else None
 
                 if self.cache is not None:
-                    parent_key = (
-                        self._cache_keys.get(id(cell.parent)) if cell.parent is not None else None
-                    )
+                    parent_key = self._cache_keys.get(id(cell.parent)) if cell.parent is not None else None
                     upstream_keys = (
                         [self._cache_keys[id(uc)] for uc in cell.upstream if id(uc) in self._cache_keys]
                         if cell.upstream
@@ -307,10 +297,7 @@ class Runner:
                         missing = self._missing_outputs(cell, parent_result)
                         if missing:
                             self.cache_misses += 1
-                            logger.debug(
-                                f"cache miss (outputs missing) {key!r}: "
-                                f"{[str(p) for p in missing]}"
-                            )
+                            logger.debug(f"cache miss (outputs missing) {key!r}: " f"{[str(p) for p in missing]}")
                         else:
                             self._results[id(cell)] = self.cache.get(key, serializer=serializer)
                             self.cache_hits += 1
@@ -326,9 +313,7 @@ class Runner:
                 self._results[id(cell)] = result
 
                 if self.cache is not None:
-                    parent_key = (
-                        self._cache_keys.get(id(cell.parent)) if cell.parent is not None else None
-                    )
+                    parent_key = self._cache_keys.get(id(cell.parent)) if cell.parent is not None else None
                     version_probe_val: Optional[str] = None
                     if cell.task.version_probe is not None:
                         try:
@@ -344,10 +329,7 @@ class Runner:
                         serializer=cell.task.serializer,
                     )
         self._ran = True
-        return {
-            qn: [self._results[id(c)] for c in cells]
-            for qn, cells in self._cells_by_task.items()
-        }
+        return {qn: [self._results[id(c)] for c in cells] for qn, cells in self._cells_by_task.items()}
 
     def result_for(self, cell: Cell) -> Any:
         """Look up a previously-computed result. Raises if cell wasn't run."""

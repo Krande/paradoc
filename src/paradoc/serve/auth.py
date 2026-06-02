@@ -107,19 +107,13 @@ def load_config_from_env() -> AuthConfig:
         try:
             data = json.loads(providers_raw)
         except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                f"PARADOC_OIDC_PROVIDERS_JSON is not valid JSON: {exc}"
-            ) from exc
+            raise RuntimeError(f"PARADOC_OIDC_PROVIDERS_JSON is not valid JSON: {exc}") from exc
         if not isinstance(data, list):
-            raise RuntimeError(
-                "PARADOC_OIDC_PROVIDERS_JSON must be a JSON array of provider blocks"
-            )
+            raise RuntimeError("PARADOC_OIDC_PROVIDERS_JSON must be a JSON array of provider blocks")
         parsed: list[ProviderConfig] = []
         for i, item in enumerate(data):
             if not isinstance(item, dict):
-                raise RuntimeError(
-                    f"PARADOC_OIDC_PROVIDERS_JSON[{i}] is not an object"
-                )
+                raise RuntimeError(f"PARADOC_OIDC_PROVIDERS_JSON[{i}] is not an object")
             try:
                 client_id = str(item["client_id"])
                 parsed.append(
@@ -132,15 +126,11 @@ def load_config_from_env() -> AuthConfig:
                     )
                 )
             except KeyError as exc:
-                raise RuntimeError(
-                    f"PARADOC_OIDC_PROVIDERS_JSON[{i}] missing required field: {exc}"
-                ) from exc
+                raise RuntimeError(f"PARADOC_OIDC_PROVIDERS_JSON[{i}] missing required field: {exc}") from exc
         providers = tuple(parsed)
     admin_group = os.environ.get("PARADOC_AUTH_ADMIN_GROUP", "").strip()
     if enabled and not providers:
-        raise RuntimeError(
-            "PARADOC_AUTH_ENABLED=true but PARADOC_OIDC_PROVIDERS_JSON is empty"
-        )
+        raise RuntimeError("PARADOC_AUTH_ENABLED=true but PARADOC_OIDC_PROVIDERS_JSON is empty")
     return AuthConfig(enabled=enabled, providers=providers, admin_group=admin_group)
 
 
@@ -223,18 +213,10 @@ class _JWKSVerifier:
         from jwt import PyJWKClient
 
         now = time.monotonic()
-        if (
-            not force_refresh
-            and self._jwks_client is not None
-            and now - self._jwks_at < _JWKS_TTL
-        ):
+        if not force_refresh and self._jwks_client is not None and now - self._jwks_at < _JWKS_TTL:
             return self._jwks_client
         async with self._lock:
-            if (
-                not force_refresh
-                and self._jwks_client is not None
-                and time.monotonic() - self._jwks_at < _JWKS_TTL
-            ):
+            if not force_refresh and self._jwks_client is not None and time.monotonic() - self._jwks_at < _JWKS_TTL:
                 return self._jwks_client
             doc = await self._discovery_doc()
             jwks_uri = doc["jwks_uri"]
@@ -299,9 +281,7 @@ class _MultiProviderVerifier:
         # slash; config files often carry it the same way. Without
         # rstrip on the key side, every token gets rejected as
         # "issuer not trusted" even though the strings match.
-        self._by_issuer: dict[str, _JWKSVerifier] = {
-            p.issuer.rstrip("/"): _JWKSVerifier(p) for p in config.providers
-        }
+        self._by_issuer: dict[str, _JWKSVerifier] = {p.issuer.rstrip("/"): _JWKSVerifier(p) for p in config.providers}
 
     async def aclose(self) -> None:
         for v in self._by_issuer.values():
@@ -411,12 +391,7 @@ def _claims_to_partial_user(
     """
     subject = str(claims.get(provider.subject_claim) or claims["sub"])
     email = str(claims.get("email") or claims.get("preferred_username") or "")
-    display_name = str(
-        claims.get("name")
-        or claims.get("preferred_username")
-        or claims.get("email")
-        or subject
-    )
+    display_name = str(claims.get("name") or claims.get("preferred_username") or claims.get("email") or subject)
     raw_groups = claims.get(_CLAIM_GROUPS) or []
     if not isinstance(raw_groups, (list, tuple, set, frozenset)):
         raw_groups = [raw_groups]
@@ -481,9 +456,7 @@ async def current_user(request: Request) -> User:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    subject, email, display_name, groups, is_admin = _claims_to_partial_user(
-        claims, provider, config.admin_group
-    )
+    subject, email, display_name, groups, is_admin = _claims_to_partial_user(claims, provider, config.admin_group)
 
     # Upsert into the control plane. If no DB pool, we still return a
     # User but with id == subject — shared-only mode where nothing

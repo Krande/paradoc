@@ -32,18 +32,9 @@ jobs:
       - name: Build and push paradoc image
         env:
           REGISTRY_IMAGE: ${{ secrets.PARADOC_REGISTRY_IMAGE }}
-          # Sibling adapy clone — required for pixi's --locked check
-          # against the workspace path dep in feature.examples-figs.
-          # Same secret the build-examples workflow uses.
-          ADAPY_GIT_URL: ${{ secrets.ADAPY_GIT_URL }}
-          ADAPY_REF: ${{ vars.ADAPY_REF || 'main' }}
         run: |
           if [ -z "$REGISTRY_IMAGE" ]; then
             echo "::error::PARADOC_REGISTRY_IMAGE secret is not set on this repo. Configure it (and REGISTRY_DOCKER_CONFIG) under Settings → Actions → Secrets before re-running."
-            exit 1
-          fi
-          if [ -z "$ADAPY_GIT_URL" ]; then
-            echo "::error::ADAPY_GIT_URL secret is required (used by Dockerfile's sibling adapy clone for pixi --locked verification)."
             exit 1
           fi
           TAG="sha-${GITHUB_SHA::7}"
@@ -54,9 +45,6 @@ jobs:
             --build-arg BUILD_SHA="${GITHUB_SHA}" \
             --build-arg BUILD_TAG="${TAG}" \
             --build-arg BUILD_TIME="${BUILD_TIME}" \
-            --build-arg ADAPY_GIT_URL="${ADAPY_GIT_URL}" \
-            --build-arg ADAPY_REF="${ADAPY_REF}" \
-            --build-arg CACHE_BUST="${{ github.run_id }}" \
             -t "${REGISTRY_IMAGE}:${TAG}" \
             -t "${REGISTRY_IMAGE}:${BRANCH_TAG}" \
             .

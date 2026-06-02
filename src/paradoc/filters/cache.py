@@ -68,9 +68,7 @@ class AttrCache:
             # instance via __getattr__) → fall back to an unstable hash
             # that still varies with the qualname so different classes
             # don't share entries.
-            digest = hashlib.sha256(
-                f"{filter_cls.__qualname__}.{attr_name}".encode()
-            ).hexdigest()
+            digest = hashlib.sha256(f"{filter_cls.__qualname__}.{attr_name}".encode()).hexdigest()
             self._source_hash_cache[cache_key] = digest  # type: ignore[index]
             return digest
         try:

@@ -138,8 +138,5 @@ def create_figure_source(data: dict) -> FigureSourceSpec:
     spec_cls = _SPEC_REGISTRY.get(figure_source_type)
     if spec_cls is None:
         supported = ", ".join(sorted(_SPEC_REGISTRY))
-        raise ValueError(
-            f"Unknown figure_source type: {figure_source_type!r}. "
-            f"Supported: {supported}."
-        )
+        raise ValueError(f"Unknown figure_source type: {figure_source_type!r}. " f"Supported: {supported}.")
     return spec_cls(**data)

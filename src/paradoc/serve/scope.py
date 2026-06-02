@@ -105,7 +105,7 @@ def parse_scope(raw: str, user: User) -> Scope:
     if raw.startswith("user:"):
         raise ScopeParseError("use 'user:me' for personal scope")
     if raw.startswith("project:"):
-        pid = raw[len("project:"):].strip()
+        pid = raw[len("project:") :].strip()
         if not pid:
             raise ScopeParseError("missing project id")
         return Scope.project(pid)
@@ -158,9 +158,7 @@ async def can_access(user: User, scope: Scope, db_pool=None) -> bool:
             return False
         from . import db as db_module
 
-        return await db_module.is_project_member(
-            db_pool, project_id=scope.id or "", user_id=user.id
-        )
+        return await db_module.is_project_member(db_pool, project_id=scope.id or "", user_id=user.id)
     return False
 
 

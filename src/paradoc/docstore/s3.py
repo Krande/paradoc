@@ -89,8 +89,7 @@ class S3DocStore(DocStore):
             from obstore.store import S3Store  # type: ignore
         except ImportError as exc:
             raise RuntimeError(
-                "obstore is required for S3DocStore. Install the `serve` extra "
-                "(pip install paradoc[serve])."
+                "obstore is required for S3DocStore. Install the `serve` extra " "(pip install paradoc[serve])."
             ) from exc
 
         kwargs: dict = {"bucket": self.bucket}
@@ -158,9 +157,7 @@ class S3DocStore(DocStore):
             # nothing's published" and made this hard to diagnose.
             import logging
 
-            logging.getLogger(__name__).warning(
-                "S3DocStore.list_doc_ids via list_with_delimiter failed: %r", exc
-            )
+            logging.getLogger(__name__).warning("S3DocStore.list_doc_ids via list_with_delimiter failed: %r", exc)
             return self._list_doc_ids_via_flat_listing(list_prefix)
 
         strip_len = len(list_prefix) if list_prefix else 0
@@ -213,21 +210,15 @@ class S3DocStore(DocStore):
         self._db_managers[cache_key] = manager
         return manager
 
-    def get_table(
-        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[TableData]:
+    def get_table(self, doc_id: str, key: str, *, scope: Optional["Scope"] = None) -> Optional[TableData]:
         s = scope if scope is not None else _default_shared_scope()
         return self._db(doc_id, s).get_table(key)
 
-    def get_plot(
-        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[PlotData]:
+    def get_plot(self, doc_id: str, key: str, *, scope: Optional["Scope"] = None) -> Optional[PlotData]:
         s = scope if scope is not None else _default_shared_scope()
         return self._db(doc_id, s).get_plot(key)
 
-    def list_bundle_files(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> list:
+    def list_bundle_files(self, doc_id: str, *, scope: Optional["Scope"] = None) -> list:
         import mimetypes
 
         from .base import BundleFileEntry
@@ -253,17 +244,13 @@ class S3DocStore(DocStore):
                         continue
                     size = entry.get("size", 0) if isinstance(entry, dict) else int(getattr(entry, "size", 0))
                     ctype, _ = mimetypes.guess_type(rel)
-                    out.append(
-                        BundleFileEntry(rel_path=rel, size=int(size), content_type=ctype or "")
-                    )
+                    out.append(BundleFileEntry(rel_path=rel, size=int(size), content_type=ctype or ""))
         except Exception:
             return out
         out.sort(key=lambda e: e.rel_path)
         return out
 
-    def get_three_d_meta(
-        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[ThreeDData]:
+    def get_three_d_meta(self, doc_id: str, key: str, *, scope: Optional["Scope"] = None) -> Optional[ThreeDData]:
         s = scope if scope is not None else _default_shared_scope()
         return self._db(doc_id, s).get_three_d(key)
 
@@ -283,13 +270,9 @@ class S3DocStore(DocStore):
         # Compose the key the same way; no separate guarded prefix
         # because the docstore's own _key helper already roots us in
         # the bundle.
-        return self._fetch_object(
-            self._key(doc_id, s, "assets", "3d", key, *clean.split("/"))
-        )
+        return self._fetch_object(self._key(doc_id, s, "assets", "3d", key, *clean.split("/")))
 
-    def get_three_d_poster(
-        self, doc_id: str, key: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_three_d_poster(self, doc_id: str, key: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         s = scope if scope is not None else _default_shared_scope()
         meta = self.get_three_d_meta(doc_id, key, scope=s)
         if meta is None or not isinstance(meta.metadata, dict):
@@ -355,9 +338,7 @@ class S3DocStore(DocStore):
         key = self._key(doc_id, s, *clean.split("/"))
         _obstore.put(self._store, key, data)
 
-    def get_bundle_manifest(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[BundleManifest]:
+    def get_bundle_manifest(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[BundleManifest]:
         s = scope if scope is not None else _default_shared_scope()
         # Bundle manifest sits at the bundle root, NOT under static/ —
         # static/manifest.json is the DocManifest the SPA reads.
@@ -369,41 +350,29 @@ class S3DocStore(DocStore):
         except Exception:
             return None
 
-    def get_static_manifest_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_manifest_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         s = scope if scope is not None else _default_shared_scope()
         return self._fetch_object(self._key(doc_id, s, "static", "manifest.json"))
 
-    def get_static_section_bytes(
-        self, doc_id: str, idx: int, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_section_bytes(self, doc_id: str, idx: int, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         if idx < 0:
             return None
         s = scope if scope is not None else _default_shared_scope()
         return self._fetch_object(self._key(doc_id, s, "static", "sections", f"{idx}.json"))
 
-    def get_static_plots_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_plots_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         s = scope if scope is not None else _default_shared_scope()
         return self._fetch_object(self._key(doc_id, s, "static", "plots.json"))
 
-    def get_static_tables_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_tables_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         s = scope if scope is not None else _default_shared_scope()
         return self._fetch_object(self._key(doc_id, s, "static", "tables.json"))
 
-    def get_static_images_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_static_images_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         s = scope if scope is not None else _default_shared_scope()
         return self._fetch_object(self._key(doc_id, s, "static", "images.json"))
 
-    def get_presets_bytes(
-        self, doc_id: str, *, scope: Optional["Scope"] = None
-    ) -> Optional[bytes]:
+    def get_presets_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         s = scope if scope is not None else _default_shared_scope()
         return self._fetch_object(self._key(doc_id, s, "assets", "presets.json"))
 

@@ -18,9 +18,7 @@ def _make_doc(tmp_path, body_text):
 
 def _add_test_table(one, key="test_table"):
     df = pd.DataFrame({"Name": ["a", "b", "c"], "Value": [1, 2, 3]})
-    one.db_manager.add_table(
-        dataframe_to_table_data(key=key, df=df, caption=f"Caption for {key}", show_index=False)
-    )
+    one.db_manager.add_table(dataframe_to_table_data(key=key, df=df, caption=f"Caption for {key}", show_index=False))
 
 
 def test_new_syntax_resolves_db_table(tmp_path):
@@ -49,7 +47,7 @@ def test_new_and_legacy_syntax_produce_same_output(tmp_path):
 
 
 def test_kwargs_translate_to_table_annotation(tmp_path):
-    one = _make_doc(tmp_path, '# X\n\n${ t(no_caption=True) }\n')
+    one = _make_doc(tmp_path, "# X\n\n${ t(no_caption=True) }\n")
     _add_test_table(one, key="t")
     one.compile("Out", export_format="html")
     text = (tmp_path / "work" / "_build" / "00-main" / "test.md").read_text()

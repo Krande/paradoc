@@ -12,14 +12,7 @@ import json
 
 import pytest
 
-from paradoc.serve.auth import (
-    AuthConfig,
-    ProviderConfig,
-    TokenError,
-    User,
-    _bearer_token,
-    load_config_from_env,
-)
+from paradoc.serve.auth import TokenError, User, _bearer_token, load_config_from_env
 
 
 class _CaseInsensitiveHeaders(dict):

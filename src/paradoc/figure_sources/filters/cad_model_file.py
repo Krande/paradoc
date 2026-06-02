@@ -6,6 +6,9 @@ import hashlib
 import logging
 from pathlib import Path
 
+from ..models import CADModelFile
+from .base import FigureSourceFilter, RenderResult, register_filter
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,9 +30,6 @@ def _find_vendored_embed() -> Path | None:
         if candidate.is_file():
             return candidate
     return None
-
-from ..models import CADModelFile
-from .base import FigureSourceFilter, RenderResult, register_filter
 
 
 @register_filter
@@ -79,7 +79,11 @@ class CADModelFileFilter(FigureSourceFilter):
                 self._render_png_from_glb(glb_path, png_path, renderer=spec.renderer)
         else:
             self._render_with_adapy(
-                source_path, glb_path, png_path, spec.camera_pos, renderer=spec.renderer,
+                source_path,
+                glb_path,
+                png_path,
+                spec.camera_pos,
+                renderer=spec.renderer,
             )
 
         glb_bytes = glb_path.read_bytes()
@@ -103,7 +107,11 @@ class CADModelFileFilter(FigureSourceFilter):
         )
 
     def _render_png_from_glb(
-        self, glb_in: Path, png_out: Path, *, renderer: str = "pygfx",
+        self,
+        glb_in: Path,
+        png_out: Path,
+        *,
+        renderer: str = "pygfx",
     ) -> None:
         """Render a PNG straight from an existing GLB.
 
@@ -130,7 +138,8 @@ class CADModelFileFilter(FigureSourceFilter):
                 # present alongside the paradoc workspace.
                 embed_bundle = _find_vendored_embed()
                 glb_to_image_via_browser(
-                    glb_in, embed_bundle=embed_bundle,
+                    glb_in,
+                    embed_bundle=embed_bundle,
                 ).save(png_out)
                 return
             except Exception as exc:  # pragma: no cover - exercised manually
@@ -142,7 +151,9 @@ class CADModelFileFilter(FigureSourceFilter):
                 # *some* poster.
                 logger.warning(
                     "chromium poster render failed for %s: %s",
-                    glb_in.name, exc, exc_info=True,
+                    glb_in.name,
+                    exc,
+                    exc_info=True,
                 )
 
         try:
@@ -185,8 +196,7 @@ class CADModelFileFilter(FigureSourceFilter):
             import ada
         except ImportError as exc:  # pragma: no cover - exercised manually
             raise RuntimeError(
-                "ada-py is required to render CAD figure sources. "
-                "Install it in the doc build environment."
+                "ada-py is required to render CAD figure sources. " "Install it in the doc build environment."
             ) from exc
 
         suffix = source.suffix.lower()
@@ -224,10 +234,10 @@ class CADModelFileFilter(FigureSourceFilter):
             preset = BUILTIN_PRESETS["iso_3"]
 
         try:
-            from ada.visit.colors import Camera  # type: ignore
+            from ada.visit.colors import Camera  # type: ignore  # noqa: F401
         except ImportError:
             try:
-                from ada.geom import Camera  # type: ignore
+                from ada.geom import Camera  # type: ignore  # noqa: F401
             except ImportError:
                 return None  # adapy will pick a default
 

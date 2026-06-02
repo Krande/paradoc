@@ -9,7 +9,6 @@ filtered out by the runner.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -32,7 +31,7 @@ def _isolate():
 
 def _build_registry() -> TaskRegistry:
     """design -> fanout {geom_repr: [...], elem_order: [1, 2]} mesh
-       -> aggregator that consumes mesh"""
+    -> aggregator that consumes mesh"""
     reg = TaskRegistry()
 
     @task

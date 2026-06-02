@@ -12,8 +12,6 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-
 from paradoc.tasks.dev import (
     _INJECTION_MARKER,
     _inject_reload_script,
@@ -21,7 +19,6 @@ from paradoc.tasks.dev import (
     _resolve_bundle_dir,
     _watch_paths,
 )
-
 
 # ---------------- reload script injection ----------------
 

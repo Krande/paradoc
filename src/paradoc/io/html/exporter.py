@@ -38,6 +38,7 @@ def _shelf_citation_env(one: OneDoc):
             else:
                 os.environ[k] = v
 
+
 THIS_DIR = pathlib.Path(__file__).parent
 
 

@@ -53,8 +53,7 @@ def main(tmpdir: Path) -> int:
         except (pickle.PicklingError, TypeError):
             tb = traceback.format_exc()
             with error_path.open("wb") as fh:
-                pickle.dump(RuntimeError(f"unpicklable exception: {tb}"), fh,
-                            protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(RuntimeError(f"unpicklable exception: {tb}"), fh, protocol=pickle.HIGHEST_PROTOCOL)
         return 1
 
     try:

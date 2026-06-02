@@ -32,14 +32,7 @@ from paradoc.figure_sources import models as figmod
 from paradoc.figure_sources.filters import register_filter
 from paradoc.figure_sources.filters.base import FigureSourceFilter, RenderResult
 
-
-_FIXTURE_GLB = (
-    Path(__file__).parent.parent.parent
-    / "files"
-    / "doc_figure_sources"
-    / "files"
-    / "cad.glb"
-)
+_FIXTURE_GLB = Path(__file__).parent.parent.parent / "files" / "doc_figure_sources" / "files" / "cad.glb"
 
 _MIN_PNG = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00"
@@ -129,8 +122,7 @@ def served_bundle(tmp_path):
         "camera_pos: iso_3\n"
         "-->\n"
         "\n"
-        "Body content.\n"
-        + "\nFiller paragraph.\n" * 40
+        "Body content.\n" + "\nFiller paragraph.\n" * 40
     )
     (main_dir / "test.md").write_text(md)
 
@@ -142,8 +134,7 @@ def served_bundle(tmp_path):
     # `<bundle>/static/manifest.json` (read by `_read_static`).
     assert (bundle / "manifest.json").exists(), "compile didn't produce manifest.json"
     assert (bundle / "static" / "manifest.json").exists(), (
-        "compile didn't populate <bundle>/static/manifest.json — REST mode "
-        "will 404 on `/api/docs/<id>/manifest`."
+        "compile didn't populate <bundle>/static/manifest.json — REST mode " "will 404 on `/api/docs/<id>/manifest`."
     )
 
     # Ensure the bundled frontend is extracted; we point `static_dir`
@@ -154,16 +145,15 @@ def served_bundle(tmp_path):
     assert fh.ensure_frontend_extracted(), "frontend.zip not extracted"
     frontend_dir = fh.resources_dir
 
+    import uvicorn
+
     from paradoc.docstore import LocalDocStore
     from paradoc.serve.app import create_app
-    import uvicorn
 
     app = create_app(doc_store=LocalDocStore(bundle), static_dir=frontend_dir)
 
     port = _free_port()
-    config = uvicorn.Config(
-        app, host="127.0.0.1", port=port, log_level="warning", access_log=False
-    )
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", access_log=False)
     server = uvicorn.Server(config)
 
     server_thread = threading.Thread(target=server.run, daemon=True, name="paradoc-serve-test")
@@ -193,9 +183,7 @@ def _attach_recorders(page):
     page.on("console", lambda msg: console_messages.append((msg.type, msg.text)))
     page.on(
         "response",
-        lambda res: failed_responses.append((res.url, res.status))
-        if res.status >= 400
-        else None,
+        lambda res: failed_responses.append((res.url, res.status)) if res.status >= 400 else None,
     )
     page.on("websocket", lambda ws: ws_attempts.append(ws.url))
 
@@ -216,20 +204,11 @@ def test_rest_mode_no_section_404s(served_bundle, page, wait_for_frontend):
     wait_for_frontend(page)
     page.wait_for_timeout(2000)
 
-    section_404s = [
-        (url, status)
-        for url, status in failed_responses
-        if "/sections/" in url and status == 404
-    ]
-    assert not section_404s, (
-        f"manifest promised sections that the section endpoint can't "
-        f"deliver: {section_404s}"
-    )
+    section_404s = [(url, status) for url, status in failed_responses if "/sections/" in url and status == 404]
+    assert not section_404s, f"manifest promised sections that the section endpoint can't " f"deliver: {section_404s}"
 
 
-def test_rest_mode_does_not_attempt_websocket(
-    served_bundle, page, wait_for_frontend
-):
+def test_rest_mode_does_not_attempt_websocket(served_bundle, page, wait_for_frontend):
     """When `transport: 'rest'` is in effect, the WS transport should
     never initialize. The prod log showed
     `WebSocket connection to 'ws://localhost:13579/' failed` in a
@@ -278,8 +257,7 @@ def test_rest_mode_3d_viewer_mounts(served_bundle, page, wait_for_frontend):
     page.wait_for_timeout(500)
 
     fallback_warnings = [
-        text for kind, text in console_messages
-        if kind == "warning" and "failed to load presets" in text
+        text for kind, text in console_messages if kind == "warning" and "failed to load presets" in text
     ]
     assert not fallback_warnings, (
         f"ThreeDRenderer fell back to hardcoded preset on REST: "
@@ -293,19 +271,14 @@ def test_rest_mode_3d_viewer_mounts(served_bundle, page, wait_for_frontend):
     # failed_responses list, ignoring the `/manifest.json` PWA 404
     # (covered by its own dedicated test).
     non_pwa_404s = [
-        (url, status)
-        for url, status in failed_responses
-        if not (url.endswith("/manifest.json") and "/api/" not in url)
+        (url, status) for url, status in failed_responses if not (url.endswith("/manifest.json") and "/api/" not in url)
     ]
     assert not non_pwa_404s, (
-        f"failed responses during REST 3D mount (excluding the PWA "
-        f"manifest noise): {non_pwa_404s}"
+        f"failed responses during REST 3D mount (excluding the PWA " f"manifest noise): {non_pwa_404s}"
     )
 
 
-def test_rest_mode_no_root_manifest_json_404(
-    served_bundle, page, wait_for_frontend
-):
+def test_rest_mode_no_root_manifest_json_404(served_bundle, page, wait_for_frontend):
     """The browser auto-fetches `/manifest.json` from
     `<link rel="manifest">`. paradoc-serve's StaticFiles mount doesn't
     ship one, so this 404s on every page load. Either the link should

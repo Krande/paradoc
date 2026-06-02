@@ -193,9 +193,7 @@ def _patch_create_chunked(monkeypatch):
     monkeypatch.setattr(preproc, "create_figure_source", _patched_create_with_chunked)
 
 
-def test_mixed_chunk_and_result_list_splices_headings_between_figures(
-    tmp_path, _patch_create_chunked
-):
+def test_mixed_chunk_and_result_list_splices_headings_between_figures(tmp_path, _patch_create_chunked):
     """A filter returning [chunk, result, chunk, result] should produce
     markdown where the chunk text appears verbatim between figure
     references, and one ThreeDData row gets registered per RenderResult

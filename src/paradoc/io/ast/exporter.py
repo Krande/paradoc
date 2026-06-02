@@ -1047,7 +1047,8 @@ class ASTExporter:
             # last week's AST out of the visitor's IndexedDB.
             from datetime import datetime, timezone
 
-            from paradoc.docstore._git import extract as _git_extract, find_repo_root
+            from paradoc.docstore._git import extract as _git_extract
+            from paradoc.docstore._git import find_repo_root
             from paradoc.docstore.manifest import _detect_paradoc_version
 
             now = datetime.now(timezone.utc).isoformat()
@@ -1094,7 +1095,9 @@ class ASTExporter:
             image_mapping: Dict[str, str] = {}
             if embed_images:
                 image_mapping = self._export_images_for_static(
-                    output_dir, sections, copy_relative=include_frontend,
+                    output_dir,
+                    sections,
+                    copy_relative=include_frontend,
                 )
 
             # Write section bundles (with rewritten image srcs).
@@ -1144,7 +1147,8 @@ class ASTExporter:
             if include_frontend:
                 self._copy_frontend_for_static(output_dir)
                 self._inject_static_runtime_config(
-                    output_dir, header_links=header_links or None,
+                    output_dir,
+                    header_links=header_links or None,
                 )
 
             # Bundle-files manifest for the static-mode "Bundle files"
@@ -1193,9 +1197,7 @@ class ASTExporter:
             except OSError:
                 continue
             ctype, _ = mimetypes.guess_type(rel)
-            entries.append(
-                {"rel_path": rel, "size": int(size), "content_type": ctype or ""}
-            )
+            entries.append({"rel_path": rel, "size": int(size), "content_type": ctype or ""})
         doc_id = self.one_doc.source_dir.name or "doc"
         out_path.write_text(
             json.dumps({"doc_id": doc_id, "files": entries}, indent=2),
@@ -1325,9 +1327,7 @@ class ASTExporter:
                         break
 
             if resolved is None:
-                logger.warning(
-                    f"Could not find image file: {img_src} (source_dir: {source_dir})"
-                )
+                logger.warning(f"Could not find image file: {img_src} (source_dir: {source_dir})")
                 skipped += 1
                 continue
 
@@ -1371,9 +1371,7 @@ class ASTExporter:
         logger.info(f"Copied {copied} images into static bundle ({skipped} skipped)")
         return mapping
 
-    def _rewrite_bundle_image_srcs(
-        self, bundle: Dict[str, Any], mapping: Dict[str, str]
-    ) -> None:
+    def _rewrite_bundle_image_srcs(self, bundle: Dict[str, Any], mapping: Dict[str, str]) -> None:
         """In-place rewrite Image inline srcs using the mapping.
 
         Mirrors the block/inline traversal in
@@ -1382,6 +1380,7 @@ class ASTExporter:
         the new flattened paths instead of the original (often
         absolute) build-container paths.
         """
+
         def rewrite_inlines(inlines):
             for inline in inlines or []:
                 if not isinstance(inline, dict):
@@ -1565,9 +1564,7 @@ class ASTExporter:
                     manifest[key]["fea_bundle_dir"] = bundle_url
                     manifest[key]["fea_manifest_path"] = f"{bundle_url}/fea.manifest.json"
                 except Exception as exc:
-                    logger.warning(
-                        f"FEA artefact bundle copy {bundle_src} → {bundle_dest} failed: {exc}"
-                    )
+                    logger.warning(f"FEA artefact bundle copy {bundle_src} → {bundle_dest} failed: {exc}")
 
             # Mode-view row: share the canonical bundle's files (no
             # extra copy — that's the whole point of the artefact
@@ -1597,9 +1594,7 @@ class ASTExporter:
                 json.dumps(manifest, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-            logger.info(
-                f"Wrote {copied} 3D asset(s) → {assets_dir} (skipped {skipped}) and {three_d_path}"
-            )
+            logger.info(f"Wrote {copied} 3D asset(s) → {assets_dir} (skipped {skipped}) and {three_d_path}")
         elif skipped:
             logger.info(f"3D export: {skipped} key(s) skipped, none successfully copied")
 

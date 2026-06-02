@@ -44,17 +44,21 @@ def lint_unresolved_substitutions(
                 if sub.attr is not None:
                     instance = registry._filters[sub.name]  # noqa: SLF001
                     if sub.attr not in instance.list_attrs():
-                        issues.append(LintIssue(
-                            path=path,
-                            sub=sub,
-                            suggestions=_suggest(sub.attr, instance.list_attrs()),
-                        ))
+                        issues.append(
+                            LintIssue(
+                                path=path,
+                                sub=sub,
+                                suggestions=_suggest(sub.attr, instance.list_attrs()),
+                            )
+                        )
                 continue
             if sub.name in extras:
                 continue
-            issues.append(LintIssue(
-                path=path,
-                sub=sub,
-                suggestions=_suggest(sub.name, known),
-            ))
+            issues.append(
+                LintIssue(
+                    path=path,
+                    sub=sub,
+                    suggestions=_suggest(sub.name, known),
+                )
+            )
     return issues

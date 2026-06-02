@@ -2,13 +2,7 @@
 
 import pytest
 
-from paradoc.filters import (
-    Filter,
-    FilterRegistry,
-    ScalarValue,
-    TableView,
-    attr,
-)
+from paradoc.filters import Filter, FilterRegistry, attr
 from paradoc.filters.cache import AttrCache, _hash_args
 
 

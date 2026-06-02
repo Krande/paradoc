@@ -131,9 +131,6 @@ def export_presets_json(presets: Mapping[str, CameraPreset], dest: Path) -> None
     The shape is `{name: {...preset fields without `name`}}` so the JSON
     object reads naturally as a lookup table on the JS side.
     """
-    payload = {
-        name: preset.model_dump(exclude={"name"})
-        for name, preset in presets.items()
-    }
+    payload = {name: preset.model_dump(exclude={"name"}) for name, preset in presets.items()}
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")

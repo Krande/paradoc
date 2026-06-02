@@ -31,9 +31,7 @@ _ALLOWED = re.compile(
 def validate_fmtspec(fmtspec: str) -> None:
     """Raise SubstitutionError if `fmtspec` is outside the allowed subset."""
     if not _ALLOWED.match(fmtspec):
-        raise SubstitutionError(
-            f"unsupported format spec {fmtspec!r}; allowed: .Nf, .Ne, .Ng, d, ,d, ,.Nf, %, .N%"
-        )
+        raise SubstitutionError(f"unsupported format spec {fmtspec!r}; allowed: .Nf, .Ne, .Ng, d, ,d, ,.Nf, %, .N%")
 
 
 def apply_fmtspec(value: Any, fmtspec: str | None) -> str:

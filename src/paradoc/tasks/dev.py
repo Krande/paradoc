@@ -32,7 +32,6 @@ from __future__ import annotations
 import asyncio
 import http.server
 import logging
-import re
 import socket
 import socketserver
 import threading
@@ -334,9 +333,7 @@ async def _rebuild_loop(
         logger.info("rebuilding...")
         t0 = time.monotonic()
         try:
-            _, one = build_document(
-                doc_root, profile=profile, no_cache=no_cache, work_dir=work_dir
-            )
+            _, one = build_document(doc_root, profile=profile, no_cache=no_cache, work_dir=work_dir)
         except Exception as exc:  # noqa: BLE001
             logger.error(f"rebuild failed: {exc}", exc_info=True)
             continue

@@ -9,11 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from paradoc.tasks import (
-    StaticExportConfig,
-    load_task_config,
-    reset_default_registry,
-)
+from paradoc.tasks import StaticExportConfig, load_task_config, reset_default_registry
 
 
 @pytest.fixture(autouse=True)
@@ -114,10 +110,7 @@ def test_orchestrator_dispatches_static_to_export_static(tmp_path: Path):
     doc_root = tmp_path / "doc"
     doc_root.mkdir()
     (doc_root / "tasks.py").write_text(
-        "from paradoc.tasks import task\n\n"
-        "@task\n"
-        "def placeholder():\n"
-        "    return None\n"
+        "from paradoc.tasks import task\n\n" "@task\n" "def placeholder():\n" "    return None\n"
     )
     (doc_root / "00-main").mkdir()
     (doc_root / "00-main" / "01-intro.md").write_text("# heading\n")
@@ -136,8 +129,10 @@ def test_orchestrator_dispatches_static_to_export_static(tmp_path: Path):
 
     from paradoc.tasks import build_document
 
-    with patch("paradoc.document.OneDoc.compile") as mock_compile, \
-         patch("paradoc.document.OneDoc.export_static") as mock_static:
+    with (
+        patch("paradoc.document.OneDoc.compile") as mock_compile,
+        patch("paradoc.document.OneDoc.export_static") as mock_static,
+    ):
         mock_static.return_value = True
         build_document(doc_root, profile="default", auto_open=False)
 
@@ -155,10 +150,7 @@ def test_orchestrator_static_uses_defaults_when_subtable_absent(tmp_path: Path):
     doc_root = tmp_path / "doc"
     doc_root.mkdir()
     (doc_root / "tasks.py").write_text(
-        "from paradoc.tasks import task\n\n"
-        "@task\n"
-        "def placeholder():\n"
-        "    return None\n"
+        "from paradoc.tasks import task\n\n" "@task\n" "def placeholder():\n" "    return None\n"
     )
     (doc_root / "00-main").mkdir()
     (doc_root / "00-main" / "01-intro.md").write_text("# heading\n")
@@ -173,8 +165,10 @@ def test_orchestrator_static_uses_defaults_when_subtable_absent(tmp_path: Path):
 
     from paradoc.tasks import build_document
 
-    with patch("paradoc.document.OneDoc.compile") as mock_compile, \
-         patch("paradoc.document.OneDoc.export_static") as mock_static:
+    with (
+        patch("paradoc.document.OneDoc.compile") as mock_compile,
+        patch("paradoc.document.OneDoc.export_static") as mock_static,
+    ):
         mock_static.return_value = True
         build_document(doc_root, profile="default", auto_open=False)
 
@@ -193,10 +187,7 @@ def test_orchestrator_static_can_coexist_with_docx(tmp_path: Path):
     doc_root = tmp_path / "doc"
     doc_root.mkdir()
     (doc_root / "tasks.py").write_text(
-        "from paradoc.tasks import task\n\n"
-        "@task\n"
-        "def placeholder():\n"
-        "    return None\n"
+        "from paradoc.tasks import task\n\n" "@task\n" "def placeholder():\n" "    return None\n"
     )
     (doc_root / "00-main").mkdir()
     (doc_root / "00-main" / "01-intro.md").write_text("# heading\n")
@@ -211,8 +202,10 @@ def test_orchestrator_static_can_coexist_with_docx(tmp_path: Path):
 
     from paradoc.tasks import build_document
 
-    with patch("paradoc.document.OneDoc.compile") as mock_compile, \
-         patch("paradoc.document.OneDoc.export_static") as mock_static:
+    with (
+        patch("paradoc.document.OneDoc.compile") as mock_compile,
+        patch("paradoc.document.OneDoc.export_static") as mock_static,
+    ):
         mock_static.return_value = True
         build_document(doc_root, profile="default", auto_open=False)
 
@@ -226,10 +219,7 @@ def test_orchestrator_static_target_absolute_passes_through(tmp_path: Path):
     doc_root.mkdir()
     abs_target = tmp_path / "elsewhere" / "bundle"
     (doc_root / "tasks.py").write_text(
-        "from paradoc.tasks import task\n\n"
-        "@task\n"
-        "def placeholder():\n"
-        "    return None\n"
+        "from paradoc.tasks import task\n\n" "@task\n" "def placeholder():\n" "    return None\n"
     )
     (doc_root / "00-main").mkdir()
     (doc_root / "00-main" / "01-intro.md").write_text("# heading\n")
@@ -247,8 +237,7 @@ def test_orchestrator_static_target_absolute_passes_through(tmp_path: Path):
 
     from paradoc.tasks import build_document
 
-    with patch("paradoc.document.OneDoc.compile"), \
-         patch("paradoc.document.OneDoc.export_static") as mock_static:
+    with patch("paradoc.document.OneDoc.compile"), patch("paradoc.document.OneDoc.export_static") as mock_static:
         mock_static.return_value = True
         build_document(doc_root, profile="default", auto_open=False)
 

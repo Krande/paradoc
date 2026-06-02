@@ -6,13 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from paradoc.tasks import (
-    Runner,
-    TaskCache,
-    TaskRegistry,
-    reset_default_registry,
-    task,
-)
+from paradoc.tasks import Runner, TaskCache, TaskRegistry, reset_default_registry, task
 
 
 @pytest.fixture(autouse=True)

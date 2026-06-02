@@ -41,8 +41,8 @@ def env_required(name: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    from obstore.store import S3Store
     import obstore
+    from obstore.store import S3Store
 
     if not EXAMPLES_DIR.is_dir():
         sys.stderr.write(

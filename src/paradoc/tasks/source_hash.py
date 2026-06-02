@@ -176,10 +176,7 @@ def _resolve_head(fn: Any, name: str) -> Any:
 def _is_python_callable(obj: Any) -> bool:
     """True if `obj` has Python source we can hash."""
     return (
-        inspect.isfunction(obj)
-        or inspect.ismethod(obj)
-        or inspect.isclass(obj)
-        or hasattr(obj, "fn")  # TaskFn wrapper
+        inspect.isfunction(obj) or inspect.ismethod(obj) or inspect.isclass(obj) or hasattr(obj, "fn")  # TaskFn wrapper
     )
 
 

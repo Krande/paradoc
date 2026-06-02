@@ -32,57 +32,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve adapy commit SHA for layer cache key
-        # The docker layer cache was being invalidated on every push
-        # because `CACHE_BUST=${{ github.run_id }}` changes every run,
-        # which cascaded through the clone → pixi install → compile
-        # layers and bought us nothing on adapy-unchanged pushes
-        # (which is most of them). Resolve adapy's current tip SHA
-        # via `git ls-remote` instead — same value across runs while
-        # adapy stays still, distinct value the moment it moves.
-        #
-        # The runner has docker but not git, so shell out to the
-        # alpine/git image. ~30 MB pull on first run, cached after.
-        id: adapy_sha
-        env:
-          ADAPY_GIT_URL: ${{ secrets.ADAPY_GIT_URL }}
-          ADAPY_REF: ${{ vars.ADAPY_REF || 'main' }}
-        run: |
-          if [ -z "$ADAPY_GIT_URL" ]; then
-            echo "::error::ADAPY_GIT_URL secret is required."
-            exit 1
-          fi
-          SHA=$(docker run --rm alpine/git ls-remote "$ADAPY_GIT_URL" "$ADAPY_REF" 2>/dev/null | awk '{print $1}' | head -n1 || true)
-          if [ -z "$SHA" ]; then
-            # Fallback to the ref name itself so the layer still
-            # invalidates per-distinct-ref even when ls-remote fails
-            # (DNS hiccup / image pull blocked / etc.).
-            SHA="$ADAPY_REF"
-            echo "::warning::ls-remote returned nothing for $ADAPY_REF; falling back to ref name as cache key."
-          fi
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-          echo "Resolved adapy $ADAPY_REF → $SHA"
-
       - name: Build examples image (compiles bundles in-layer)
-        env:
-          # Sibling adapy clone fed into the image. The pixi `examples-figs`
-          # env now uses `ada-py = { path = "../adapy", editable = true }`
-          # instead of a git SHA, so the build context must include adapy.
-          # URL comes from a workflow secret to keep the source-host name
-          # out of the file. ADAPY_REF defaults to main; override per
-          # workflow run if you need to test a feature branch.
-          ADAPY_GIT_URL: ${{ secrets.ADAPY_GIT_URL }}
-          ADAPY_REF: ${{ vars.ADAPY_REF || 'main' }}
+        # ada-py now resolves from conda-forge via pixi.lock, so the
+        # build needs no sibling adapy clone or cache-bust plumbing —
+        # the `COPY pixi.lock` layer invalidates naturally whenever the
+        # pinned adapy version changes.
         run: |
-          if [ -z "$ADAPY_GIT_URL" ]; then
-            echo "::error::ADAPY_GIT_URL secret is required to build the examples image."
-            exit 1
-          fi
           docker build \
             -f Dockerfile.examples \
-            --build-arg ADAPY_GIT_URL="$ADAPY_GIT_URL" \
-            --build-arg ADAPY_REF="$ADAPY_REF" \
-            --build-arg CACHE_BUST="${{ steps.adapy_sha.outputs.sha }}" \
             -t paradoc-examples:ci .
 
       - name: Upload bundles to object store

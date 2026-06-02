@@ -222,6 +222,7 @@ class OneDoc:
 
         # Filter registry — discovers `<source_dir>/filters.py` lazily during compile.
         from paradoc.filters import FilterRegistry
+
         self._filter_registry = FilterRegistry()
         self._filters_discovered = False
 
@@ -994,11 +995,13 @@ class OneDoc:
             md_str_original = md_str
 
             import re as _re
+
             _legacy_re = _re.compile(r"{{(.*)}}")
             # Same code-span guard as paradoc.substitution.parser: a
             # `{{__key__}}` inside backticks is doc-of-the-syntax, not a
             # reference to substitute.
             from paradoc.substitution.parser import _CODE_FENCE_RE, _CODE_SPAN_RE
+
             _masked = [m.span() for m in _CODE_FENCE_RE.finditer(md_str_original)]
             _masked += [m.span() for m in _CODE_SPAN_RE.finditer(md_str_original)]
 
@@ -1106,12 +1109,10 @@ class OneDoc:
         out: list[str] = []
         last = 0
         for sub in find_substitutions(md_str):
-            out.append(md_str[last:sub.span[0]])
+            out.append(md_str[last : sub.span[0]])
             replacement = self._desugar_one_substitution(sub, mdf)
             if replacement is None:
-                logger.warning(
-                    f'Unresolved substitution ${{ {sub.reference} }} in {mdf.path}'
-                )
+                logger.warning(f"Unresolved substitution ${{ {sub.reference} }} in {mdf.path}")
                 out.append(sub.raw)
             else:
                 out.append(replacement)
@@ -1147,7 +1148,7 @@ class OneDoc:
             try:
                 return apply_fmtspec(value, sub.fmtspec)
             except SubstitutionError as exc:
-                logger.error(f'{exc} for ${{ {name} }} in {mdf.path}')
+                logger.error(f"{exc} for ${{ {name} }} in {mdf.path}")
                 return None
 
         return None
@@ -1177,7 +1178,7 @@ class OneDoc:
                 )
                 raw = filter_inst.render(spec, key=key)
             except Exception as exc:
-                logger.error(f'figure-source filter failed for key {key!r}: {exc}')
+                logger.error(f"figure-source filter failed for key {key!r}: {exc}")
                 return f"<!-- paradoc:figure ERROR: {exc} -->"
 
             # Filters return either a single entry, or a list of entries.
@@ -1189,9 +1190,7 @@ class OneDoc:
             else:
                 entries = list(raw)
             if not entries:
-                logger.warning(
-                    f'figure-source filter for key {key!r} returned no entries'
-                )
+                logger.warning(f"figure-source filter for key {key!r} returned no entries")
                 return f"<!-- paradoc:figure {key} produced no results -->"
 
             markdown_parts: list[str] = []
@@ -1238,10 +1237,7 @@ class OneDoc:
                 # Forward slashes for portability (pandoc + S3).
                 rel_png = rel_png.replace(os.sep, "/")
                 fig_id = f"fig:{sub_key}"
-                markdown_parts.append(
-                    f"![{result.caption}]({rel_png})"
-                    f"{{#{fig_id} data-3d-key={sub_key}}}"
-                )
+                markdown_parts.append(f"![{result.caption}]({rel_png})" f"{{#{fig_id} data-3d-key={sub_key}}}")
 
             return "\n\n".join(markdown_parts)
 
@@ -1357,9 +1353,7 @@ class OneDoc:
         try:
             result = self._filter_registry.call_attr(sub.name, sub.attr, sub.kwargs)
         except (KeyError, TypeError) as exc:
-            logger.error(
-                f'Failed to resolve ${{ {sub.reference} }} in {mdf.path}: {exc}'
-            )
+            logger.error(f"Failed to resolve ${{ {sub.reference} }} in {mdf.path}: {exc}")
             return None
 
         return self._render_view(result, sub, mdf)
@@ -1385,9 +1379,7 @@ class OneDoc:
                 fig_id = result.figure_id or f"fig:{sub.name}_{sub.attr}"
                 cap = result.caption
                 return f"![{cap}]({result.image_path}){{#{fig_id}}}"
-            logger.error(
-                f'FigureView from ${{ {sub.reference} }} has neither plot_key nor image_path'
-            )
+            logger.error(f"FigureView from ${{ {sub.reference} }} has neither plot_key nor image_path")
             return None
 
         if isinstance(result, ThreeDView):
@@ -1403,14 +1395,14 @@ class OneDoc:
             try:
                 return apply_fmtspec(result.value, sub.fmtspec)
             except SubstitutionError as exc:
-                logger.error(f'{exc} for ${{ {sub.reference} }} in {mdf.path}')
+                logger.error(f"{exc} for ${{ {sub.reference} }} in {mdf.path}")
                 return None
 
         # Plain scalar return
         try:
             return apply_fmtspec(result, sub.fmtspec)
         except SubstitutionError as exc:
-            logger.error(f'{exc} for ${{ {sub.reference} }} in {mdf.path}')
+            logger.error(f"{exc} for ${{ {sub.reference} }} in {mdf.path}")
             return None
 
     def _warn_legacy_syntax(self, raw_match: str, full_md: str, mdf: MarkDownFile) -> None:
@@ -1430,7 +1422,7 @@ class OneDoc:
         idx = full_md.find(raw_match)
         suggestion = raw_match
         if idx >= 0:
-            after = full_md[idx + len(raw_match):]
+            after = full_md[idx + len(raw_match) :]
             if after.startswith("{tbl:") or after.startswith("{plt:"):
                 close = _find_matching_brace(after, 0)
                 if close != -1:
@@ -1440,9 +1432,9 @@ class OneDoc:
 
         new_form, _, _ = migrate_text(suggestion)
         logger.warning(
-            f'Deprecated legacy substitution {suggestion!r} in {mdf.path}; '
-            f'replace with {new_form!r}. Run `paradoc-migrate-syntax` to '
-            f'rewrite all legacy syntax in this doc tree.'
+            f"Deprecated legacy substitution {suggestion!r} in {mdf.path}; "
+            f"replace with {new_form!r}. Run `paradoc-migrate-syntax` to "
+            f"rewrite all legacy syntax in this doc tree."
         )
 
     def _uniqueness_check(self, name):

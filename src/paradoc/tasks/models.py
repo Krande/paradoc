@@ -23,7 +23,6 @@ from typing import Any, Callable, Optional, Union
 
 from pydantic import BaseModel, Field
 
-
 # Sentinel for "no value supplied" so callers can pass None explicitly.
 _UNSET: Any = object()
 
@@ -43,9 +42,7 @@ def _resolve_task_by_qualname(qualname: str) -> "TaskFn":
     for part in name.split("."):
         target = getattr(target, part)
     if not isinstance(target, TaskFn):
-        raise TypeError(
-            f"qualname {qualname!r} resolved to {type(target).__name__}, not TaskFn"
-        )
+        raise TypeError(f"qualname {qualname!r} resolved to {type(target).__name__}, not TaskFn")
     return target
 
 
@@ -179,8 +176,7 @@ class TaskHandle:
         """
         if self._runner is None:
             raise RuntimeError(
-                f"TaskHandle({self.qualname!r}) is unbound; "
-                f"the Runner must bind it before results() is callable."
+                f"TaskHandle({self.qualname!r}) is unbound; " f"the Runner must bind it before results() is callable."
             )
         return [self._runner.result_for(c) for c in self.cells(**filter_coords)]
 

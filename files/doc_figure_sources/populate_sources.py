@@ -76,10 +76,10 @@ def write_png(assembly: ada.Assembly, dest: Path) -> None:
 # the `examples-figs` pixi env brings adapy + offscreen renderers
 # but not paradoc itself.
 _COMPARISON_PRESETS: dict[str, dict] = {
-    "front":  {"azimuth_deg": 0,    "elevation_deg": 0},
-    "top":    {"azimuth_deg": 0,    "elevation_deg": 89.9},
-    "left":   {"azimuth_deg": 90,   "elevation_deg": 0},
-    "iso_1":  {"azimuth_deg": 45,   "elevation_deg": 30},
+    "front": {"azimuth_deg": 0, "elevation_deg": 0},
+    "top": {"azimuth_deg": 0, "elevation_deg": 89.9},
+    "left": {"azimuth_deg": 90, "elevation_deg": 0},
+    "iso_1": {"azimuth_deg": 45, "elevation_deg": 30},
 }
 
 
@@ -105,9 +105,7 @@ def write_comparison_grid(assembly: ada.Assembly) -> None:
                 image.save(dest)
                 logger.info("wrote %s (backend=%s, preset=%s)", dest, backend, preset_name)
             except Exception as exc:
-                logger.warning(
-                    "comparison render failed (%s, %s): %s", backend, preset_name, exc
-                )
+                logger.warning("comparison render failed (%s, %s): %s", backend, preset_name, exc)
 
 
 def main() -> None:

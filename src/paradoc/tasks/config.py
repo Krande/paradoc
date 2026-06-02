@@ -46,7 +46,6 @@ not here.
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -192,14 +191,9 @@ def load_task_config(
 
     build_sections: dict[str, Any] = data.get("build", {}) or {}
     if build_sections and profile not in build_sections:
-        raise KeyError(
-            f"paradoc.toml has no [build.{profile}] section. "
-            f"Known profiles: {sorted(build_sections)!r}"
-        )
+        raise KeyError(f"paradoc.toml has no [build.{profile}] section. " f"Known profiles: {sorted(build_sections)!r}")
 
-    profile_cfg = (
-        BuildProfile(**build_sections[profile]) if profile in build_sections else BuildProfile()
-    )
+    profile_cfg = BuildProfile(**build_sections[profile]) if profile in build_sections else BuildProfile()
 
     # Resolve env-map: global envs, then profile overrides on top.
     resolved_envs = {**paradoc_cfg.envs, **profile_cfg.envs}

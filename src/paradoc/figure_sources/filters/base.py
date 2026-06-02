@@ -145,6 +145,4 @@ class FigureSourceFilter:
         markdown image tag + one ``ThreeDData`` row per entry, with
         derived keys ``<key>``, ``<key>_2``, ``<key>_3``, …
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} did not implement render()"
-        )
+        raise NotImplementedError(f"{type(self).__name__} did not implement render()")

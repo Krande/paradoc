@@ -17,7 +17,6 @@ import pytest
 from paradoc.tasks import reset_default_registry
 from paradoc.tasks.orchestrator import build_document
 
-
 _ONE_DOC_AVAILABLE = importlib.util.find_spec("paradoc.document") is not None
 
 
@@ -152,7 +151,6 @@ def test_build_document_compiles_with_filter_binding(tmp_path: Path):
 @pytest.mark.skipif(not _ONE_DOC_AVAILABLE, reason="paradoc.document not importable")
 def test_build_document_loops_outputs_from_toml(tmp_path: Path):
     """[build.x.outputs = ["docx", "pdf"]] should drive two compile passes."""
-    from paradoc.common import ExportFormats
 
     doc = _scaffold(
         tmp_path,

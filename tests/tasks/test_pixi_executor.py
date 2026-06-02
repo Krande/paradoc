@@ -31,13 +31,9 @@ from unittest.mock import patch
 
 import pytest
 
-from paradoc.tasks import (
-    Cell,
-    PixiSubprocessError,
-    PixiSubprocessExecutor,
-    _test_fixtures as fx,
-    reset_default_registry,
-)
+from paradoc.tasks import Cell, PixiSubprocessError, PixiSubprocessExecutor
+from paradoc.tasks import _test_fixtures as fx
+from paradoc.tasks import reset_default_registry
 
 
 @pytest.fixture(autouse=True)
@@ -144,9 +140,7 @@ def test_subprocess_failure_with_no_error_pkl_raises_pixi_error():
     cell = Cell(task=fx.simple_design)
 
     def _fake_pixi_fails(cmd, **kwargs):
-        return subprocess.CompletedProcess(
-            args=cmd, returncode=2, stdout="", stderr="pixi: env 'tests' not found"
-        )
+        return subprocess.CompletedProcess(args=cmd, returncode=2, stdout="", stderr="pixi: env 'tests' not found")
 
     with patch("paradoc.tasks.executors.subprocess.run", side_effect=_fake_pixi_fails):
         future = ex.submit(cell, parent_result=None)
@@ -245,9 +239,7 @@ def _invoke_worker(payload: dict) -> tuple[int, Path]:
     if proc.returncode not in (0, 1):
         # Surface unexpected failures (e.g. import errors) instead of
         # leaving the assertion in the test producing a confusing diff.
-        raise RuntimeError(
-            f"worker rc={proc.returncode}\nstderr:\n{proc.stderr}\nstdout:\n{proc.stdout}"
-        )
+        raise RuntimeError(f"worker rc={proc.returncode}\nstderr:\n{proc.stderr}\nstdout:\n{proc.stdout}")
     return proc.returncode, tmpdir
 
 

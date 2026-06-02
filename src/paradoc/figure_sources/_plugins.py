@@ -106,13 +106,16 @@ def ensure_plugins_loaded() -> None:
         except Exception as exc:
             logger.warning(
                 "paradoc.figure_sources plugin %s: load failed: %s",
-                ep.name, exc, exc_info=True,
+                ep.name,
+                exc,
+                exc_info=True,
             )
             continue
         if not callable(handler):
             logger.warning(
                 "paradoc.figure_sources plugin %s: target %r is not callable",
-                ep.name, handler,
+                ep.name,
+                handler,
             )
             continue
         try:
@@ -120,7 +123,9 @@ def ensure_plugins_loaded() -> None:
         except Exception as exc:
             logger.warning(
                 "paradoc.figure_sources plugin %s: handler raised: %s",
-                ep.name, exc, exc_info=True,
+                ep.name,
+                exc,
+                exc_info=True,
             )
 
 

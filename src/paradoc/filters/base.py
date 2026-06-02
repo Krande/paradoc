@@ -14,10 +14,10 @@ from __future__ import annotations
 
 import functools
 import inspect
-from typing import Any, Callable, ClassVar, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Optional
 
 if TYPE_CHECKING:  # pragma: no cover
-    from paradoc.tasks import Task, TaskHandle
+    pass
 
 
 _ATTR_MARKER = "__paradoc_attr__"
@@ -82,9 +82,7 @@ class Filter:
 
     def list_attrs(self) -> list[str]:
         """Return the names of all `@attr`-decorated methods on this instance."""
-        return [
-            name for name, member in inspect.getmembers(self, predicate=_is_attr)
-        ]
+        return [name for name, member in inspect.getmembers(self, predicate=_is_attr)]
 
     def get_attr_callable(self, attr_name: str) -> Callable[..., Any]:
         """Return the bound `@attr` callable, or raise KeyError."""

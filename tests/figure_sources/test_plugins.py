@@ -10,13 +10,14 @@ check paradoc's side of the plumbing.
 
 from __future__ import annotations
 
-import pytest
-from pydantic import Field
 from typing import Literal
 
+import pytest
+from pydantic import Field
+
 from paradoc.figure_sources._plugins import (
-    Dispatcher,
     _DISPATCHER,
+    Dispatcher,
     _reset_for_tests,
     ensure_plugins_loaded,
 )
@@ -26,12 +27,11 @@ from paradoc.figure_sources.filters.base import (
     get_filter_for,
 )
 from paradoc.figure_sources.models import (
-    BaseFigureSource,
     _SPEC_REGISTRY,
+    BaseFigureSource,
     create_figure_source,
     register_spec,
 )
-
 
 _TEST_SOURCE = "test_only_plugin_source_xyz"
 
@@ -45,6 +45,7 @@ def _isolate_test_registries():
     _SPEC_REGISTRY.pop(_TEST_SOURCE, None)
     # The filter registry is keyed the same way.
     from paradoc.figure_sources.filters.base import _REGISTRY
+
     _REGISTRY.pop(_TEST_SOURCE, None)
 
 
@@ -63,21 +64,27 @@ def test_dispatcher_register_spec_and_filter_round_trips():
 
         def render(self, spec, *, key):  # type: ignore[override]
             return RenderResult(
-                png_path="x.png", glb_path="x.glb",
-                glb_sha256="0" * 64, glb_size=1,
-                caption=f"plugin {key}", camera_pos=spec.camera_pos,
-                source_type=self.figure_source, metadata={},
+                png_path="x.png",
+                glb_path="x.glb",
+                glb_sha256="0" * 64,
+                glb_size=1,
+                caption=f"plugin {key}",
+                camera_pos=spec.camera_pos,
+                source_type=self.figure_source,
+                metadata={},
             )
 
     dispatcher.register_spec(_TEST_SOURCE, _PluginSpec)
     dispatcher.register_filter(_PluginFilter)
 
     assert _TEST_SOURCE in _SPEC_REGISTRY
-    parsed = create_figure_source({
-        "figure_source": _TEST_SOURCE,
-        "figure_title": "Plugin test",
-        "source_inp": "files/whatever",
-    })
+    parsed = create_figure_source(
+        {
+            "figure_source": _TEST_SOURCE,
+            "figure_title": "Plugin test",
+            "source_inp": "files/whatever",
+        }
+    )
     assert isinstance(parsed, _PluginSpec)
     assert get_filter_for(_TEST_SOURCE) is _PluginFilter
 
@@ -103,6 +110,7 @@ def test_ensure_plugins_loaded_is_idempotent():
     # itself is the surface tested elsewhere; here we check the guard.
     ensure_plugins_loaded()
     from paradoc.figure_sources import _plugins
+
     assert _plugins._LOADED is True
 
     # Second call: still True, no exception.
@@ -121,6 +129,7 @@ def test_create_figure_source_triggers_discovery():
         create_figure_source({"figure_source": "definitely_not_registered"})
 
     from paradoc.figure_sources import _plugins
+
     assert _plugins._LOADED is True
 
 
@@ -141,10 +150,12 @@ def test_register_spec_overwrites_silently():
     register_spec(_TEST_SOURCE, _SpecA)
     register_spec(_TEST_SOURCE, _SpecB)
 
-    parsed = create_figure_source({
-        "figure_source": _TEST_SOURCE,
-        "figure_title": "overwrite test",
-        "source_inp": "x",
-    })
+    parsed = create_figure_source(
+        {
+            "figure_source": _TEST_SOURCE,
+            "figure_title": "overwrite test",
+            "source_inp": "x",
+        }
+    )
     assert isinstance(parsed, _SpecB)
     assert parsed.extra_field == 7

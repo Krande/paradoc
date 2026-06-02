@@ -54,9 +54,7 @@ def serve(
     try:
         import uvicorn
     except ImportError as exc:
-        raise typer.BadParameter(
-            "uvicorn is required for `paradoc-serve`. Install the `serve` extra."
-        ) from exc
+        raise typer.BadParameter("uvicorn is required for `paradoc-serve`. Install the `serve` extra.") from exc
 
     from paradoc.serve import create_app
 
