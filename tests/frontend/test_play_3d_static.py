@@ -192,6 +192,24 @@ def _attach_recorders(page):
     return console_messages, failed_requests, ws_attempts
 
 
+def _open_interactive_viewer(page):
+    """Switch a 3D figure from its static poster to the live viewer.
+
+    The redesigned `Interactive3DFigure` has no standalone "Load
+    interactive 3D viewer" button: a hover-gated `Static | Interactive`
+    segmented toggle sits in the figure's top-right corner. Hover the
+    figure wrapper to reveal it, click `Interactive`, then wait for the
+    canvas to mount (GLB download + adapy ingest).
+    """
+    wrapper = page.locator("div.group.relative").first
+    wrapper.wait_for(timeout=10000)
+    wrapper.hover()
+    interactive_btn = wrapper.locator('button:has-text("Interactive")').first
+    interactive_btn.wait_for(state="visible", timeout=10000)
+    interactive_btn.click()
+    page.wait_for_selector("canvas", timeout=15000)
+
+
 def test_static_export_3d_viewer_mounts_without_presets_404(static_bundle, page, wait_for_frontend):
     """The original ada-docs incident: `presets.json` is 404, the
     fallback preset only ships `iso_3`, and the canvas can't frame a
@@ -209,12 +227,7 @@ def test_static_export_3d_viewer_mounts_without_presets_404(static_bundle, page,
     wait_for_frontend(page)
 
     # The figure starts as a poster placeholder. Mount the live viewer.
-    load_btn = page.locator('button:has-text("Load interactive 3D viewer")').first
-    load_btn.wait_for(timeout=10000)
-    load_btn.click()
-
-    # Canvas should appear once the GLB downloads + adapy ingests it.
-    page.wait_for_selector("canvas", timeout=15000)
+    _open_interactive_viewer(page)
 
     # Give the lazy ThreeDRenderer time to fire its presets fetch.
     page.wait_for_timeout(500)
@@ -240,10 +253,7 @@ def test_static_export_3d_viewer_does_not_hijack_page_scroll(static_bundle, page
     page.goto(f"{static_bundle}/")
     wait_for_frontend(page)
 
-    load_btn = page.locator('button:has-text("Load interactive 3D viewer")').first
-    load_btn.wait_for(timeout=10000)
-    load_btn.click()
-    page.wait_for_selector("canvas", timeout=15000)
+    _open_interactive_viewer(page)
     page.wait_for_timeout(500)
 
     # The inner reader is the scroll target.
@@ -289,10 +299,7 @@ def test_static_export_3d_viewer_canvas_stays_within_container(static_bundle, pa
     page.goto(f"{static_bundle}/")
     wait_for_frontend(page)
 
-    load_btn = page.locator('button:has-text("Load interactive 3D viewer")').first
-    load_btn.wait_for(timeout=10000)
-    load_btn.click()
-    page.wait_for_selector("canvas", timeout=15000)
+    _open_interactive_viewer(page)
     page.wait_for_timeout(500)
 
     # The ThreeDRenderer mounts the canvas inside a div with
@@ -331,8 +338,7 @@ def test_static_export_scroll_survives_showControls_toggle(static_bundle, page, 
     page.goto(f"{static_bundle}/")
     wait_for_frontend(page)
 
-    page.locator('button:has-text("Load interactive 3D viewer")').first.click(timeout=10000)
-    page.wait_for_selector("canvas", timeout=15000)
+    _open_interactive_viewer(page)
     page.wait_for_timeout(500)
 
     # Snapshot a button title only present when EmbedUI is mounted
@@ -345,9 +351,13 @@ def test_static_export_scroll_survives_showControls_toggle(static_bundle, page, 
         "If the default flipped, this test needs to be inverted."
     )
 
-    # Open the kebab menu + flip the toggle.
-    page.locator('button[aria-label="More options"]').first.click()
-    page.locator('button[role="menuitem"]:has-text("3D viewer controls")').first.click()
+    # Flip "3D viewer controls" off. It moved out of the old kebab menu
+    # into the Settings cog → Options preferences modal: open the cog,
+    # pick Options, flip the toggle switch, then dismiss the modal.
+    page.locator('button[aria-label="Settings"]').first.click()
+    page.locator('button[role="menuitem"]:has-text("Options")').first.click()
+    page.locator('button[role="switch"]').first.click()
+    page.keyboard.press("Escape")
 
     # ThreeDRenderer re-mounts on toggle change. Wait for the EmbedUI
     # button to disappear (now in canvas-only mode) and a fresh canvas
