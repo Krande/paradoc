@@ -101,6 +101,10 @@ upload-examples = { cmd = "python scripts/upload_examples.py", env = { PYTHONPAT
 # render pipeline (scipy, wgpu, …), which the offscreen path needs
 # regardless of what adapy happens to require.
 ada-py = "*"
+# Pin ruff to match `feature.lint` (CI's lint version): ada-py → xsdata
+# declares `ruff >=0.9.8`, which otherwise floats to 0.15.x here. 0.12.8
+# satisfies that floor and keeps one ruff across the workspace.
+ruff = "==0.12.8"
 pythonocc-core = "*"
 occt = "*"
 ifcopenshell = "*"
@@ -188,6 +192,11 @@ pytest = "*"
 
 [feature.dev.dependencies]
 ada-py = "*"
+# Pin ruff to match `feature.lint` (== the CI lint version). ada-py pulls
+# xsdata, which declares `ruff >=0.9.8` and otherwise floats to 0.15.x —
+# so an IDE pointed at this env would lint differently from CI. 0.12.8
+# still satisfies xsdata's floor.
+ruff = "==0.12.8"
 
 [feature.frontend.dependencies]
 nodejs = "*"
