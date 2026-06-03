@@ -10,7 +10,6 @@ name: Publish image
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 
