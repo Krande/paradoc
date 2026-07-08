@@ -68,6 +68,18 @@ resources:
     cpu: 100m
     memory: 128Mi
 
+# Health-probe timing for both the liveness and readiness probes. The chart
+# used to render only httpGet, so both probes inherited the Kubernetes
+# defaults (timeoutSeconds: 1) — too aggressive for paradoc-serve. Its single
+# uvicorn worker occasionally needs >1s to answer /api/health while streaming
+# a bundle from S3, which tripped the liveness probe and forced needless
+# restarts (SIGTERM/SIGKILL crashloops). Loosened defaults below.
+probes:
+  initialDelaySeconds: 5
+  timeoutSeconds: 5
+  periodSeconds: 15
+  failureThreshold: 5
+
 # Map externally-resolvable hostnames to in-cluster service IPs.
 # Required when paradoc-serve has to call IdP discovery / JWKS
 # endpoints that live behind the same Traefik ingress that fronts
