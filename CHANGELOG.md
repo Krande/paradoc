@@ -2,6 +2,22 @@
 
 
 
+## v0.6.1 (2026-07-08)
+
+### Chore
+
+* chore: Bump the dependencies group across 1 directory with 5 updates (#31)
+
+Signed-off-by: dependabot[bot] &lt;support@github.com&gt;
+Co-authored-by: dependabot[bot] &lt;49699333+dependabot[bot]@users.noreply.github.com&gt; ([`a8f3097`](https://github.com/Krande/paradoc/commit/a8f3097cabecfab9ba6a017697f624ab34ed9f01))
+
+### Fix
+
+* fix: make health-probe timing configurable (#34)
+
+Co-authored-by: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt; ([`9267654`](https://github.com/Krande/paradoc/commit/9267654e42d705fa8562b627b198ae581645ff11))
+
+
 ## v0.6.0 (2026-06-02)
 
 ### Chore
