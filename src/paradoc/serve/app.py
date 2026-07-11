@@ -126,6 +126,7 @@ def create_app(
     try:
         from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
         from fastapi.responses import JSONResponse, Response, StreamingResponse
+        from starlette.concurrency import run_in_threadpool
     except ImportError as exc:
         raise RuntimeError(
             "FastAPI is required for `paradoc serve`. Install the `serve` extra " "(pip install paradoc[serve])."
@@ -177,7 +178,13 @@ def create_app(
 
     @app.get("/api/health")
     async def health() -> dict[str, Any]:
-        return {"status": "ok", "docs": doc_store.list_doc_ids()}
+        # Liveness/readiness must be trivial: prove the process + event loop
+        # are alive, nothing more. It previously returned doc_store.list_doc_ids(),
+        # a SYNCHRONOUS S3 list — run on every 15s probe inside this async handler
+        # it blocked the whole event loop, and when Garage/the node was slow it
+        # exceeded the probe timeout and got the pod killed (crashloop) while also
+        # stalling every concurrent request. Never touch external I/O here.
+        return {"status": "ok"}
 
     @app.get("/api/info")
     async def info() -> dict[str, Any]:
@@ -521,46 +528,53 @@ def create_app(
     _shared = Scope.shared()
     _scope_dep = scope_from_path()
 
+    # NOTE: these delegating handlers are plain ``def`` (not ``async def``) on
+    # purpose. Their bodies call the synchronous doc_store helpers, which do
+    # blocking S3 I/O. FastAPI runs ``def`` route handlers in a threadpool, so
+    # the S3 call no longer blocks the single event loop (which starved
+    # /api/health and every concurrent request). The async ``current_user``
+    # dependency still resolves on the loop before the handler runs. Only
+    # handlers that genuinely ``await`` (e.g. streaming, DB) stay ``async def``.
     @app.get("/api/docs")
-    async def list_docs(
+    def list_docs(
         user: User = Depends(auth_module.current_user),
     ) -> dict[str, Any]:
         return _list_docs(_shared)
 
     @app.get("/api/docs/{doc_id}/manifest")
-    async def get_manifest(doc_id: str, user: User = Depends(auth_module.current_user)):
+    def get_manifest(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_manifest(doc_id, _shared)
 
     @app.get("/api/docs/{doc_id}/sections/{idx}")
-    async def get_section(doc_id: str, idx: int, user: User = Depends(auth_module.current_user)):
+    def get_section(doc_id: str, idx: int, user: User = Depends(auth_module.current_user)):
         return _get_section(doc_id, idx, _shared)
 
     @app.get("/api/docs/{doc_id}/plots")
-    async def get_all_plots(doc_id: str, user: User = Depends(auth_module.current_user)):
+    def get_all_plots(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_all_plots(doc_id, _shared)
 
     @app.get("/api/docs/{doc_id}/tables")
-    async def get_all_tables(doc_id: str, user: User = Depends(auth_module.current_user)):
+    def get_all_tables(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_all_tables(doc_id, _shared)
 
     @app.get("/api/docs/{doc_id}/images")
-    async def get_all_images(doc_id: str, user: User = Depends(auth_module.current_user)):
+    def get_all_images(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_all_images(doc_id, _shared)
 
     @app.get("/api/docs/{doc_id}/tables/{key}")
-    async def get_table(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
+    def get_table(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
         return _get_table(doc_id, key, _shared)
 
     @app.get("/api/docs/{doc_id}/plots/{key}")
-    async def get_plot(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
+    def get_plot(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
         return _get_plot(doc_id, key, _shared)
 
     @app.get("/api/docs/{doc_id}/presets")
-    async def get_presets(doc_id: str, user: User = Depends(auth_module.current_user)):
+    def get_presets(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_presets(doc_id, _shared)
 
     @app.get("/api/docs/{doc_id}/3d/{key}/meta")
-    async def get_3d_meta(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
+    def get_3d_meta(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
         return _get_3d_meta(doc_id, key, _shared)
 
     @app.get("/api/docs/{doc_id}/3d/{key}/blob")
@@ -573,11 +587,11 @@ def create_app(
         return await _get_3d_blob(doc_id, key, _shared, request)
 
     @app.get("/api/docs/{doc_id}/3d/{key}/poster")
-    async def get_3d_poster(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
+    def get_3d_poster(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
         return _get_3d_poster(doc_id, key, _shared)
 
     @app.get("/api/docs/{doc_id}/3d/{key}/fea/{filename:path}")
-    async def get_3d_fea_artefact(
+    def get_3d_fea_artefact(
         doc_id: str,
         key: str,
         filename: str,
@@ -586,7 +600,7 @@ def create_app(
         return _get_3d_fea_artefact(doc_id, key, filename, _shared)
 
     @app.get("/api/docs/{doc_id}/files/{rel_path:path}")
-    async def get_doc_file(
+    def get_doc_file(
         doc_id: str,
         rel_path: str,
         user: User = Depends(auth_module.current_user),
@@ -594,49 +608,51 @@ def create_app(
         return _get_file(doc_id, rel_path, _shared)
 
     @app.get("/api/docs/{doc_id}/manifest/files")
-    async def list_doc_files(doc_id: str, user: User = Depends(auth_module.current_user)):
+    def list_doc_files(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _list_bundle_files(doc_id, _shared)
 
     # ── Scope-aware /api/scopes/{scope}/docs/... routes ──────────────
 
+    # Same rationale as the legacy block above: ``def`` (threadpool) for the
+    # sync-helper handlers, ``async def`` only where the body awaits.
     @app.get("/api/scopes/{scope}/docs")
-    async def s_list_docs(scope_obj: Scope = Depends(_scope_dep)) -> dict[str, Any]:
+    def s_list_docs(scope_obj: Scope = Depends(_scope_dep)) -> dict[str, Any]:
         return _list_docs(scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/manifest")
-    async def s_get_manifest(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
+    def s_get_manifest(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_manifest(doc_id, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/sections/{idx}")
-    async def s_get_section(doc_id: str, idx: int, scope_obj: Scope = Depends(_scope_dep)):
+    def s_get_section(doc_id: str, idx: int, scope_obj: Scope = Depends(_scope_dep)):
         return _get_section(doc_id, idx, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/plots")
-    async def s_get_all_plots(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
+    def s_get_all_plots(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_all_plots(doc_id, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/tables")
-    async def s_get_all_tables(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
+    def s_get_all_tables(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_all_tables(doc_id, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/images")
-    async def s_get_all_images(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
+    def s_get_all_images(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_all_images(doc_id, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/tables/{key}")
-    async def s_get_table(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
+    def s_get_table(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_table(doc_id, key, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/plots/{key}")
-    async def s_get_plot(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
+    def s_get_plot(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_plot(doc_id, key, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/presets")
-    async def s_get_presets(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
+    def s_get_presets(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_presets(doc_id, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/3d/{key}/meta")
-    async def s_get_3d_meta(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
+    def s_get_3d_meta(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_3d_meta(doc_id, key, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/3d/{key}/blob")
@@ -649,11 +665,11 @@ def create_app(
         return await _get_3d_blob(doc_id, key, scope_obj, request)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/3d/{key}/poster")
-    async def s_get_3d_poster(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
+    def s_get_3d_poster(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_3d_poster(doc_id, key, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/3d/{key}/fea/{filename:path}")
-    async def s_get_3d_fea_artefact(
+    def s_get_3d_fea_artefact(
         doc_id: str,
         key: str,
         filename: str,
@@ -662,7 +678,7 @@ def create_app(
         return _get_3d_fea_artefact(doc_id, key, filename, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/files/{rel_path:path}")
-    async def s_get_doc_file(
+    def s_get_doc_file(
         doc_id: str,
         rel_path: str,
         scope_obj: Scope = Depends(_scope_dep),
@@ -670,7 +686,7 @@ def create_app(
         return _get_file(doc_id, rel_path, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/manifest/files")
-    async def s_list_doc_files(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
+    def s_list_doc_files(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
         return _list_bundle_files(doc_id, scope_obj)
 
     # ── Bundle upload (paradoc publish CLI) ───────────────────────────
@@ -695,7 +711,10 @@ def create_app(
         if len(body) > MAX_SIZE:
             raise HTTPException(status_code=413, detail="payload too large")
         try:
-            doc_store.put_bundle_file(doc_id, rel_path, body, scope=scope_obj)
+            # Sync S3 PUT — offload so a publish (many sequential file PUTs)
+            # doesn't block the event loop. This handler must stay async for
+            # the request.body() await above.
+            await run_in_threadpool(doc_store.put_bundle_file, doc_id, rel_path, body, scope=scope_obj)
         except PermissionError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         except NotImplementedError:
@@ -739,14 +758,19 @@ def create_app(
                 }
         return entry
 
+    def _build_scope_docs(scope: Scope, label: str) -> list[dict[str, Any]]:
+        # list_doc_ids + a get_bundle_manifest per doc — all synchronous S3.
+        # Called via run_in_threadpool from the async /api/landing handler so
+        # this fan-out of blocking calls never sits on the event loop.
+        return [_doc_entry(d, scope, label) for d in doc_store.list_doc_ids(scope)]
+
     @app.get("/api/landing")
     async def get_landing(
         request: Request,
         user: User = Depends(auth_module.current_user),
     ) -> dict[str, Any]:
         shared_scope = Scope.shared()
-        shared_ids = doc_store.list_doc_ids(shared_scope)
-        shared = [_doc_entry(d, shared_scope, "shared") for d in shared_ids]
+        shared = await run_in_threadpool(_build_scope_docs, shared_scope, "shared")
 
         personal: list[dict[str, Any]] = []
         # Synthetic local-dev users keep the zero UUID; their bundles
@@ -754,8 +778,7 @@ def create_app(
         if user.id and not user.id.startswith("00000000"):
             try:
                 user_scope = Scope.user(user.id)
-                personal_ids = doc_store.list_doc_ids(user_scope)
-                personal = [_doc_entry(d, user_scope, "personal") for d in personal_ids]
+                personal = await run_in_threadpool(_build_scope_docs, user_scope, "personal")
             except Exception:
                 personal = []
 
@@ -768,8 +791,7 @@ def create_app(
             for p in user_projects:
                 try:
                     project_scope = Scope.project(p.id)
-                    doc_ids = doc_store.list_doc_ids(project_scope)
-                    docs = [_doc_entry(d, project_scope, "project") for d in doc_ids]
+                    docs = await run_in_threadpool(_build_scope_docs, project_scope, "project")
                 except Exception:
                     docs = []
                 projects_out.append(
