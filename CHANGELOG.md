@@ -2,6 +2,26 @@
 
 
 
+## v0.7.0 (2026-09-28)
+
+### Feature
+
+* feat: release reader outline, page view, table column order and export fixes (#37)
+
+Co-authored-by: Claude Opus 5.5 &lt;noreply@anthropic.com&gt; ([`01c833b`](https://github.com/Krande/paradoc/commit/01c833b4eae0e522944ad3b82a8f0db07c752d1a))
+
+* feat: Reader outline + page view, table column order, per-view 3D state, DOCX/PDF export fixes (#36)
+
+Signed-off-by: dependabot[bot] &lt;support@github.com&gt;
+Co-authored-by: dependabot[bot] &lt;49699333+dependabot[bot]@users.noreply.github.com&gt; ([`230e17a`](https://github.com/Krande/paradoc/commit/230e17ae90fe750db8325489be853cc391099bc4))
+
+### Fix
+
+* fix: don&#39;t block the event loop on synchronous storage calls (#35)
+
+Co-authored-by: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt; ([`4c7145e`](https://github.com/Krande/paradoc/commit/4c7145ed6c323c8d24fe1dc1593bd313fa3c002a))
+
+
 ## v0.6.1 (2026-07-08)
 
 ### Chore
