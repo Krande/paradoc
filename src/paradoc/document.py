@@ -815,13 +815,19 @@ class OneDoc:
         cache_dir = self.work_dir / ".paradoc_cache" / "rendered_plots"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Scan all markdown files to find plot references. Use the desugared
-        # cache when available so `${...}` plot refs are picked up too.
+        # Scan all markdown files to find plot references -- in the desugared text, as the
+        # substitution pass does. Scanning the original file (`mdf.get_variables()`) missed every
+        # `${...}` plot reference, which only becomes `{{__key__}}` once desugared: none were
+        # batched, and each was then rendered on its own by `_get_plot_markdown_from_db`, a fresh
+        # headless Chrome per plot (~4 s each). It also took match offsets from the original text
+        # and applied them to the desugared one.
+        import re as _re
+
         cache = getattr(self, "_desugared_md_cache", {})
         for mdf in self.md_files_main + self.md_files_app:
             md_str = cache.get(mdf.path) or mdf.read_original_file()
 
-            for m in mdf.get_variables():
+            for m in _re.finditer(r"{{(.*)}}", md_str):
                 res = m.group(1)
                 key = res.split("|")[0] if "|" in res else res
                 key_clean = key[2:-2] if key.startswith("__") and key.endswith("__") else key
