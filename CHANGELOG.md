@@ -2,6 +2,15 @@
 
 
 
+## v0.7.1 (2026-09-28)
+
+### Fix
+
+* fix: render stored figures under plotly 7; build the feedstock recipe on PRs (#38)
+
+Co-authored-by: Claude Opus 5.5 &lt;noreply@anthropic.com&gt; ([`87f964a`](https://github.com/Krande/paradoc/commit/87f964ac0c0933ad1f1527690f5ba7450ecf08bd))
+
+
 ## v0.7.0 (2026-09-28)
 
 ### Feature
