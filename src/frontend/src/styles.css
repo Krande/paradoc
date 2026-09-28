@@ -63,4 +63,12 @@
   .muted {
     @apply text-gray-500;
   }
+  /* A cell's content is pandoc blocks; the paragraph margins meant for body text only made
+     every row taller. */
+  .paradoc-table p { margin-top: 0 !important; margin-bottom: 0 !important; }
+  /* Page view: tables at print size, the way the DOCX/PDF set them, so a wide table fits
+     the sheet instead of being scaled down to unreadable. */
+  /* !important: the table carries Tailwind's text-sm, a utility, which outranks this layer. */
+  .paged table { font-size: 8.5pt !important; line-height: 1.25 !important; }
+  .paged th, .paged td { padding: 1px 4px !important; }
 }

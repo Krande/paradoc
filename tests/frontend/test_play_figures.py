@@ -1,5 +1,6 @@
 """Test frontend rendering of interactive plots using Playwright."""
 
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,6 +10,38 @@ import pytest
 
 from paradoc import OneDoc
 from paradoc.db import dataframe_to_plot_data
+
+# Waits on what the next step needs rather than a fixed sleep: they return as soon as the page
+# is there, and fail (after the timeout) exactly where a too-short sleep used to.
+
+
+def _wait_for_plot_figure(page):
+    """The plot figure has rendered with its Static/Interactive wrapper.
+
+    A figure first renders plain and gains the `div.relative.group` wrapper once its plot data
+    has arrived, so the wrapped figure is the state the tests go on to use.
+    """
+    page.locator("div.relative.group figure").first.wait_for(state="visible", timeout=15000)
+
+
+def _wait_for_plotly(page):
+    """Interactive mode has drawn the Plotly plot."""
+    page.locator("div.plotly, div:has(> svg.main-svg)").first.wait_for(state="visible", timeout=15000)
+
+
+def _hover_until_active(container, button, timeout_s: float = 10.0):
+    """Hover the figure (its buttons exist only while hovered) until ``button`` is the active one.
+
+    A mode switch re-lays the figure out, which can drop the hover, so hover is re-applied each try.
+    """
+    deadline = time.monotonic() + timeout_s
+    while True:
+        container.hover()
+        if "bg-blue-600" in (button.get_attribute("class", timeout=2000) or ""):
+            return
+        if time.monotonic() > deadline:
+            return  # let the caller's assertion report the state
+        time.sleep(0.05)
 
 
 @pytest.fixture
@@ -85,7 +118,7 @@ def test_plot_static_interactive_buttons_exist(
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for the document to be loaded and rendered
-    page.wait_for_timeout(3000)
+    _wait_for_plot_figure(page)
 
     # Look for the figure element with the plot
     # The InteractiveFigure component renders a div with hover functionality
@@ -139,7 +172,7 @@ def test_plot_toggle_between_static_and_interactive(
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
-    page.wait_for_timeout(3000)
+    _wait_for_plot_figure(page)
 
     # Hover to reveal buttons
     figure_container = page.locator("div.relative.group").first
@@ -157,11 +190,8 @@ def test_plot_toggle_between_static_and_interactive(
     interactive_button = page.locator('button:has-text("Interactive")').first
     interactive_button.click()
 
-    # Wait for the mode to change
-    page.wait_for_timeout(500)
-
-    # Ensure hover is maintained/restored after layout change
-    figure_container.hover()
+    # Wait for the mode to change, keeping the hover (restored after the layout change)
+    _hover_until_active(figure_container, interactive_button)
 
     # Now Interactive should be active
     interactive_classes = interactive_button.get_attribute("class")
@@ -173,10 +203,9 @@ def test_plot_toggle_between_static_and_interactive(
 
     # Click back to Static
     static_button.click()
-    page.wait_for_timeout(500)
 
-    # Ensure hover is maintained/restored
-    figure_container.hover()
+    # Wait for the mode to change, keeping the hover
+    _hover_until_active(figure_container, static_button)
 
     # Verify Static is active again
     static_classes = static_button.get_attribute("class")
@@ -207,7 +236,7 @@ def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_fronte
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
-    page.wait_for_timeout(3000)
+    _wait_for_plot_figure(page)
 
     # Hover to reveal buttons
     figure_container = page.locator("div.relative.group").first
@@ -218,7 +247,7 @@ def test_plot_interactive_mode_loads_plotly(doc_with_plot, page, wait_for_fronte
     interactive_button.click()
 
     # Wait for Plotly to load and render
-    page.wait_for_timeout(2000)
+    _wait_for_plotly(page)
 
     # Look for Plotly elements
     # Plotly creates a div with class 'plotly' or a div containing svg.main-svg
@@ -258,7 +287,7 @@ def test_plot_static_mode_shows_image(doc_with_plot, page, wait_for_frontend, fr
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
-    page.wait_for_timeout(3000)
+    _wait_for_plot_figure(page)
 
     # In static mode (default), we should see a figure with an img element
     figure_element = page.locator("figure").first

@@ -20,12 +20,23 @@ jobs:
         os: [ ubuntu-latest, windows-latest ]
 
     steps:
-      - uses: actions/checkout@v6
-      - uses: prefix-dev/setup-pixi@v0.9.6 # https://github.com/prefix-dev/setup-pixi
+      - uses: actions/checkout@v7
+      - uses: prefix-dev/setup-pixi@v0.10.0 # https://github.com/prefix-dev/setup-pixi
         with:
           pixi-version: v0.68.0
           environments: test
           cache: true
+
+      # tectonic (the Linux PDF engine) fetches the TeX packages a document needs on first use
+      # into its per-user cache; without this, every run re-downloads them (~1 min of the PDF
+      # test). Keyed on the lock, so a tectonic upgrade starts a fresh cache.
+      - name: Cache tectonic's TeX files
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Tectonic
+          key: tectonic-${{ runner.os }}-${{ hashFiles('pixi.lock') }}
+          restore-keys: tectonic-${{ runner.os }}-
 
       - name: Runs Tests
         # Explicit env: the `test` task is also provided by the `e2e`

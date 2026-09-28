@@ -1,10 +1,12 @@
 """Test frontend rendering of interactive tables using Playwright."""
 
+import re
 from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
 import pytest
+from playwright.sync_api import expect
 
 from paradoc import OneDoc
 from paradoc.db import dataframe_to_table_data
@@ -60,6 +62,21 @@ def frontend_resources_dir():
     return Path(__file__).parent.parent.parent / "src" / "paradoc" / "frontend" / "resources"
 
 
+# Waits on what the next step needs rather than a fixed sleep: they return as soon as the page
+# is there, and fail (after the timeout) exactly where a too-short sleep used to.
+_ACTIVE = re.compile(r"\bbg-blue-600\b")
+
+
+def _wait_for_table(page):
+    """The document's table has rendered (its interactive wrapper holds a <table>)."""
+    page.locator("div.relative.group table").first.wait_for(state="visible", timeout=15000)
+
+
+def _wait_for_interactive(page):
+    """Interactive mode has loaded: the per-column filter inputs exist only there."""
+    page.locator('input[placeholder*="Filter"]').first.wait_for(state="visible", timeout=15000)
+
+
 def test_table_static_interactive_buttons_exist(
     doc_with_table, page, wait_for_frontend, frontend_resources_dir, ws_server
 ):
@@ -92,7 +109,7 @@ def test_table_static_interactive_buttons_exist(
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for the document to be loaded and rendered
-    page.wait_for_timeout(3000)
+    _wait_for_table(page)
 
     # Debug: Print console logs
     print("\n=== CONSOLE LOGS ===")
@@ -206,7 +223,7 @@ def test_table_toggle_between_static_and_interactive(
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
-    page.wait_for_timeout(3000)
+    _wait_for_table(page)
 
     # Hover to reveal buttons
     table_container = page.locator("div.relative.group").first
@@ -225,7 +242,8 @@ def test_table_toggle_between_static_and_interactive(
     interactive_button.click()
 
     # Wait for the mode to change
-    page.wait_for_timeout(500)
+    expect(interactive_button).to_have_class(_ACTIVE)
+    expect(static_button).not_to_have_class(_ACTIVE)
 
     # Now Interactive should be active
     interactive_classes = interactive_button.get_attribute("class")
@@ -237,7 +255,7 @@ def test_table_toggle_between_static_and_interactive(
 
     # Click back to Static
     static_button.click()
-    page.wait_for_timeout(500)
+    expect(static_button).to_have_class(_ACTIVE)
 
     # Verify Static is active again
     static_classes = static_button.get_attribute("class")
@@ -270,7 +288,7 @@ def test_table_interactive_mode_renders_table(
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
-    page.wait_for_timeout(3000)
+    _wait_for_table(page)
 
     # Hover to reveal buttons
     table_container = page.locator("div.relative.group").first
@@ -281,7 +299,7 @@ def test_table_interactive_mode_renders_table(
     interactive_button.click()
 
     # Wait for table to load and render
-    page.wait_for_timeout(2000)
+    _wait_for_interactive(page)
 
     # Look for the interactive table elements
     # The TableRenderer should render a table with interactive features
@@ -323,14 +341,14 @@ def test_table_interactive_filtering(doc_with_table, page, wait_for_frontend, fr
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
-    page.wait_for_timeout(3000)
+    _wait_for_table(page)
 
     # Switch to interactive mode
     table_container = page.locator("div.relative.group").first
     table_container.hover()
     interactive_button = page.locator('button:has-text("Interactive")').first
     interactive_button.click()
-    page.wait_for_timeout(2000)
+    _wait_for_interactive(page)
 
     # Count initial rows (should be 5 data rows)
     initial_rows = page.locator("tbody tr").count()
@@ -339,7 +357,7 @@ def test_table_interactive_filtering(doc_with_table, page, wait_for_frontend, fr
     # Type in the Name column filter input to filter for "Alice"
     name_filter_input = page.locator('input[placeholder*="Filter Name"]').first
     name_filter_input.fill("Alice")
-    page.wait_for_timeout(500)
+    expect(page.locator("tbody tr")).to_have_count(1)
 
     # Count rows after filtering (should be 1 row)
     filtered_rows = page.locator("tbody tr").count()
@@ -347,7 +365,7 @@ def test_table_interactive_filtering(doc_with_table, page, wait_for_frontend, fr
 
     # Clear filter and check all rows are back
     name_filter_input.fill("")
-    page.wait_for_timeout(500)
+    expect(page.locator("tbody tr")).to_have_count(5)
     rows_after_clear = page.locator("tbody tr").count()
     assert rows_after_clear == 5, f"Should have 5 rows after clearing filter, found {rows_after_clear}"
 
@@ -376,14 +394,14 @@ def test_table_interactive_sorting(doc_with_table, page, wait_for_frontend, fron
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
-    page.wait_for_timeout(3000)
+    _wait_for_table(page)
 
     # Switch to interactive mode
     table_container = page.locator("div.relative.group").first
     table_container.hover()
     interactive_button = page.locator('button:has-text("Interactive")').first
     interactive_button.click()
-    page.wait_for_timeout(2000)
+    _wait_for_interactive(page)
 
     # Get all Name column values before sorting
     # Find the Name column index by looking at headers
@@ -403,7 +421,7 @@ def test_table_interactive_sorting(doc_with_table, page, wait_for_frontend, fron
     # Click on the "Name" column header to sort (click the sortable div within the header)
     name_header = page.locator('th:has-text("Name") div.cursor-pointer').first
     name_header.click()
-    page.wait_for_timeout(500)
+    expect(name_column_cells.first).to_have_text("Alice")
 
     # Get the first row's Name value after sorting (should be Alice in ascending order)
     first_name_after = name_column_cells.first.inner_text()
@@ -411,7 +429,7 @@ def test_table_interactive_sorting(doc_with_table, page, wait_for_frontend, fron
 
     # Click again to reverse sort
     name_header.click()
-    page.wait_for_timeout(500)
+    expect(name_column_cells.first).to_have_text("Eve")
 
     # After reverse sort (descending), Eve should be first
     first_name_reversed = name_column_cells.first.inner_text()
@@ -442,7 +460,7 @@ def test_table_static_mode_shows_html_table(doc_with_table, page, wait_for_front
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
-    page.wait_for_timeout(3000)
+    _wait_for_table(page)
 
     # In static mode (default), we should see a table element
     table_element = page.locator("table").first
@@ -480,7 +498,7 @@ def test_table_caption_displayed(doc_with_table, page, wait_for_frontend, fronte
     exporter.send_to_frontend(embed_images=True, use_static_html=False, auto_open_frontend=False)
 
     # Wait for document to render
-    page.wait_for_timeout(3000)
+    _wait_for_table(page)
 
     # Check caption in static mode (look for caption text on page)
     caption_text = page.locator('text="Sample Data Table"')
@@ -491,7 +509,7 @@ def test_table_caption_displayed(doc_with_table, page, wait_for_frontend, fronte
     table_container.hover()
     interactive_button = page.locator('button:has-text("Interactive")').first
     interactive_button.click()
-    page.wait_for_timeout(2000)
+    _wait_for_interactive(page)
 
     # Check caption still visible in interactive mode
     caption_text_interactive = page.locator('text="Sample Data Table"')

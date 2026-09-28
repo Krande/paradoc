@@ -1,0 +1,46 @@
+name: PR checks
+
+# The python half of the review the old reusable PR-review workflow ran: lint with the
+# pinned formatter/linter versions, and check the package still builds. deputy only
+# reviews the PR itself (title + release label), so these live here.
+#
+# Plain `pull_request`, not `pull_request_target`: this runs the PR's own code, so it
+# gets a read-only token and no secrets, which is what makes that safe for fork PRs.
+# The versions match `[feature.lint.dependencies]` in pixi.toml, so `pixi run -e lint
+# lint` locally and this check agree.
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (black, isort, ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install "black==24.4.2" "isort==5.13.2" "ruff==0.12.8"
+      - run: black --check --config pyproject.toml .
+      - run: isort --check-only .
+      - run: ruff check .
+
+  build:
+    name: Package builds (sdist + wheel)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build

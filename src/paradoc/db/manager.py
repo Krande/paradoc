@@ -255,17 +255,20 @@ class DbManager:
         if not row:
             return None
 
-        # Get columns
-        cursor.execute("SELECT name, data_type FROM table_columns WHERE table_key = ?", (key,))
+        # Get columns, in the order they were written. Without the ORDER BY, SQLite answers from
+        # the UNIQUE(table_key, name) index and hands the columns back alphabetically.
+        cursor.execute("SELECT name, data_type FROM table_columns WHERE table_key = ? ORDER BY id", (key,))
         columns = [TableColumn(name=r["name"], data_type=r["data_type"]) for r in cursor.fetchall()]
 
-        # Get cells
+        # Get cells, each row's in column order
         cursor.execute(
             """
-            SELECT row_index, column_name, value 
-            FROM table_cells 
-            WHERE table_key = ?
-            ORDER BY row_index, column_name
+            SELECT c.row_index, c.column_name, c.value
+            FROM table_cells AS c
+            LEFT JOIN table_columns AS col
+              ON col.table_key = c.table_key AND col.name = c.column_name
+            WHERE c.table_key = ?
+            ORDER BY c.row_index, col.id, c.column_name
         """,
             (key,),
         )

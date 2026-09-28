@@ -5,6 +5,7 @@ import { DocSwitcher } from './DocSwitcher'
 import { OverflowMenu } from './OverflowMenu'
 import { ThemeToggle } from './ThemeToggle'
 import { getRuntimeConfig } from '../transport'
+import { usePageViewStore } from '../store/pageViewStore'
 
 // Inline favicon glyph — same paths as public/favicon.svg, but rendered
 // inline so it inherits `currentColor` and adapts to dark mode without
@@ -24,6 +25,30 @@ function BrandMark({ className = 'w-5 h-5' }: { className?: string }) {
         d="M3 3 H21 V21 H3 Z M6 6 H18 V18 H6 Z M7 17 L7 13 L10 13 L10 11 L13 11 L13 8 L17 8 L17 17 Z"
       />
     </svg>
+  )
+}
+
+// Switches the reader between the flowing web layout and A4 sheets (see PagedSection).
+function PageViewToggle() {
+  const enabled = usePageViewStore((s) => s.enabled)
+  const toggle = usePageViewStore((s) => s.toggle)
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={enabled}
+      aria-label="Page view"
+      title={enabled ? 'Page view: A4 sheets (click for web layout)' : 'Web layout (click for A4 page view)'}
+      className={`cursor-pointer inline-flex items-center justify-center rounded p-2 ${
+        enabled
+          ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800'
+      }`}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-5 h-5" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+      </svg>
+    </button>
   )
 }
 
@@ -145,6 +170,7 @@ export function Topbar({
         </div>
 
         <div className="flex items-center gap-2 min-w-0">
+          {hasDoc && <PageViewToggle />}
           <div className="hidden sm:block">
             <ThemeToggle />
           </div>

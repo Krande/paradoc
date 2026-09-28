@@ -80,9 +80,15 @@ def docx_update_isolated(docx_file: pathlib.Path, timeout_s: float = 120.0) -> b
         async_res = pool.apply_async(_update_docx_worker, (str(docx_file),))
         try:
             ok, msg = async_res.get(timeout=timeout_s)
-        except TimeoutError:
+        except mp.TimeoutError:
+            # `mp.TimeoutError`, not the builtin: `AsyncResult.get` raises multiprocessing's own,
+            # which the builtin does not catch -- and then the "non-critical" update kills the build.
             pool.terminate()
+            logger.warning(f"Word COM update timed out after {timeout_s:.0f} s")
             # Optionally: kill spawned WINWORD if it lingered; usually Word exits with the worker.
+            return False
+        except Exception as e:  # the worker's own exception, re-raised by `get`
+            logger.warning(f"Word COM update failed in the worker: {e}")
             return False
         return bool(ok)
 
@@ -133,17 +139,18 @@ def word_session_context() -> Iterable[WordSession | None]:
                 logger.warning(f"Failed to cleanup Word session: {e}")
 
 
-def docx_update(docx_file):
+def docx_update(docx_file) -> bool:
     """
     Update fields and table of contents in a .docx file using Word COM automation.
     This is optional - if it fails, the document will still be saved correctly,
-    just without automatically updated field numbers.
+    just without automatically updated field numbers. Returns whether it succeeded.
     """
     p = pathlib.Path(docx_file)
     success = docx_update_isolated(p)
     if not success:
         # Keep it non-fatal for your pipeline, but you can log if you want
         logger.warning("Word COM update failed (non-critical)")
+    return success
 
 
 def close_word_docs_by_name(names: list) -> None:

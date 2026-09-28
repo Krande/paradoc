@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Callable, Dict, Iterable, Optional
 import pandas as pd
 
 from .common import (
+    GRID_TABLE_PROPS,
     MY_DEFAULT_HTML_CSS,
     MY_DOCX_TMPL,
     MY_DOCX_TMPL_BLANK,
@@ -29,7 +30,6 @@ from .db import (
 )
 from .db.plot_renderer import PlotRenderer
 from .equations import Equation
-from .exceptions import LatexNotInstalled
 from .io.ast.exporter import ASTExporter
 from .pandoc_helper import ensure_pandoc_path
 from .utils import get_list_of_files
@@ -42,6 +42,16 @@ ensure_pandoc_path()
 if TYPE_CHECKING:
     from .io.pdf.exporter import PdfExporter
     from .io.word.exporter import WordExporter
+
+
+def _md_image_path(path) -> str:
+    """An image path as markdown can carry it: forward slashes only.
+
+    A Windows path (``C:\\docs\\beam.png``, or a ``pathlib.Path`` on Windows) put into
+    ``![cap](...)`` as-is has its backslashes read as markdown escapes, so pandoc looks for
+    ``C:docsbeam.png``, finds nothing, and the DOCX / PDF shows the caption with no image.
+    """
+    return str(path).replace("\\", "/")
 
 
 def _kwargs_to_table_anno_str(kwargs: dict) -> str:
@@ -547,20 +557,19 @@ class OneDoc:
 
             if update_docx_with_com and platform.system() == "Windows":
                 from paradoc.io.word.com_api.com_utils import docx_update
+                from paradoc.io.word.utils import request_field_update_on_open
 
-                docx_update(dest_file)
+                if docx_update(dest_file):
+                    # Word has evaluated the fields; don't have it offer to again on every open.
+                    request_field_update_on_open(dest_file, request=False)
             converter = wordx
         elif export_format == ExportFormats.PDF:
-            from paradoc.io.pdf.exporter import PdfExporter
+            from paradoc.io.pdf.exporter import PdfExporter, resolve_pdf_engine
 
-            latex_path = shutil.which("latex")
-            if latex_path is None:
-                latex_url = "https://www.latex-project.org/get/"
-                raise LatexNotInstalled(
-                    "Latex was not installed on your system. "
-                    f'Please install latex before exporting to pdf. See "{latex_url}" for installation packages'
-                )
-            pdf = PdfExporter(self)
+            resolve_pdf_engine()  # fail before the (long) conversion when no engine is installed
+            # `pdf_config`: a PdfExportConfig -- from `[build.<profile>.pdf]` when built through
+            # paradoc.tasks, or passed by a caller directly; None means the defaults.
+            pdf = PdfExporter(self, config=kwargs.get("pdf_config"))
             pdf.export(dest_file)
             converter = pdf
         elif export_format == ExportFormats.HTML:
@@ -635,7 +644,7 @@ class OneDoc:
         # This eliminates data corruption and makes the system more robust
 
         # Convert to markdown
-        props = dict(index=show_index, tablefmt="grid")
+        props = dict(index=show_index, **GRID_TABLE_PROPS)
         tbl_str = df.to_markdown(**props)
 
         # Add caption unless nocaption flag is set
@@ -806,13 +815,19 @@ class OneDoc:
         cache_dir = self.work_dir / ".paradoc_cache" / "rendered_plots"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Scan all markdown files to find plot references. Use the desugared
-        # cache when available so `${...}` plot refs are picked up too.
+        # Scan all markdown files to find plot references -- in the desugared text, as the
+        # substitution pass does. Scanning the original file (`mdf.get_variables()`) missed every
+        # `${...}` plot reference, which only becomes `{{__key__}}` once desugared: none were
+        # batched, and each was then rendered on its own by `_get_plot_markdown_from_db`, a fresh
+        # headless Chrome per plot (~4 s each). It also took match offsets from the original text
+        # and applied them to the desugared one.
+        import re as _re
+
         cache = getattr(self, "_desugared_md_cache", {})
         for mdf in self.md_files_main + self.md_files_app:
             md_str = cache.get(mdf.path) or mdf.read_original_file()
 
-            for m in mdf.get_variables():
+            for m in _re.finditer(r"{{(.*)}}", md_str):
                 res = m.group(1)
                 key = res.split("|")[0] if "|" in res else res
                 key_clean = key[2:-2] if key.startswith("__") and key.endswith("__") else key
@@ -1378,7 +1393,7 @@ class OneDoc:
             if result.image_path is not None:
                 fig_id = result.figure_id or f"fig:{sub.name}_{sub.attr}"
                 cap = result.caption
-                return f"![{cap}]({result.image_path}){{#{fig_id}}}"
+                return f"![{cap}]({_md_image_path(result.image_path)}){{#{fig_id}}}"
             logger.error(f"FigureView from ${{ {sub.reference} }} has neither plot_key nor image_path")
             return None
 
@@ -1388,7 +1403,7 @@ class OneDoc:
             # will pick up once Phase 6 lands.
             fig_id = result.figure_id or f"fig:{sub.name}_{sub.attr}"
             cap = result.caption
-            img_path = result.image_path or "MISSING_3D_IMAGE.png"
+            img_path = _md_image_path(result.image_path) if result.image_path else "MISSING_3D_IMAGE.png"
             return f"![{cap}]({img_path}){{#{fig_id} data-3d-key={result.glb_key}}}"
 
         if isinstance(result, ScalarValue):

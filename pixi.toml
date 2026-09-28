@@ -73,6 +73,7 @@ plotly = "*"
 python-kaleido = "*"
 pydantic = ">=2.0"
 playwright = "*"
+pillow = ">=12.3.0,<13"
 
 [feature.examples.dependencies]
 # obstore for uploading compiled bundles to the configured object store.
@@ -186,6 +187,7 @@ pytest-playwright = "*"
 [feature.prod.target.win-64.dependencies]
 pywin32 = "*"
 types-pywin32 = "*"
+miktex = ">=24.4,<25"
 
 [feature.test-core.dependencies]
 pytest = "*"
@@ -222,6 +224,12 @@ mkdocs-glightbox = "*"
 
 [feature.prod.target.win-64.activation.env]
 PYTHONPATH="%PIXI_PROJECT_ROOT%/src"
+
+[feature.prod.target.linux-64.dependencies]
+tectonic = ">=0.17.0,<0.18"
+
+[feature.prod.target.osx-64.dependencies]
+tectonic = ">=0.17.0,<0.18"
 
 [feature.test.target.win-64.activation.env]
 PYTHONPATH="%PIXI_PROJECT_ROOT%/src"

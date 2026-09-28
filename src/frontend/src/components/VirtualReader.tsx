@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DocManifest, SectionBundle, Header } from '../ast/types'
 import { renderBlock, RenderWithDocId } from '../ast/render'
 import { predictivePrefetch } from '../sections/store'
 import { calculateHeadingNumbers } from '../ast/headingNumbers'
+import { usePageViewStore } from '../store/pageViewStore'
+import { PagedSection } from './PagedSection'
 
 interface Props {
   docId: string
@@ -53,25 +55,60 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
     return () => obs.disconnect()
   }, [items])
 
+  // Page view: sheets per section, numbered straight through the document.
+  const pageView = usePageViewStore((s) => s.enabled)
+  const [pageCounts, setPageCounts] = useState<Record<number, number>>({})
+  const setPageCount = useCallback(
+    (i: number, n: number) => setPageCounts((prev) => (prev[i] === n ? prev : { ...prev, [i]: n })),
+    [],
+  )
+  const firstPages = useMemo(() => {
+    const out: number[] = []
+    let next = 1
+    h1Sections.forEach((_, i) => {
+      out.push(next)
+      next += pageCounts[i] ?? 1
+    })
+    return out
+  }, [h1Sections, pageCounts])
+
   return (
     <RenderWithDocId docId={docId}>
-      <div ref={containerRef} className="flex-1 overflow-auto overscroll-contain p-6" data-search-root>
-        <div className="max-w-none w-full">
+      <div
+        ref={containerRef}
+        className={`flex-1 overflow-auto overscroll-contain ${pageView ? 'px-4 py-2 bg-gray-200 dark:bg-gray-950' : 'p-6'}`}
+        data-search-root
+      >
+        <div className={pageView ? 'w-max min-w-full' : 'max-w-none w-full'}>
           {h1Sections.map((s, i) => {
             const bundle = sections[s.id]
+            const body = bundle ? (
+              <Section blockKey={s.id} bundle={bundle} headingNumbers={headingNumbers} />
+            ) : (
+              <Skeleton title={s.title} />
+            )
+            if (pageView) {
+              // No content-visibility here: pagination measures every block, and a skipped
+              // subtree has no layout to measure.
+              return (
+                <section key={s.id} id={s.id} data-section-index={i} className="scroll-mt-14">
+                  <PagedSection firstPage={firstPages[i]} onPageCount={(n) => setPageCount(i, n)}>
+                    {body}
+                  </PagedSection>
+                </section>
+              )
+            }
             return (
               <section
                 key={s.id}
                 id={s.id}
                 data-section-index={i}
-                style={{ containIntrinsicSize: '1px 800px' as any }}
+                // `auto`: once a section has rendered, the browser keeps its real height instead of
+                // snapping back to the 800px placeholder, so positions below it stop drifting.
+                style={{ containIntrinsicSize: 'auto 1px auto 800px' as any }}
                 className="content-visibility-auto my-6 scroll-mt-14"
               >
-                {bundle ? (
-                  <Section blockKey={s.id} bundle={bundle} headingNumbers={headingNumbers} />
-                ) : (
-                  <Skeleton title={s.title} />
-                )}
+                {body}
               </section>
             )
           })}

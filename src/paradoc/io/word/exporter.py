@@ -4,20 +4,30 @@ import pypandoc
 from docx import Document
 from docx.table import Table as DocxTable
 
-from paradoc.common import MY_DOCX_TMPL, MY_DOCX_TMPL_BLANK, ExportFormats
+from paradoc.common import MY_DOCX_TMPL, MY_DOCX_TMPL_BLANK, ExportFormats, TableFormat
 from paradoc.config import logger
 from paradoc.document import OneDoc
 from paradoc.io.word.com_api.com_utils import close_word_docs_by_name, docx_update
 
 from .formatting import fix_headers_after_compose, format_paragraphs_and_headings
-from .models import DocXFigureRef, DocXTableRef
+from .models import DocXFigureRef, DocXTableRef, apply_table_format
 from .reference_helper import ReferenceHelper
 from .utils import (
     add_to_composer,
     fix_bookmark_ids,
     get_from_doc_by_index,
     iter_block_items,
+    request_field_update_on_open,
 )
+
+
+def _is_figure_layout_table(tbl: DocxTable) -> bool:
+    """Pandoc lays out some figures as a one-cell table styled ``FigureTable``; that is not data."""
+    from docx.oxml.ns import qn
+
+    tbl_pr = tbl._tbl.tblPr
+    style = tbl_pr.find(qn("w:tblStyle")) if tbl_pr is not None else None
+    return style is not None and style.get(qn("w:val")) == "FigureTable"
 
 
 class WordExporter:
@@ -151,6 +161,19 @@ class WordExporter:
             restart_caption_num = i == 0  # Restart numbering for first appendix table
             docx_tbl.format_table(True, restart_caption_numbering=restart_caption_num, reference_helper=ref_helper)
 
+        # Plain markdown tables -- no caption, so no paradoc Table to match -- would otherwise keep
+        # the template's body-text style (large and bold in the default template), unlike every
+        # captioned table beside them.
+        formatted = {id(t.docx_table._tbl) for t in main_tables + app_tables}
+        n_plain = 0
+        for doc in (main_doc, app_doc):
+            for tbl in doc.tables:
+                if id(tbl._tbl) in formatted or _is_figure_layout_table(tbl):
+                    continue
+                apply_table_format(tbl, TableFormat())
+                n_plain += 1
+        logger.info(f"[WordExporter] Formatted {n_plain} uncaptioned table(s)")
+
         # Format figures
         logger.info("[WordExporter] Formatting figures")
         for i, docx_fig in enumerate(main_figures):
@@ -230,8 +253,13 @@ class WordExporter:
 
         # Only attempt Word COM automation if explicitly enabled
         # This is disabled by default to avoid fatal COM errors in test/CI environments
+        updated = False
         if self.enable_word_com_automation:
-            docx_update(str(dest_file))
+            updated = docx_update(str(dest_file))
+        if not updated:
+            # Nothing has evaluated the SEQ / REF / TOC fields, so every caption still reads its
+            # placeholder ("Table 1-1") and the TOC is empty. Ask Word to update them on open.
+            request_field_update_on_open(dest_file)
 
     def format_tables(self, composer_doc: Document, is_appendix, reference_helper=None):
         """DEPRECATED: Use _extract_and_format_captions instead.

@@ -1,7 +1,9 @@
 // Minimal Pandoc JSON AST type declarations for core nodes we render
 // See: https://pandoc.org/lua-filters.html for structure; we model a pragmatic subset.
 
-export type PandocInline = Str | Space | SoftBreak | LineBreak | Emph | Strong | Code | Link | Image | Span | Math
+export type PandocInline =
+  | Str | Space | SoftBreak | LineBreak | Emph | Strong | Code | Link | Image | Span | Math
+  | Quoted | Superscript | Subscript | Strikeout | Underline | SmallCaps | Cite
 export type PandocBlock = Para | Plain | Figure | Header | BulletList | OrderedList | CodeBlock | BlockQuote | HorizontalRule | RawBlock | Div | Table
 
 // Attr can be in object form {id, classes, attributes} or array form [id, [classes], [[key, value], ...]]
@@ -30,6 +32,14 @@ export interface Link { t: 'Link'; c: [Attr, PandocInline[], [string, string]] }
 export interface Image { t: 'Image'; c: [Attr, PandocInline[], [string, string]] }
 export interface Span { t: 'Span'; c: [Attr, PandocInline[]] }
 export interface Math { t: 'Math'; c: [{ t: string }, string] }
+export interface Quoted { t: 'Quoted'; c: [{ t: 'SingleQuote' | 'DoubleQuote' }, PandocInline[]] }
+export interface Superscript { t: 'Superscript'; c: PandocInline[] }
+export interface Subscript { t: 'Subscript'; c: PandocInline[] }
+export interface Strikeout { t: 'Strikeout'; c: PandocInline[] }
+export interface Underline { t: 'Underline'; c: PandocInline[] }
+export interface SmallCaps { t: 'SmallCaps'; c: PandocInline[] }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface Cite { t: 'Cite'; c: [any[], PandocInline[]] }
 
 export interface Plain { t: 'Plain'; c: PandocInline[] }
 export interface Para { t: 'Para'; c: PandocInline[] }

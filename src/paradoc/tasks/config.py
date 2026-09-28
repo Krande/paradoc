@@ -57,6 +57,8 @@ except ImportError:  # pragma: no cover
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from paradoc.io.pdf.config import PdfExportConfig
+
 
 class _StrictModel(BaseModel):
     """Pydantic base that rejects unknown keys — typos in paradoc.toml
@@ -104,12 +106,16 @@ class BuildProfile(_StrictModel):
     `OneDoc.export_static`; its config lives in `[build.<profile>.static]`.
 
     `static` is the optional `[build.<profile>.static]` subtable.
+
+    `pdf` is the optional `[build.<profile>.pdf]` subtable -- page, font, figure and table
+    layout for the `"pdf"` output (see `paradoc.io.pdf.config.PdfExportConfig`).
     """
 
     fanout: dict[str, dict[str, list[Any]]] = Field(default_factory=dict)
     envs: dict[str, str] = Field(default_factory=dict)
     outputs: list[str] = Field(default_factory=list)
     static: Optional[StaticExportConfig] = None
+    pdf: Optional[PdfExportConfig] = None
 
 
 class TasksToml(_StrictModel):
@@ -149,6 +155,7 @@ class TaskConfig:
     source_dir: Optional[Path] = None
     outputs: list[str] = field(default_factory=list)
     static: Optional[StaticExportConfig] = None
+    pdf: Optional[PdfExportConfig] = None
     profile: str = "default"
 
 
@@ -205,6 +212,7 @@ def load_task_config(
         source_dir=source_dir_resolved,
         outputs=profile_cfg.outputs,
         static=profile_cfg.static,
+        pdf=profile_cfg.pdf,
         profile=profile,
     )
 
