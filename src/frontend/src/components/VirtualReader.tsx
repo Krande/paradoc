@@ -64,7 +64,9 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
                 key={s.id}
                 id={s.id}
                 data-section-index={i}
-                style={{ containIntrinsicSize: '1px 800px' as any }}
+                // `auto`: once a section has rendered, the browser keeps its real height instead of
+                // snapping back to the 800px placeholder, so positions below it stop drifting.
+                style={{ containIntrinsicSize: 'auto 1px auto 800px' as any }}
                 className="content-visibility-auto my-6 scroll-mt-14"
               >
                 {bundle ? (
