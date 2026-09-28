@@ -189,6 +189,22 @@ export function renderInlines(xs: PandocInline[]): React.ReactNode {
         out.push(<span key={i} {...spanAttrs}>{renderInlines(content)}</span>)
         break
       }
+      // Pandoc turns straight quotes into Quoted nodes (smart punctuation); without a case here the
+      // quoted words vanished -- `Beam("MyBeam", …)` read `Beam(, …)`. The formatting nodes below
+      // were dropped the same way, text and all.
+      case 'Quoted': {
+        const [quoteType, content] = (x as any).c
+        const [open, close] = quoteType?.t === 'SingleQuote' ? ['‘', '’'] : ['“', '”']
+        out.push(<React.Fragment key={i}>{open}{renderInlines(content)}{close}</React.Fragment>)
+        break
+      }
+      case 'Superscript': out.push(<sup key={i}>{renderInlines((x as any).c)}</sup>); break
+      case 'Subscript': out.push(<sub key={i}>{renderInlines((x as any).c)}</sub>); break
+      case 'Strikeout': out.push(<s key={i}>{renderInlines((x as any).c)}</s>); break
+      case 'Underline': out.push(<u key={i}>{renderInlines((x as any).c)}</u>); break
+      case 'SmallCaps': out.push(<span key={i} style={{ fontVariant: 'small-caps' }}>{renderInlines((x as any).c)}</span>); break
+      // Cite: [citations, inlines] -- the inlines are the citation as written, e.g. "[@smith, p. 3]".
+      case 'Cite': out.push(<React.Fragment key={i}>{renderInlines((x as any).c[1])}</React.Fragment>); break
       case 'Math': {
         // Math: c = [{t: 'InlineMath'|'DisplayMath'}, latex_string]
         const [mathType, latex] = (x as any).c

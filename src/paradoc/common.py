@@ -13,6 +13,12 @@ MY_DOCX_TMPL = RESOURCE_DIR / "template.docx"
 MY_DOCX_TMPL_BLANK = RESOURCE_DIR / "template_blank.docx"
 MY_DEFAULT_HTML_CSS = RESOURCE_DIR / "default_style.css"
 
+#: How a DataFrame is written as a pandoc grid table. Left-aligned, because tabulate
+#: right-aligns numbers by padding them with leading spaces, and in a grid-table cell four or
+#: more leading spaces make an indented code block: every short number in a wide column
+#: arrived as a CodeBlock -- a padded box in the HTML reader, monospace in the DOCX.
+GRID_TABLE_PROPS = dict(tablefmt="grid", numalign="left", stralign="left")
+
 
 @dataclass
 class TableFormat:
@@ -64,7 +70,7 @@ class Table:
         # Table identification now uses bookmark/hyperlink anchor system from pandoc-crossref
         # This eliminates the need to corrupt the first cell with a temporary identifier
 
-        props = dict(index=False, tablefmt="grid")
+        props = dict(index=False, **GRID_TABLE_PROPS)
         if self.format.float_fmt is not None:
             props["floatfmt"] = self.format.float_fmt
         tbl_str = df.to_markdown(**props)

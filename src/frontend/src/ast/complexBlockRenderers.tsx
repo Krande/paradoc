@@ -5,6 +5,7 @@ import { renderInlines } from './inlineRenderers'
 import { Interactive3DFigure } from '../components/Interactive3DFigure'
 import { InteractiveFigure } from '../components/InteractiveFigure'
 import { InteractiveTable } from '../components/InteractiveTable'
+import { FitToWidth } from '../components/FitToWidth'
 import { useDocId } from './context'
 import type { HeadingNumbering } from './headingNumbers'
 
@@ -217,9 +218,11 @@ function renderTableContent(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
     const [cellAttr, , rowSpan, colSpan, cellBlocks] = cell
     const cellAttrs = attrs(cellAttr)
     const content = Array.isArray(cellBlocks) ? cellBlocks.map((bb: any, i: number) => renderBlock(bb, i)) : null
+    // Compact cells: a report table is read as a grid of values, and the roomy padding it had
+    // pushed wide ones past the page width. FitToWidth scales whatever is still too wide.
     const className = isHeader
-      ? 'px-3 py-2 bg-gray-100 dark:bg-gray-800 font-semibold text-left border border-gray-300 dark:border-gray-700'
-      : 'px-3 py-2 border border-gray-300 dark:border-gray-700'
+      ? 'px-2 py-1 bg-gray-100 dark:bg-gray-800 font-semibold text-left border border-gray-300 dark:border-gray-700'
+      : 'px-2 py-1 border border-gray-300 dark:border-gray-700'
 
     const Tag = isHeader ? 'th' : 'td'
     return (
@@ -249,10 +252,10 @@ function renderTableContent(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
   }
 
   return (
-    <div key={key} className="overflow-x-auto">
+    <FitToWidth key={key}>
       <table
         {...tableAttrs}
-        className={'min-w-full border-collapse border border-gray-300 dark:border-gray-700 ' + (tableAttrs.className || '')}
+        className={'paradoc-table min-w-full border-collapse border border-gray-300 dark:border-gray-700 text-sm ' + (tableAttrs.className || '')}
       >
         {tableHead && Array.isArray(tableHead) && tableHead.length > 1 && Array.isArray(tableHead[1]) && tableHead[1].length > 0 ? (
           <thead>
@@ -280,7 +283,7 @@ function renderTableContent(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
           </tfoot>
         ) : null}
       </table>
-    </div>
+    </FitToWidth>
   )
 }
 

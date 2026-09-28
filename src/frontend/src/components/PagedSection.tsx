@@ -156,7 +156,7 @@ export function PagedSection({ children, firstPage, onPageCount }: Props) {
       ))}
       <div
         ref={contentRef}
-        className="relative"
+        className="paged relative"
         style={{ padding: `${MARGIN_Y_MM}mm ${MARGIN_X_MM}mm` }}
       >
         {children}
