@@ -72,6 +72,22 @@ def test_an_uncaptioned_table_is_formatted_like_a_captioned_one():
     assert [run.font.bold for run in runs] == [True, True, False, False]  # header row only
 
 
+def test_pdf_fonts_default_to_system_fonts_unless_the_document_sets_them(tmp_path, monkeypatch):
+    monkeypatch.setattr("sys.platform", "win32")
+    assert pdf_exporter.default_font_args(None) == ["--variable=mainfont=Cambria", "--variable=monofont=Consolas"]
+
+    meta = tmp_path / "metadata.yaml"
+    meta.write_text("title: x\nmainfont: Georgia\n", encoding="utf-8")
+    assert pdf_exporter.default_font_args(meta) == ["--variable=monofont=Consolas"]
+
+    monkeypatch.setattr("sys.platform", "linux")
+    meta.write_text("title: x\n", encoding="utf-8")
+    assert pdf_exporter.default_font_args(meta) == [
+        "--variable=mainfont=DejaVu Serif",
+        "--variable=monofont=DejaVu Sans Mono",
+    ]
+
+
 def test_pdf_engine_falls_back_past_a_missing_xelatex(monkeypatch):
     monkeypatch.delenv("PARADOC_PDF_ENGINE", raising=False)
     monkeypatch.setattr(pdf_exporter.shutil, "which", lambda name: "/bin/tectonic" if name == "tectonic" else None)
