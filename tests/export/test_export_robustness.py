@@ -155,7 +155,8 @@ def test_short_tables_size_columns_to_content_and_long_ones_keep_wrapping(tmp_pa
 
 
 def test_images_are_made_absolute_and_cropped_of_empty_margins(tmp_path):
-    from PIL import Image
+    # pillow is optional: without it trim_whitespace declines and images go in uncropped.
+    Image = pytest.importorskip("PIL.Image")
 
     from paradoc.io.pdf.config import PdfExportConfig
 
