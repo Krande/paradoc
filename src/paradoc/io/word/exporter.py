@@ -17,6 +17,7 @@ from .utils import (
     fix_bookmark_ids,
     get_from_doc_by_index,
     iter_block_items,
+    request_field_update_on_open,
 )
 
 
@@ -230,8 +231,13 @@ class WordExporter:
 
         # Only attempt Word COM automation if explicitly enabled
         # This is disabled by default to avoid fatal COM errors in test/CI environments
+        updated = False
         if self.enable_word_com_automation:
-            docx_update(str(dest_file))
+            updated = docx_update(str(dest_file))
+        if not updated:
+            # Nothing has evaluated the SEQ / REF / TOC fields, so every caption still reads its
+            # placeholder ("Table 1-1") and the TOC is empty. Ask Word to update them on open.
+            request_field_update_on_open(dest_file)
 
     def format_tables(self, composer_doc: Document, is_appendix, reference_helper=None):
         """DEPRECATED: Use _extract_and_format_captions instead.

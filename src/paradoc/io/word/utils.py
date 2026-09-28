@@ -93,6 +93,49 @@ def fix_bookmark_ids(document):
                                 break
 
 
+#: The elements `CT_Settings` places after `w:updateFields`. Word validates the order of
+#: settings.xml and calls the file corrupt when an element is out of place, so the new element goes
+#: before the first of these that the file has.
+_SETTINGS_AFTER_UPDATE_FIELDS = (
+    "hdrShapeDefaults", "footnotePr", "endnotePr", "compat", "docVars", "rsids", "mathPr",
+    "attachedSchema", "themeFontLang", "clrSchemeMapping", "doNotIncludeSubdocsInStats",
+    "doNotAutoCompressPictures", "forceUpgrade", "captions", "readModeInkLockDown", "smartTagType",
+    "schemaLibrary", "shapeDefaults", "doNotEmbedSmartTags", "decimalSymbol", "listSeparator",
+)  # fmt: skip
+
+
+def request_field_update_on_open(docx_path, request: bool = True) -> None:
+    """Set ``w:updateFields`` so Word re-evaluates every field (SEQ, REF, TOC) when it opens the file.
+
+    For documents nothing has updated -- no Word COM run, e.g. on Linux / CI -- where each caption
+    otherwise shows its placeholder number and the table of contents is empty. Word asks the reader
+    before it updates. ``request=False`` removes the flag again, once the fields have been updated.
+    """
+    from docx import Document
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    doc = Document(str(docx_path))
+    settings = doc.settings.element
+    flag = settings.find(qn("w:updateFields"))
+    if not request:
+        if flag is not None:
+            settings.remove(flag)
+            doc.save(str(docx_path))
+        return
+    if flag is None:
+        flag = OxmlElement("w:updateFields")
+        successor = next(
+            (el for el in settings if el.tag in {qn(f"w:{n}") for n in _SETTINGS_AFTER_UPDATE_FIELDS}), None
+        )
+        if successor is None:
+            settings.append(flag)
+        else:
+            successor.addprevious(flag)
+    flag.set(qn("w:val"), "true")
+    doc.save(str(docx_path))
+
+
 def delete_paragraph(paragraph):
     p = paragraph._element
     p.getparent().remove(p)

@@ -1173,7 +1173,9 @@ class ReferenceHelper:
         Returns:
             The caption text after the colon (e.g., "A basic table"), or None if not found
         """
-        if caption_para is None:
+        # The block before a table is its caption only when it is a paragraph. Two tables back to
+        # back put a Table there, which has no `.text` -- that table simply has no caption above it.
+        if not isinstance(caption_para, Paragraph):
             return None
 
         caption_text = caption_para.text

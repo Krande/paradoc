@@ -29,7 +29,6 @@ from .db import (
 )
 from .db.plot_renderer import PlotRenderer
 from .equations import Equation
-from .exceptions import LatexNotInstalled
 from .io.ast.exporter import ASTExporter
 from .pandoc_helper import ensure_pandoc_path
 from .utils import get_list_of_files
@@ -547,19 +546,16 @@ class OneDoc:
 
             if update_docx_with_com and platform.system() == "Windows":
                 from paradoc.io.word.com_api.com_utils import docx_update
+                from paradoc.io.word.utils import request_field_update_on_open
 
-                docx_update(dest_file)
+                if docx_update(dest_file):
+                    # Word has evaluated the fields; don't have it offer to again on every open.
+                    request_field_update_on_open(dest_file, request=False)
             converter = wordx
         elif export_format == ExportFormats.PDF:
-            from paradoc.io.pdf.exporter import PdfExporter
+            from paradoc.io.pdf.exporter import PdfExporter, resolve_pdf_engine
 
-            latex_path = shutil.which("latex")
-            if latex_path is None:
-                latex_url = "https://www.latex-project.org/get/"
-                raise LatexNotInstalled(
-                    "Latex was not installed on your system. "
-                    f'Please install latex before exporting to pdf. See "{latex_url}" for installation packages'
-                )
+            resolve_pdf_engine()  # fail before the (long) conversion when no engine is installed
             pdf = PdfExporter(self)
             pdf.export(dest_file)
             converter = pdf
