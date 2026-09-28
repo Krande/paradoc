@@ -88,6 +88,18 @@ def test_pdf_fonts_default_to_system_fonts_unless_the_document_sets_them(tmp_pat
     ]
 
 
+def test_pdf_figures_are_pinned_where_written_unless_the_document_says_otherwise(tmp_path):
+    arg, block = pdf_exporter.figure_placement_args(None, tmp_path)
+    header = arg.split("=", 1)[1]
+    assert "\\floatplacement{figure}{H}" in open(header, encoding="utf-8").read()
+    assert block == "--variable=block-headings"
+
+    meta = tmp_path / "metadata.yaml"
+    meta.write_text("float-placement-figure: htbp\nblock-headings: false\n", encoding="utf-8")
+    [arg] = pdf_exporter.figure_placement_args(meta, tmp_path)
+    assert "\\floatplacement{figure}{htbp}" in open(arg.split("=", 1)[1], encoding="utf-8").read()
+
+
 def test_pdf_engine_falls_back_past_a_missing_xelatex(monkeypatch):
     monkeypatch.delenv("PARADOC_PDF_ENGINE", raising=False)
     monkeypatch.setattr(pdf_exporter.shutil, "which", lambda name: "/bin/tectonic" if name == "tectonic" else None)

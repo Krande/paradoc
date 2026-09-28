@@ -72,6 +72,34 @@ def default_font_args(metadata_file=None) -> list[str]:
     return args
 
 
+def figure_placement_args(metadata_file, out_dir: pathlib.Path) -> list[str]:
+    """Keep figures where the markdown puts them: ``--include-in-header`` a ``\\floatplacement``.
+
+    As LaTeX floats, a report with hundreds of figures had them drift pages away from their
+    headings -- whole sections empty, a mode's figure under the next mode's heading -- which the
+    DOCX and the HTML never do. pandoc's LaTeX template has no variable for this, so a small
+    header file does it (added to, not replacing, the document's own header-includes).
+    ``float-placement-figure: htbp`` (or any placement) in the metadata file picks another.
+    """
+    import re
+
+    text = ""
+    if metadata_file and pathlib.Path(metadata_file).is_file():
+        text = pathlib.Path(metadata_file).read_text(encoding="utf-8")
+    m = re.search(r"^float-placement-figure\s*:\s*['\"]?([A-Za-z!]+)", text, re.MULTILINE)
+    placement = m.group(1) if m else "H"
+    header = out_dir / "paradoc-figure-placement.tex"
+    header.write_text(f"\\usepackage{{float}}\n\\floatplacement{{figure}}{{{placement}}}\n", encoding="utf-8")
+    args = [f"--include-in-header={header}"]
+    # `####` headings are LaTeX \paragraph, a run-in heading typeset with the next line of body
+    # text. Under a heading followed only by figures there is none, so the heading surfaced
+    # after its figures -- beside the next group, reading as that group's title. pandoc's
+    # block-headings makes \paragraph / \subparagraph stand alone, as in the DOCX and the HTML.
+    if not re.search(r"^block-headings\s*:", text, re.MULTILINE):
+        args.append("--variable=block-headings")
+    return args
+
+
 class PdfExporter:
     def __init__(self, one_doc: OneDoc):
         self.one_doc = one_doc
@@ -102,6 +130,7 @@ class PdfExporter:
                 f"--resource-path={dest_file.parent}",
                 f"--metadata-file={one.metadata_file}",
                 *default_font_args(one.metadata_file),
+                *figure_placement_args(one.metadata_file, dest_file.parent),
             ],
             filters=["pandoc-crossref"],
         )
