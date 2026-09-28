@@ -43,6 +43,16 @@ if TYPE_CHECKING:
     from .io.word.exporter import WordExporter
 
 
+def _md_image_path(path) -> str:
+    """An image path as markdown can carry it: forward slashes only.
+
+    A Windows path (``C:\\docs\\beam.png``, or a ``pathlib.Path`` on Windows) put into
+    ``![cap](...)`` as-is has its backslashes read as markdown escapes, so pandoc looks for
+    ``C:docsbeam.png``, finds nothing, and the DOCX / PDF shows the caption with no image.
+    """
+    return str(path).replace("\\", "/")
+
+
 def _kwargs_to_table_anno_str(kwargs: dict) -> str:
     """Inverse of `TableAnnotation.from_annotation_string`.
 
@@ -1374,7 +1384,7 @@ class OneDoc:
             if result.image_path is not None:
                 fig_id = result.figure_id or f"fig:{sub.name}_{sub.attr}"
                 cap = result.caption
-                return f"![{cap}]({result.image_path}){{#{fig_id}}}"
+                return f"![{cap}]({_md_image_path(result.image_path)}){{#{fig_id}}}"
             logger.error(f"FigureView from ${{ {sub.reference} }} has neither plot_key nor image_path")
             return None
 
@@ -1384,7 +1394,7 @@ class OneDoc:
             # will pick up once Phase 6 lands.
             fig_id = result.figure_id or f"fig:{sub.name}_{sub.attr}"
             cap = result.caption
-            img_path = result.image_path or "MISSING_3D_IMAGE.png"
+            img_path = _md_image_path(result.image_path) if result.image_path else "MISSING_3D_IMAGE.png"
             return f"![{cap}]({img_path}){{#{fig_id} data-3d-key={result.glb_key}}}"
 
         if isinstance(result, ScalarValue):

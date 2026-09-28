@@ -15,6 +15,27 @@ from paradoc.config import create_logger
 logger = create_logger()
 
 
+def apply_table_format(tbl: DocxTable, tbl_format) -> None:
+    """Style a table's cells: the table style, centred, header row bold, the body at the format's font.
+
+    Shared by captioned tables (via :meth:`DocXTableRef.format_table`) and the plain ones no caption
+    ties to a paradoc table, so the two look alike.
+    """
+    tbl.style = tbl_format.style
+    tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for i, row in enumerate(tbl.rows):
+        for cell in row.cells:
+            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+            for paragraph in cell.paragraphs:
+                paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
+                for run in paragraph.runs:
+                    font = run.font
+                    font.name = tbl_format.font_style
+                    font.size = Pt(tbl_format.font_size)
+                    font.bold = i == 0
+    tbl.autofit = True
+
+
 @dataclass
 class DocXTableRef:
     """Reference to a table in a Word document with associated metadata."""
@@ -52,25 +73,8 @@ class DocXTableRef:
         tbl_format = self.table_ref.format
 
         # Format content of table
-        tbl.style = tbl_format.style
-        tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
-
         logger.info(f'Changed Table style from "{tbl.style}" to "{tbl_format.style}"')
-        for i, row in enumerate(tbl.rows):
-            for cell in row.cells:
-                cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-                paragraphs = cell.paragraphs
-                for paragraph in paragraphs:
-                    paragraph.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
-                    for run in paragraph.runs:
-                        font = run.font
-                        font.name = tbl_format.font_style
-                        font.size = Pt(tbl_format.font_size)
-                        if i == 0:
-                            font.bold = True
-                        else:
-                            font.bold = False
-        tbl.autofit = True
+        apply_table_format(tbl, tbl_format)
 
         # Format table Caption
         self.docx_caption.paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER

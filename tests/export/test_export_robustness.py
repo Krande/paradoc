@@ -42,6 +42,36 @@ def test_field_update_on_open_goes_where_the_schema_puts_it_and_can_be_removed(t
     assert Document(str(path)).settings.element.find(qn("w:updateFields")) is None
 
 
+def test_an_image_path_reaches_markdown_with_forward_slashes():
+    from paradoc.document import _md_image_path
+
+    # Backslashes in `![cap](...)` are markdown escapes: pandoc would look for "C:docsbeam.png".
+    assert _md_image_path(r"C:\docs\_assets\beam.png") == "C:/docs/_assets/beam.png"
+    assert _md_image_path("images/plot.png") == "images/plot.png"
+
+
+def test_an_uncaptioned_table_is_formatted_like_a_captioned_one():
+    from docx.shared import Pt
+
+    from paradoc.common import TableFormat
+    from paradoc.io.word.exporter import _is_figure_layout_table
+    from paradoc.io.word.models import apply_table_format
+
+    doc = Document()
+    tbl = doc.add_table(rows=2, cols=2)
+    for r, row in enumerate(tbl.rows):
+        for c, cell in enumerate(row.cells):
+            cell.paragraphs[0].add_run(f"{r}{c}")
+    assert not _is_figure_layout_table(tbl)
+
+    # "Table Grid": python-docx's blank document lacks the default "Grid Table 1 Light", which
+    # paradoc's own Word template provides.
+    apply_table_format(tbl, TableFormat(style="Table Grid"))
+    runs = [cell.paragraphs[0].runs[0] for row in tbl.rows for cell in row.cells]
+    assert all(run.font.size == Pt(11) and run.font.name == "Arial" for run in runs)
+    assert [run.font.bold for run in runs] == [True, True, False, False]  # header row only
+
+
 def test_pdf_engine_falls_back_past_a_missing_xelatex(monkeypatch):
     monkeypatch.delenv("PARADOC_PDF_ENGINE", raising=False)
     monkeypatch.setattr(pdf_exporter.shutil, "which", lambda name: "/bin/tectonic" if name == "tectonic" else None)
