@@ -1,0 +1,27 @@
+# deputy CI config — https://github.com/Krande/deputy
+#
+# The pr-review / tag-on-merge workflows run deputy's action; the static config
+# lives here so the workflows stay thin. Release behaviour otherwise falls back to
+# deputy's built-in semantic-release defaults (tag "v{version}", angular parser,
+# chore/feat/fix release tags, main branch, push over origin, upload to the VCS
+# release), which are what this repo's old action_config.toml spelled out by hand,
+# so only the repo-specific bits are set below.
+
+[pr_review]
+# Marker for this repo's sticky PR comment; keeps deputy updating one thread
+# instead of posting a new comment on every run.
+marker = "<!-- PARADOC_PR_BOT -->"
+# Release label applied when a PR carries none: semantic-release derives the bump
+# from the PR title, so a `fix:` PR cuts a patch and a `feat:` PR a minor without
+# anyone hand-applying a label. An explicit release-skip on a PR still wins.
+default_label = "release-auto"
+
+[release]
+# The python package version.
+version_toml = ["pyproject.toml:project.version"]
+
+# The frontend package version, kept in lockstep with the python one. version_json
+# (deputy's own key) writes only the package's own version -- the root "version" and
+# the lockfile's packages[""] entry -- so the lockfile is safe here, where the regex
+# version_variables would rewrite every dependency's version too.
+version_json = ["src/frontend/package.json", "src/frontend/package-lock.json"]
