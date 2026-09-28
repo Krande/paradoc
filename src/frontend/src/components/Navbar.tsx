@@ -15,18 +15,22 @@ type NavbarProps = {
 
 /** Gap left above a heading once it has been scrolled to, px. */
 const SCROLL_TOP_GAP = 16
-/** How many times a scroll is re-aimed while sections below it are still being laid out. */
-const MAX_SCROLL_CORRECTIONS = 8
+/** Once on target, how long the layout must stay still before the heading is let go, ms. */
+const SCROLL_HOLD_QUIET_MS = 2500
+/** Upper bound on how long a scroll keeps re-aiming, ms. */
+const SCROLL_MAX_MS = 10000
 
 /**
  * Scroll the reader so `el` sits at the top of it, and keep re-aiming until it stays there.
  *
- * The reader renders its sections with `content-visibility: auto`, so every section not yet on
- * screen is laid out at a placeholder height. A target computed up front is therefore computed
- * against placeholders; as the smooth scroll passes sections they render at their real height,
- * everything below them moves, and the scroll ends short of the heading -- by more the further
- * down it is. So once a scroll settles, measure again and go again, until the heading is where it
- * should be, the scroller can go no further, or the reader takes over the scroll themselves.
+ * Layout keeps moving under a long scroll. In the web layout, sections render with
+ * `content-visibility: auto`, so every section not yet on screen is laid out at a placeholder
+ * height, and takes its real height as the scroll passes it. In the page view, lazily loaded
+ * images take their height on arrival and the sheets re-paginate around them. Either way a target
+ * computed up front goes stale, and a scroll aimed once ends short of the heading -- by more the
+ * further down it is. So re-aim each time the scroll settles, and keep holding the heading in place
+ * while the content around it is still resizing; stop once it has been still for a moment, the
+ * time budget is spent, or the reader takes over the scroll themselves.
  */
 function scrollToHeading(el: HTMLElement) {
   // Find the reader's overflow-auto container explicitly (it carries `data-search-root`). Scroll
@@ -47,13 +51,26 @@ function scrollToHeading(el: HTMLElement) {
     return Math.max(0, Math.min(target, scroller.scrollHeight - scroller.clientHeight))
   }
 
-  let corrections = 0
   let cancelled = false
   let fallback: number | undefined
+  let quiet: number | undefined
+  const budget = window.setTimeout(() => stop(), SCROLL_MAX_MS)
 
-  const stop = () => {
+  // Content resizing while we hold the heading: re-check once the frame has laid out. Not before
+  // the first scroll has settled -- re-aiming mid-flight would cut the smooth scroll short.
+  let settledOnce = false
+  const resized = new ResizeObserver(() => {
+    if (settledOnce) onSettled()
+  })
+  const content = scroller.firstElementChild
+  if (content) resized.observe(content)
+
+  function stop() {
     cancelled = true
     window.clearTimeout(fallback)
+    window.clearTimeout(quiet)
+    window.clearTimeout(budget)
+    resized.disconnect()
     scroller.removeEventListener('scrollend', onSettled)
     scroller.removeEventListener('wheel', stop)
     scroller.removeEventListener('touchstart', stop)
@@ -69,15 +86,17 @@ function scrollToHeading(el: HTMLElement) {
 
   function onSettled() {
     if (cancelled) return
-    // Let the sections that just came on screen lay out before measuring again.
+    settledOnce = true
+    // Let whatever just came on screen lay out before measuring again.
     requestAnimationFrame(() => {
       if (cancelled) return
       const off = Math.abs(targetTop() - scroller.scrollTop)
-      if (off <= 2 || corrections >= MAX_SCROLL_CORRECTIONS) {
-        stop()
+      if (off <= 2) {
+        // On target. Hold it there until the content has been still for a moment.
+        window.clearTimeout(quiet)
+        quiet = window.setTimeout(stop, SCROLL_HOLD_QUIET_MS)
         return
       }
-      corrections += 1
       go('auto')
     })
   }
