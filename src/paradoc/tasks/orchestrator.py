@@ -215,6 +215,8 @@ def build_document(
             compile_kwargs: dict[str, Any] = {"auto_open": auto_open}
             if fmt is not None:
                 compile_kwargs["export_format"] = fmt
+            if str(getattr(fmt, "value", fmt)) == "pdf" and config.pdf is not None:
+                compile_kwargs["pdf_config"] = config.pdf
             one.compile(name, **compile_kwargs)
 
         return runner, one

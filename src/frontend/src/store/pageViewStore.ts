@@ -1,15 +1,17 @@
 import { create } from 'zustand'
 
 // Whether the reader lays the document out on A4 sheets, the way the DOCX / PDF exports print it.
-// Remembered per browser, like the theme.
+// The page view is the default; a reader's own choice is remembered per browser, like the theme.
 
 const STORAGE_KEY = 'paradoc-page-view'
+const DEFAULT_ENABLED = true
 
 function readStored(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) === '1'
+    const stored = localStorage.getItem(STORAGE_KEY)
+    return stored === null ? DEFAULT_ENABLED : stored === '1'
   } catch {
-    return false
+    return DEFAULT_ENABLED
   }
 }
 

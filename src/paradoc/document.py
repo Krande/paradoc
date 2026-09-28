@@ -567,7 +567,9 @@ class OneDoc:
             from paradoc.io.pdf.exporter import PdfExporter, resolve_pdf_engine
 
             resolve_pdf_engine()  # fail before the (long) conversion when no engine is installed
-            pdf = PdfExporter(self)
+            # `pdf_config`: a PdfExportConfig -- from `[build.<profile>.pdf]` when built through
+            # paradoc.tasks, or passed by a caller directly; None means the defaults.
+            pdf = PdfExporter(self, config=kwargs.get("pdf_config"))
             pdf.export(dest_file)
             converter = pdf
         elif export_format == ExportFormats.HTML:

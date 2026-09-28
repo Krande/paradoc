@@ -1,11 +1,15 @@
+import hashlib
 import os
 import pathlib
+import re
 import shutil
+import sys
 
 import pypandoc
 
 from paradoc import OneDoc
 from paradoc.exceptions import LatexNotInstalled
+from paradoc.io.pdf.config import PdfExportConfig
 from paradoc.utils import copy_figures_to_dist
 
 #: PDF engines pandoc can drive, in the order they are tried. xelatex first because it is what
@@ -47,73 +51,183 @@ _SYSTEM_FONTS = {
 _SYSTEM_FONTS_OTHER = ("DejaVu Serif", "DejaVu Sans Mono")
 
 
-def default_font_args(metadata_file=None) -> list[str]:
-    """``-V mainfont=… -V monofont=…`` for this platform, unless the document sets its own.
+def _metadata_keys(metadata_file) -> set[str]:
+    """Top-level keys the document's metadata file sets. (Read as ``key:`` lines rather than
+    parsed: pyyaml is not a paradoc dependency.)"""
+    if not metadata_file or not pathlib.Path(metadata_file).is_file():
+        return set()
+    text = pathlib.Path(metadata_file).read_text(encoding="utf-8")
+    return set(re.findall(r"^([A-Za-z][\w-]*)\s*:", text, re.MULTILINE))
 
-    A ``mainfont`` / ``monofont`` in the document's metadata file wins, key by key. (Read as a
-    top-level ``key:`` line rather than parsed: pyyaml is not a paradoc dependency.)
+
+def pandoc_args(cfg: PdfExportConfig, metadata_file, out_dir: pathlib.Path) -> list[str]:
+    """pandoc arguments for the page, fonts, figures and headings ``cfg`` describes.
+
+    A key the document's metadata file sets itself (``fontsize``, ``mainfont``, ...) is not
+    passed, so the document's value stands.
     """
-    import re
-    import sys
-
-    text = ""
-    if metadata_file and pathlib.Path(metadata_file).is_file():
-        text = pathlib.Path(metadata_file).read_text(encoding="utf-8")
-
-    def is_set(key: str) -> bool:
-        return re.search(rf"^{key}\s*:\s*\S", text, re.MULTILINE) is not None
-
+    doc_keys = _metadata_keys(metadata_file)
     main, mono = _SYSTEM_FONTS.get(sys.platform, _SYSTEM_FONTS_OTHER)
-    args = []
-    if not is_set("mainfont"):
-        args.append(f"--variable=mainfont={main}")
-    if not is_set("monofont"):
-        args.append(f"--variable=monofont={mono}")
-    return args
-
-
-def figure_placement_args(metadata_file, out_dir: pathlib.Path) -> list[str]:
-    """Keep figures where the markdown puts them: ``--include-in-header`` a ``\\floatplacement``.
-
-    As LaTeX floats, a report with hundreds of figures had them drift pages away from their
-    headings -- whole sections empty, a mode's figure under the next mode's heading -- which the
-    DOCX and the HTML never do. pandoc's LaTeX template has no variable for this, so a small
-    header file does it (added to, not replacing, the document's own header-includes).
-    ``float-placement-figure: htbp`` (or any placement) in the metadata file picks another.
-    """
-    import re
-
-    text = ""
-    if metadata_file and pathlib.Path(metadata_file).is_file():
-        text = pathlib.Path(metadata_file).read_text(encoding="utf-8")
-    m = re.search(r"^float-placement-figure\s*:\s*['\"]?([A-Za-z!]+)", text, re.MULTILINE)
-    placement = m.group(1) if m else "H"
-    header = out_dir / "paradoc-figure-placement.tex"
-    header.write_text(f"\\usepackage{{float}}\n\\floatplacement{{figure}}{{{placement}}}\n", encoding="utf-8")
-    args = [f"--include-in-header={header}"]
+    variables = {
+        "papersize": cfg.papersize,
+        "fontsize": cfg.fontsize,
+        "geometry": cfg.geometry,
+        "mainfont": cfg.mainfont or main,
+        "monofont": cfg.monofont or mono,
+    }
+    args = [f"--variable={k}={v}" for k, v in variables.items() if v and k not in doc_keys]
     # `####` headings are LaTeX \paragraph, a run-in heading typeset with the next line of body
-    # text. Under a heading followed only by figures there is none, so the heading surfaced
-    # after its figures -- beside the next group, reading as that group's title. pandoc's
-    # block-headings makes \paragraph / \subparagraph stand alone, as in the DOCX and the HTML.
-    if not re.search(r"^block-headings\s*:", text, re.MULTILINE):
+    # text. Under a heading followed only by figures there is none, so the heading surfaced after
+    # its figures -- beside the next group, reading as that group's title.
+    if cfg.block_headings and "block-headings" not in doc_keys:
         args.append("--variable=block-headings")
+
+    # Figures: where they go, and how large they may be. pandoc's template has no variables for
+    # either, so a header file does it (added to, not replacing, the document's header-includes).
+    # \maxwidth / \maxheight are the macros pandoc's template feeds \includegraphics; defined
+    # again here, after the template's, they cap figures at a fraction of the text block.
+    placement = cfg.figure_placement
+    header = out_dir / "paradoc-pdf-layout.tex"
+    header.write_text(
+        "\\usepackage{float}\n"
+        f"\\floatplacement{{figure}}{{{placement}}}\n"
+        "\\makeatletter\n"
+        f"\\def\\maxwidth{{\\ifdim\\Gin@nat@width>{cfg.figure_max_width}\\linewidth "
+        f"{cfg.figure_max_width}\\linewidth\\else\\Gin@nat@width\\fi}}\n"
+        f"\\def\\maxheight{{\\ifdim\\Gin@nat@height>{cfg.figure_max_height}\\textheight "
+        f"{cfg.figure_max_height}\\textheight\\else\\Gin@nat@height\\fi}}\n"
+        "\\makeatother\n",
+        encoding="utf-8",
+    )
+    args.append(f"--include-in-header={header}")
     return args
+
+
+_TABLE_FILTER = """-- Generated by paradoc for this PDF export: how tables are set.
+local MODE, SHORT, SIZE, SEP = "{mode}", {short}, "{size}", "{sep}"
+
+-- The longest cell text in the table, in characters.
+local function longest_cell(t)
+  local longest = 0
+  local function scan(rows)
+    for _, row in ipairs(rows) do
+      for _, cell in ipairs(row.cells) do
+        local n = utf8.len(pandoc.utils.stringify(cell.contents)) or 0
+        if n > longest then longest = n end
+      end
+    end
+  end
+  scan(t.head.rows)
+  for _, body in ipairs(t.bodies) do scan(body.head); scan(body.body) end
+  scan(t.foot.rows)
+  return longest
+end
+
+function Table(t)
+  -- Relative widths make each column a fixed-width paragraph column; a number wider than its
+  -- share overruns into the next column. A default width sizes the column to its content.
+  if MODE == "auto" or (MODE == "content" and longest_cell(t) <= SHORT) then
+    for i, spec in ipairs(t.colspecs) do t.colspecs[i] = {{spec[1]}} end
+  end
+  return {{
+    pandoc.RawBlock("latex", "\\\\begingroup\\\\" .. SIZE .. "\\\\setlength{{\\\\tabcolsep}}{{" .. SEP .. "}}"),
+    t,
+    pandoc.RawBlock("latex", "\\\\endgroup"),
+  }}
+end
+"""
+
+
+def table_filter(cfg: PdfExportConfig, out_dir: pathlib.Path) -> pathlib.Path:
+    """Write the Lua filter that sets tables per ``cfg`` and return its path."""
+    path = out_dir / "paradoc-pdf-tables.lua"
+    path.write_text(
+        _TABLE_FILTER.format(
+            mode=cfg.table_col_widths,
+            short=cfg.table_short_cell_chars,
+            size=cfg.table_font_size,
+            sep=cfg.table_col_sep,
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+_IMAGE_RE = re.compile(r"(!\[[^\]]*\]\()([^)\s]+)((?:\s+\"[^\"]*\")?\))")
+_TRIMMABLE = {".png", ".jpg", ".jpeg"}
+
+
+def trim_whitespace(src: pathlib.Path, dest: pathlib.Path, padding: float) -> bool:
+    """Write ``src`` cropped to its content (plus ``padding``) to ``dest``; False if it can't be.
+
+    The background is the top-left pixel's colour; content is anything that differs from it.
+    """
+    try:
+        from PIL import Image, ImageChops
+    except ImportError:
+        return False
+    with Image.open(src) as im:
+        rgb = im.convert("RGB")
+        bg = Image.new("RGB", rgb.size, rgb.getpixel((0, 0)))
+        bbox = ImageChops.difference(rgb, bg).getbbox()
+        if bbox is None:
+            return False
+        pad = int(padding * max(bbox[2] - bbox[0], bbox[3] - bbox[1]))
+        w, h = rgb.size
+        box = (max(0, bbox[0] - pad), max(0, bbox[1] - pad), min(w, bbox[2] + pad), min(h, bbox[3] + pad))
+        if box == (0, 0, w, h):
+            return False
+        im.crop(box).save(dest)
+    return True
+
+
+def prepare_images(md_text: str, md_dir: pathlib.Path, out_dir: pathlib.Path, cfg: PdfExportConfig) -> str:
+    """Point every local image at an absolute path, cropped of empty margins if ``cfg`` says so.
+
+    The markdown files are joined into one document for the PDF, so a path relative to the
+    file it came from no longer resolves from where pandoc looks. Absolute (forward-slash) paths
+    do; a crop goes to ``out_dir/_pdf_images`` and leaves the original alone.
+    """
+    crop_dir = out_dir / "_pdf_images"
+
+    def replace(m: re.Match) -> str:
+        target = m.group(2)
+        if re.match(r"^[a-z][a-z0-9+.-]*://", target, re.IGNORECASE) or target.startswith("data:"):
+            return m.group(0)
+        path = pathlib.Path(target)
+        if not path.is_absolute():
+            path = (md_dir / path).resolve()
+        if not path.is_file():
+            return m.group(0)
+        if cfg.figure_trim_whitespace and path.suffix.lower() in _TRIMMABLE:
+            crop_dir.mkdir(parents=True, exist_ok=True)
+            digest = hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:16]
+            cropped = crop_dir / f"{digest}{path.suffix.lower()}"
+            if cropped.is_file() or trim_whitespace(path, cropped, cfg.figure_trim_padding):
+                path = cropped
+        return f"{m.group(1)}{path.as_posix()}{m.group(3)}"
+
+    return _IMAGE_RE.sub(replace, md_text)
 
 
 class PdfExporter:
-    def __init__(self, one_doc: OneDoc):
+    def __init__(self, one_doc: OneDoc, config: PdfExportConfig | None = None):
         self.one_doc = one_doc
+        self.config = config or PdfExportConfig()
 
     def export(self, dest_file: pathlib.Path):
         one = self.one_doc
+        cfg = self.config
+        out_dir = dest_file.parent
 
-        md_main_str = "\n\n".join([md.read_built_file() for md in one.md_files_main])
+        copy_figures_to_dist(one, out_dir)
 
-        copy_figures_to_dist(one, dest_file.parent)
+        def built(md) -> str:
+            return prepare_images(md.read_built_file(), md.build_file.parent, out_dir, cfg)
 
+        md_main_str = "\n\n".join(built(md) for md in one.md_files_main)
         app_str = """\n\n\\appendix\n\n"""
-
-        md_app_str = "\n".join([md.read_built_file() for md in one.md_files_app])
+        md_app_str = "\n".join(built(md) for md in one.md_files_app)
         combined_str = md_main_str + app_str + md_app_str
 
         pypandoc.convert_text(
@@ -127,11 +241,11 @@ class PdfExporter:
                 "-K64m",
                 "-RTS",
                 f"--pdf-engine={resolve_pdf_engine()}",
-                f"--resource-path={dest_file.parent}",
+                f"--resource-path={out_dir}",
                 f"--metadata-file={one.metadata_file}",
-                *default_font_args(one.metadata_file),
-                *figure_placement_args(one.metadata_file, dest_file.parent),
+                *pandoc_args(cfg, one.metadata_file, out_dir),
             ],
-            filters=["pandoc-crossref"],
+            # The table filter runs after pandoc-crossref, which numbers the table captions.
+            filters=["pandoc-crossref", str(table_filter(cfg, out_dir))],
         )
         print(f'Successfully exported PDF to "{dest_file}"')

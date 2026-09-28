@@ -1,5 +1,10 @@
 """Export paths that must not fall over on an ordinary document or an ordinary machine."""
 
+import pathlib
+import re
+import shutil
+import subprocess
+
 import pytest
 from docx import Document
 from docx.oxml.ns import qn
@@ -72,32 +77,109 @@ def test_an_uncaptioned_table_is_formatted_like_a_captioned_one():
     assert [run.font.bold for run in runs] == [True, True, False, False]  # header row only
 
 
-def test_pdf_fonts_default_to_system_fonts_unless_the_document_sets_them(tmp_path, monkeypatch):
-    monkeypatch.setattr("sys.platform", "win32")
-    assert pdf_exporter.default_font_args(None) == ["--variable=mainfont=Cambria", "--variable=monofont=Consolas"]
+def _variables(args):
+    return dict(
+        a.removeprefix("--variable=").split("=", 1) for a in args if a.startswith("--variable=") and "=" in a[11:]
+    )
 
-    meta = tmp_path / "metadata.yaml"
-    meta.write_text("title: x\nmainfont: Georgia\n", encoding="utf-8")
-    assert pdf_exporter.default_font_args(meta) == ["--variable=monofont=Consolas"]
+
+def test_pdf_defaults_page_fonts_and_headings(tmp_path, monkeypatch):
+    from paradoc.io.pdf.config import PdfExportConfig
+
+    monkeypatch.setattr("sys.platform", "win32")
+    args = pdf_exporter.pandoc_args(PdfExportConfig(), None, tmp_path)
+    assert _variables(args) == {
+        "papersize": "a4",
+        "fontsize": "10pt",
+        "geometry": "margin=2cm",
+        "mainfont": "Cambria",
+        "monofont": "Consolas",
+    }
+    assert "--variable=block-headings" in args
 
     monkeypatch.setattr("sys.platform", "linux")
-    meta.write_text("title: x\n", encoding="utf-8")
-    assert pdf_exporter.default_font_args(meta) == [
-        "--variable=mainfont=DejaVu Serif",
-        "--variable=monofont=DejaVu Sans Mono",
-    ]
+    assert _variables(pdf_exporter.pandoc_args(PdfExportConfig(), None, tmp_path))["mainfont"] == "DejaVu Serif"
 
 
-def test_pdf_figures_are_pinned_where_written_unless_the_document_says_otherwise(tmp_path):
-    arg, block = pdf_exporter.figure_placement_args(None, tmp_path)
-    header = arg.split("=", 1)[1]
-    assert "\\floatplacement{figure}{H}" in open(header, encoding="utf-8").read()
-    assert block == "--variable=block-headings"
+def test_pdf_settings_come_from_the_config_but_the_documents_own_metadata_wins(tmp_path):
+    from paradoc.io.pdf.config import PdfExportConfig
 
+    cfg = PdfExportConfig(fontsize="12pt", mainfont="Georgia", block_headings=False, figure_max_height=0.3)
     meta = tmp_path / "metadata.yaml"
-    meta.write_text("float-placement-figure: htbp\nblock-headings: false\n", encoding="utf-8")
-    [arg] = pdf_exporter.figure_placement_args(meta, tmp_path)
-    assert "\\floatplacement{figure}{htbp}" in open(arg.split("=", 1)[1], encoding="utf-8").read()
+    meta.write_text("title: x\nfontsize: 11pt\n", encoding="utf-8")
+    args = pdf_exporter.pandoc_args(cfg, meta, tmp_path)
+    variables = _variables(args)
+    assert "fontsize" not in variables  # the document says 11pt itself
+    assert variables["mainfont"] == "Georgia"
+    assert "--variable=block-headings" not in args
+    header = next(a for a in args if a.startswith("--include-in-header=")).split("=", 1)[1]
+    text = open(header, encoding="utf-8").read()
+    assert "\\floatplacement{figure}{H}" in text and "0.3\\textheight" in text
+
+
+def test_pdf_config_is_read_from_paradoc_toml_and_typos_are_rejected(tmp_path):
+    from paradoc.tasks.config import load_task_config
+
+    toml = tmp_path / "paradoc.toml"
+    toml.write_text('[build.pdf]\noutputs = ["pdf"]\n\n[build.pdf.pdf]\ntable_font_size = "small"\n', encoding="utf-8")
+    cfg = load_task_config(toml, profile="pdf").pdf
+    assert cfg.table_font_size == "small" and cfg.figure_placement == "H"  # the rest keep defaults
+
+    toml.write_text('[build.pdf]\noutputs = ["pdf"]\n\n[build.pdf.pdf]\ntable_font = "small"\n', encoding="utf-8")
+    with pytest.raises(Exception, match="table_font"):
+        load_task_config(toml, profile="pdf")
+
+
+@pytest.mark.skipif(shutil.which("pandoc") is None, reason="needs pandoc")
+def test_short_tables_size_columns_to_content_and_long_ones_keep_wrapping(tmp_path):
+    from paradoc.io.pdf.config import PdfExportConfig
+
+    lua = pdf_exporter.table_filter(PdfExportConfig(), tmp_path)
+
+    def latex(md):
+        run = subprocess.run(
+            ["pandoc", "-f", "markdown", "-t", "latex", f"--lua-filter={lua}"],
+            input=md, capture_output=True, text=True, encoding="utf-8", check=True,
+        )  # fmt: skip
+        return run.stdout
+
+    numbers = (
+        "+------+----------+\n| Mode | ccx_HEXR |\n+======+==========+\n| 1    | 14.3018  |\n+------+----------+\n"
+    )
+    out = latex(numbers)
+    assert "\\begin{longtable}[]{@{}ll@{}}" in out  # natural widths: no p{...} to overrun
+    assert "\\begingroup\\footnotesize\\setlength{\\tabcolsep}{3pt}" in out and "\\endgroup" in out
+
+    prose = "+----+------+\n| A  | B    |\n+====+======+\n| x  | " + "long text " * 5 + "|\n+----+------+\n"
+    assert "p{" in latex(prose.replace("+------+", "+" + "-" * 52 + "+"))
+
+
+def test_images_are_made_absolute_and_cropped_of_empty_margins(tmp_path):
+    from PIL import Image
+
+    from paradoc.io.pdf.config import PdfExportConfig
+
+    src_dir = tmp_path / "build" / "01-app"
+    src_dir.mkdir(parents=True)
+    im = Image.new("RGB", (200, 100), "white")
+    im.paste((255, 0, 0), (90, 40, 110, 60))  # a 20x20 block in a mostly-empty picture
+    im.save(src_dir / "poster.png")
+
+    out = tmp_path / "dist"
+    out.mkdir()
+    md = "![A poster](poster.png){#fig:p}\n\n![remote](https://example.com/x.png)"
+    new = pdf_exporter.prepare_images(md, src_dir, out, PdfExportConfig())
+    path = re.search(r"\]\(([^)]+)\)\{#fig:p\}", new).group(1)
+    assert pathlib.Path(path).is_absolute() and "\\" not in path
+    assert Image.open(path).size[0] < 40  # cropped to the block plus a little padding
+    assert "https://example.com/x.png" in new
+
+    assert (
+        pdf_exporter.prepare_images(md, src_dir, out, PdfExportConfig(figure_trim_whitespace=False)).count(
+            (src_dir / "poster.png").as_posix()
+        )
+        == 1
+    )
 
 
 def test_pdf_engine_falls_back_past_a_missing_xelatex(monkeypatch):
