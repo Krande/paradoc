@@ -1,0 +1,52 @@
+name: Conda package (feedstock recipe)
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: feedstock-package-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  # Everything test.yml runs, it runs from a checkout against pixi.lock -- so nothing there can see
+  # what the PACKAGE contains, or how it fares against the dependencies conda-forge resolves today.
+  # 0.7.0 went out green and then failed on the feedstock: plotly 7 rejected the stored figure
+  # templates, pillow was missing from the recipe's test env, and the recipe still carried a patch
+  # for pypandoc 1.17. All found after the release, by the feedstock, not by us.
+  #
+  # This clones the real feedstock, points its recipe at the checkout (rattler-build has no flag for
+  # that -- see scripts/localise_feedstock_recipe.py) and builds it with the feedstock's own
+  # build-locally.py, so the packaged tests run the way conda-forge runs them.
+  conda-package:
+    name: Conda package (feedstock recipe)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          fetch-depth: 0
+
+      # Inline rather than an `on: paths:` filter so the job always reports a status and can be a
+      # required check. Broad on purpose: conda-forge resolves fresh dependencies, so any change to
+      # the code or the tests can meet a dependency pixi.lock is shielding us from.
+      - name: Could this PR change what the package contains or how it behaves?
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          CHANGED="$(git diff --name-only "$BASE_SHA"...HEAD || true)"
+          if echo "$CHANGED" | grep -qE '^(pyproject\.toml$|MANIFEST\.in$|src/paradoc/|tests/|files/|scripts/localise_feedstock_recipe\.py$|scripts/feedstock_build\.sh$|\.github/workflows/feedstock-package\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing here changes what is packaged or what the packaged tests assume."
+          fi
+
+      # The feedstock's OWN build-locally.py, not rattler-build on this runner: conda-forge's image
+      # (linux-anvil), its mounts and its layout. scripts/feedstock_build.sh is the same command to
+      # run locally.
+      - name: Build and test the package the way conda-forge does
+        if: steps.scope.outputs.run == 'true'
+        run: scripts/feedstock_build.sh "$RUNNER_TEMP/feedstock-build"

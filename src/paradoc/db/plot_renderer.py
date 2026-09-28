@@ -148,8 +148,17 @@ class PlotRenderer:
             fig = func(plot_data.data)
 
         elif plot_data.plot_type == "plotly":
-            # Reconstruct plotly figure from dict
-            fig = go.Figure(plot_data.data)
+            # Reconstruct plotly figure from dict. A stored figure carries the template of the
+            # plotly that wrote it, and a newer plotly rejects trace types it has since removed
+            # (plotly 7 dropped `scattermapbox`), so fall back to dropping what it can't read.
+            try:
+                fig = go.Figure(plot_data.data)
+            except ValueError as e:
+                logger.warning(
+                    f'Plot "{plot_data.key}" has properties this plotly version does not accept; '
+                    f"dropping them: {str(e).splitlines()[0]}"
+                )
+                fig = go.Figure(plot_data.data, skip_invalid=True)
 
         else:
             # Use default plot types
