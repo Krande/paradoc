@@ -181,12 +181,15 @@ def trim_whitespace(src: pathlib.Path, dest: pathlib.Path, padding: float) -> bo
     return True
 
 
-def prepare_images(md_text: str, md_dir: pathlib.Path, out_dir: pathlib.Path, cfg: PdfExportConfig) -> str:
+def prepare_images(
+    md_text: str, md_dir: pathlib.Path, out_dir: pathlib.Path, cfg: PdfExportConfig | None = None
+) -> str:
     """Point every local image at an absolute path, cropped of empty margins if ``cfg`` says so.
 
     The markdown files are joined into one document for the PDF, so a path relative to the
     file it came from no longer resolves from where pandoc looks. Absolute (forward-slash) paths
-    do; a crop goes to ``out_dir/_pdf_images`` and leaves the original alone.
+    do; a crop goes to ``out_dir/_pdf_images`` and leaves the original alone. Without a ``cfg``
+    nothing is cropped (the ODT export, which joins the files the same way).
     """
     crop_dir = out_dir / "_pdf_images"
 
@@ -199,7 +202,7 @@ def prepare_images(md_text: str, md_dir: pathlib.Path, out_dir: pathlib.Path, cf
             path = (md_dir / path).resolve()
         if not path.is_file():
             return m.group(0)
-        if cfg.figure_trim_whitespace and path.suffix.lower() in _TRIMMABLE:
+        if cfg is not None and cfg.figure_trim_whitespace and path.suffix.lower() in _TRIMMABLE:
             crop_dir.mkdir(parents=True, exist_ok=True)
             digest = hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:16]
             cropped = crop_dir / f"{digest}{path.suffix.lower()}"

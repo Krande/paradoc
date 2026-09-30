@@ -194,4 +194,5 @@ class MarkDownFile:
 class ExportFormats(str, Enum):
     DOCX = "docx"
     PDF = "pdf"
+    ODT = "odt"
     HTML = "html"

@@ -203,7 +203,7 @@ export function SearchBar({ isOpen, onClose }: SearchBarProps) {
           font-weight: 600;
         }
       `}</style>
-      <div className="fixed top-4 right-4 z-50 bg-white border border-gray-300 rounded-lg shadow-lg p-3 min-w-[320px]">
+      <div className="fixed top-4 right-4 z-50 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-3 min-w-[320px]">
         <div className="flex items-center gap-2">
           <input
             ref={inputRef}
@@ -212,13 +212,13 @@ export function SearchBar({ isOpen, onClose }: SearchBarProps) {
             onChange={(e) => handleSearchChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search in document..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
           <div className="flex items-center gap-1">
             <button
               onClick={goToPrevious}
               disabled={totalResults === 0}
-              className="p-2 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               title="Previous (Shift+Enter)"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -228,7 +228,7 @@ export function SearchBar({ isOpen, onClose }: SearchBarProps) {
             <button
               onClick={goToNext}
               disabled={totalResults === 0}
-              className="p-2 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               title="Next (Enter)"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,7 +237,7 @@ export function SearchBar({ isOpen, onClose }: SearchBarProps) {
             </button>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded cursor-pointer"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer"
               title="Close (Esc)"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -247,7 +247,7 @@ export function SearchBar({ isOpen, onClose }: SearchBarProps) {
           </div>
         </div>
         {searchQuery && (
-          <div className="mt-2 text-xs text-gray-600">
+          <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
             {totalResults > 0 ? (
               <span>
                 Result {currentIndex + 1} of {totalResults}
