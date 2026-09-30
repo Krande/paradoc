@@ -2,6 +2,16 @@
 
 
 
+## v0.8.0 (2026-09-30)
+
+### Feature
+
+* feat: ODT export; dark-mode search bar (#40)
+
+Signed-off-by: dependabot[bot] &lt;support@github.com&gt;
+Co-authored-by: dependabot[bot] &lt;49699333+dependabot[bot]@users.noreply.github.com&gt; ([`3632f68`](https://github.com/Krande/paradoc/commit/3632f68894fa30a3491992a1fb98dd65868d7322))
+
+
 ## v0.7.1 (2026-09-28)
 
 ### Fix
