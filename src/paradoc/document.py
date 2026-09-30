@@ -572,6 +572,12 @@ class OneDoc:
             pdf = PdfExporter(self, config=kwargs.get("pdf_config"))
             pdf.export(dest_file)
             converter = pdf
+        elif export_format == ExportFormats.ODT:
+            from paradoc.io.odt.exporter import OdtExporter
+
+            odt = OdtExporter(self)
+            odt.export(dest_file)
+            converter = odt
         elif export_format == ExportFormats.HTML:
             from paradoc.io.html.exporter import HTMLExporter
 

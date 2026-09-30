@@ -21,6 +21,8 @@ _(Note! If you want to export to pdf you need to have latex installed (which on 
 mamba install paradoc miktex
 ```
 
+OpenDocument (`.odt`) export needs nothing beyond pandoc: `one.compile(name, export_format="odt")`.
+
 
 Note! This is a very experimental project so expect things to break.
 

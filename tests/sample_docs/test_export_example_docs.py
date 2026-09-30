@@ -8,7 +8,7 @@ from paradoc.exceptions import LatexNotInstalled
 auto_open = os.getenv("AUTO_OPEN", False)
 
 
-@pytest.mark.parametrize("export_format", ["html", "docx", "pdf"])
+@pytest.mark.parametrize("export_format", ["html", "docx", "pdf", "odt"])
 def test_doc1_export_to_html(files_dir, tmp_path, export_format):
     source = files_dir / "doc1"
     dest = tmp_path / f"{source.name}/{source.name}.{export_format}"
@@ -20,7 +20,7 @@ def test_doc1_export_to_html(files_dir, tmp_path, export_format):
         print(e)
 
 
-@pytest.mark.parametrize("export_format", ["html", "docx", "pdf"])
+@pytest.mark.parametrize("export_format", ["html", "docx", "pdf", "odt"])
 def test_doc2_export_to_html(files_dir, tmp_path, export_format):
     source = files_dir / "doc2"
     dest = tmp_path / f"{source.name}/{source.name}.{export_format}"
