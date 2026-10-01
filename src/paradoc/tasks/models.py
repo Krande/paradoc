@@ -103,6 +103,25 @@ class TaskFn:
     None means "no file outputs declared" — the cache is purely the
     pickled return value.
     """
+    concurrency: Optional[dict[str, Any]] = None
+    """Optional: let this task's cells run at the same time.
+
+    The cells of one task depend only on earlier tasks, never on each other,
+    so the runner may run them concurrently -- which is what a solver matrix
+    wants: an hour of runs one after another, when most could overlap. What
+    may overlap is the task's to say, because the limits are external
+    (licences, cores)::
+
+        @task(parent=mesh, fanout={"solver": [...]},
+              concurrency={"key": "solver", "limits": {"abaqus": 2, "sesam": 2}, "default": 4})
+
+    ``key`` names the cell kwarg the limits are per value of; ``limits`` maps
+    a value to how many cells with it may run at once; ``default`` covers the
+    values not listed (and the whole task when ``key`` is omitted). The body
+    runs in a worker thread, so it must not touch thread-unsafe global state;
+    a solver run in its own directory is the case this is for.
+    ``PARADOC_MAX_PARALLEL=1`` turns it off for a build.
+    """
 
     @property
     def qualname(self) -> str:

@@ -51,6 +51,7 @@ def task(  # @task(...)
     depends_on: Optional[list[Callable[..., Any]]] = None,
     serializer: Optional[Any] = None,
     outputs: Optional[Any] = None,
+    concurrency: Optional[dict[str, Any]] = None,
 ) -> Callable[[Callable[..., Any]], TaskFn]: ...
 
 
@@ -68,6 +69,7 @@ def task(  # type: ignore[misc]
     depends_on: Optional[list[Callable[..., Any]]] = None,
     serializer: Optional[Any] = None,
     outputs: Optional[Any] = None,
+    concurrency: Optional[dict[str, Any]] = None,
 ):
     """Mark a callable as a paradoc task. See module docstring for usage."""
 
@@ -92,6 +94,9 @@ def task(  # type: ignore[misc]
                 f"{type(outputs).__name__}."
             )
 
+        if concurrency is not None:
+            _check_concurrency(target.__name__, concurrency)
+
         task_fn = TaskFn(
             fn=target,
             name=name or target.__name__,
@@ -104,6 +109,7 @@ def task(  # type: ignore[misc]
             depends_on=depends_on or [],
             serializer=serializer,
             outputs=outputs,
+            concurrency=concurrency,
         )
         # functools.wraps copies __name__, __doc__, __module__, etc. onto
         # the TaskFn so introspection (and the qualname property) behaves
@@ -117,6 +123,22 @@ def task(  # type: ignore[misc]
         # Bare `@task` form: `task` was applied to the function directly.
         return decorate(fn)
     return decorate
+
+
+def _check_concurrency(task_name: str, concurrency: Any) -> None:
+    """``{"key": str?, "limits": {value: int}?, "default": int?}``, every count a positive int."""
+    where = f"@task on {task_name}: `concurrency=`"
+    if not isinstance(concurrency, dict):
+        raise TypeError(f"{where} must be a dict, got {type(concurrency).__name__}.")
+    unknown = set(concurrency) - {"key", "limits", "default"}
+    if unknown:
+        raise ValueError(f"{where} has unknown entries {sorted(unknown)}; use key / limits / default.")
+    key = concurrency.get("key")
+    if key is not None and not isinstance(key, str):
+        raise TypeError(f"{where} `key` must name a fanout kwarg (a str).")
+    counts = list((concurrency.get("limits") or {}).values()) + [concurrency.get("default", 1)]
+    if not all(isinstance(n, int) and not isinstance(n, bool) and n >= 1 for n in counts):
+        raise ValueError(f"{where} limits and default must be positive ints.")
 
 
 def is_task(obj: Any) -> bool:
