@@ -1586,6 +1586,11 @@ class ASTExporter:
                     manifest[key]["fea_bundle_key"] = bundle_key
                 if isinstance(mode_idx, int):
                     manifest[key]["fea_mode_index"] = mode_idx
+            # The document's choice of how the viewer starts out drawing beam
+            # elements: as their solid cross-section, or as lines (the default).
+            fea_md = meta.metadata if isinstance(meta.metadata, dict) else {}
+            if isinstance(fea_md.get("fea_beam_solids"), bool):
+                manifest[key]["fea_beam_solids"] = fea_md["fea_beam_solids"]
             copied += 1
 
         if manifest:

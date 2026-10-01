@@ -34,6 +34,25 @@ function paginate(paper: HTMLElement, content: HTMLElement): number {
     }
   }
 
+  // Fast path: plan every push from ONE measurement of the natural flow, write them all, then
+  // check them in ONE more read. The pass below measures after each write instead, and every one of
+  // those reads is a forced layout of the whole section -- on a report appendix with a thousand
+  // blocks and hundreds of page breaks that is seconds of blocked main thread, on every resize of
+  // any block in it (a figure switched to its 3D viewer). Only a block the plan put in the wrong
+  // place falls through to the measuring pass.
+  if (paginatePlanned(paper, blocks)) {
+    const last = blocks[blocks.length - 1]
+    if (!last) return 1
+    const bottom = last.getBoundingClientRect().bottom - paper.getBoundingClientRect().top
+    return Math.max(1, Math.floor(bottom / STRIDE) + 1)
+  }
+  for (const b of blocks) {
+    if (b.hasAttribute(PUSH_ATTR)) {
+      b.style.marginTop = b.getAttribute(PUSH_ATTR) || ''
+      b.removeAttribute(PUSH_ATTR)
+    }
+  }
+
   const origin = () => paper.getBoundingClientRect().top
   /** Move `el` down so its top sits at `target` (px from the paper's top). */
   const pushTo = (el: HTMLElement, target: number) => {
@@ -83,15 +102,106 @@ function paginate(paper: HTMLElement, content: HTMLElement): number {
   return Math.max(1, Math.floor(bottom / STRIDE) + 1)
 }
 
+/**
+ * The same layout as the measuring pass in `paginate`, planned arithmetically: read every block's
+ * natural top and height once, walk them carrying the accumulated shift, and turn each block's
+ * total push into a new top margin. Returns false -- with the margins it wrote still in place for
+ * the caller to undo -- when a block did not land where the plan put it.
+ *
+ * A push of `d` moves a block by exactly `d` when its new top margin is the old border-to-border
+ * gap above it plus `d`: the gap is already the collapsed margin, and a larger top margin wins the
+ * collapse outright. That holds for ordinary block siblings; anything else (a margin that does not
+ * collapse, a float, a flex parent) shows up in the check and takes the measuring pass.
+ */
+function paginatePlanned(paper: HTMLElement, blocks: HTMLElement[]): boolean {
+  const n = blocks.length
+  if (n === 0) return true
+  const originTop = paper.getBoundingClientRect().top
+  const tops = new Float64Array(n)
+  const heights = new Float64Array(n)
+  const gaps = new Float64Array(n)
+  for (let i = 0; i < n; i++) {
+    const r = blocks[i].getBoundingClientRect()
+    tops[i] = r.top - originTop
+    heights[i] = r.height
+  }
+  for (let i = 0; i < n; i++) {
+    gaps[i] = i === 0
+      ? parseFloat(getComputedStyle(blocks[0]).marginTop) || 0
+      : tops[i] - (tops[i - 1] + heights[i - 1])
+  }
+
+  const push = new Float64Array(n)
+  let shift = 0
+  const topOf = (i: number) => tops[i] + shift
+  for (let i = 0; i < n; i++) {
+    if (heights[i] === 0) continue
+    const top = topOf(i)
+    const p = Math.floor(top / STRIDE)
+    // Below a block that ran across the gap, the next can start in a sheet's top margin.
+    if (top < pageTop(p) - 0.5) {
+      const d = pageTop(p) - top
+      push[i] += d
+      shift += d
+      i -= 1 // re-check it where it now sits
+      continue
+    }
+    const crosses = top + heights[i] > pageBottom(p) + 0.5
+    if (!crosses || heights[i] > USABLE_H) continue
+
+    // Keep a heading with what it introduces: move the heading, then re-check this block below it.
+    // The heading's top is where it sits now: its natural top plus every push up to and including
+    // it -- the current shift less what this block has itself been pushed by already (a block
+    // re-checked after the top-margin branch above), which moves only this block and what follows.
+    const prev = i - 1
+    if (prev >= 0 && isHeading(blocks[prev]) && push[prev] === 0) {
+      const prevTop = tops[prev] + shift - push[i]
+      if (Math.floor(prevTop / STRIDE) === p && prevTop > pageTop(p) + 1) {
+        const d = pageTop(p + 1) - prevTop
+        push[prev] += d
+        shift += d
+        i -= 1
+        continue
+      }
+    }
+    const d = pageTop(p + 1) - top
+    push[i] += d
+    shift += d
+  }
+
+  // Write every push at once, then read once to check.
+  for (let i = 0; i < n; i++) {
+    if (push[i] === 0) continue
+    const el = blocks[i]
+    el.setAttribute(PUSH_ATTR, el.style.marginTop)
+    el.style.marginTop = `${gaps[i] + push[i]}px`
+  }
+  let acc = 0
+  const checkOrigin = paper.getBoundingClientRect().top
+  for (let i = 0; i < n; i++) {
+    acc += push[i]
+    if (heights[i] === 0) continue
+    // A pixel, not half of one: layout snaps positions to sub-pixel units, and far down a long
+    // section (y ~ 98 000 px) a correctly placed block reads ~0.5 px off its planned top. Failing
+    // the check on that sent every large report through the slow pass.
+    const want = tops[i] + acc
+    if (Math.abs(blocks[i].getBoundingClientRect().top - checkOrigin - want) > 1) return false
+  }
+  return true
+}
+
 type Props = {
   children: React.ReactNode
+  /** The section's position in the document, handed back with its page count. */
+  index: number
   /** Number printed on this section's first sheet. */
   firstPage: number
-  onPageCount: (n: number) => void
+  /** Must be stable across renders (a `useCallback`): it is an effect dependency. */
+  onPageCount: (index: number, n: number) => void
 }
 
 /** One document section on A4 sheets. Starts on a new sheet, like a chapter in the exports. */
-export function PagedSection({ children, firstPage, onPageCount }: Props) {
+export function PagedSection({ children, index, firstPage, onPageCount }: Props) {
   const paperRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [pages, setPages] = useState(1)
@@ -122,15 +232,22 @@ export function PagedSection({ children, firstPage, onPageCount }: Props) {
     run()
     // Images, plots and 3D posters arrive after first paint and change block heights. Our own
     // pushes resize `content` too; that re-run lands on the same layout and changes nothing.
+    //
+    // The observer is the only re-run trigger -- not a change of `children`. A parent re-render
+    // hands over a new `children` element every time even when nothing in it changed, and
+    // re-paginating on that turned one block's resize (a 3D figure switched to interactive) into
+    // a page-count change, a document re-render, and a full re-pagination of every section: ~10 s
+    // of forced layouts on a large report. What a children change could alter here is block
+    // heights, and those resize `content`.
     const ro = new ResizeObserver(run)
     ro.observe(content)
     return () => {
       cancelAnimationFrame(frame)
       ro.disconnect()
     }
-  }, [children])
+  }, [])
 
-  useLayoutEffect(() => onPageCount(pages), [pages, onPageCount])
+  useLayoutEffect(() => onPageCount(index, pages), [index, pages, onPageCount])
 
   return (
     <div

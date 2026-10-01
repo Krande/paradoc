@@ -92,7 +92,7 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
               // subtree has no layout to measure.
               return (
                 <section key={s.id} id={s.id} data-section-index={i} className="scroll-mt-14">
-                  <PagedSection firstPage={firstPages[i]} onPageCount={(n) => setPageCount(i, n)}>
+                  <PagedSection index={i} firstPage={firstPages[i]} onPageCount={setPageCount}>
                     {body}
                   </PagedSection>
                 </section>
@@ -118,7 +118,11 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
   )
 }
 
-function Section({ bundle, blockKey, headingNumbers }: { bundle: SectionBundle, blockKey: string, headingNumbers: Map<string, any> }) {
+// Memoised: its props (the section's bundle, id and the document's heading numbers) only change
+// when the content does. The reader re-renders on scroll position and on every page-count change,
+// and without this each of those rendered every block of every section again -- every figure and
+// table of a large report, on a single scroll or resize.
+const Section = React.memo(function Section({ bundle, blockKey, headingNumbers }: { bundle: SectionBundle, blockKey: string, headingNumbers: Map<string, any> }) {
   return (
     <div>
       {bundle.doc.blocks.map((b, i) => {
@@ -135,7 +139,7 @@ function Section({ bundle, blockKey, headingNumbers }: { bundle: SectionBundle, 
       })}
     </div>
   )
-}
+})
 
 function Skeleton({ title }: { title: string }) {
   return (

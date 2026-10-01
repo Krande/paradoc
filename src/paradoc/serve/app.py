@@ -414,6 +414,9 @@ def create_app(
             body["fea_bundle_key"] = md["fea_bundle_key"]
         if isinstance(md.get("fea_mode_index"), int):
             body["fea_mode_index"] = md["fea_mode_index"]
+        # How the document wants the viewer to start out drawing beam elements.
+        if isinstance(md.get("fea_beam_solids"), bool):
+            body["fea_beam_solids"] = md["fea_beam_solids"]
         return JSONResponse(content=body)
 
     def _list_bundle_files(doc_id: str, scope: Scope):

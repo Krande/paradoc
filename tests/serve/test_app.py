@@ -18,7 +18,7 @@ from paradoc.docstore import LocalDocStore, write_manifest  # noqa: E402
 from paradoc.serve import create_app  # noqa: E402
 
 
-def _build_bundle(tmp_path, doc_id="my_doc"):
+def _build_bundle(tmp_path, doc_id="my_doc", extra_three_d=()):
     bundle = tmp_path / "bundle"
     bundle.mkdir()
     write_manifest(bundle, doc_id=doc_id)
@@ -43,6 +43,8 @@ def _build_bundle(tmp_path, doc_id="my_doc"):
             source_type="cad_model_file",
         )
     )
+    for row in extra_three_d:
+        db.add_three_d(row(glb))
     db.close()
     return bundle, doc_id, glb
 
@@ -83,6 +85,43 @@ def test_three_d_meta_endpoint(tmp_path):
     body = res.json()
     assert body["key"] == "fig1"
     assert body["sha256"] == hashlib.sha256(glb).hexdigest()
+
+
+def test_three_d_meta_carries_the_fea_view_hints(tmp_path):
+    """An FEA mode-view row's metadata reaches the REST meta body: which mode to show, and whether the
+    document wants beam elements drawn as solids. Absent, the viewer draws them as lines."""
+
+    def mode_view(key, md):
+        return lambda glb: ThreeDData(
+            key=key,
+            glb_path="assets/3d/fig1.glb",
+            format="glb",
+            camera_pos="iso_3",
+            caption="mode",
+            sha256=hashlib.sha256(glb).hexdigest(),
+            size=len(glb),
+            source_type="fea_artefact_bundle_mode_view",
+            metadata=md,
+        )
+
+    bundle, doc_id, _ = _build_bundle(
+        tmp_path,
+        extra_three_d=(
+            mode_view("mode_solid", {"fea_bundle_key": "case", "fea_mode_index": 2, "fea_beam_solids": True}),
+            mode_view("mode_plain", {"fea_bundle_key": "case", "fea_mode_index": 2}),
+        ),
+    )
+
+    # One app per request: LocalDocStore keeps the SQLite connection of the thread that first used
+    # it, and TestClient serves a second request from another thread.
+    def meta(key):
+        client = TestClient(create_app(doc_store=LocalDocStore(bundle)))
+        return client.get(f"/api/docs/{doc_id}/3d/{key}/meta").json()
+
+    solid = meta("mode_solid")
+    assert solid["fea_mode_index"] == 2
+    assert solid["fea_beam_solids"] is True
+    assert "fea_beam_solids" not in meta("mode_plain")
 
 
 def test_three_d_blob_endpoint(tmp_path):

@@ -27,6 +27,7 @@ interface StaticThreeDEntry {
   fea_bundle_dir?: string
   fea_manifest_path?: string
   fea_mode_index?: number
+  fea_beam_solids?: boolean
 }
 
 export class StaticTransport implements AssetTransport {
@@ -77,6 +78,8 @@ export class StaticTransport implements AssetTransport {
               : undefined,
             feaModeIndex:
               typeof v.fea_mode_index === 'number' ? v.fea_mode_index : undefined,
+            feaBeamSolids:
+              typeof v.fea_beam_solids === 'boolean' ? v.fea_beam_solids : undefined,
           }
         }
         return out
@@ -94,7 +97,12 @@ export class StaticTransport implements AssetTransport {
     if (!meta) return undefined
     // Mirror into IndexedDB the same way the WS / REST transports do, so
     // subsequent reads (and the cache-aware fetchBinary path) line up.
-    await dbPut('three_d_meta' as any, `${docId}:${key}`, meta).catch(() => {})
+    //
+    // Not awaited: the answer is already in memory, and the write is only a
+    // mirror. Every poster calls this on mount, so on a report with a thousand
+    // 3D figures the writes queue up, and awaiting this one put a figure's
+    // switch to its 3D viewer behind all of them -- seconds of idle wait.
+    void dbPut('three_d_meta' as any, `${docId}:${key}`, meta).catch(() => {})
     return meta
   }
 

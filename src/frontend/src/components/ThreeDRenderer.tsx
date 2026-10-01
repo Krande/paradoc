@@ -148,6 +148,7 @@ export function ThreeDRenderer({ threeDKey, docId, caption, style }: ThreeDRende
               caption: caption || meta?.caption,
               showControls,
               modeIndex: meta.feaModeIndex,
+              beamSolids: meta.feaBeamSolids,
               onError: (err) => !canceled && setError(err.message),
             },
           )

@@ -90,6 +90,7 @@ export class RESTTransport implements AssetTransport {
       feaBundleDir,
       feaManifestUrl,
       feaModeIndex,
+      feaBeamSolids: typeof body.fea_beam_solids === 'boolean' ? body.fea_beam_solids : undefined,
     }
   }
 

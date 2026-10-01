@@ -31,6 +31,10 @@ export interface ThreeDMeta {
    *  share one set of files but ask the embed to show a specific
    *  mode. Absent on the canonical bundle row (renderer treats as 0). */
   feaModeIndex?: number
+  /** The document's choice of how the FEA viewer starts out drawing beam
+   *  elements: true for their solid cross-section (which also shows twist),
+   *  false/absent for lines. The viewer's own toggle still switches. */
+  feaBeamSolids?: boolean
 }
 
 export interface ThreeDPayload extends ThreeDMeta {
