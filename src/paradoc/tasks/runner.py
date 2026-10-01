@@ -25,6 +25,9 @@ runner when the integration lands.
 from __future__ import annotations
 
 import logging
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Optional
 
@@ -262,74 +265,144 @@ class Runner:
         """
         self.expand()
         for task in self._topo_sorted():
+            # Cache first, for every cell of the task; what is left runs -- one after another, or
+            # side by side when the task allows it (`@task(concurrency=...)`). Its cells depend only
+            # on earlier tasks, so the order they finish in does not matter; results are recorded
+            # and cached in cell order either way.
+            pending: list[tuple[Cell, Any]] = []
             for cell in self._cells_by_task[task.qualname]:
-                # Resolve the body's first-positional input:
-                # - aggregator: list of upstream results, Nones filtered out
-                # - regular task with a parent: single result (or None)
-                # - root task: None
-                if cell.upstream:
-                    upstream_results = [self._results[id(uc)] for uc in cell.upstream if id(uc) in self._results]
-                    parent_result: Any = [r for r in upstream_results if r is not None]
-                else:
-                    parent_result = self._results.get(id(cell.parent)) if cell.parent is not None else None
+                parent_result = self._parent_result_for(cell)
+                if self.cache is not None and self._from_cache(cell, parent_result):
+                    continue
+                pending.append((cell, parent_result))
 
-                if self.cache is not None:
-                    parent_key = self._cache_keys.get(id(cell.parent)) if cell.parent is not None else None
-                    upstream_keys = (
-                        [self._cache_keys[id(uc)] for uc in cell.upstream if id(uc) in self._cache_keys]
-                        if cell.upstream
-                        else None
-                    )
-                    key = compute_cache_key(
-                        cell.task,
-                        cell.kwargs,
-                        parent_key=parent_key,
-                        upstream_keys=upstream_keys,
-                        ast_hash_memo=self._ast_hash_memo,
-                    )
-                    self._cache_keys[id(cell)] = key
-                    serializer = cell.task.serializer  # None => cache default
-                    if self.cache.has(key, serializer=serializer):
-                        # Pre-flight: if the task declared file outputs,
-                        # verify they all exist on disk. A cache key that
-                        # matches data but points at deleted files is a
-                        # stale-cache footgun; re-execute to regenerate.
-                        missing = self._missing_outputs(cell, parent_result)
-                        if missing:
-                            self.cache_misses += 1
-                            logger.debug(f"cache miss (outputs missing) {key!r}: " f"{[str(p) for p in missing]}")
-                        else:
-                            self._results[id(cell)] = self.cache.get(key, serializer=serializer)
-                            self.cache_hits += 1
-                            logger.debug(f"cache hit  {key!r}")
-                            continue
-                    else:
-                        self.cache_misses += 1
-                        logger.debug(f"cache miss {key!r}")
-
-                extra_kwargs = self._extra_kwargs_for(cell)
-                future = self.executor.submit(cell, parent_result, extra_kwargs or None)
-                result = future.result()
-                self._results[id(cell)] = result
-
-                if self.cache is not None:
-                    parent_key = self._cache_keys.get(id(cell.parent)) if cell.parent is not None else None
-                    version_probe_val: Optional[str] = None
-                    if cell.task.version_probe is not None:
-                        try:
-                            version_probe_val = str(cell.task.version_probe(cell.kwargs))
-                        except Exception:  # noqa: BLE001
-                            version_probe_val = None
-                    self.cache.put(
-                        self._cache_keys[id(cell)],
-                        result,
-                        kwargs=cell.kwargs,
-                        parent_key=parent_key,
-                        version_probe=version_probe_val,
-                        serializer=cell.task.serializer,
-                    )
+            self._execute(task, pending, self._record)
         self._ran = True
         return {qn: [self._results[id(c)] for c in cells] for qn, cells in self._cells_by_task.items()}
+
+    def _parent_result_for(self, cell: Cell) -> Any:
+        """The body's first-positional input:
+        - aggregator: list of upstream results, Nones filtered out
+        - regular task with a parent: single result (or None)
+        - root task: None
+        """
+        if cell.upstream:
+            upstream_results = [self._results[id(uc)] for uc in cell.upstream if id(uc) in self._results]
+            return [r for r in upstream_results if r is not None]
+        return self._results.get(id(cell.parent)) if cell.parent is not None else None
+
+    def _from_cache(self, cell: Cell, parent_result: Any) -> bool:
+        """Compute the cell's cache key; on a hit, record its result and return True."""
+        parent_key = self._cache_keys.get(id(cell.parent)) if cell.parent is not None else None
+        upstream_keys = (
+            [self._cache_keys[id(uc)] for uc in cell.upstream if id(uc) in self._cache_keys] if cell.upstream else None
+        )
+        key = compute_cache_key(
+            cell.task,
+            cell.kwargs,
+            parent_key=parent_key,
+            upstream_keys=upstream_keys,
+            ast_hash_memo=self._ast_hash_memo,
+        )
+        self._cache_keys[id(cell)] = key
+        serializer = cell.task.serializer  # None => cache default
+        if not self.cache.has(key, serializer=serializer):
+            self.cache_misses += 1
+            logger.debug(f"cache miss {key!r}")
+            return False
+        # Pre-flight: if the task declared file outputs, verify they all exist on disk. A cache key
+        # that matches data but points at deleted files is a stale-cache footgun; re-execute to
+        # regenerate.
+        missing = self._missing_outputs(cell, parent_result)
+        if missing:
+            self.cache_misses += 1
+            logger.debug(f"cache miss (outputs missing) {key!r}: " f"{[str(p) for p in missing]}")
+            return False
+        self._results[id(cell)] = self.cache.get(key, serializer=serializer)
+        self.cache_hits += 1
+        logger.debug(f"cache hit  {key!r}")
+        return True
+
+    def _cache_put(self, cell: Cell, result: Any) -> None:
+        parent_key = self._cache_keys.get(id(cell.parent)) if cell.parent is not None else None
+        version_probe_val: Optional[str] = None
+        if cell.task.version_probe is not None:
+            try:
+                version_probe_val = str(cell.task.version_probe(cell.kwargs))
+            except Exception:  # noqa: BLE001
+                version_probe_val = None
+        self.cache.put(
+            self._cache_keys[id(cell)],
+            result,
+            kwargs=cell.kwargs,
+            parent_key=parent_key,
+            version_probe=version_probe_val,
+            serializer=cell.task.serializer,
+        )
+
+    def _run_cell(self, cell: Cell, parent_result: Any) -> Any:
+        extra_kwargs = self._extra_kwargs_for(cell)
+        return self.executor.submit(cell, parent_result, extra_kwargs or None).result()
+
+    def _record(self, cell: Cell, result: Any) -> None:
+        self._results[id(cell)] = result
+        if self.cache is not None:
+            self._cache_put(cell, result)
+
+    def _execute(self, task: TaskFn, pending: list[tuple[Cell, Any]], record) -> None:
+        """Run the cells that missed the cache, handing each result to ``record``.
+
+        One after another unless the task declares `concurrency` (and `PARADOC_MAX_PARALLEL` is not
+        1): then every cell gets a worker thread, and a semaphore per value of the task's `key`
+        kwarg holds each value to its limit -- e.g. two Abaqus runs at once, whatever the others do.
+        Results are recorded in cell order, on this thread. Every cell runs to the end even when
+        one fails; the successes are recorded (and cached) and the first failure in cell order is
+        raised -- as the sequential path records each result before it runs the next cell.
+        """
+        spec = task.concurrency
+        max_parallel = os.environ.get("PARADOC_MAX_PARALLEL", "").strip()
+        if spec is None or len(pending) < 2 or max_parallel == "1":
+            for cell, parent_result in pending:
+                record(cell, self._run_cell(cell, parent_result))
+            return
+
+        key = spec.get("key")
+        limits = spec.get("limits") or {}
+        default = int(spec.get("default", 1))
+        semaphores: dict[Any, threading.Semaphore] = {}
+        for cell, _ in pending:
+            value = cell.kwargs.get(key) if key else None
+            if value not in semaphores:
+                semaphores[value] = threading.Semaphore(int(limits.get(value, default)))
+        overall = threading.Semaphore(int(max_parallel)) if max_parallel.isdigit() else None
+
+        def run_limited(cell: Cell, parent_result: Any) -> Any:
+            with semaphores[cell.kwargs.get(key) if key else None]:
+                if overall is None:
+                    return self._run_cell(cell, parent_result)
+                with overall:
+                    return self._run_cell(cell, parent_result)
+
+        logger.info(
+            f"{task.name}: running {len(pending)} cells concurrently "
+            f"(per {key or 'task'}: {dict(limits) or {}} default {default})"
+        )
+        with ThreadPoolExecutor(max_workers=len(pending), thread_name_prefix=f"paradoc-{task.name}") as pool:
+            futures = [pool.submit(run_limited, cell, parent_result) for cell, parent_result in pending]
+            outcomes = []
+            for future in futures:
+                try:
+                    outcomes.append((True, future.result()))
+                except BaseException as exc:  # noqa: BLE001 - re-raised below, after the others finish
+                    outcomes.append((False, exc))
+        first_failure: Optional[BaseException] = None
+        for (cell, _), (ok, value) in zip(pending, outcomes):
+            if ok:
+                record(cell, value)
+            elif first_failure is None:
+                first_failure = value
+        if first_failure is not None:
+            raise first_failure
 
     def result_for(self, cell: Cell) -> Any:
         """Look up a previously-computed result. Raises if cell wasn't run."""
