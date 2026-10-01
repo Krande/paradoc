@@ -2,6 +2,15 @@
 
 
 
+## v0.9.0 (2026-10-01)
+
+### Feature
+
+* feat: fast first switch to a 3D viewer in page view; FEA beam-solid hint (#41)
+
+Co-authored-by: Claude Opus 5.5 &lt;noreply@anthropic.com&gt; ([`3c5b15b`](https://github.com/Krande/paradoc/commit/3c5b15b5ef660c2544cbba1013efd25f87a7039e))
+
+
 ## v0.8.0 (2026-09-30)
 
 ### Feature
