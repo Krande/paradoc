@@ -737,14 +737,20 @@ def create_app(
     # one. `recent` stays empty until we surface per-doc updated_at;
     # the frontend hides the section when it's empty.
 
-    def _doc_entry(doc_id: str, scope: Scope, scope_label: str) -> dict[str, Any]:
+    def _doc_entry(doc_id: str, scope: Scope, scope_label: str, scope_ref: str) -> dict[str, Any]:
         """Build a landing-card entry — id + scope + provenance.
+
+        ``scope_label`` is the coarse card chip (shared/personal/project);
+        ``scope_ref`` is the URL-form scope (``shared``, ``user:me``,
+        ``project:<slug>``) the SPA routes the doc's REST calls through
+        (``/api/scopes/{scope_ref}/docs/{id}/...``) — non-shared docs are
+        unreachable via the unscoped ``/api/docs/{id}/...`` routes.
 
         Reads each doc's bundle manifest so the SPA can show
         published_at + git info on the card. Missing manifest (pre-v2
         bundle, S3 fetch failed, etc.) gracefully degrades to id-only.
         """
-        entry: dict[str, Any] = {"id": doc_id, "scope": scope_label}
+        entry: dict[str, Any] = {"id": doc_id, "scope": scope_label, "scope_ref": scope_ref}
         try:
             bm = doc_store.get_bundle_manifest(doc_id, scope=scope)
         except Exception:
@@ -761,11 +767,11 @@ def create_app(
                 }
         return entry
 
-    def _build_scope_docs(scope: Scope, label: str) -> list[dict[str, Any]]:
+    def _build_scope_docs(scope: Scope, label: str, scope_ref: str) -> list[dict[str, Any]]:
         # list_doc_ids + a get_bundle_manifest per doc — all synchronous S3.
         # Called via run_in_threadpool from the async /api/landing handler so
         # this fan-out of blocking calls never sits on the event loop.
-        return [_doc_entry(d, scope, label) for d in doc_store.list_doc_ids(scope)]
+        return [_doc_entry(d, scope, label, scope_ref) for d in doc_store.list_doc_ids(scope)]
 
     @app.get("/api/landing")
     async def get_landing(
@@ -773,7 +779,7 @@ def create_app(
         user: User = Depends(auth_module.current_user),
     ) -> dict[str, Any]:
         shared_scope = Scope.shared()
-        shared = await run_in_threadpool(_build_scope_docs, shared_scope, "shared")
+        shared = await run_in_threadpool(_build_scope_docs, shared_scope, "shared", "shared")
 
         personal: list[dict[str, Any]] = []
         # Synthetic local-dev users keep the zero UUID; their bundles
@@ -781,7 +787,7 @@ def create_app(
         if user.id and not user.id.startswith("00000000"):
             try:
                 user_scope = Scope.user(user.id)
-                personal = await run_in_threadpool(_build_scope_docs, user_scope, "personal")
+                personal = await run_in_threadpool(_build_scope_docs, user_scope, "personal", "user:me")
             except Exception:
                 personal = []
 
@@ -794,7 +800,7 @@ def create_app(
             for p in user_projects:
                 try:
                     project_scope = Scope.project(p.id)
-                    docs = await run_in_threadpool(_build_scope_docs, project_scope, "project")
+                    docs = await run_in_threadpool(_build_scope_docs, project_scope, "project", f"project:{p.slug}")
                 except Exception:
                     docs = []
                 projects_out.append(

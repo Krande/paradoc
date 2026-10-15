@@ -13,7 +13,16 @@ import InlineWorker from './ws/worker.ts?worker&inline'
 
 import { useSectionStore, storeEmbeddedImage, storePlotData, storeTableData, isStaticMode, detectStaticMode, loadStaticData } from './sections/store'
 import { initTransport, getRuntimeConfig } from './transport'
-import { loadRestData } from './transport/loadRestData'
+import { loadRestData, RestLoadError } from './transport/loadRestData'
+import type { LoadRestResult } from './transport/loadRestData'
+import {
+  PERSONAL_SCOPE,
+  getDocScope,
+  normalizeScope,
+  readDocSelection,
+  setDocScope,
+  writeDocSelection,
+} from './transport/docScope'
 import type { DocManifest, SectionBundle } from './ast/types'
 import { VirtualReader } from './components/VirtualReader'
 import { LandingPage } from './components/LandingPage'
@@ -185,14 +194,14 @@ function AppContent() {
     }
   }, [])
 
-  // Resolve docId from URL (?doc=...) or hash (#doc=...)
+  // Resolve docId (+ optional scope) from URL (?doc=...&scope=...) or
+  // hash (#doc=...&scope=...). The scope is registered before the id is
+  // set so the REST loader routes to the right /api/scopes/... prefix.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const q = params.get('doc')
-    if (q) setDocId(q)
-    else {
-      const m = /doc=([^&]+)/.exec(window.location.hash)
-      if (m) setDocId(decodeURIComponent(m[1]))
+    const sel = readDocSelection(window.location)
+    if (sel) {
+      setDocScope(sel.docId, sel.scope)
+      setDocId(sel.docId)
     }
   }, [])
 
@@ -276,7 +285,31 @@ function AppContent() {
     let canceled = false
     ;(async () => {
       try {
-        const data = await loadRestData(cfg.apiBase || '', docId)
+        const apiBase = cfg.apiBase || ''
+        let data: LoadRestResult
+        try {
+          data = await loadRestData(apiBase, docId)
+        } catch (err) {
+          // Old links carry only ?doc=<id> (shared). If the shared
+          // manifest 404s, probe the personal scope once before giving
+          // up — personal docs published before ?scope= existed would
+          // otherwise be unreachable from a bookmarked link.
+          if (!(err instanceof RestLoadError && err.status === 404) || getDocScope(docId)) {
+            throw err
+          }
+          setDocScope(docId, PERSONAL_SCOPE)
+          try {
+            data = await loadRestData(apiBase, docId)
+          } catch {
+            setDocScope(docId, undefined)
+            throw err
+          }
+          if (canceled) return
+          try {
+            const url = writeDocSelection(new URL(window.location.href), docId, PERSONAL_SCOPE)
+            window.history.replaceState(window.history.state, '', url.toString())
+          } catch {}
+        }
         if (canceled) return
         setManifest(data.manifest)
         for (const bundle of data.sections) upsertSection(bundle)
@@ -310,22 +343,22 @@ function AppContent() {
     }
   }, [docId, state.manifest])
 
-  const handleSelectDoc = (id: string) => {
-    if (id === docId) return
+  // `scope` is the URL-form doc scope (`user:me`, `project:<slug>`);
+  // omitted / `shared` means the legacy shared scope.
+  const handleSelectDoc = (id: string, scope?: string) => {
+    const nextScope = normalizeScope(scope)
+    if (id === docId && (!id || nextScope === getDocScope(id))) return
     // Drop the previous doc's manifest + sections so the REST loader's
     // `if (state.manifest) return` short-circuit lifts and we actually
     // refetch for the new doc.
     resetSections()
+    if (id) setDocScope(id, nextScope)
     setDocId(id)
     try {
-      const url = new URL(window.location.href)
-      if (id) {
-        url.searchParams.set('doc', id)
-      } else {
-        // Empty id = "back to landing" (clicked the brand mark). Drop
-        // the ?doc= param so a refresh stays on the landing page.
-        url.searchParams.delete('doc')
-      }
+      // Empty id = "back to landing" (clicked the brand mark): drops
+      // ?doc= and ?scope= so a refresh stays on the landing page.
+      // Shared docs omit ?scope= so old links keep working.
+      const url = writeDocSelection(new URL(window.location.href), id, nextScope)
       window.history.pushState({}, '', url.toString())
     } catch {}
   }

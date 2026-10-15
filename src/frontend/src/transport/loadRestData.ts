@@ -1,5 +1,6 @@
 // REST-backed analogue of `loadStaticData()`. Hits the paradoc-serve
-// endpoints `/api/docs/{id}/manifest`, `/api/docs/{id}/sections/{idx}`,
+// endpoints `<doc>/manifest`, `<doc>/sections/{idx}` (where `<doc>` is
+// `/api/docs/{id}` or `/api/scopes/{scope}/docs/{id}`, see docScope.ts),
 // and the bulk `/plots` `/tables` `/images` endpoints (same shape as
 // the static-mode `plots.json` / `tables.json` / `images.json` dumps)
 // to assemble the same structure the static loader returns. 3D blobs
@@ -8,6 +9,7 @@
 import type { DocManifest, SectionBundle } from '../ast/types'
 import type { PlotData, TableData } from '../sections/store'
 import { authedFetch } from '../services/auth/oidc'
+import { docApiPath } from './docScope'
 
 export interface LoadRestResult {
   manifest: DocManifest
@@ -34,14 +36,22 @@ async function fetchOptionalJson<T>(url: string, fallback: T): Promise<T> {
   }
 }
 
+/** Manifest fetch failure; `status` lets callers distinguish a 404. */
+export class RestLoadError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+    this.name = 'RestLoadError'
+  }
+}
+
 export async function loadRestData(apiBase: string, docId: string): Promise<LoadRestResult> {
-  const docPath = `/api/docs/${encodeURIComponent(docId)}`
+  const docPath = docApiPath(docId)
 
   const manifestRes = await authedFetch(joinUrl(apiBase, `${docPath}/manifest`), {
     cache: 'no-store',
   })
   if (!manifestRes.ok) {
-    throw new Error(`manifest fetch failed: HTTP ${manifestRes.status}`)
+    throw new RestLoadError(`manifest fetch failed: HTTP ${manifestRes.status}`, manifestRes.status)
   }
   const manifest = (await manifestRes.json()) as DocManifest
 
@@ -70,7 +80,7 @@ export async function loadRestData(apiBase: string, docId: string): Promise<Load
   // so we still need the bulk seed.
   //
   // Images are NOT bulk-fetched anymore. resolveAssetUrl routes each
-  // `<img src>` through `/api/docs/{id}/files/<path>` for lazy fetching
+  // `<img src>` through `<doc>/files/<path>` for lazy fetching
   // — this replaces the legacy ~10 MB `/images` blob that gated the
   // page render. The empty seed keeps the return shape stable for
   // back-compat with existing call sites.

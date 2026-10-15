@@ -12,6 +12,7 @@ npm = { cmd = "npm", cwd = "src/frontend" }
 winstall = { cmd = "npm install", cwd = "src/frontend", outputs = ["$PIXI_PROJECT_ROOT/src/frontend/node_modules"] }
 wdev = { cmd = "npm run dev --prefix src/frontend", depends-on = ["winstall"] }
 wbuild = { cmd = "npm run build:standalone", cwd = "src/frontend", depends-on = ["winstall"], outputs = ["$PIXI_PROJECT_ROOT/src/paradoc/frontend/resources/frontend.zip"] }
+wtest = { cmd = "npm test", cwd = "src/frontend" }
 
 [feature.profile.tasks]
 test-doc-profile = { cmd = ["pyinstrument", "-r", "html", "-o", "profile_doc.html", "$PIXI_PROJECT_ROOT/examples/cli_document_tester.py"], cwd= "examples" }

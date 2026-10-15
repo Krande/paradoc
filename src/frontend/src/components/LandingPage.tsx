@@ -1,6 +1,7 @@
 import React from 'react'
 import { authedFetch } from '../services/auth/oidc'
 import { getRuntimeConfig } from '../transport'
+import { landingScopeRef } from '../transport/docScope'
 
 // Sectioned landing: Recent strip, Personal, Shared, Projects.
 //
@@ -34,6 +35,10 @@ interface LandingDoc {
   paradoc_version?: string
   git?: GitInfo
   scope?: 'shared' | 'personal' | 'project'
+  /** URL-form scope (`shared`, `user:me`, `project:<slug>`) used to
+   *  route the doc's REST calls. Older servers omit it; the SPA then
+   *  derives it from `scope` (+ the project group's slug). */
+  scope_ref?: string
 }
 
 interface ProjectGroup {
@@ -49,8 +54,10 @@ interface LandingResponse {
   projects?: ProjectGroup[]
 }
 
+type SelectDoc = (docId: string, scope?: string) => void
+
 interface LandingPageProps {
-  onSelect: (docId: string) => void
+  onSelect: SelectDoc
 }
 
 function joinUrl(base: string, path: string): string {
@@ -118,15 +125,17 @@ function DocCard({
   doc,
   onSelect,
   compact = false,
+  projectSlug,
 }: {
   doc: LandingDoc
-  onSelect: (id: string) => void
+  onSelect: SelectDoc
   compact?: boolean
+  projectSlug?: string
 }) {
   const ts = doc.published_at || doc.updated_at
   return (
     <button
-      onClick={() => onSelect(doc.id)}
+      onClick={() => onSelect(doc.id, landingScopeRef(doc, projectSlug))}
       className={
         'group text-left rounded-lg border border-gray-200 dark:border-gray-800 ' +
         'bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-600 ' +
@@ -161,7 +170,7 @@ function ProjectGroupView({
   onSelect,
 }: {
   group: ProjectGroup
-  onSelect: (id: string) => void
+  onSelect: SelectDoc
 }) {
   const [open, setOpen] = React.useState(true)
   return (
@@ -193,7 +202,7 @@ function ProjectGroupView({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {group.docs.map((d) => (
-                <DocCard key={d.id} doc={d} onSelect={onSelect} />
+                <DocCard key={d.id} doc={d} onSelect={onSelect} projectSlug={group.slug} />
               ))}
             </div>
           )}
@@ -301,7 +310,7 @@ export function LandingPage({ onSelect }: LandingPageProps) {
                 <SectionHeader>Recent</SectionHeader>
                 <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
                   {recent.map((d) => (
-                    <DocCard key={d.id} doc={d} onSelect={onSelect} compact />
+                    <DocCard key={`${d.scope_ref || d.scope}:${d.id}`} doc={d} onSelect={onSelect} compact />
                   ))}
                 </div>
               </section>

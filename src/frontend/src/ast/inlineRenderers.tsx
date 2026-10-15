@@ -5,6 +5,7 @@ import type { PandocInline } from './types'
 import { attrs, resolveAssetUrl } from './utils'
 import { useDocId } from './context'
 import { authedFetch } from '../services/auth/oidc'
+import { isDocApiPath } from '../transport/docScope'
 
 /**
  * Component to render LaTeX math using KaTeX
@@ -72,7 +73,7 @@ export function AsyncImage({ src, alt, title, className, imgAttrs }: {
         // API-routed images go through authedFetch so the bearer
         // token reaches the server. We swap to a blob: URL so the
         // browser caches it and the <img> can decode normally.
-        if (resolved.startsWith('/api/') || resolved.includes('/api/docs/')) {
+        if (resolved.startsWith('/api/') || isDocApiPath(resolved)) {
           try {
             const res = await authedFetch(resolved)
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
