@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { DocManifest, SectionBundle, Header } from '../ast/types'
 import { renderBlock, RenderWithDocId } from '../ast/render'
 import { predictivePrefetch } from '../sections/store'
 import { calculateHeadingNumbers } from '../ast/headingNumbers'
-import { usePageViewStore } from '../store/pageViewStore'
-import { PagedSection } from './PagedSection'
+import { clampZoom, usePageViewStore } from '../store/pageViewStore'
+import { PagedSection, PAGE_WIDTH_PX } from './PagedSection'
 
 interface Props {
   docId: string
@@ -72,11 +72,81 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
     return out
   }, [h1Sections, pageCounts])
 
+  // Sheet zoom: the stored zoom, or fit-to-width (at most 100 %) from the reader's inner width.
+  const zoom = usePageViewStore((s) => s.zoom)
+  const setZoom = usePageViewStore((s) => s.setZoom)
+  const [fit, setFit] = useState(1)
+  useEffect(() => {
+    const root = containerRef.current
+    if (!root || !pageView) return
+    const measure = () => {
+      const cs = getComputedStyle(root)
+      const inner = root.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      setFit(Math.min(1, Math.max(0.1, inner / PAGE_WIDTH_PX)))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(root)
+    return () => ro.disconnect()
+  }, [pageView])
+  const scale = pageView ? (zoom ?? fit) : 1
+
+  // Keep the reading position when the zoom changes: everything scales about the top, so the
+  // scroll offsets scale with it.
+  const lastScale = useRef(scale)
+  useLayoutEffect(() => {
+    const root = containerRef.current
+    const prev = lastScale.current
+    lastScale.current = scale
+    if (!root || prev === scale) return
+    const k = scale / prev
+    root.scrollTop = root.scrollTop * k
+    root.scrollLeft = root.scrollLeft * k
+  }, [scale])
+
+  // Two-finger pinch zooms the sheets. The browser's own pinch cannot zoom out past the device
+  // width, which is exactly what a phone needs to see a whole sheet, so it is handled here
+  // (touch-action below hands pinch to us and keeps one-finger panning native).
+  const scaleRef = useRef(scale)
+  scaleRef.current = scale
+  useEffect(() => {
+    const root = containerRef.current
+    if (!root || !pageView) return
+    let start: { d: number; z: number } | null = null
+    let frame = 0
+    const dist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) start = { d: dist(e.touches), z: scaleRef.current }
+    }
+    const onMove = (e: TouchEvent) => {
+      if (!start || e.touches.length !== 2) return
+      e.preventDefault()
+      const z = clampZoom((start.z * dist(e.touches)) / start.d)
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => setZoom(z))
+    }
+    const onEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) start = null
+    }
+    root.addEventListener('touchstart', onStart, { passive: true })
+    root.addEventListener('touchmove', onMove, { passive: false })
+    root.addEventListener('touchend', onEnd, { passive: true })
+    root.addEventListener('touchcancel', onEnd, { passive: true })
+    return () => {
+      cancelAnimationFrame(frame)
+      root.removeEventListener('touchstart', onStart)
+      root.removeEventListener('touchmove', onMove)
+      root.removeEventListener('touchend', onEnd)
+      root.removeEventListener('touchcancel', onEnd)
+    }
+  }, [pageView, setZoom])
+
   return (
     <RenderWithDocId docId={docId}>
       <div
         ref={containerRef}
         className={`flex-1 overflow-auto overscroll-contain ${pageView ? 'px-4 py-2 bg-gray-200 dark:bg-gray-950' : 'p-6'}`}
+        style={pageView ? { touchAction: 'pan-x pan-y' } : undefined}
         data-search-root
       >
         <div className={pageView ? 'w-max min-w-full' : 'max-w-none w-full'}>
@@ -92,7 +162,7 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
               // subtree has no layout to measure.
               return (
                 <section key={s.id} id={s.id} data-section-index={i} className="scroll-mt-14">
-                  <PagedSection index={i} firstPage={firstPages[i]} onPageCount={setPageCount}>
+                  <PagedSection index={i} firstPage={firstPages[i]} onPageCount={setPageCount} scale={scale}>
                     {body}
                   </PagedSection>
                 </section>
@@ -114,7 +184,33 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
           })}
         </div>
       </div>
+      {pageView && <ZoomControls scale={scale} fitted={zoom === null} onZoom={setZoom} />}
     </RenderWithDocId>
+  )
+}
+
+const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 2, 3]
+
+/** −, fit / percentage, + for the A4 sheets. Bottom-right, out of the way of the text. */
+function ZoomControls({ scale, fitted, onZoom }: { scale: number; fitted: boolean; onZoom: (z: number | null) => void }) {
+  const down = () => onZoom([...ZOOM_STEPS].reverse().find((z) => z < scale - 0.005) ?? ZOOM_STEPS[0])
+  const up = () => onZoom(ZOOM_STEPS.find((z) => z > scale + 0.005) ?? ZOOM_STEPS[ZOOM_STEPS.length - 1])
+  const btn =
+    'cursor-pointer px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+  return (
+    <div className="fixed bottom-4 right-4 z-30 flex items-stretch rounded-md bg-white/95 dark:bg-gray-900/95 shadow-md ring-1 ring-black/10 dark:ring-white/10 divide-x divide-gray-200 dark:divide-gray-700 select-none">
+      <button type="button" className={btn} onClick={down} aria-label="Zoom out" title="Zoom out">−</button>
+      <button
+        type="button"
+        className={`${btn} min-w-[4.5rem] tabular-nums`}
+        onClick={() => onZoom(fitted ? 1 : null)}
+        aria-label={fitted ? 'Actual size' : 'Fit page to width'}
+        title={fitted ? 'Fitted to width (click for 100 %)' : 'Click to fit the page to the width'}
+      >
+        {fitted ? 'Fit' : `${Math.round(scale * 100)} %`}
+      </button>
+      <button type="button" className={btn} onClick={up} aria-label="Zoom in" title="Zoom in">+</button>
+    </div>
   )
 }
 
