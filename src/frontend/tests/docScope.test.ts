@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { beforeEach, describe, it } from 'node:test'
 
 import {
+  canDeleteInScope,
   clearDocScopes,
   docApiPath,
   getDocScope,
@@ -133,5 +134,17 @@ describe('landingScopeRef', () => {
     assert.equal(landingScopeRef({ scope: 'project' }, 'demo-project'), 'project:demo-project')
     assert.equal(landingScopeRef({ scope: 'shared' }), undefined)
     assert.equal(landingScopeRef({}), undefined)
+  })
+})
+
+describe('canDeleteInScope', () => {
+  it('offers delete on personal and project docs to any signed-in user', () => {
+    assert.equal(canDeleteInScope('user:me', false), true)
+    assert.equal(canDeleteInScope('project:demo', false), true)
+  })
+  it('offers delete on shared docs to admins only', () => {
+    assert.equal(canDeleteInScope('shared', false), false)
+    assert.equal(canDeleteInScope(undefined, false), false)
+    assert.equal(canDeleteInScope('shared', true), true)
   })
 })

@@ -727,6 +727,27 @@ def create_app(
             )
         return {"status": "ok", "size": len(body)}
 
+    @app.delete("/api/scopes/{scope}/docs/{doc_id}")
+    def s_delete_doc(
+        doc_id: str,
+        scope_obj: Scope = Depends(_scope_dep),
+        user: User = Depends(auth_module.current_user),
+    ) -> dict[str, Any]:
+        # Scope access is the same as for uploads (owner for user:me, members for a project).
+        # Shared docs are writable by any signed-in user, but deleting one is irreversible and
+        # bundles don't record who published them, so that is reserved for admins.
+        if scope_obj.kind == "shared" and not user.is_admin:
+            raise HTTPException(status_code=403, detail="only admins can delete shared documents")
+        try:
+            removed = doc_store.delete_doc(doc_id, scope=scope_obj)
+        except PermissionError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except NotImplementedError:
+            raise HTTPException(status_code=501, detail="this docstore does not support deletes")
+        if removed == 0:
+            raise HTTPException(status_code=404, detail=f"document not found: {doc_id!r}")
+        return {"status": "deleted", "doc_id": doc_id, "files": removed}
+
     # ── Landing aggregator ───────────────────────────────────────────
     #
     # One round-trip backing the landing-page UI. Bundles the

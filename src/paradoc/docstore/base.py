@@ -61,6 +61,12 @@ class DocGroup:
     doc_ids: tuple[str, ...]
 
 
+def check_doc_id(doc_id: str) -> None:
+    """Refuse a doc id that is not one plain path segment (empty, ``.``/``..``, or with a separator)."""
+    if not doc_id or doc_id in (".", "..") or "/" in doc_id or "\\" in doc_id:
+        raise PermissionError(f"doc_id {doc_id!r} is not a single path segment")
+
+
 class DocStore(ABC):
     """Read-only access to a built doc bundle, independent of storage.
 
@@ -83,6 +89,15 @@ class DocStore(ABC):
         Default returns an empty list; backends override.
         """
         return []
+
+    def delete_doc(self, doc_id: str, *, scope: Optional["Scope"] = None) -> int:
+        """Remove every file of the doc's bundle within ``scope``.
+
+        Returns the number of files removed; 0 means there was no such doc. Implementations must
+        refuse a ``doc_id`` that is not a single path segment. Read-only stores raise
+        ``NotImplementedError``.
+        """
+        raise NotImplementedError
 
     def put_bundle_file(
         self,

@@ -27,7 +27,7 @@ from urllib.parse import urlparse
 from paradoc.db import DbManager
 from paradoc.db.models import PlotData, TableData, ThreeDData
 
-from .base import DocStore, _default_shared_scope
+from .base import DocStore, _default_shared_scope, check_doc_id
 from .manifest import BundleManifest
 
 if TYPE_CHECKING:
@@ -320,6 +320,25 @@ class S3DocStore(DocStore):
         if primary is not None:
             return primary
         return self._fetch_object(self._key(doc_id, s, "static", *parts))
+
+    def delete_doc(self, doc_id: str, *, scope: Optional["Scope"] = None) -> int:
+        import shutil
+
+        import obstore as _obstore
+
+        s = scope if scope is not None else _default_shared_scope()
+        check_doc_id(doc_id)
+        # Trailing slash: `docs/foo/` must not also match `docs/foobar/...`.
+        prefix = self._doc_prefix(doc_id, s) + "/"
+        keys = [obj["path"] for batch in _obstore.list(self._store, prefix=prefix) for obj in batch]
+        if keys:
+            _obstore.delete(self._store, keys)
+        # Forget the cached sqlite copy so a doc re-published under the same id is fetched fresh.
+        manager = self._db_managers.pop(f"{s.prefix()}/{doc_id}", None)
+        if manager is not None:
+            manager.close()
+        shutil.rmtree(self.cache_dir / s.prefix() / doc_id, ignore_errors=True)
+        return len(keys)
 
     def put_bundle_file(
         self,

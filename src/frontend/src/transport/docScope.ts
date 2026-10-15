@@ -111,3 +111,14 @@ export function landingScopeRef(
   if (doc.scope === 'project' && projectSlug) return `project:${projectSlug}`
   return undefined
 }
+
+/**
+ * Whether a signed-in user may delete a doc in `scopeRef` -- only decides if the UI offers it; the
+ * server enforces the same rule: the owner deletes personal docs, project members project docs, and
+ * only admins shared ones.
+ */
+export function canDeleteInScope(scopeRef: string | undefined, isAdmin: boolean): boolean {
+  const scope = normalizeScope(scopeRef) // undefined = shared
+  if (!scope) return isAdmin
+  return scope === PERSONAL_SCOPE || scope.startsWith('project:')
+}

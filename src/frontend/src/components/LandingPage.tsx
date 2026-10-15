@@ -1,7 +1,7 @@
 import React from 'react'
 import { authedFetch } from '../services/auth/oidc'
 import { getRuntimeConfig } from '../transport'
-import { landingScopeRef } from '../transport/docScope'
+import { canDeleteInScope, landingScopeRef } from '../transport/docScope'
 
 // Sectioned landing: Recent strip, Personal, Shared, Projects.
 //
@@ -55,6 +55,10 @@ interface LandingResponse {
 }
 
 type SelectDoc = (docId: string, scope?: string) => void
+
+/** Deletes a doc; resolves when it is gone, rejects with a message to show on the card. */
+type DeleteDoc = (doc: LandingDoc, scopeRef: string) => Promise<void>
+
 
 interface LandingPageProps {
   onSelect: SelectDoc
@@ -124,36 +128,84 @@ function GitFooter({ git, ts }: { git?: GitInfo; ts?: string }) {
 function DocCard({
   doc,
   onSelect,
+  onDelete,
+  isAdmin = false,
   compact = false,
   projectSlug,
 }: {
   doc: LandingDoc
   onSelect: SelectDoc
+  onDelete?: DeleteDoc
+  isAdmin?: boolean
   compact?: boolean
   projectSlug?: string
 }) {
   const ts = doc.published_at || doc.updated_at
+  const scopeRef = landingScopeRef(doc, projectSlug) || 'shared'
+  const [busy, setBusy] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const deletable = !!onDelete && canDeleteInScope(scopeRef, isAdmin)
+
+  const remove = async () => {
+    if (!onDelete || busy) return
+    const where = scopeRef === 'shared' ? 'the shared scope' : scopeRef === 'user:me' ? 'your personal scope' : scopeRef
+    if (!window.confirm(`Delete "${doc.title || doc.id}" from ${where}?\n\nThis removes the published report and cannot be undone.`)) return
+    setBusy(true)
+    setError(null)
+    try {
+      await onDelete(doc, scopeRef)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'delete failed')
+      setBusy(false)
+    }
+  }
+
   return (
-    <button
-      onClick={() => onSelect(doc.id, landingScopeRef(doc, projectSlug))}
-      className={
-        'group text-left rounded-lg border border-gray-200 dark:border-gray-800 ' +
-        'bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-600 ' +
-        'hover:shadow-sm transition cursor-pointer ' +
-        (compact ? 'p-3 w-56 shrink-0' : 'p-4')
-      }
-    >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <ScopeChip scope={doc.scope} />
-      </div>
-      <p className="font-medium text-gray-900 dark:text-gray-100 break-words leading-snug">
-        {doc.title || doc.id}
-      </p>
-      {doc.title && doc.title !== doc.id && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-all">{doc.id}</p>
+    // The card holds two sibling buttons -- open (the whole card) and delete (top-right) -- since a
+    // button cannot contain another.
+    <div className={'relative group ' + (compact ? 'w-56 shrink-0' : '')}>
+      <button
+        onClick={() => onSelect(doc.id, scopeRef)}
+        disabled={busy}
+        className={
+          'w-full h-full text-left rounded-lg border border-gray-200 dark:border-gray-800 ' +
+          'bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-600 ' +
+          'hover:shadow-sm transition cursor-pointer disabled:opacity-50 ' +
+          (compact ? 'p-3' : 'p-4')
+        }
+      >
+        <div className={'flex items-start justify-between gap-2 mb-2 ' + (deletable ? 'pr-8' : '')}>
+          <ScopeChip scope={doc.scope} />
+        </div>
+        <p className="font-medium text-gray-900 dark:text-gray-100 break-words leading-snug">
+          {doc.title || doc.id}
+        </p>
+        {doc.title && doc.title !== doc.id && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-all">{doc.id}</p>
+        )}
+        <GitFooter git={doc.git} ts={ts} />
+        {error && <p className="text-xs text-red-600 dark:text-red-400 mt-2">Could not delete: {error}</p>}
+      </button>
+      {deletable && (
+        <button
+          type="button"
+          onClick={remove}
+          disabled={busy}
+          aria-label={`Delete ${doc.title || doc.id}`}
+          title="Delete this report"
+          className={
+            'absolute top-2 right-2 rounded p-1.5 cursor-pointer text-gray-400 ' +
+            'hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-950/40 ' +
+            // Always visible on touch screens (no hover); on desktop it shows on card hover/focus.
+            'sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100 transition disabled:opacity-50'
+          }
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+          </svg>
+        </button>
       )}
-      <GitFooter git={doc.git} ts={ts} />
-    </button>
+    </div>
   )
 }
 
@@ -168,9 +220,13 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 function ProjectGroupView({
   group,
   onSelect,
+  onDelete,
+  isAdmin,
 }: {
   group: ProjectGroup
   onSelect: SelectDoc
+  onDelete?: DeleteDoc
+  isAdmin?: boolean
 }) {
   const [open, setOpen] = React.useState(true)
   return (
@@ -202,7 +258,7 @@ function ProjectGroupView({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {group.docs.map((d) => (
-                <DocCard key={d.id} doc={d} onSelect={onSelect} projectSlug={group.slug} />
+                <DocCard key={d.id} doc={d} onSelect={onSelect} onDelete={onDelete} isAdmin={isAdmin} projectSlug={group.slug} />
               ))}
             </div>
           )}
@@ -216,6 +272,49 @@ export function LandingPage({ onSelect }: LandingPageProps) {
   const [data, setData] = React.useState<LandingResponse | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(true)
+  const [isAdmin, setIsAdmin] = React.useState(false)
+
+  // Only decides whether shared cards show a delete button; the server enforces it regardless.
+  React.useEffect(() => {
+    const apiBase = getRuntimeConfig().apiBase || ''
+    let canceled = false
+    authedFetch(joinUrl(apiBase, '/api/me'), { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((me) => {
+        if (!canceled && me) setIsAdmin(!!me.is_admin)
+      })
+      .catch(() => {})
+    return () => {
+      canceled = true
+    }
+  }, [])
+
+  const deleteDoc: DeleteDoc = React.useCallback(async (doc, scopeRef) => {
+    const apiBase = getRuntimeConfig().apiBase || ''
+    const res = await authedFetch(
+      joinUrl(apiBase, `/api/scopes/${encodeURIComponent(scopeRef)}/docs/${encodeURIComponent(doc.id)}`),
+      { method: 'DELETE' },
+    )
+    if (!res.ok && res.status !== 404) {
+      let detail = `HTTP ${res.status}`
+      try {
+        const body = await res.json()
+        if (body?.detail) detail = String(body.detail)
+      } catch {}
+      throw new Error(detail)
+    }
+    // Gone (or already gone): drop it from every list, Recent included.
+    const keep = (d: LandingDoc, slug?: string) => !(d.id === doc.id && (landingScopeRef(d, slug) || 'shared') === scopeRef)
+    setData((prev) =>
+      prev && {
+        ...prev,
+        recent: prev.recent?.filter((d) => keep(d)),
+        personal: prev.personal?.filter((d) => keep(d)),
+        shared: prev.shared?.filter((d) => keep(d)),
+        projects: prev.projects?.map((p) => ({ ...p, docs: p.docs.filter((d) => keep(d, p.slug)) })),
+      },
+    )
+  }, [])
 
   React.useEffect(() => {
     const cfg = getRuntimeConfig()
@@ -310,7 +409,7 @@ export function LandingPage({ onSelect }: LandingPageProps) {
                 <SectionHeader>Recent</SectionHeader>
                 <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
                   {recent.map((d) => (
-                    <DocCard key={`${d.scope_ref || d.scope}:${d.id}`} doc={d} onSelect={onSelect} compact />
+                    <DocCard key={`${d.scope_ref || d.scope}:${d.id}`} doc={d} onSelect={onSelect} onDelete={deleteDoc} isAdmin={isAdmin} compact />
                   ))}
                 </div>
               </section>
@@ -321,7 +420,7 @@ export function LandingPage({ onSelect }: LandingPageProps) {
                 <SectionHeader>Personal</SectionHeader>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {personal.map((d) => (
-                    <DocCard key={d.id} doc={d} onSelect={onSelect} />
+                    <DocCard key={d.id} doc={d} onSelect={onSelect} onDelete={deleteDoc} isAdmin={isAdmin} />
                   ))}
                 </div>
               </section>
@@ -332,7 +431,7 @@ export function LandingPage({ onSelect }: LandingPageProps) {
                 <SectionHeader>Shared</SectionHeader>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {shared.map((d) => (
-                    <DocCard key={d.id} doc={d} onSelect={onSelect} />
+                    <DocCard key={d.id} doc={d} onSelect={onSelect} onDelete={deleteDoc} isAdmin={isAdmin} />
                   ))}
                 </div>
               </section>
@@ -342,7 +441,7 @@ export function LandingPage({ onSelect }: LandingPageProps) {
               <section>
                 <SectionHeader>Projects</SectionHeader>
                 {projects.map((p) => (
-                  <ProjectGroupView key={p.slug} group={p} onSelect={onSelect} />
+                  <ProjectGroupView key={p.slug} group={p} onSelect={onSelect} onDelete={deleteDoc} isAdmin={isAdmin} />
                 ))}
               </section>
             )}
