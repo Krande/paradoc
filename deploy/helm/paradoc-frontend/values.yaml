@@ -28,8 +28,8 @@ auth:
   enabled: false
   # Name of a Kubernetes Secret holding the multi-IdP config under
   # `PARADOC_OIDC_PROVIDERS_JSON`. Materialised via ExternalSecret in
-  # the consuming namespace (see workloads/paradoc/externalsecret-oidc.yaml
-  # in k8s-gitops for the canonical shape).
+  # the consuming namespace (an ExternalSecret that writes the JSON
+  # under the key the chart reads).
   providersExistingSecret: ""
   providersExistingSecretKey: PARADOC_OIDC_PROVIDERS_JSON
   # Exact group name (Authentik) or object id (Azure AD) that grants

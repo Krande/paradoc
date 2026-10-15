@@ -7,7 +7,7 @@ import { completeSignIn } from '../../services/auth/oidc'
 // original entry path (stashed in sessionStorage before signIn).
 //
 // Authentik must have this URL in the provider's redirect_uris list:
-//   https://paradoc.krande.no/auth/callback
+//   https://paradoc.example.com/auth/callback
 //   http://localhost:8000/auth/callback   (for local dev)
 
 export const AuthCallback: React.FC = () => {

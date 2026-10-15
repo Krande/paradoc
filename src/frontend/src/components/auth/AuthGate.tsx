@@ -9,7 +9,7 @@ import { bootstrap, isAuthEnabled, isSignedIn, signIn } from '../../services/aut
 // token (sessionStorage); if that succeeds the user lands on the app
 // without seeing the sign-in prompt. If no token is available, the
 // gate immediately redirects through the IdP via signIn() — matching
-// adapy-viewer's behavior so paradoc.krande.no doesn't ever show a
+// adapy-viewer's behavior so a deployed instance doesn't ever show a
 // "Could not load document list" 401 to a fresh visitor.
 
 export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {

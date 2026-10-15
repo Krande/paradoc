@@ -242,7 +242,7 @@ def test_static_export_3d_viewer_mounts_without_presets_404(static_bundle, page,
 
 
 def test_static_export_3d_viewer_does_not_hijack_page_scroll(static_bundle, page, wait_for_frontend):
-    """The bug from paradoc.krande.no: enabling the viewer makes the
+    """The bug from a deployed instance: enabling the viewer makes the
     surrounding paradoc page un-scrollable.
 
     The SPA puts `html` / `body` in `overflow: hidden` and scrolls

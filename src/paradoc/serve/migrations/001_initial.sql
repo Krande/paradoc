@@ -8,8 +8,7 @@
 -- Users are identified by the (oidc_iss, oidc_sub) tuple — never email,
 -- which can change across IdPs. Each (iss, sub) maps to one users row
 -- via the UNIQUE constraint; a person who signs in via two different
--- IdPs gets two users rows (no implicit merge — see the harmonization
--- note `dap/plan/v1/notes_auth_scope_harmonization.md`).
+-- IdPs gets two users rows (no implicit merge).
 
 CREATE TABLE users (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),

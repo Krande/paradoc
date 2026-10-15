@@ -30,8 +30,7 @@ suffix to a plain string and parse with a small regex:
   * everything else (sec/table/eq/fig) → ``?find=<urlencoded>``
 
 The find-fallback is acceptable for v0 because shelf doesn't yet
-expose stable anchors per sub-document element
-(``[[shelf_subdoc_anchors]]`` in dap/plan/v1).
+expose stable anchors per sub-document element.
 """
 
 from __future__ import annotations
