@@ -170,6 +170,7 @@ def build_document(
             work_dir=work_dir,
             runner=runner,
             doc_root=doc_root,
+            chapter_numbering=config.chapter_numbering,
         )
 
         # Pre-register filters from doc_root (not source_dir) so the

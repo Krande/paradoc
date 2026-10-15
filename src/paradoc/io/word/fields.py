@@ -6,13 +6,14 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 
 
-def add_seq_reference(run_in, seq: str, parent):
+def add_seq_reference(run_in, seq: str, parent, placeholder: str = "1"):
     """Add a SEQ field to a run.
 
     Args:
         run_in: The run element to add the field to
         seq: The SEQ field instruction (e.g., "SEQ Figure \\* ARABIC \\s 1")
         parent: The parent element
+        placeholder: Field result shown until Word updates the field
 
     Returns:
         The new run with the SEQ field
@@ -38,7 +39,7 @@ def add_seq_reference(run_in, seq: str, parent):
 
     # Field result placeholder
     t = OxmlElement("w:t")
-    t.text = "1"  # Placeholder that will be updated by Word
+    t.text = placeholder  # Placeholder that will be updated by Word
     r.append(t)
 
     # Field end
@@ -141,7 +142,7 @@ def create_ref_field_runs(p_element, bookmark_name: str, label: str = "Figure"):
     IMPORTANT: The label (e.g., "Figure") should NOT be added as a separate text run
     because the REF field will be updated by Word to show the complete bookmark text
     which already includes the label. Adding it separately causes duplication like
-    "Figure Figure 1-1".
+    "Figure Figure 1.1".
 
     Args:
         p_element: The paragraph XML element (w:p)
@@ -177,11 +178,11 @@ def create_ref_field_runs(p_element, bookmark_name: str, label: str = "Figure"):
     r4 = OxmlElement("w:r")
     t = OxmlElement("w:t")
     t.set(qn("xml:space"), "preserve")
-    # For equations, add period after "Eq" to match bookmark format "Eq. 1-1"
+    # For equations, add period after "Eq" to match bookmark format "Eq. 1.1"
     if label == "Eq":
-        t.text = "Eq. 1-1"
+        t.text = "Eq. 1.1"
     else:
-        t.text = f"{label} 1-1"  # Placeholder - will be updated by Word to show actual bookmark content
+        t.text = f"{label} 1.1"  # Placeholder - will be updated by Word to show actual bookmark content
     r4.append(t)
     p_element.append(r4)
 

@@ -42,7 +42,7 @@ class ReferenceItem:
         ref_type: The type of reference (FIGURE, TABLE, or EQUATION)
         semantic_id: The semantic identifier (e.g., "test_figure" from "fig:test_figure")
         word_bookmark: The Word-style bookmark name (e.g., "_Ref306075071")
-        display_number: The display number (e.g., "1-1", "2-3")
+        display_number: The display number (e.g., "1.1", "2.3", "A.1")
         caption_paragraph: The actual Word paragraph containing the caption
         document_order: Sequential order in the document (0, 1, 2, ...)
     """
@@ -573,9 +573,10 @@ class ReferenceHelper:
         for item in self._all_items:
             if item.caption_paragraph:
                 # Extract the number from the caption text
-                # Caption format: "Figure 2-1: Caption text" or "Table 1-1: Caption text"
+                # Caption format: "Figure 2.1: Caption text", "Table A.1: Caption text", or without
+                # chapter numbering "Figure 7: Caption text". (Older documents: "Figure 2-1".)
                 text = item.caption_paragraph.text
-                number_match = re.search(r"(\d+[-.]\d+)", text)
+                number_match = re.match(r"\s*\S+\s+((?:[A-Z]{1,3}|\d+)[-.]\d+|\d+)\b", text)
                 if number_match:
                     item.display_number = number_match.group(1)
 

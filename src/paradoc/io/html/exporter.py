@@ -7,6 +7,7 @@ import pypandoc
 
 from paradoc import OneDoc
 from paradoc.citation import FILTER_PATH as SHELF_CITATION_FILTER
+from paradoc.numbering import crossref_args, crossref_filters
 from paradoc.utils import copy_figures_to_dist
 
 
@@ -60,11 +61,12 @@ class HTMLExporter:
             "-K64m",
             "-RTS",
             f"--metadata-file={one.metadata_file}",
+            *crossref_args(one.chapter_numbering),
         ]
         # Shelf citation filter is appended after pandoc-crossref so
         # cross-references are already resolved by the time we walk
         # Cite nodes. The filter no-ops when its env vars are unset.
-        filters = ["pandoc-crossref", str(SHELF_CITATION_FILTER)]
+        filters = [*crossref_filters(one.chapter_numbering), str(SHELF_CITATION_FILTER)]
         with _shelf_citation_env(one):
             html_str = pypandoc.convert_text(
                 combined_str,

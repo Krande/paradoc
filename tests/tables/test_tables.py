@@ -43,8 +43,8 @@ def test_table(files_dir, tmp_path):
     assert len(caption_paras) >= 2, f"Expected at least 2 table captions, found {len(caption_paras)}"
 
     # Verify caption numbering format
-    # Main document tables: "Table 1-1", "Table 1-2", etc.
-    # Appendix tables: "Table A-1", "Table A-2", etc.
+    # Main document tables: "Table 1.1", "Table 1.2", etc.
+    # Appendix tables: "Table A.1", "Table A.2", etc.
     for i, caption_para in enumerate(caption_paras):
         caption_text = caption_para.text
 
@@ -54,12 +54,12 @@ def test_table(files_dir, tmp_path):
         elif i == 1:
             assert "No Space 1" in caption_text, f"Second caption should contain 'No Space 1', got: {caption_text}"
 
-        # Verify numbering format: Should start with "Table" followed by X-Y format
+        # Verify numbering format: Should start with "Table" followed by X.Y format
         # X can be a number (main document) or letter (appendix)
-        # The pattern should be: "Table <chapter>-<number>: Caption text"
-        numbering_pattern = r"Table\s+([A-Z0-9]+)-(\d+)"
+        # The pattern should be: "Table <chapter>.<number>: Caption text"
+        numbering_pattern = r"Table\s+([A-Z0-9]+)\.(\d+)"
         match = re.search(numbering_pattern, caption_text)
-        assert match, f"Caption should have 'Table X-Y' numbering format, got: '{caption_text}'"
+        assert match, f"Caption should have 'Table X.Y' numbering format, got: '{caption_text}'"
 
         chapter_part = match.group(1)
         table_num = int(match.group(2))
@@ -167,11 +167,11 @@ def test_regular_table(files_dir, tmp_path):
 
     caption_text = caption_para.text
 
-    # Verify caption numbering format: Should be "Table X-Y: A basic table"
+    # Verify caption numbering format: Should be "Table X.Y: A basic table"
     # where X is the heading level and Y is the table number within that section
-    numbering_pattern = r"Table\s+(\d+)-(\d+)"
+    numbering_pattern = r"Table\s+(\d+)\.(\d+)"
     match = re.search(numbering_pattern, caption_text)
-    assert match, f"Caption should have 'Table X-Y' format, got: '{caption_text}'"
+    assert match, f"Caption should have 'Table X.Y' format, got: '{caption_text}'"
 
     chapter_num = int(match.group(1))
     table_num = int(match.group(2))

@@ -13,6 +13,10 @@ Schema (Q5/Q6 from the design doc):
     # directories.
     pixi_toml = "pixi.toml"
 
+    # Number figures/tables/equations per top-level heading ("Figure 6.3",
+    # "Figure A.2" in appendices). Default true; false = one running count.
+    chapter_numbering = true
+
     [paradoc.envs]
     default  = "docs"         # alias used by @task(env="default") or env=None
                               # in `PixiSubprocessExecutor`-pure mode
@@ -130,11 +134,14 @@ class TasksToml(_StrictModel):
     `filters.py` / `paradoc.toml` stay at the doc root (eg the adapy
     verification layout where markdown is at `verification/report/`
     but tasks live at `verification/`).
+    `chapter_numbering` (default on) numbers figures, tables and equations per top-level
+    heading -- "Figure 6.3", and "Figure A.2" in appendices -- instead of one running count.
     """
 
     pixi_toml: Optional[Path] = None
     envs: dict[str, str] = Field(default_factory=dict)
     source_dir: Optional[Path] = None
+    chapter_numbering: bool = True
 
 
 @dataclass
@@ -157,6 +164,7 @@ class TaskConfig:
     static: Optional[StaticExportConfig] = None
     pdf: Optional[PdfExportConfig] = None
     profile: str = "default"
+    chapter_numbering: bool = True
 
 
 def load_task_config(
@@ -214,6 +222,7 @@ def load_task_config(
         static=profile_cfg.static,
         pdf=profile_cfg.pdf,
         profile=profile,
+        chapter_numbering=paradoc_cfg.chapter_numbering,
     )
 
 

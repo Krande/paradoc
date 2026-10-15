@@ -11,6 +11,7 @@ import pypandoc
 
 from paradoc.citation import FILTER_PATH as SHELF_CITATION_FILTER
 from paradoc.config import logger
+from paradoc.numbering import crossref_args, crossref_filters
 
 if TYPE_CHECKING:
     from paradoc import OneDoc
@@ -130,10 +131,11 @@ class ASTExporter:
                     "-K64m",
                     "-RTS",
                     f"--metadata-file={one.metadata_file}",
+                    *crossref_args(one.chapter_numbering),
                 ],
                 # Shelf citation filter appended after pandoc-crossref;
                 # it's a no-op when bibliography_file is unset.
-                filters=["pandoc-crossref", str(SHELF_CITATION_FILTER)],
+                filters=[*crossref_filters(one.chapter_numbering), str(SHELF_CITATION_FILTER)],
             )
         try:
             ast = json.loads(ast_json)

@@ -40,6 +40,13 @@ whereas `00-main` and `01-app` contains markdown (.md) files representing conten
 main and appendix respectively. Both `00-main` and `01-app` can contain as many subdirectories
 as you prefer. The document order is simply the alphabetical order of subdirectories and naming of markdown files.
 
+Figures, tables and equations are numbered per top-level heading, and the counter restarts at
+each new one: "Figure 6.3" is the third figure under heading 6. In the appendix the chapter part
+is the appendix letter: "Figure A.2", "Table B.1". Captions and cross-references use the same
+numbers in the web reader, the HTML and the DOCX. For one running count instead, pass
+`OneDoc(..., chapter_numbering=False)` or set `chapter_numbering = false` under `[paradoc]` in
+`paradoc.toml`.
+
 ### Cli usage
 
 Make sure you activate the conda environment you installed `paradoc` in. Then run

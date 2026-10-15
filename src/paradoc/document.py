@@ -161,6 +161,7 @@ class OneDoc:
         shelf_base_url=None,
         runner=None,
         doc_root=None,
+        chapter_numbering=True,
         **kwargs,
     ):
         # `runner` is an optional `paradoc.tasks.Runner` whose DAG has
@@ -204,6 +205,9 @@ class OneDoc:
         self.md_files_app = []
         self.metadata_file = None
         self.use_default_html_style = use_default_html_style
+        # Chapter-scoped figure/table/equation numbers ("Figure 6.3", "Table A.1" in appendices)
+        # instead of one running count. See paradoc.numbering.
+        self.chapter_numbering = bool(chapter_numbering)
 
         # Shelf citation deep-link config. ``bibliography_file`` points
         # to a YAML file with CSL-style `references:` entries; the

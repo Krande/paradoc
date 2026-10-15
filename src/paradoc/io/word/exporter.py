@@ -139,6 +139,14 @@ class WordExporter:
 
         ref_helper = self.ref_helper
 
+        # Chapter numbering: "Figure 6.3" / "Figure A.2", each counter restarting per top-level
+        # heading (SEQ \s 1). Without it: one running count, so the appendix continues the main
+        # body's count instead of restarting it.
+        chapters = getattr(self.one_doc, "chapter_numbering", True)
+
+        def restart_app(i: int) -> bool:
+            return i == 0 and chapters
+
         # Extract all tables, figures, and equations from both documents
         main_tables = ref_helper.extract_all_tables(main_doc, self.one_doc, is_appendix=False)
         app_tables = ref_helper.extract_all_tables(app_doc, self.one_doc, is_appendix=True)
@@ -154,12 +162,22 @@ class WordExporter:
         for i, docx_tbl in enumerate(main_tables):
             # No longer need substitute_back_temp_var() - using bookmark-based identification
             restart_caption_num = i == 0  # Restart numbering for first table
-            docx_tbl.format_table(False, restart_caption_numbering=restart_caption_num, reference_helper=ref_helper)
+            docx_tbl.format_table(
+                False,
+                restart_caption_numbering=restart_caption_num,
+                reference_helper=ref_helper,
+                chapter_numbering=chapters,
+            )
 
         for i, docx_tbl in enumerate(app_tables):
             # No longer need substitute_back_temp_var() - using bookmark-based identification
-            restart_caption_num = i == 0  # Restart numbering for first appendix table
-            docx_tbl.format_table(True, restart_caption_numbering=restart_caption_num, reference_helper=ref_helper)
+            restart_caption_num = restart_app(i)
+            docx_tbl.format_table(
+                True,
+                restart_caption_numbering=restart_caption_num,
+                reference_helper=ref_helper,
+                chapter_numbering=chapters,
+            )
 
         # Plain markdown tables -- no caption, so no paradoc Table to match -- would otherwise keep
         # the template's body-text style (large and bold in the default template), unlike every
@@ -178,21 +196,31 @@ class WordExporter:
         logger.info("[WordExporter] Formatting figures")
         for i, docx_fig in enumerate(main_figures):
             restart_caption_num = i == 0  # Restart numbering for first figure
-            docx_fig.format_figure(False, restart_caption_num, reference_helper=ref_helper)
+            docx_fig.format_figure(False, restart_caption_num, reference_helper=ref_helper, chapter_numbering=chapters)
 
         for i, docx_fig in enumerate(app_figures):
-            restart_caption_num = i == 0  # Restart numbering for first appendix figure
-            docx_fig.format_figure(True, restart_caption_num, reference_helper=ref_helper)
+            restart_caption_num = restart_app(i)
+            docx_fig.format_figure(True, restart_caption_num, reference_helper=ref_helper, chapter_numbering=chapters)
 
         # Format equations
         logger.info("[WordExporter] Formatting equations")
         for i, docx_eq in enumerate(main_equations):
             restart_caption_num = i == 0  # Restart numbering for first equation
-            docx_eq.format_equation(False, restart_caption_numbering=restart_caption_num, reference_helper=ref_helper)
+            docx_eq.format_equation(
+                False,
+                restart_caption_numbering=restart_caption_num,
+                reference_helper=ref_helper,
+                chapter_numbering=chapters,
+            )
 
         for i, docx_eq in enumerate(app_equations):
-            restart_caption_num = i == 0  # Restart numbering for first appendix equation
-            docx_eq.format_equation(True, restart_caption_numbering=restart_caption_num, reference_helper=ref_helper)
+            restart_caption_num = restart_app(i)
+            docx_eq.format_equation(
+                True,
+                restart_caption_numbering=restart_caption_num,
+                reference_helper=ref_helper,
+                chapter_numbering=chapters,
+            )
 
         logger.info(
             f"[WordExporter] Formatted {len(main_tables) + len(app_tables)} tables, "
@@ -258,7 +286,7 @@ class WordExporter:
             updated = docx_update(str(dest_file))
         if not updated:
             # Nothing has evaluated the SEQ / REF / TOC fields, so every caption still reads its
-            # placeholder ("Table 1-1") and the TOC is empty. Ask Word to update them on open.
+            # placeholder ("Table 1.1") and the TOC is empty. Ask Word to update them on open.
             request_field_update_on_open(dest_file)
 
     def format_tables(self, composer_doc: Document, is_appendix, reference_helper=None):
