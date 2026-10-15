@@ -39,7 +39,8 @@ multi-IdP token verification. ``auth.enabled=true`` is required;
 ``auth.providersExistingSecret`` should point at a Kubernetes Secret
 holding the PARADOC_OIDC_PROVIDERS_JSON value (the JSON array of
 provider blocks). ``auth.adminGroup`` is matched against the verified
-token's groups claim to drive the admin role.
+token's groups claim to drive the admin role; ``auth.adminEmails`` (a
+list) grants it by email as well.
 
 When auth.enabled is false, this expands to nothing — paradoc-serve
 falls back to the synthetic local-dev admin user, which is what the
@@ -59,6 +60,10 @@ chart wants for dev / public-bundle deployments.
 {{- if .Values.auth.adminGroup }}
 - name: PARADOC_AUTH_ADMIN_GROUP
   value: {{ .Values.auth.adminGroup | quote }}
+{{- end }}
+{{- if .Values.auth.adminEmails }}
+- name: PARADOC_AUTH_ADMIN_EMAILS
+  value: {{ .Values.auth.adminEmails | toJson | quote }}
 {{- end }}
 {{- end }}
 {{- end -}}

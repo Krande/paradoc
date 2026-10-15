@@ -80,11 +80,37 @@ class AuthConfig:
 
     ``admin_group`` matches token's ``groups`` claim by exact string;
     use a group name for Authentik, a group object id for Azure AD.
+
+    ``admin_emails`` (lower-cased) also grant admin: a user whose email is
+    listed is an admin whether they sign in or use an API token. It is
+    evaluated on every request, so removing an address revokes at once.
     """
 
     enabled: bool
     providers: tuple[ProviderConfig, ...] = field(default_factory=tuple)
     admin_group: str = ""
+    admin_emails: frozenset[str] = frozenset()
+
+    def is_admin_email(self, email: Optional[str]) -> bool:
+        return bool(email) and email.strip().casefold() in self.admin_emails
+
+
+def parse_admin_emails(raw: str) -> frozenset[str]:
+    """``PARADOC_AUTH_ADMIN_EMAILS``: a JSON list (``["a@x.org"]``) or a
+    comma/whitespace-separated list. Entries are compared case-insensitively."""
+    raw = raw.strip()
+    if not raw:
+        return frozenset()
+    if raw.startswith("["):
+        try:
+            items = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"PARADOC_AUTH_ADMIN_EMAILS is not valid JSON: {exc}") from exc
+        if not isinstance(items, list):
+            raise RuntimeError("PARADOC_AUTH_ADMIN_EMAILS must be a JSON array or a comma-separated list")
+    else:
+        items = raw.replace(",", " ").split()
+    return frozenset(str(e).strip().casefold() for e in items if str(e).strip())
 
 
 def load_config_from_env() -> AuthConfig:
@@ -98,6 +124,8 @@ def load_config_from_env() -> AuthConfig:
         ``subject_claim`` defaults to ``"sub"``.
       - ``PARADOC_AUTH_ADMIN_GROUP`` — group name (Authentik) or object
         id (Azure AD) granting admin role.
+      - ``PARADOC_AUTH_ADMIN_EMAILS`` — emails granting admin role, as a
+        JSON list or comma-separated.
     """
     enabled_raw = os.environ.get("PARADOC_AUTH_ENABLED", "false").strip().lower()
     enabled = enabled_raw in ("1", "true", "yes", "on")
@@ -131,7 +159,8 @@ def load_config_from_env() -> AuthConfig:
     admin_group = os.environ.get("PARADOC_AUTH_ADMIN_GROUP", "").strip()
     if enabled and not providers:
         raise RuntimeError("PARADOC_AUTH_ENABLED=true but PARADOC_OIDC_PROVIDERS_JSON is empty")
-    return AuthConfig(enabled=enabled, providers=providers, admin_group=admin_group)
+    admin_emails = parse_admin_emails(os.environ.get("PARADOC_AUTH_ADMIN_EMAILS", ""))
+    return AuthConfig(enabled=enabled, providers=providers, admin_group=admin_group, admin_emails=admin_emails)
 
 
 @dataclass(frozen=True)
@@ -364,11 +393,10 @@ async def _resolve_api_token(request: Request, token: str) -> Optional["User"]:
     row = await db_module.resolve_api_token(pool, digest)
     if row is None:
         return None
-    # API tokens inherit the issuing user's identity. No claims-based
-    # admin lift here — the token's scope is whatever the user already
-    # has via OIDC + admin_group membership. Group membership isn't
-    # stored on `users` rows so we leave it empty and let admin gates
-    # require a fresh OIDC sign-in for now.
+    # API tokens inherit the issuing user's identity. Group membership isn't
+    # stored on `users` rows, so the admin group can't apply here; an admin
+    # email can (the row's email is the one their OIDC sign-in recorded).
+    config: Optional[AuthConfig] = getattr(request.app.state, "auth_config", None)
     return User(
         id=row["id"],
         iss=row["oidc_iss"],
@@ -376,12 +404,12 @@ async def _resolve_api_token(request: Request, token: str) -> Optional["User"]:
         email=row["email"] or "",
         display_name=row["display_name"] or row["oidc_sub"],
         groups=frozenset(),
-        is_admin=False,
+        is_admin=bool(config is not None and config.is_admin_email(row["email"])),
     )
 
 
 def _claims_to_partial_user(
-    claims: dict[str, Any], provider: ProviderConfig, admin_group: str
+    claims: dict[str, Any], provider: ProviderConfig, admin_group: str, config: Optional[AuthConfig] = None
 ) -> tuple[str, str, str, frozenset[str], bool]:
     """Pull display fields + admin flag from the verified claims.
 
@@ -397,6 +425,10 @@ def _claims_to_partial_user(
         raw_groups = [raw_groups]
     groups = frozenset(str(g) for g in raw_groups)
     is_admin = bool(admin_group) and admin_group in groups
+    # Admin by email uses the `email` claim only (not the preferred_username
+    # fallback above) and never one the IdP marks unverified.
+    if not is_admin and config is not None and claims.get("email_verified") is not False:
+        is_admin = config.is_admin_email(claims.get("email"))
     return subject, email, display_name, groups, is_admin
 
 
@@ -456,7 +488,9 @@ async def current_user(request: Request) -> User:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    subject, email, display_name, groups, is_admin = _claims_to_partial_user(claims, provider, config.admin_group)
+    subject, email, display_name, groups, is_admin = _claims_to_partial_user(
+        claims, provider, config.admin_group, config
+    )
 
     # Upsert into the control plane. If no DB pool, we still return a
     # User but with id == subject — shared-only mode where nothing

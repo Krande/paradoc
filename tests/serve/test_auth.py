@@ -126,3 +126,45 @@ def test_bearer_token_wrong_scheme_raises():
     req = _FakeRequest({"Authorization": "Basic abc"})
     with pytest.raises(TokenError):
         _bearer_token(req)
+
+
+def test_parse_admin_emails_json_and_csv():
+    from paradoc.serve.auth import parse_admin_emails
+
+    assert parse_admin_emails("") == frozenset()
+    assert parse_admin_emails('["Admin@Example.com", " b@example.org "]') == {"admin@example.com", "b@example.org"}
+    assert parse_admin_emails("admin@example.com, b@example.org") == {"admin@example.com", "b@example.org"}
+    with pytest.raises(RuntimeError):
+        parse_admin_emails('["unterminated"')
+
+
+def test_load_config_reads_admin_emails(monkeypatch):
+    monkeypatch.setenv("PARADOC_AUTH_ADMIN_EMAILS", '["Admin@Example.com"]')
+    cfg = load_config_from_env()
+    assert cfg.is_admin_email("admin@example.com")
+    assert cfg.is_admin_email(" ADMIN@example.com ")
+    assert not cfg.is_admin_email("other@example.com")
+    assert not cfg.is_admin_email("")
+
+
+def test_admin_by_email_claim_only_when_verified():
+    from paradoc.serve.auth import AuthConfig, ProviderConfig, _claims_to_partial_user
+
+    provider = ProviderConfig(
+        name="p", issuer="https://idp.example.com", client_id="c", audience="c", subject_claim="sub"
+    )
+    cfg = AuthConfig(
+        enabled=True, providers=(provider,), admin_group="admins", admin_emails=frozenset({"admin@example.com"})
+    )
+
+    def admin(claims):
+        return _claims_to_partial_user({"sub": "s", **claims}, provider, cfg.admin_group, cfg)[4]
+
+    assert admin({"email": "Admin@Example.com"})
+    assert admin({"email": "admin@example.com", "email_verified": True})
+    assert not admin({"email": "admin@example.com", "email_verified": False})
+    # preferred_username is a display fallback, never an admin key.
+    assert not admin({"preferred_username": "admin@example.com"})
+    assert not admin({"email": "other@example.com"})
+    # The group still works on its own.
+    assert admin({"email": "other@example.com", "groups": ["admins"]})

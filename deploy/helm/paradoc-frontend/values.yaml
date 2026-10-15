@@ -35,6 +35,9 @@ auth:
   # Exact group name (Authentik) or object id (Azure AD) that grants
   # admin role. Matched against the verified token's `groups` claim.
   adminGroup: ""
+  # Emails that also grant admin role (case-insensitive), for sign-ins and
+  # API tokens alike. Checked on every request: removing one revokes at once.
+  adminEmails: []
   # Deprecated; no-op since the OIDC layer landed. Removed in a future
   # cleanup pass.
   requireAuth: false
