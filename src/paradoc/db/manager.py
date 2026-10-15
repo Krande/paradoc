@@ -149,7 +149,14 @@ class DbManager:
     def _ensure_connection(self):
         """Ensure database connection exists for read operations."""
         if self.connection is None and self.db_path.exists():
-            self.connection = sqlite3.connect(str(self.db_path))
+            # Read connections are cached per bundle by the DocStores, and
+            # paradoc-serve runs its sync handlers in a threadpool, so the
+            # same connection is used from several threads (and from the
+            # event loop by the async 3D-blob handler). Python's bundled
+            # SQLite is built serialized (sqlite3.threadsafety == 3), so
+            # sharing it is safe; the default same-thread check would raise
+            # ProgrammingError on a later request served by another thread.
+            self.connection = sqlite3.connect(str(self.db_path), check_same_thread=False)
             self.connection.row_factory = sqlite3.Row
             self._initialized = True
 
