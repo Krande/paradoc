@@ -748,12 +748,12 @@ class OneDoc:
 
                 # Write to cache
                 try:
-                    fig.write_image(str(cache_png), format="png")
+                    fig.write_image(str(cache_png), format="png", width=width, height=height)
                 except Exception:
                     from plotly.io._kaleido import get_chrome
 
                     get_chrome()
-                    fig.write_image(str(cache_png), format="png")
+                    fig.write_image(str(cache_png), format="png", width=width, height=height)
                 cache_timestamp.write_text(str(db_timestamp), encoding="utf-8")
                 logger.info(f'Rendered and cached plot "{key_clean}"')
             except Exception as e:
@@ -913,6 +913,8 @@ class OneDoc:
         # Prepare lists for batch rendering
         figures = []
         file_paths = []
+        widths = []
+        heights = []
         cache_keys = []
         timestamps_to_write = []
 
@@ -927,6 +929,9 @@ class OneDoc:
                 # Add to batch lists
                 figures.append(fig)
                 file_paths.append(str(cache_png))
+                # kaleido 1.x ignores the layout size on export: pass it explicitly as well.
+                widths.append(width)
+                heights.append(height)
                 cache_keys.append(cache_key)
                 timestamps_to_write.append((cache_timestamp, db_timestamp))
 
@@ -944,13 +949,13 @@ class OneDoc:
 
             # Initialize kaleido once before batch processing
             try:
-                pio.write_images(fig=figures, file=file_paths, format="png")
+                pio.write_images(fig=figures, file=file_paths, format="png", width=widths, height=heights)
             except Exception:
                 # Fallback to ensure chrome is initialized
                 from plotly.io._kaleido import get_chrome
 
                 get_chrome()
-                pio.write_images(fig=figures, file=file_paths, format="png")
+                pio.write_images(fig=figures, file=file_paths, format="png", width=widths, height=heights)
 
             # Write timestamp files after successful batch rendering
             for i, (cache_timestamp, db_timestamp) in enumerate(timestamps_to_write):
@@ -966,7 +971,7 @@ class OneDoc:
             logger.info("Falling back to individual plot rendering")
             for i, fig in enumerate(figures):
                 try:
-                    fig.write_image(file_paths[i], format="png")
+                    fig.write_image(file_paths[i], format="png", width=widths[i], height=heights[i])
                     cache_timestamp, db_timestamp = timestamps_to_write[i]
                     cache_timestamp.write_text(str(db_timestamp), encoding="utf-8")
                     logger.info(f'Rendered and cached plot "{cache_keys[i]}"')

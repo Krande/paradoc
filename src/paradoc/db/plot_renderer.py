@@ -77,6 +77,8 @@ class PlotRenderer:
         height = annotation.height if annotation and annotation.height else plot_data.height or 600
 
         fig.update_layout(width=width, height=height)
+        # kaleido 1.x ignores the layout size on export and falls back to its 700x500 default:
+        # the size has to be passed to write_image/to_image as well.
 
         # Determine format
         img_format = annotation.format if annotation and annotation.format else format
@@ -86,11 +88,11 @@ class PlotRenderer:
             # Save to file
             # get_chrome()
             if img_format == "svg":
-                fig.write_image(str(output_path), format="svg")
+                fig.write_image(str(output_path), format="svg", width=width, height=height)
             elif img_format == "jpeg":
-                fig.write_image(str(output_path), format="jpeg")
+                fig.write_image(str(output_path), format="jpeg", width=width, height=height)
             else:
-                fig.write_image(str(output_path), format="png")
+                fig.write_image(str(output_path), format="png", width=width, height=height)
 
             # Return markdown reference with proper pandoc-crossref syntax
             # The correct syntax is: ![caption](path){#fig:key}
@@ -107,7 +109,7 @@ class PlotRenderer:
             return md_str
         else:
             # Return base64 embedded image
-            img_bytes = fig.to_image(format=img_format)
+            img_bytes = fig.to_image(format=img_format, width=width, height=height)
             img_b64 = base64.b64encode(img_bytes).decode()
 
             caption = "" if (annotation and annotation.no_caption) else plot_data.caption
