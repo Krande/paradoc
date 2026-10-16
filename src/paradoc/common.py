@@ -19,6 +19,33 @@ MY_DEFAULT_HTML_CSS = RESOURCE_DIR / "default_style.css"
 #: arrived as a CodeBlock -- a padded box in the HTML reader, monospace in the DOCX.
 GRID_TABLE_PROPS = dict(tablefmt="grid", numalign="left", stralign="left")
 
+#: A line holding nothing but a `{#fig:...}`-labelled image. Pandoc only makes an image a
+#: Figure when it is alone in its paragraph, so one written directly under a text line
+#: became an inline image of that paragraph and dropped out of the DOCX export (#20).
+_BLOCK_FIGURE_LINE_RE = re.compile(r" {0,3}!\[[^\n]*\]\([^\n]*\)\{#fig:[^\n]*\}[ \t]*")
+
+
+def isolate_block_figures(md_str: str) -> str:
+    """Surround each line-alone `{#fig:...}` image with blank lines so pandoc parses a Figure."""
+    from paradoc.substitution.parser import _CODE_FENCE_RE
+
+    fenced = [m.span() for m in _CODE_FENCE_RE.finditer(md_str)]
+    lines = md_str.split("\n")
+    out: list[str] = []
+    pos = 0
+    for i, line in enumerate(lines):
+        start = pos
+        pos += len(line) + 1
+        if not _BLOCK_FIGURE_LINE_RE.fullmatch(line) or any(s <= start < e for s, e in fenced):
+            out.append(line)
+            continue
+        if out and out[-1].strip():
+            out.append("")
+        out.append(line)
+        if i + 1 < len(lines) and lines[i + 1].strip():
+            out.append("")
+    return "\n".join(out)
+
 
 @dataclass
 class TableFormat:
