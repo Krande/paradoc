@@ -2,6 +2,17 @@
 
 
 
+## v0.10.0 (2026-10-16)
+
+### Feature
+
+* feat: Library view, chapter numbering, Chromium PDF engine and lazy reader (#43)
+
+Signed-off-by: dependabot[bot] &lt;support@github.com&gt;
+Co-authored-by: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;
+Co-authored-by: dependabot[bot] &lt;49699333+dependabot[bot]@users.noreply.github.com&gt; ([`d422a24`](https://github.com/Krande/paradoc/commit/d422a2481b60c5f4e058db99e417103722246412))
+
+
 ## v0.9.0 (2026-10-01)
 
 ### Feature
