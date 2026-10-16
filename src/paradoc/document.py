@@ -568,12 +568,18 @@ class OneDoc:
                     request_field_update_on_open(dest_file, request=False)
             converter = wordx
         elif export_format == ExportFormats.PDF:
-            from paradoc.io.pdf.exporter import PdfExporter, resolve_pdf_engine
-
-            resolve_pdf_engine()  # fail before the (long) conversion when no engine is installed
             # `pdf_config`: a PdfExportConfig -- from `[build.<profile>.pdf]` when built through
             # paradoc.tasks, or passed by a caller directly; None means the defaults.
-            pdf = PdfExporter(self, config=kwargs.get("pdf_config"))
+            pdf_config = kwargs.get("pdf_config")
+            if pdf_config is not None and pdf_config.engine == "chromium":
+                from paradoc.io.pdf.chromium import ChromiumPdfExporter
+
+                pdf = ChromiumPdfExporter(self, config=pdf_config)
+            else:
+                from paradoc.io.pdf.exporter import PdfExporter, resolve_pdf_engine
+
+                resolve_pdf_engine()  # fail before the (long) conversion when no engine is installed
+                pdf = PdfExporter(self, config=pdf_config)
             pdf.export(dest_file)
             converter = pdf
         elif export_format == ExportFormats.ODT:

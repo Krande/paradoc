@@ -1,0 +1,413 @@
+/* paradoc print stylesheet for the "chromium" PDF engine.
+ * The custom properties are set per build from [build.<profile>.pdf] (see chromium.py). */
+
+@page {
+  size: var(--pd-paper, A4);
+}
+
+html {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--pd-font);
+  font-size: var(--pd-fontsize);
+  line-height: 1.42;
+  color: #1f2328;
+  background: #fff;
+  hyphens: auto;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+p {
+  margin: 0 0 0.6em 0;
+  text-align: justify;
+  orphans: 3;
+  widows: 3;
+}
+
+/* --- headings ---------------------------------------------------------------------------- */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--pd-accent);
+  font-weight: 700;
+  line-height: 1.2;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+h1 {
+  font-size: 1.75em;
+  margin: 0 0 0.9em 0;
+  padding-bottom: 0.25em;
+  border-bottom: 1.2pt solid var(--pd-accent);
+}
+
+body.pd-chapter-breaks .pd-body h1 {
+  break-before: page;
+  page-break-before: always;
+}
+
+h2 {
+  font-size: 1.3em;
+  margin: 1.3em 0 0.5em 0;
+}
+
+h3 {
+  font-size: 1.1em;
+  margin: 1.1em 0 0.4em 0;
+}
+
+h4, h5, h6 {
+  font-size: 1em;
+  margin: 1em 0 0.3em 0;
+}
+
+.secno {
+  display: inline-block;
+  min-width: 2.2em;
+  margin-right: 0.3em;
+}
+
+h1 .secno {
+  min-width: 1.6em;
+}
+
+/* --- figures ------------------------------------------------------------------------------ */
+figure {
+  margin: 0.8em 0 1em 0;
+  text-align: center;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+figure img,
+p > img {
+  max-width: var(--pd-fig-max-w);
+  max-height: var(--pd-fig-max-h);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+figcaption,
+caption {
+  font-size: 0.9em;
+  color: #3b4148;
+  margin-top: 0.35em;
+  line-height: 1.3;
+  text-align: center;
+}
+
+/* --- tables ------------------------------------------------------------------------------- */
+table {
+  border-collapse: collapse;
+  margin: 0.6em auto 1em auto;
+  font-size: var(--pd-table-font);
+  max-width: 100%;
+  width: auto;
+  break-inside: auto;
+}
+
+table.pd-wide {
+  width: 100%;
+}
+
+table caption {
+  caption-side: top;
+  margin: 0 0 0.35em 0;
+  break-after: avoid;
+}
+
+thead {
+  display: table-header-group;
+}
+
+tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+th, td {
+  hyphens: manual;
+}
+
+th {
+  background: var(--pd-accent);
+  color: #fff;
+  font-weight: 600;
+  text-align: left;
+  vertical-align: bottom;
+  padding: 0.3em 0.45em;
+  border: 0.5pt solid var(--pd-accent);
+}
+
+td {
+  padding: 0.22em 0.45em;
+  border: 0.5pt solid #c9d1d9;
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+
+tbody tr:nth-child(even) td {
+  background: #f3f6f9;
+}
+
+/* --- code, math, lists -------------------------------------------------------------------- */
+code {
+  font-family: "Noto Sans Mono", "DejaVu Sans Mono", monospace;
+  font-size: 0.88em;
+}
+
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #f5f7f9;
+  border-left: 2pt solid var(--pd-accent);
+  padding: 0.5em 0.7em;
+  font-size: 0.85em;
+  break-inside: avoid;
+}
+
+math[display="block"] {
+  margin: 0.6em 0;
+}
+
+ul, ol {
+  margin: 0 0 0.6em 0;
+  padding-left: 1.5em;
+}
+
+li {
+  margin: 0.1em 0;
+}
+
+blockquote {
+  margin: 0.6em 0;
+  padding: 0.2em 0.9em;
+  border-left: 2pt solid #c9d1d9;
+  color: #3b4148;
+}
+
+/* --- title page --------------------------------------------------------------------------- */
+.pd-title {
+  height: var(--pd-content-h);
+  display: flex;
+  flex-direction: column;
+  break-after: page;
+  page-break-after: always;
+  position: relative;
+}
+
+.pd-title-brand {
+  display: flex;
+  align-items: center;
+  gap: 5mm;
+  margin-top: 4mm;
+}
+
+.pd-title-brand img {
+  height: 22mm;
+  width: auto;
+}
+
+.pd-title-brand .pd-company {
+  font-size: 20pt;
+  font-weight: 700;
+  color: var(--pd-accent);
+  letter-spacing: 0.02em;
+}
+
+.pd-title-rule {
+  height: 2.2pt;
+  background: var(--pd-accent);
+  margin: 10mm 0 22mm 0;
+}
+
+.pd-title-project {
+  font-size: 13pt;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #5c6b7a;
+  margin-bottom: 4mm;
+}
+
+.pd-title-main {
+  font-size: 27pt;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--pd-accent);
+  margin-bottom: 4mm;
+}
+
+.pd-title-sub {
+  font-size: 13pt;
+  color: #3b4148;
+  margin-bottom: 4mm;
+}
+
+.pd-stamp {
+  position: absolute;
+  right: 0;
+  top: 58mm;
+  border: 2.2pt solid #b42318;
+  color: #b42318;
+  font-size: 20pt;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 1.5mm 4mm 1.5mm 5mm;
+  transform: rotate(-8deg);
+  opacity: 0.85;
+}
+
+.pd-docdata {
+  margin: 12mm 0 0 0;
+  border-collapse: collapse;
+  font-size: 10pt;
+  width: auto !important;
+}
+
+.pd-docdata th,
+.pd-docdata td {
+  background: none !important;
+  color: #1f2328;
+  border: none;
+  border-bottom: 0.5pt solid #c9d1d9;
+  padding: 1.6mm 8mm 1.6mm 0;
+  text-align: left;
+}
+
+.pd-docdata th {
+  color: #5c6b7a;
+  font-weight: 600;
+  width: 38mm;
+}
+
+.pd-note {
+  margin-top: 8mm;
+  font-size: 9pt;
+  color: #3b4148;
+  border-left: 2pt solid #c9d1d9;
+  padding: 1mm 0 1mm 4mm;
+  max-width: 150mm;
+}
+
+.pd-spacer {
+  flex: 1;
+}
+
+.pd-revhist-title {
+  font-size: 9pt;
+  font-weight: 700;
+  color: var(--pd-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2mm;
+}
+
+.pd-revhist {
+  width: 100% !important;
+  margin: 0;
+  font-size: 8.5pt;
+}
+
+.pd-revhist td,
+.pd-revhist th {
+  padding: 1.3mm 2mm;
+}
+
+.pd-revhist tbody tr td {
+  background: none;
+}
+
+.pd-revhist tbody tr.pd-current td {
+  font-weight: 600;
+}
+
+/* --- table of contents -------------------------------------------------------------------- */
+.pd-toc {
+  break-after: page;
+  page-break-after: always;
+}
+
+.pd-toc-title {
+  font-size: 1.75em;
+  font-weight: 700;
+  color: var(--pd-accent);
+  margin: 0 0 0.9em 0;
+  padding-bottom: 0.25em;
+  border-bottom: 1.2pt solid var(--pd-accent);
+}
+
+.pd-toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pd-toc li {
+  margin: 0;
+  break-inside: avoid;
+}
+
+.pd-toc a {
+  display: flex;
+  align-items: baseline;
+  padding: 0.16em 0;
+}
+
+.pd-toc .l1 > a {
+  font-weight: 700;
+  color: var(--pd-accent);
+  margin-top: 0.55em;
+}
+
+.pd-toc .l2 > a { padding-left: 2.4em; }
+.pd-toc .l3 > a { padding-left: 4.8em; font-size: 0.95em; }
+.pd-toc .l4 > a { padding-left: 7.2em; font-size: 0.95em; }
+
+.pd-toc .no {
+  min-width: 2.4em;
+  flex: none;
+}
+
+.pd-toc .l1 .no { min-width: 2.4em; }
+
+.pd-toc .dots {
+  flex: 1;
+  border-bottom: 0.8pt dotted #9aa4ae;
+  margin: 0 0.5em;
+  transform: translateY(-0.25em);
+}
+
+.pd-toc .pg {
+  min-width: 1.8em;
+  text-align: right;
+  flex: none;
+}
+
+/* A cell holding only "-" is parsed by pandoc as an empty bullet list: print it as a dash. */
+td > ul:only-child,
+td > ol:only-child {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+td > ul:only-child > li:empty::before {
+  content: "\2013";
+}
+
+.pd-revhist td:nth-child(-n+2),
+.pd-revhist th:nth-child(-n+2),
+.pd-revhist td:nth-child(4),
+.pd-revhist th:nth-child(4) {
+  white-space: nowrap;
+}

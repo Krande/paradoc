@@ -47,7 +47,10 @@ class HTMLExporter:
     def __init__(self, one_doc: OneDoc):
         self.one_doc = one_doc
 
-    def _build_styled_html(self, include_navbar: bool = True) -> str:
+    def render_body(self, extra_pandoc_args: tuple[str, ...] = ()) -> str:
+        """The document body as HTML: every markdown file (appendices after ``\\appendix``)
+        through pandoc with cross-references resolved. ``extra_pandoc_args`` are appended to
+        pandoc's arguments (the PDF export passes ``--mathml``)."""
         one = self.one_doc
 
         md_main_str = "\n\n".join([md.read_built_file() for md in one.md_files_main])
@@ -62,6 +65,7 @@ class HTMLExporter:
             "-RTS",
             f"--metadata-file={one.metadata_file}",
             *crossref_args(one.chapter_numbering),
+            *extra_pandoc_args,
         ]
         # Shelf citation filter is appended after pandoc-crossref so
         # cross-references are already resolved by the time we walk
@@ -75,6 +79,11 @@ class HTMLExporter:
                 extra_args=extra_args,
                 filters=filters,
             )
+        return html_str
+
+    def _build_styled_html(self, include_navbar: bool = True) -> str:
+        one = self.one_doc
+        html_str = self.render_body()
 
         js_script = ""
         if include_navbar:
