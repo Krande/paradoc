@@ -1,5 +1,16 @@
 import { useState } from 'react'
 import type { DocManifest, SectionBundle } from '../ast/types'
+import {
+  findPlot,
+  findTable,
+  getTable,
+  hasPlotSource,
+  hasTableSource,
+  loadPlot,
+  resolveKey,
+} from './dataSources'
+import { bulkPlotSource, fetchSectionRun } from './dataSources'
+import type { PlotIndexEntry, PlotSourceSpec } from './dataSources'
 
 // Very small IndexedDB helper. Bump the version when adding stores.
 type StoreName =
@@ -297,8 +308,24 @@ export async function storePlotData(docId: string, plotKey: string, plotData: Pl
 }
 
 export async function getPlotData(docId: string, plotKey: string): Promise<PlotData | undefined> {
+  // Static / REST: the registered source fetches the plot on first use.
+  if (hasPlotSource(docId)) return (await loadPlot(docId, plotKey)) as PlotData | undefined
+  // WebSocket live view: the relay wrote it to IndexedDB.
   const key = `${docId}:${plotKey}`
   return await dbGet<PlotData>('plots', key)
+}
+
+/**
+ * The plot key a figure's id resolves to (exact, or without a `_N` suffix) when the document has
+ * interactive data for it; undefined otherwise. Never loads the plot itself.
+ */
+export async function resolvePlotKey(docId: string, plotKey: string): Promise<string | undefined> {
+  if (hasPlotSource(docId)) return findPlot(docId, plotKey)
+  const found = new Set<string>()
+  for (const k of [plotKey, plotKey.replace(/_\d+$/, '')]) {
+    if (!found.has(k) && (await dbGet<PlotData>('plots', `${docId}:${k}`))) found.add(k)
+  }
+  return resolveKey(plotKey, (k) => found.has(k))
 }
 
 // Table data storage helpers
@@ -321,8 +348,19 @@ export async function storeTableData(docId: string, tableKey: string, tableData:
 }
 
 export async function getTableData(docId: string, tableKey: string): Promise<TableData | undefined> {
+  if (hasTableSource(docId)) return getTable(docId, tableKey) as TableData | undefined
   const key = `${docId}:${tableKey}`
   return await dbGet<TableData>('tables', key)
+}
+
+/** Like `resolvePlotKey`, for a table's interactive data. */
+export async function resolveTableKey(docId: string, tableKey: string): Promise<string | undefined> {
+  if (hasTableSource(docId)) return findTable(docId, tableKey)
+  const found = new Set<string>()
+  for (const k of [tableKey, tableKey.replace(/_\d+$/, '')]) {
+    if (!found.has(k) && (await dbGet<TableData>('tables', `${docId}:${k}`))) found.add(k)
+  }
+  return resolveKey(tableKey, (k) => found.has(k))
 }
 
 // ========================================
@@ -352,19 +390,33 @@ export function getStaticBasePath(): string {
 }
 
 /**
- * Load all static data files and return the loaded data.
- * This is the main entry point for static mode.
+ * Load the static data files. This is the main entry point for static mode.
+ *
+ * Plot data is not loaded here: `plots_index.json` names the plots that have interactive data and
+ * the file each one's data lives in, fetched when a reader switches that figure to interactive.
+ * An export written before the per-plot split has only `plots.json`; it is fetched whole, as
+ * before, and served from memory.
  */
 export async function loadStaticData(): Promise<{
   manifest: DocManifest
   sections: SectionBundle[]
   images: Record<string, { data: string; mimeType: string }>
-  plots: Record<string, PlotData>
+  plots: PlotSourceSpec
   tables: Record<string, TableData>
 }> {
   const basePath = getStaticBasePath()
 
-  // Load manifest
+  // Start the optional side files with the manifest; none of them depends on it.
+  const plotsP = loadStaticPlotSource(basePath)
+  const tablesP = (async () => {
+    try {
+      const res = await fetch(`${basePath}tables.json`, { cache: 'no-store' })
+      return res.ok ? ((await res.json()) as Record<string, TableData>) : {}
+    } catch {
+      return {} // tables.json is optional
+    }
+  })()
+
   const manifestRes = await fetch(`${basePath}manifest.json`, { cache: 'no-store' })
   if (!manifestRes.ok) {
     throw new Error(`Failed to load manifest: ${manifestRes.status} ${manifestRes.statusText}`)
@@ -376,20 +428,17 @@ export async function loadStaticData(): Promise<{
   // bundle on disk — paradoc splits content by H1 only and numbers
   // those bundles 0..N-1 contiguously. Fetch by H1 count rather than
   // by manifest index so we don't issue dozens of 404s for every
-  // nested H2/H3 in the FEA verification report.
+  // nested H2/H3.
   const h1Count = manifest.sections.filter((s: any) => (s.level ?? 1) === 1).length
   const numBundles = Math.max(h1Count, 1)
-  const sections: SectionBundle[] = []
-  for (let idx = 0; idx < numBundles; idx += 1) {
-    const sectionRes = await fetch(`${basePath}sections/${idx}.json`, { cache: 'no-store' })
-    if (sectionRes.ok) {
-      const bundle = await sectionRes.json() as SectionBundle
-      sections.push(bundle)
-    } else {
-      console.warn(`Failed to load section ${idx}: ${sectionRes.status}`)
-      break
+  const sections = await fetchSectionRun<SectionBundle>(numBundles, async (idx) => {
+    const res = await fetch(`${basePath}sections/${idx}.json`, { cache: 'no-store' })
+    if (!res.ok) {
+      console.warn(`Failed to load section ${idx}: ${res.status}`)
+      return undefined
     }
-  }
+    return (await res.json()) as SectionBundle
+  })
 
   // Images are no longer bundled into `images.json` (the legacy ~10 MB
   // base64 dict that gated the page render). The static exporter now
@@ -399,29 +448,37 @@ export async function loadStaticData(): Promise<{
   // empty seed for back-compat with the existing call shape.
   const images: Record<string, { data: string; mimeType: string }> = {}
 
-  // Load plots (optional)
-  let plots: Record<string, PlotData> = {}
+  const [plots, tables] = await Promise.all([plotsP, tablesP])
+  return { manifest, sections, images, plots, tables }
+}
+
+async function loadStaticPlotSource(basePath: string): Promise<PlotSourceSpec> {
   try {
-    const plotsRes = await fetch(`${basePath}plots.json`, { cache: 'no-store' })
-    if (plotsRes.ok) {
-      plots = await plotsRes.json()
+    const res = await fetch(`${basePath}plots_index.json`, { cache: 'no-store' })
+    if (res.ok) {
+      const index = (await res.json()) as Record<string, PlotIndexEntry>
+      return {
+        index,
+        fetch: async (key, entry) => {
+          const file = entry.file || `_plots/${encodeURIComponent(key)}.json`
+          const r = await fetch(`${basePath}${file.split('/').map(encodeURIComponent).join('/')}`)
+          if (!r.ok) throw new Error(`plot ${key}: HTTP ${r.status}`)
+          return await r.json()
+        },
+      }
     }
+  } catch {
+    // fall through to the bulk file
+  }
+  // Export written before the per-plot split: only the bulk `plots.json` exists.
+  let bulk: Record<string, PlotData> = {}
+  try {
+    const res = await fetch(`${basePath}plots.json`, { cache: 'no-store' })
+    if (res.ok) bulk = await res.json()
   } catch {
     // plots.json is optional
   }
-
-  // Load tables (optional)
-  let tables: Record<string, TableData> = {}
-  try {
-    const tablesRes = await fetch(`${basePath}tables.json`, { cache: 'no-store' })
-    if (tablesRes.ok) {
-      tables = await tablesRes.json()
-    }
-  } catch {
-    // tables.json is optional
-  }
-
-  return { manifest, sections, images, plots, tables }
+  return bulkPlotSource(bulk)
 }
 
 /**

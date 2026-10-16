@@ -161,6 +161,7 @@ class OneDoc:
         shelf_base_url=None,
         runner=None,
         doc_root=None,
+        chapter_numbering=True,
         **kwargs,
     ):
         # `runner` is an optional `paradoc.tasks.Runner` whose DAG has
@@ -204,6 +205,9 @@ class OneDoc:
         self.md_files_app = []
         self.metadata_file = None
         self.use_default_html_style = use_default_html_style
+        # Chapter-scoped figure/table/equation numbers ("Figure 6.3", "Table A.1" in appendices)
+        # instead of one running count. See paradoc.numbering.
+        self.chapter_numbering = bool(chapter_numbering)
 
         # Shelf citation deep-link config. ``bibliography_file`` points
         # to a YAML file with CSL-style `references:` entries; the
@@ -564,12 +568,18 @@ class OneDoc:
                     request_field_update_on_open(dest_file, request=False)
             converter = wordx
         elif export_format == ExportFormats.PDF:
-            from paradoc.io.pdf.exporter import PdfExporter, resolve_pdf_engine
-
-            resolve_pdf_engine()  # fail before the (long) conversion when no engine is installed
             # `pdf_config`: a PdfExportConfig -- from `[build.<profile>.pdf]` when built through
             # paradoc.tasks, or passed by a caller directly; None means the defaults.
-            pdf = PdfExporter(self, config=kwargs.get("pdf_config"))
+            pdf_config = kwargs.get("pdf_config")
+            if pdf_config is not None and pdf_config.engine == "chromium":
+                from paradoc.io.pdf.chromium import ChromiumPdfExporter
+
+                pdf = ChromiumPdfExporter(self, config=pdf_config)
+            else:
+                from paradoc.io.pdf.exporter import PdfExporter, resolve_pdf_engine
+
+                resolve_pdf_engine()  # fail before the (long) conversion when no engine is installed
+                pdf = PdfExporter(self, config=pdf_config)
             pdf.export(dest_file)
             converter = pdf
         elif export_format == ExportFormats.ODT:
@@ -744,12 +754,12 @@ class OneDoc:
 
                 # Write to cache
                 try:
-                    fig.write_image(str(cache_png), format="png")
+                    fig.write_image(str(cache_png), format="png", width=width, height=height)
                 except Exception:
                     from plotly.io._kaleido import get_chrome
 
                     get_chrome()
-                    fig.write_image(str(cache_png), format="png")
+                    fig.write_image(str(cache_png), format="png", width=width, height=height)
                 cache_timestamp.write_text(str(db_timestamp), encoding="utf-8")
                 logger.info(f'Rendered and cached plot "{key_clean}"')
             except Exception as e:
@@ -909,6 +919,8 @@ class OneDoc:
         # Prepare lists for batch rendering
         figures = []
         file_paths = []
+        widths = []
+        heights = []
         cache_keys = []
         timestamps_to_write = []
 
@@ -923,6 +935,9 @@ class OneDoc:
                 # Add to batch lists
                 figures.append(fig)
                 file_paths.append(str(cache_png))
+                # kaleido 1.x ignores the layout size on export: pass it explicitly as well.
+                widths.append(width)
+                heights.append(height)
                 cache_keys.append(cache_key)
                 timestamps_to_write.append((cache_timestamp, db_timestamp))
 
@@ -940,13 +955,13 @@ class OneDoc:
 
             # Initialize kaleido once before batch processing
             try:
-                pio.write_images(fig=figures, file=file_paths, format="png")
+                pio.write_images(fig=figures, file=file_paths, format="png", width=widths, height=heights)
             except Exception:
                 # Fallback to ensure chrome is initialized
                 from plotly.io._kaleido import get_chrome
 
                 get_chrome()
-                pio.write_images(fig=figures, file=file_paths, format="png")
+                pio.write_images(fig=figures, file=file_paths, format="png", width=widths, height=heights)
 
             # Write timestamp files after successful batch rendering
             for i, (cache_timestamp, db_timestamp) in enumerate(timestamps_to_write):
@@ -962,7 +977,7 @@ class OneDoc:
             logger.info("Falling back to individual plot rendering")
             for i, fig in enumerate(figures):
                 try:
-                    fig.write_image(file_paths[i], format="png")
+                    fig.write_image(file_paths[i], format="png", width=widths[i], height=heights[i])
                     cache_timestamp, db_timestamp = timestamps_to_write[i]
                     cache_timestamp.write_text(str(db_timestamp), encoding="utf-8")
                     logger.info(f'Rendered and cached plot "{cache_keys[i]}"')

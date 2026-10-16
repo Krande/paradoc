@@ -2,7 +2,7 @@
 
 Boots `paradoc.serve.create_app` against a compiled bundle and points
 Playwright at the served URL. Targets the bugs we observed on
-paradoc.krande.no:
+a deployed instance:
 
   - `manifest.sections[].index` references sections that `/api/docs/
     <id>/sections/<idx>` then 404s ("section N fetch failed: HTTP
@@ -193,7 +193,7 @@ def _attach_recorders(page):
 def test_rest_mode_no_section_404s(served_bundle, page, wait_for_frontend):
     """`loadRestData` iterates `manifest.sections[].index`. Every
     promised index must resolve via `/api/docs/<id>/sections/<idx>`.
-    The paradoc.krande.no incident logged
+    The deployed-instance incident logged
     `[paradoc] section 5 fetch failed: HTTP 404` for indices 5-9 —
     the manifest claimed they existed but the section endpoint 404'd.
     """

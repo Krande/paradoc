@@ -2,6 +2,7 @@ import React from 'react'
 import { Modal } from './Modal'
 import { getRuntimeConfig } from '../transport'
 import { authedFetch } from '../services/auth/oidc'
+import { docApiPath } from '../transport/docScope'
 
 interface BundleFileEntry {
   rel_path: string
@@ -59,7 +60,7 @@ export function BundleFilesModal({ open, onClose, docId }: BundleFilesModalProps
         if (cfg.transport === 'rest') {
           url = joinUrl(
             cfg.apiBase || '',
-            `/api/docs/${encodeURIComponent(docId)}/manifest/files`,
+            docApiPath(docId, '/manifest/files'),
           )
         } else {
           // Static mode: paradoc's exporter writes a sibling
@@ -110,7 +111,7 @@ export function BundleFilesModal({ open, onClose, docId }: BundleFilesModalProps
     if (cfg.transport === 'rest') {
       return joinUrl(
         cfg.apiBase || '',
-        `/api/docs/${encodeURIComponent(docId || '')}/files/${rel}`,
+        docApiPath(docId || '', `/files/${rel}`),
       )
     }
     const w = window as any

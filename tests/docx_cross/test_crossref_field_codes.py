@@ -1,6 +1,7 @@
 """Test that SEQ fields are created in captions for figures, tables, and equations across sections."""
 
 import base64
+import re
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -178,13 +179,12 @@ Summary with references to all elements:
         para_text = "".join([t.text for t in para.findall(".//w:t", nsmap) if t.text])
 
         # Check if this is a caption or cross-reference paragraph
-        # Captions have format: "Figure 1-1:" or "Table 2-3:" not "Subsection 1.1:"
-        # Equations are inline captions in the math paragraph: "... (Eq. 1-1)"
+        # Captions have format: "Figure 1.1:" or "Table A.3:" not "Subsection 1.1:"
+        # Equations are inline captions in the math paragraph: "... (Eq. 1.1)"
+        chapter_number = re.search(r"(?:[A-Z]|\d)[.\-]\d", para_text) is not None
         is_caption = (
-            (para_text.startswith("Figure ") or para_text.startswith("Table "))
-            and "-" in para_text
-            and ":" in para_text
-        ) or ("(Eq." in para_text and "-" in para_text and ")" in para_text)
+            (para_text.startswith("Figure ") or para_text.startswith("Table ")) and chapter_number and ":" in para_text
+        ) or ("(Eq." in para_text and chapter_number and ")" in para_text)
 
         if is_caption:
             # Analyze caption structure in detail
@@ -193,7 +193,7 @@ Summary with references to all elements:
                 "para_text": para_text[:80],
                 "seq_field": None,
                 "styleref_field": None,
-                "has_hyphen": "-" in para_text,
+                "has_separator": chapter_number,
                 "label": None,
             }
 
@@ -277,7 +277,7 @@ Summary with references to all elements:
     for cap in caption_structures:
         print(f"Caption at Para {cap['para_idx']}: {cap['label'] or 'Unknown'}")
         print(f"  Text: {cap['para_text']}")
-        print(f"  Has hyphen separator: {cap['has_hyphen']}")
+        print(f"  Has chapter separator: {cap['has_separator']}")
         print(f"  STYLEREF field: {cap['styleref_field'] or 'NOT FOUND ❌'}")
         print(f"  SEQ field: {cap['seq_field'] or 'NOT FOUND ❌'}")
         print()
@@ -392,9 +392,9 @@ Summary with references to all elements:
             f"Caption at para {cap['para_idx']} MISSING SEQ field. "
             f"Valid Word captions MUST have SEQ for numbering. Caption: {cap['para_text']}"
         )
-        assert cap["has_hyphen"], (
-            f"Caption at para {cap['para_idx']} MISSING hyphen separator. "
-            f"Valid Word captions use format 'Label STYLEREF-SEQ: Text'. Caption: {cap['para_text']}"
+        assert cap["has_separator"], (
+            f"Caption at para {cap['para_idx']} MISSING chapter separator. "
+            f"Valid Word captions use format 'Label STYLEREF.SEQ: Text'. Caption: {cap['para_text']}"
         )
 
     # Verify equation captions have STYLEREF and SEQ fields (they use inline format)
@@ -407,12 +407,12 @@ Summary with references to all elements:
             f"Equation caption at para {cap['para_idx']} MISSING SEQ field. "
             f"Valid Word equation captions MUST have SEQ for numbering. Caption: {cap['para_text']}"
         )
-        assert cap["has_hyphen"], (
-            f"Equation caption at para {cap['para_idx']} MISSING hyphen separator. "
-            f"Valid Word equation captions use format '(Eq. STYLEREF-SEQ)'. Caption: {cap['para_text']}"
+        assert cap["has_separator"], (
+            f"Equation caption at para {cap['para_idx']} MISSING chapter separator. "
+            f"Valid Word equation captions use format '(Eq. STYLEREF.SEQ)'. Caption: {cap['para_text']}"
         )
 
-    print("[OK] All captions have required STYLEREF and SEQ fields with hyphen separator")
+    print("[OK] All captions have required STYLEREF and SEQ fields with chapter separator")
 
     # REQUIREMENT 2: SEQ fields must have correct structure
     assert len(fig_seq_fields) >= 2, (

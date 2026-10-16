@@ -58,7 +58,13 @@ class DocXTableRef:
         tbl = self.docx_table
         return tbl.rows[1].cells[0].paragraphs[0]
 
-    def format_table(self, is_appendix: bool, restart_caption_numbering: bool = False, reference_helper=None):
+    def format_table(
+        self,
+        is_appendix: bool,
+        restart_caption_numbering: bool = False,
+        reference_helper=None,
+        chapter_numbering: bool = True,
+    ):
         """Format the table and its caption with proper styling and numbering.
 
         Args:
@@ -79,7 +85,14 @@ class DocXTableRef:
         # Format table Caption
         self.docx_caption.paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
-        rebuild_caption(self.docx_caption, "Table", self.table_ref.caption, is_appendix, restart_caption_numbering)
+        rebuild_caption(
+            self.docx_caption,
+            "Table",
+            self.table_ref.caption,
+            is_appendix,
+            restart_caption_numbering,
+            chapter_numbering=chapter_numbering,
+        )
 
         # Add bookmark around the caption number for Word cross-references
         if self.table_ref.link_name_override or self.table_ref.name:
@@ -144,7 +157,13 @@ class DocXFigureRef:
     document_index: int = None
     actual_bookmark_name: str = None  # Store the actual Word-style bookmark name
 
-    def format_figure(self, is_appendix: bool, restart_caption_numbering: bool, reference_helper=None):
+    def format_figure(
+        self,
+        is_appendix: bool,
+        restart_caption_numbering: bool,
+        reference_helper=None,
+        chapter_numbering: bool = True,
+    ):
         """Format the figure caption with proper styling and numbering.
 
         Args:
@@ -159,7 +178,14 @@ class DocXFigureRef:
         self.docx_caption.paragraph_format.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
         # Rebuild caption without bookmark
-        rebuild_caption(self.docx_caption, "Figure", self.figure_ref.caption, is_appendix, restart_caption_numbering)
+        rebuild_caption(
+            self.docx_caption,
+            "Figure",
+            self.figure_ref.caption,
+            is_appendix,
+            restart_caption_numbering,
+            chapter_numbering=chapter_numbering,
+        )
 
         # Add bookmark around the caption number (SEQ field) for Word cross-references
         if self.figure_ref.reference:
@@ -196,16 +222,22 @@ class DocXEquationRef:
     document_index: int = None
     actual_bookmark_name: str = None  # Store the actual Word-style bookmark name
 
-    def format_equation(self, is_appendix: bool, restart_caption_numbering: bool = False, reference_helper=None):
+    def format_equation(
+        self,
+        is_appendix: bool,
+        restart_caption_numbering: bool = False,
+        reference_helper=None,
+        chapter_numbering: bool = True,
+    ):
         """Format the equation by replacing pandoc-crossref's number with proper SEQ field caption.
 
         Pandoc-crossref adds a number like "(1)" to equations. This method:
         1. Finds and removes the pandoc-crossref number (e.g., "(1)", "(2)")
-        2. Replaces it with proper caption "(Eq. 1-1)" with SEQ fields
+        2. Replaces it with proper caption "(Eq. 1.1)" with SEQ fields
         3. Wraps a bookmark around just the caption for cross-referencing
 
         The result is an equation like:
-        E = mc^2                                                (Eq. 1-1)
+        E = mc^2                                                (Eq. 1.1)
 
         Args:
             is_appendix: Whether this equation is in the appendix
@@ -350,8 +382,8 @@ class DocXEquationRef:
         insertion_point = pandoc_number_run if pandoc_number_run else None
 
         # Build the caption with SEQ fields
-        # Format: "(Eq. STYLEREF-SEQ)" but bookmark wraps only "Eq. STYLEREF-SEQ" (without parentheses)
-        heading_ref = '"Appendix"' if is_appendix else '"Heading 1"'
+        # Format: "(Eq. STYLEREF.SEQ)" but bookmark wraps only "Eq. STYLEREF.SEQ" (without parentheses)
+        from .captions import CHAPTER_SEPARATOR, chapter_styleref, seq_instruction
 
         # Create runs for the caption
         # First, add a tab to push the number to the right
@@ -390,24 +422,24 @@ class DocXEquationRef:
 
         # STYLEREF field for chapter number
         styleref_run_elem = p_element._new_r()
-        add_seq_reference(styleref_run_elem, f"STYLEREF \\s {heading_ref} \\n", eq_para)
+        add_seq_reference(
+            styleref_run_elem, chapter_styleref(is_appendix), eq_para, placeholder="A" if is_appendix else "1"
+        )
 
-        # Hyphen separator
+        # Chapter separator
         hyphen_run_elem = p_element._new_r()
         t_elem = OxmlElement("w:t")
-        t_elem.text = "-"
+        t_elem.text = CHAPTER_SEPARATOR
         hyphen_run_elem.append(t_elem)
 
         # SEQ field for equation number
-        if restart_caption_numbering:
-            seq_instruction = "SEQ Equation \\* ARABIC \\r 1 \\s 1"
-        else:
-            seq_instruction = "SEQ Equation \\* ARABIC \\s 1"
-
         seq_run_elem = p_element._new_r()
-        add_seq_reference(seq_run_elem, seq_instruction, eq_para)
+        add_seq_reference(
+            seq_run_elem, seq_instruction("Equation", restart_caption_numbering, chapter_numbering), eq_para
+        )
+        chapter_runs = [styleref_run_elem, hyphen_run_elem] if chapter_numbering else []
 
-        # Bookmark end (wraps "Eq. 1-1" without parentheses)
+        # Bookmark end (wraps "Eq. 1.1" without parentheses)
         bookmark_end = OxmlElement("w:bookmarkEnd")
         bookmark_end.set(qn("w:id"), bookmark_start.get(qn("w:id")))
 
@@ -424,8 +456,8 @@ class DocXEquationRef:
             insertion_point.addprevious(open_paren_run_elem)
             insertion_point.addprevious(bookmark_start)
             insertion_point.addprevious(eq_label_run_elem)
-            insertion_point.addprevious(styleref_run_elem)
-            insertion_point.addprevious(hyphen_run_elem)
+            for elem in chapter_runs:
+                insertion_point.addprevious(elem)
             insertion_point.addprevious(seq_run_elem)
             insertion_point.addprevious(bookmark_end)
             insertion_point.addprevious(close_paren_run_elem)
@@ -437,8 +469,8 @@ class DocXEquationRef:
             p_element.append(open_paren_run_elem)
             p_element.append(bookmark_start)
             p_element.append(eq_label_run_elem)
-            p_element.append(styleref_run_elem)
-            p_element.append(hyphen_run_elem)
+            for elem in chapter_runs:
+                p_element.append(elem)
             p_element.append(seq_run_elem)
             p_element.append(bookmark_end)
             p_element.append(close_paren_run_elem)

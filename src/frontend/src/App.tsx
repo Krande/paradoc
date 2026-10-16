@@ -12,14 +12,45 @@ import { AuthCallback } from './components/auth/AuthCallback'
 import InlineWorker from './ws/worker.ts?worker&inline'
 
 import { useSectionStore, storeEmbeddedImage, storePlotData, storeTableData, isStaticMode, detectStaticMode, loadStaticData } from './sections/store'
+import { registerPlotSource, registerTables } from './sections/dataSources'
 import { initTransport, getRuntimeConfig } from './transport'
-import { loadRestData } from './transport/loadRestData'
+import { loadRestData, RestLoadError } from './transport/loadRestData'
+import type { LoadRestResult } from './transport/loadRestData'
+import {
+  PERSONAL_SCOPE,
+  getDocScope,
+  normalizeScope,
+  readDocSelection,
+  setDocScope,
+  writeDocSelection,
+} from './transport/docScope'
 import type { DocManifest, SectionBundle } from './ast/types'
 import { VirtualReader } from './components/VirtualReader'
 import { LandingPage } from './components/LandingPage'
+import { LibraryView } from './components/library/LibraryView'
+import { recordOpen } from './components/library/libraryModel'
+import type { ShellView } from './components/Topbar'
 import { calculateHeadingNumbers } from './ast/headingNumbers'
 import { SourceDisplayProvider } from './store/sourceDisplayStore'
 import { ViewerControlsProvider } from './store/viewerControlsStore'
+
+// Query params owned by the Library view (`?view=library&in=..&sort=..&layout=..&q=..`).
+const LIBRARY_PARAMS = ['view', 'in', 'sort', 'layout', 'q']
+
+function readLibraryFlag(): boolean {
+  try {
+    return new URLSearchParams(window.location.search).get('view') === 'library'
+  } catch {
+    return false
+  }
+}
+
+/** Local open-history for the landing page's "Recent". */
+function rememberOpened(id: string, scope?: string) {
+  try {
+    recordOpen(window.localStorage, id, normalizeScope(scope) || 'shared', Date.now())
+  } catch {}
+}
 
 function AppContent() {
   const {
@@ -185,15 +216,39 @@ function AppContent() {
     }
   }, [])
 
-  // Resolve docId from URL (?doc=...) or hash (#doc=...)
+  // Resolve docId (+ optional scope) from URL (?doc=...&scope=...) or
+  // hash (#doc=...&scope=...). The scope is registered before the id is
+  // set so the REST loader routes to the right /api/scopes/... prefix.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const q = params.get('doc')
-    if (q) setDocId(q)
-    else {
-      const m = /doc=([^&]+)/.exec(window.location.hash)
-      if (m) setDocId(decodeURIComponent(m[1]))
+    const sel = readDocSelection(window.location)
+    if (sel) {
+      setDocScope(sel.docId, sel.scope)
+      setDocId(sel.docId)
+      rememberOpened(sel.docId, sel.scope)
     }
+  }, [])
+
+  // Landing vs Library when no doc is open (REST mode): `?view=library`.
+  const [libraryView, setLibraryView] = React.useState(() => readLibraryFlag())
+
+  // Back / forward: follow the URL's doc + view instead of leaving the old doc on screen.
+  useEffect(() => {
+    // REST only: static / WS docs are not addressed by the URL, and in-page hash
+    // navigation fires popstate too.
+    if (getRuntimeConfig().transport !== 'rest') return
+    const onPop = () => {
+      setLibraryView(readLibraryFlag())
+      const sel = readDocSelection(window.location)
+      const nextId = sel?.docId || ''
+      const current = useAppStore.getState().docId
+      if (nextId !== current || (nextId && normalizeScope(sel?.scope) !== getDocScope(nextId))) {
+        resetSections()
+        if (nextId) setDocScope(nextId, sel?.scope)
+        setDocId(nextId)
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
   }, [])
 
   // Static mode: Load data from static JSON files if available
@@ -225,34 +280,17 @@ function AppContent() {
         const data = await loadStaticData()
         const currentDocId = (data.manifest as any).docId || 'static-doc'
 
-        // Set manifest
+        // Plot and table data stay in memory: the plot index now, each plot's data when a reader
+        // switches it to interactive. Writing every plot and table to IndexedDB at load was
+        // seconds of main-thread work on a large report.
+        registerPlotSource(currentDocId, data.plots.index, data.plots.fetch)
+        registerTables(currentDocId, data.tables)
         setManifest(data.manifest)
         setDocId(currentDocId)
 
         // Load all sections
         for (const bundle of data.sections) {
           upsertSection(bundle)
-        }
-
-        // Store images in IndexedDB
-        for (const [path, imgData] of Object.entries(data.images)) {
-          await storeEmbeddedImage(currentDocId, path, imgData.data, imgData.mimeType).catch(err => {
-            console.warn(`Failed to store embedded image ${path}:`, err)
-          })
-        }
-
-        // Store plots in IndexedDB
-        for (const [plotKey, plotData] of Object.entries(data.plots)) {
-          await storePlotData(currentDocId, plotKey, plotData).catch(err => {
-            console.warn(`Failed to store plot data ${plotKey}:`, err)
-          })
-        }
-
-        // Store tables in IndexedDB
-        for (const [tableKey, tableData] of Object.entries(data.tables)) {
-          await storeTableData(currentDocId, tableKey, tableData).catch(err => {
-            console.warn(`Failed to store table data ${tableKey}:`, err)
-          })
         }
 
         console.log('Paradoc: Successfully loaded static document')
@@ -276,31 +314,39 @@ function AppContent() {
     let canceled = false
     ;(async () => {
       try {
-        const data = await loadRestData(cfg.apiBase || '', docId)
+        const apiBase = cfg.apiBase || ''
+        let data: LoadRestResult
+        try {
+          data = await loadRestData(apiBase, docId)
+        } catch (err) {
+          // Old links carry only ?doc=<id> (shared). If the shared
+          // manifest 404s, probe the personal scope once before giving
+          // up — personal docs published before ?scope= existed would
+          // otherwise be unreachable from a bookmarked link.
+          if (!(err instanceof RestLoadError && err.status === 404) || getDocScope(docId)) {
+            throw err
+          }
+          setDocScope(docId, PERSONAL_SCOPE)
+          try {
+            data = await loadRestData(apiBase, docId)
+          } catch {
+            setDocScope(docId, undefined)
+            throw err
+          }
+          if (canceled) return
+          try {
+            const url = writeDocSelection(new URL(window.location.href), docId, PERSONAL_SCOPE)
+            window.history.replaceState(window.history.state, '', url.toString())
+          } catch {}
+        }
         if (canceled) return
+        // Register the plot index (data fetched per plot, on demand) and the tables so
+        // InteractiveFigure / InteractiveTable can offer the static/interactive toggle.
+        registerPlotSource(docId, data.plots.index, data.plots.fetch)
+        registerTables(docId, data.tables)
         setManifest(data.manifest)
         for (const bundle of data.sections) upsertSection(bundle)
 
-        // Seed IndexedDB with bulk plots/tables/images so InteractiveFigure
-        // and InteractiveTable can detect available data and offer the
-        // static/interactive toggle — same flow the static-mode block above
-        // uses. Without this, the toggle stays hidden because the IndexedDB
-        // probe in those components misses on every island.
-        for (const [path, imgData] of Object.entries(data.images)) {
-          await storeEmbeddedImage(docId, path, imgData.data, imgData.mimeType).catch((err) => {
-            console.warn(`[paradoc] failed to store image ${path}:`, err)
-          })
-        }
-        for (const [plotKey, plotData] of Object.entries(data.plots)) {
-          await storePlotData(docId, plotKey, plotData).catch((err) => {
-            console.warn(`[paradoc] failed to store plot ${plotKey}:`, err)
-          })
-        }
-        for (const [tableKey, tableData] of Object.entries(data.tables)) {
-          await storeTableData(docId, tableKey, tableData).catch((err) => {
-            console.warn(`[paradoc] failed to store table ${tableKey}:`, err)
-          })
-        }
       } catch (err) {
         console.warn('[paradoc] REST load failed', err)
       }
@@ -310,25 +356,50 @@ function AppContent() {
     }
   }, [docId, state.manifest])
 
-  const handleSelectDoc = (id: string) => {
-    if (id === docId) return
+  // `scope` is the URL-form doc scope (`user:me`, `project:<slug>`);
+  // omitted / `shared` means the legacy shared scope.
+  const handleSelectDoc = (id: string, scope?: string) => {
+    const nextScope = normalizeScope(scope)
+    if (id === docId && (!id || nextScope === getDocScope(id))) return
     // Drop the previous doc's manifest + sections so the REST loader's
     // `if (state.manifest) return` short-circuit lifts and we actually
     // refetch for the new doc.
     resetSections()
+    if (id) setDocScope(id, nextScope)
     setDocId(id)
+    if (id) {
+      rememberOpened(id, nextScope)
+      setLibraryView(false)
+    }
     try {
-      const url = new URL(window.location.href)
-      if (id) {
-        url.searchParams.set('doc', id)
-      } else {
-        // Empty id = "back to landing" (clicked the brand mark). Drop
-        // the ?doc= param so a refresh stays on the landing page.
-        url.searchParams.delete('doc')
-      }
+      // Empty id = "back to landing" (clicked the brand mark): drops
+      // ?doc= and ?scope= so a refresh stays on the landing page.
+      // Shared docs omit ?scope= so old links keep working. Opening a doc
+      // also drops the Library's view state.
+      const url = writeDocSelection(new URL(window.location.href), id, nextScope)
+      if (id) for (const k of LIBRARY_PARAMS) url.searchParams.delete(k)
       window.history.pushState({}, '', url.toString())
     } catch {}
   }
+
+  // Leave the open doc (if any) for the landing page or the Library, as one history entry.
+  const showShell = (library: boolean, scope?: string) => {
+    if (getRuntimeConfig().transport !== 'rest') return
+    if (docId) {
+      resetSections()
+      setDocId('')
+    }
+    setLibraryView(library)
+    try {
+      const url = writeDocSelection(new URL(window.location.href), '')
+      for (const k of LIBRARY_PARAMS) url.searchParams.delete(k)
+      if (library) url.searchParams.set('view', 'library')
+      if (library && scope) url.searchParams.set('in', scope)
+      if (url.toString() !== window.location.href) window.history.pushState({}, '', url.toString())
+    } catch {}
+  }
+  const goHome = () => showShell(false)
+  const openLibrary = (scope?: string) => showShell(true, scope)
 
   // Handle global keyboard shortcuts
   useEffect(() => {
@@ -344,6 +415,10 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  const restMode = getRuntimeConfig().transport === 'rest'
+  // Landing / Library replace the reader when no doc is open in REST mode.
+  const view: ShellView = state.manifest || !restMode || docId ? 'reader' : libraryView ? 'library' : 'home'
+
   return (
     // `h-dvh` (dynamic-viewport, not `100vh`) so mobile browsers' URL
     // bar show/hide doesn't leave the layout mis-sized vs the visible
@@ -353,7 +428,7 @@ function AppContent() {
     // and scrolls internally (with `min-h-screen` the root grew to
     // fit content, clientHeight = scrollHeight, wheel was a no-op).
     <div className="flex h-dvh overflow-hidden">
-      <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {view === 'reader' && <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />}
       {/* `min-w-0` is essential alongside `flex-1`: default flex
           `min-width: auto` lets the column grow to fit content
           (e.g. the 3D viewer's canvas, which is sized from
@@ -361,22 +436,25 @@ function AppContent() {
           past the viewport on narrow screens. */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
         <Topbar
+          view={view}
           connected={connected}
           frontendId={frontendId}
           docId={docId}
+          docScope={(docId && getDocScope(docId)) || 'shared'}
           onSelectDoc={handleSelectDoc}
+          onHome={goHome}
+          onOpenLibrary={openLibrary}
+          onOpenSearch={() => setSearchBarOpen(true)}
           connectedFrontends={connectedFrontends}
           processInfo={processInfo}
           logFilePath={logFilePath}
           workerRef={workerRef}
           onToggleSidebar={toggleSidebar} />
         {state.manifest ? (
-          <VirtualReader docId={docId} manifest={state.manifest} sections={state.sections} />
+          <VirtualReader key={docId} docId={docId} manifest={state.manifest} sections={state.sections} />
         ) : (() => {
-          const cfg = getRuntimeConfig()
-          if (cfg.transport === 'rest' && !docId) {
-            return <LandingPage onSelect={handleSelectDoc} />
-          }
+          if (view === 'library') return <LibraryView onSelect={handleSelectDoc} />
+          if (view === 'home') return <LandingPage onSelect={handleSelectDoc} onOpenLibrary={() => openLibrary()} />
           return (
             <div className="flex-1 overflow-auto p-6">
               <div className="text-sm text-gray-500 dark:text-gray-400">Waiting for document manifest…</div>

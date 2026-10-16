@@ -61,6 +61,12 @@ class DocGroup:
     doc_ids: tuple[str, ...]
 
 
+def check_doc_id(doc_id: str) -> None:
+    """Refuse a doc id that is not one plain path segment (empty, ``.``/``..``, or with a separator)."""
+    if not doc_id or doc_id in (".", "..") or "/" in doc_id or "\\" in doc_id:
+        raise PermissionError(f"doc_id {doc_id!r} is not a single path segment")
+
+
 class DocStore(ABC):
     """Read-only access to a built doc bundle, independent of storage.
 
@@ -83,6 +89,15 @@ class DocStore(ABC):
         Default returns an empty list; backends override.
         """
         return []
+
+    def delete_doc(self, doc_id: str, *, scope: Optional["Scope"] = None) -> int:
+        """Remove every file of the doc's bundle within ``scope``.
+
+        Returns the number of files removed; 0 means there was no such doc. Implementations must
+        refuse a ``doc_id`` that is not a single path segment. Read-only stores raise
+        ``NotImplementedError``.
+        """
+        raise NotImplementedError
 
     def put_bundle_file(
         self,
@@ -221,6 +236,15 @@ class DocStore(ABC):
 
     def get_static_tables_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         """Return the raw bytes of `static/tables.json`."""
+        return None
+
+    def get_static_file_bytes(self, doc_id: str, rel: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
+        """Return the raw bytes of `static/<rel>`, or None when absent.
+
+        Generic accessor for the static-export files that have no dedicated method (the plot index
+        and the per-plot files, see `paradoc.docstore.static_plots`). `rel` is bundle-static-relative
+        and must not escape `static/`.
+        """
         return None
 
     def get_static_images_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:

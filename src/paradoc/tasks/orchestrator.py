@@ -57,6 +57,13 @@ def _dispatch_static(
     )
 
 
+def _deep_merge(base: dict, over: dict) -> dict:
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = _deep_merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+
 def build_document(
     doc_root: Path,
     *,
@@ -69,6 +76,7 @@ def build_document(
     export_format: Any = None,
     compile: bool = True,
     runner_hooks: Optional[dict] = None,
+    pdf_overrides: Optional[dict] = None,
 ):
     """Run the task DAG and compile the document.
 
@@ -98,6 +106,10 @@ def build_document(
         Optional callbacks for testing or instrumentation. Currently
         only `"after_expand"`: `Callable[[Runner], None]`, called before
         execution starts.
+    pdf_overrides : dict | None
+        Values merged (recursively) over the profile's `[build.<profile>.pdf]` table, eg
+        `{"document": {"revision": "B"}}` to print another revision without editing
+        paradoc.toml.
 
     Returns
     -------
@@ -112,6 +124,11 @@ def build_document(
     reset_default_registry()  # idempotent across repeated invocations
 
     config = load_task_config(doc_root / "paradoc.toml", profile=profile)
+    if pdf_overrides:
+        from paradoc.io.pdf.config import PdfExportConfig
+
+        base = config.pdf.model_dump(exclude_unset=True) if config.pdf is not None else {}
+        config.pdf = PdfExportConfig.model_validate(_deep_merge(base, pdf_overrides))
 
     registry = TaskRegistry()
     discover_tasks(doc_root=doc_root, registry=registry)
@@ -170,6 +187,7 @@ def build_document(
             work_dir=work_dir,
             runner=runner,
             doc_root=doc_root,
+            chapter_numbering=config.chapter_numbering,
         )
 
         # Pre-register filters from doc_root (not source_dir) so the

@@ -28,13 +28,16 @@ auth:
   enabled: false
   # Name of a Kubernetes Secret holding the multi-IdP config under
   # `PARADOC_OIDC_PROVIDERS_JSON`. Materialised via ExternalSecret in
-  # the consuming namespace (see workloads/paradoc/externalsecret-oidc.yaml
-  # in k8s-gitops for the canonical shape).
+  # the consuming namespace (an ExternalSecret that writes the JSON
+  # under the key the chart reads).
   providersExistingSecret: ""
   providersExistingSecretKey: PARADOC_OIDC_PROVIDERS_JSON
   # Exact group name (Authentik) or object id (Azure AD) that grants
   # admin role. Matched against the verified token's `groups` claim.
   adminGroup: ""
+  # Emails that also grant admin role (case-insensitive), for sign-ins and
+  # API tokens alike. Checked on every request: removing one revokes at once.
+  adminEmails: []
   # Deprecated; no-op since the OIDC layer landed. Removed in a future
   # cleanup pass.
   requireAuth: false

@@ -1,6 +1,7 @@
 import type { Attr } from './types'
 import { getEmbeddedImage, getStaticBasePath, isStaticMode } from '../sections/store'
 import { getRuntimeConfig } from '../transport'
+import { docApiPath, isDocApiPath } from '../transport/docScope'
 
 /**
  * Check if a URL is absolute or a data URL
@@ -22,10 +23,11 @@ function encodePathSegments(path: string): string {
  *
  * Order of preference (per transport):
  *   1. Absolute / data URLs pass through.
- *   2. Already-API-routed URLs (``/api/docs/...``) pass through. Some
+ *   2. Already-API-routed URLs (``/api/docs/...``, ``/api/scopes/...``) pass through. Some
  *      callers (e.g. Interactive3DFigure's poster) already construct
  *      the full API path; double-prefixing would break them.
- *   3. REST mode + relative path: route through ``/api/docs/{id}/files/...``.
+ *   3. REST mode + relative path: route through ``<doc>/files/...``
+ *      (``docApiPath`` picks the shared or scoped prefix).
  *      ``files/...`` srcs have the leading ``files/`` stripped first
  *      (the endpoint adds it back), so a markdown ``![](files/x.png)``
  *      doesn't end up as ``/files/files/x.png``.
@@ -42,7 +44,7 @@ export async function resolveAssetUrl(src: string, docId?: string): Promise<stri
     if (isAbsoluteOrData(src)) return src
 
     // Already an API path — caller did the routing; don't double-prefix.
-    if (src.startsWith('/api/') || src.includes('/api/docs/')) return src
+    if (src.startsWith('/api/') || isDocApiPath(src)) return src
 
     const cfg = getRuntimeConfig()
     const normalized = src.replace(/^\.\//, '').replace(/^\//, '')
@@ -59,7 +61,7 @@ export async function resolveAssetUrl(src: string, docId?: string): Promise<stri
         : normalized
       return joinUrl(
         apiBase,
-        `/api/docs/${encodeURIComponent(docId)}/files/${encodePathSegments(rel)}`,
+        docApiPath(docId, `/files/${encodePathSegments(rel)}`),
       )
     }
 

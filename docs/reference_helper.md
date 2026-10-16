@@ -57,9 +57,9 @@ ref_helper.convert_all_references(document)  # Convert text to REF fields
 ```
 
 The conversion process:
-1. Scans caption paragraphs to extract display numbers (e.g., "1-1", "2-3")
+1. Scans caption paragraphs to extract display numbers (e.g., "1.1", "2.3", "A.1")
 2. Builds a mapping of display numbers to bookmarks
-3. Finds all text references in the document (e.g., "Figure 1-1")
+3. Finds all text references in the document (e.g., "Figure 1.1")
 4. Replaces them with proper REF fields pointing to the correct bookmarks
 
 ## Architecture
@@ -77,7 +77,7 @@ ReferenceItem
 ├── ref_type: ReferenceType                 # FIGURE, TABLE, or EQUATION
 ├── semantic_id: str                        # "test_figure"
 ├── word_bookmark: str                      # "_Ref306075071"
-├── display_number: str                     # "1-1"
+├── display_number: str                     # "1.1"
 ├── caption_paragraph: Paragraph            # Actual Word paragraph
 └── document_order: int                     # Sequential position
 ```
@@ -148,7 +148,7 @@ The ReferenceHelper now supports two different approaches for converting cross-r
 
 ### 1. Pattern-Based Conversion (Original)
 
-Uses regex patterns to find and convert text references like "Figure 1-1", "Table 2-3", etc.
+Uses regex patterns to find and convert text references like "Figure 1.1", "Table 2.3", "Figure A.1", etc.
 
 ```python
 # After formatting all items

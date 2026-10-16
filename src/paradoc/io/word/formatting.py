@@ -60,7 +60,9 @@ def format_paragraph(pg, document: Document, paragraph_style_map: dict, index):
         next_pg = pg._p.getnext()
 
         pg._p.style = bullet_list_style_name
-        if prev_pg.style != bullet_list_style_name:
+        # The previous sibling can be a table (CT_Tbl, no `.style`) or missing altogether: either
+        # way it is not a bullet, so the list gets its leading space.
+        if getattr(prev_pg, "style", None) != bullet_list_style_name:
             pg.paragraph_format.space_before = Pt(12)
         if next_pg is not None and hasattr(next_pg, "style") and next_pg.style != "Compact":
             pg.paragraph_format.space_after = Pt(12)

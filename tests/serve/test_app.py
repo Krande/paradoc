@@ -187,3 +187,126 @@ def test_me_returns_local_dev_when_auth_disabled(tmp_path, monkeypatch):
     assert body["iss"] == "local-dev"
     assert body["is_admin"] is True
     assert body["subject"] == "local-dev"
+
+
+def _build_scoped_store(tmp_path, user_id, doc_id="demo-doc"):
+    """Multi-doc store with one doc in shared scope and one in
+    ``users/<user_id>`` (personal scope)."""
+    root = tmp_path / "store"
+    shared_bundle, _, _ = _build_bundle(tmp_path / "shared_src", doc_id="shared-doc")
+    personal_src = tmp_path / "personal_src"
+    personal_src.mkdir()
+    personal_bundle, _, _ = _build_bundle(personal_src, doc_id=doc_id)
+    for bundle in (shared_bundle, personal_bundle):
+        static = bundle / "static"
+        static.mkdir()
+        (static / "manifest.json").write_text('{"sections": []}')
+    (root / "shared").mkdir(parents=True)
+    shared_bundle.rename(root / "shared" / "shared-doc")
+    (root / "users" / user_id).mkdir(parents=True)
+    personal_bundle.rename(root / "users" / user_id / doc_id)
+    return root
+
+
+def test_personal_doc_served_via_scoped_routes_and_landing_scope_ref(tmp_path):
+    # A doc published to the personal scope is listed on /api/landing
+    # but only reachable via /api/scopes/user:me/docs/... — the SPA uses
+    # the entry's `scope_ref` to build those URLs.
+    (tmp_path / "shared_src").mkdir()
+    from paradoc.serve import auth as auth_module
+
+    user = auth_module.User(
+        id="11111111-2222-3333-4444-555555555555",
+        iss="test",
+        subject="demo-user",
+        email="demo@example.com",
+        display_name="Demo User",
+        groups=frozenset(),
+        is_admin=False,
+    )
+    root = _build_scoped_store(tmp_path, user.id)
+    app = create_app(doc_store=LocalDocStore(root))
+    app.dependency_overrides[auth_module.current_user] = lambda: user
+    client = TestClient(app)
+
+    landing = client.get("/api/landing").json()
+    assert [(d["id"], d["scope"], d["scope_ref"]) for d in landing["personal"]] == [("demo-doc", "personal", "user:me")]
+    assert [(d["id"], d["scope_ref"]) for d in landing["shared"]] == [("shared-doc", "shared")]
+
+    # Unscoped legacy routes only see the shared scope.
+    assert client.get("/api/docs/demo-doc/manifest").status_code == 404
+    assert client.get("/api/docs/shared-doc/manifest").status_code == 200
+
+    base = "/api/scopes/user:me/docs/demo-doc"
+    assert client.get(f"{base}/manifest").status_code == 200
+    assert client.get(f"{base}/tables/t").json()["key"] == "t"
+    assert client.get(f"{base}/3d/fig1/meta").json()["key"] == "fig1"
+    assert client.get(f"{base}/3d/fig1/blob").status_code == 200
+    assert client.get(f"{base}/presets").json() == {}
+    files = client.get(f"{base}/manifest/files")
+    assert files.status_code == 200
+    assert files.json()["doc_id"] == "demo-doc"
+    # URL-encoded scope segment (what the SPA sends) resolves the same.
+    assert client.get("/api/scopes/user%3Ame/docs/demo-doc/manifest").status_code == 200
+
+
+def _demo_user(is_admin: bool):
+    from paradoc.serve import auth as auth_module
+
+    return auth_module.User(
+        id="11111111-2222-3333-4444-555555555555",
+        iss="test",
+        subject="demo-user",
+        email="demo@example.com",
+        display_name="Demo User",
+        groups=frozenset(),
+        is_admin=is_admin,
+    )
+
+
+def test_delete_doc_personal_owner_and_shared_admin_only(tmp_path):
+    from paradoc.serve import auth as auth_module
+
+    (tmp_path / "shared_src").mkdir()
+    user = _demo_user(is_admin=False)
+    root = _build_scoped_store(tmp_path, user.id)
+    app = create_app(doc_store=LocalDocStore(root))
+    app.dependency_overrides[auth_module.current_user] = lambda: user
+    client = TestClient(app)
+
+    # The owner deletes a personal doc: gone from the scope and from the landing page.
+    base = "/api/scopes/user:me/docs/demo-doc"
+    assert client.get(f"{base}/manifest").status_code == 200
+    resp = client.delete(base)
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "deleted" and resp.json()["files"] > 0
+    assert client.get(f"{base}/manifest").status_code == 404
+    assert client.get("/api/landing").json()["personal"] == []
+    assert not (root / "users" / user.id / "demo-doc").exists()
+    # Deleting it again is a 404, not a silent success.
+    assert client.delete(base).status_code == 404
+
+    # A shared doc cannot be deleted by a non-admin, and stays in place.
+    assert client.delete("/api/scopes/shared/docs/shared-doc").status_code == 403
+    assert client.get("/api/docs/shared-doc/manifest").status_code == 200
+
+    # An admin can.
+    admin = _demo_user(is_admin=True)
+    app.dependency_overrides[auth_module.current_user] = lambda: admin
+    assert client.delete("/api/scopes/shared/docs/shared-doc").status_code == 200
+    assert client.get("/api/docs/shared-doc/manifest").status_code == 404
+
+
+def test_local_delete_doc_refuses_path_tricks(tmp_path):
+    import pytest
+
+    from paradoc.serve.scope import Scope
+
+    (tmp_path / "shared_src").mkdir()
+    root = _build_scoped_store(tmp_path, "11111111-2222-3333-4444-555555555555")
+    store = LocalDocStore(root)
+    for bad in ("", ".", "..", "a/b", "..\\x"):
+        with pytest.raises(PermissionError):
+            store.delete_doc(bad, scope=Scope.shared())
+    assert store.delete_doc("no-such-doc", scope=Scope.shared()) == 0
+    assert (root / "shared" / "shared-doc").is_dir()

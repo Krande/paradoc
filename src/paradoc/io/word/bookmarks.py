@@ -85,13 +85,13 @@ def add_bookmark_around_seq_field(paragraph: Paragraph, bookmark_name: str) -> s
     """Add a bookmark around only the label and number portion of a caption.
 
     For Word cross-references with "Only label and number" behavior, the bookmark
-    should only wrap the label and number (e.g., "Figure 1-1"), NOT the caption text.
+    should only wrap the label and number (e.g., "Figure 1.1"), NOT the caption text.
     This matches Word's native Insert Caption cross-reference behavior.
 
     Caption structure (as created by rebuild_caption):
     - Run 0: "Figure " or "Table " text
     - Runs 1-5: STYLEREF field (chapter number: "2")
-    - Run 6: hyphen text "-"
+    - Run 6: separator text "."
     - Runs 7-11: SEQ field (figure/table number: "1")
     - Run 12+: ": caption text" <- This should NOT be included in the bookmark
 

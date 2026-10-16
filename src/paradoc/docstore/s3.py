@@ -27,7 +27,7 @@ from urllib.parse import urlparse
 from paradoc.db import DbManager
 from paradoc.db.models import PlotData, TableData, ThreeDData
 
-from .base import DocStore, _default_shared_scope
+from .base import DocStore, _default_shared_scope, check_doc_id
 from .manifest import BundleManifest
 
 if TYPE_CHECKING:
@@ -321,6 +321,25 @@ class S3DocStore(DocStore):
             return primary
         return self._fetch_object(self._key(doc_id, s, "static", *parts))
 
+    def delete_doc(self, doc_id: str, *, scope: Optional["Scope"] = None) -> int:
+        import shutil
+
+        import obstore as _obstore
+
+        s = scope if scope is not None else _default_shared_scope()
+        check_doc_id(doc_id)
+        # Trailing slash: `docs/foo/` must not also match `docs/foobar/...`.
+        prefix = self._doc_prefix(doc_id, s) + "/"
+        keys = [obj["path"] for batch in _obstore.list(self._store, prefix=prefix) for obj in batch]
+        if keys:
+            _obstore.delete(self._store, keys)
+        # Forget the cached sqlite copy so a doc re-published under the same id is fetched fresh.
+        manager = self._db_managers.pop(f"{s.prefix()}/{doc_id}", None)
+        if manager is not None:
+            manager.close()
+        shutil.rmtree(self.cache_dir / s.prefix() / doc_id, ignore_errors=True)
+        return len(keys)
+
     def put_bundle_file(
         self,
         doc_id: str,
@@ -337,6 +356,13 @@ class S3DocStore(DocStore):
             raise PermissionError(f"invalid rel_path: {rel_path!r}")
         key = self._key(doc_id, s, *clean.split("/"))
         _obstore.put(self._store, key, data)
+        if clean == self.db_filename:
+            # A re-published doc replaces its sqlite: drop the cached local copy and its connection, or reads
+            # (3D/plot/table metadata such as blob sizes) keep serving the previous publish until a restart.
+            manager = self._db_managers.pop(f"{s.prefix()}/{doc_id}", None)
+            if manager is not None:
+                manager.close()
+            (self.cache_dir / s.prefix() / doc_id / self.db_filename).unlink(missing_ok=True)
 
     def get_bundle_manifest(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[BundleManifest]:
         s = scope if scope is not None else _default_shared_scope()
@@ -367,6 +393,13 @@ class S3DocStore(DocStore):
     def get_static_tables_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         s = scope if scope is not None else _default_shared_scope()
         return self._fetch_object(self._key(doc_id, s, "static", "tables.json"))
+
+    def get_static_file_bytes(self, doc_id: str, rel: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
+        parts = rel.split("/")
+        if not rel or any(p in ("", ".", "..") for p in parts) or "\\" in rel:
+            return None
+        s = scope if scope is not None else _default_shared_scope()
+        return self._fetch_object(self._key(doc_id, s, "static", *parts))
 
     def get_static_images_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         s = scope if scope is not None else _default_shared_scope()

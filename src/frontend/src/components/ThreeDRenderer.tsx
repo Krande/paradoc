@@ -1,6 +1,7 @@
 import React from 'react'
 import { getAssetTransport, getRuntimeConfig } from '../transport'
 import { authedFetch } from '../services/auth/oidc'
+import { docApiPath, getDocScope } from '../transport/docScope'
 import { useViewerControlsStore } from '../store/viewerControlsStore'
 import type { CameraPreset } from '../../vendor/ada-viewer'
 
@@ -27,14 +28,15 @@ interface ViewerHandle {
 const _presetCache = new Map<string, Promise<Record<string, CameraPreset>>>()
 
 function loadPresets(docId: string): Promise<Record<string, CameraPreset>> {
-  const cached = _presetCache.get(docId)
+  // Same doc id can exist in several scopes — key the cache on both.
+  const cacheKey = `${getDocScope(docId) || 'shared'}|${docId}`
+  const cached = _presetCache.get(cacheKey)
   if (cached) return cached
   const p = (async () => {
     const cfg = getRuntimeConfig()
     let url: string
     if (cfg.transport === 'rest') {
-      url = (cfg.apiBase || '').replace(/\/?$/, '') +
-        `/api/docs/${encodeURIComponent(docId)}/presets`
+      url = (cfg.apiBase || '').replace(/\/?$/, '') + docApiPath(docId, '/presets')
     } else {
       const w = window as any
       const base: string =
@@ -68,7 +70,7 @@ function loadPresets(docId: string): Promise<Record<string, CameraPreset>> {
       return fallback
     }
   })()
-  _presetCache.set(docId, p)
+  _presetCache.set(cacheKey, p)
   return p
 }
 
@@ -118,7 +120,7 @@ export function ThreeDRenderer({ threeDKey, docId, caption, style }: ThreeDRende
           // + edges) from the manifest + per-filename fetcher; the
           // fetcher resolves manifest-relative filenames against the
           // bundle's directory URL the backend exposes via
-          // `/api/docs/{id}/3d/{key}/fea/...`.
+          // `<docApiPath>/3d/{key}/fea/...`.
           const manifestRes = await authedFetch(meta.feaManifestUrl, {
             cache: 'no-store',
           })

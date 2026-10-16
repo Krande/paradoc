@@ -30,8 +30,7 @@ suffix to a plain string and parse with a small regex:
   * everything else (sec/table/eq/fig) → ``?find=<urlencoded>``
 
 The find-fallback is acceptable for v0 because shelf doesn't yet
-expose stable anchors per sub-document element
-(``[[shelf_subdoc_anchors]]`` in dap/plan/v1).
+expose stable anchors per sub-document element.
 """
 
 from __future__ import annotations
@@ -201,6 +200,16 @@ def _walk(node: Any, bibliography, shelf_base_url) -> Any:
     return node
 
 
+def _read_ast() -> Any:
+    # pandoc pipes UTF-8 JSON; text-mode stdio would decode it with the locale codec (cp1252 on Windows).
+    return json.loads(sys.stdin.buffer.read().decode("utf-8"))
+
+
+def _write_ast(ast: Any) -> None:
+    sys.stdout.buffer.write(json.dumps(ast, ensure_ascii=False).encode("utf-8"))
+    sys.stdout.buffer.flush()
+
+
 def main() -> int:
     bibliography_path = os.environ.get("PARADOC_BIBLIOGRAPHY", "").strip() or None
     shelf_base_url = os.environ.get("PARADOC_SHELF_BASE_URL", "").strip()
@@ -208,19 +217,19 @@ def main() -> int:
     bibliography = _load_bibliography(bibliography_path)
 
     try:
-        ast = json.load(sys.stdin)
-    except json.JSONDecodeError as exc:
+        ast = _read_ast()
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         sys.stderr.write(f"[shelf-citation] bad input AST: {exc}\n")
         return 2
 
     if not bibliography:
         # No-op: pass the AST through. Done as a separate code path so
         # the noop case has zero risk of mangling something.
-        json.dump(ast, sys.stdout)
+        _write_ast(ast)
         return 0
 
     transformed = _walk(ast, bibliography, shelf_base_url)
-    json.dump(transformed, sys.stdout)
+    _write_ast(transformed)
     return 0
 
 

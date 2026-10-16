@@ -2,7 +2,7 @@ import React from 'react'
 import { PlotRenderer } from './PlotRenderer'
 import type { PandocBlock } from '../ast/types'
 import { renderBlock } from '../ast/render'
-import { getPlotData } from '../sections/store'
+import { getPlotData, resolvePlotKey } from '../sections/store'
 
 interface InteractiveFigureProps {
   figureId?: string
@@ -16,77 +16,47 @@ interface InteractiveFigureProps {
 export function InteractiveFigure({ figureId, className, plotKey, docId, content, caption }: InteractiveFigureProps) {
   const [showInteractive, setShowInteractive] = React.useState(false)
   const [isHovering, setIsHovering] = React.useState(false)
-  const [plotExists, setPlotExists] = React.useState(false)
+  // The key the plot data is stored under (the figure id may carry a `_N` suffix), or null when
+  // the figure has no interactive data. Only the index is consulted: the plot's data itself is
+  // fetched when the reader switches to interactive (or hovers, as a head start).
+  const [resolvedKey, setResolvedKey] = React.useState<string | null>(null)
+  const plotExists = resolvedKey !== null
 
-  // Check if plot data exists for this plot key (handle suffixes like _1, _2)
   React.useEffect(() => {
     if (!docId || !plotKey) {
-      setPlotExists(false)
+      setResolvedKey(null)
       return
     }
-
-    // Try to find plot data - first try the exact key, then try without suffix
-    const checkPlotExists = async () => {
-      // Try exact match first
-      let data = await getPlotData(docId, plotKey)
-      if (data) {
-        console.log('[InteractiveFigure] Found plot data for key:', plotKey)
-        setPlotExists(true)
-        return
-      }
-
-      // If plotKey has a suffix like _1, _2, try the base key
-      const underscoreIndex = plotKey.lastIndexOf('_')
-      if (underscoreIndex > 0) {
-        const suffix = plotKey.substring(underscoreIndex + 1)
-        if (/^\d+$/.test(suffix)) {
-          // Has numeric suffix, try base key
-          const baseKey = plotKey.substring(0, underscoreIndex)
-          data = await getPlotData(docId, baseKey)
-          if (data) {
-            console.log('[InteractiveFigure] Found plot data for base key:', baseKey, '(original:', plotKey, ')')
-            setPlotExists(true)
-            return
-          }
-        }
-      }
-
-      console.log('[InteractiveFigure] No plot data found for key:', plotKey)
-      setPlotExists(false)
+    let canceled = false
+    const check = () => {
+      resolvePlotKey(docId, plotKey)
+        .then((k) => {
+          if (!canceled) setResolvedKey(k ?? null)
+        })
+        .catch(() => {
+          if (!canceled) setResolvedKey(null)
+        })
     }
+    check()
 
-    checkPlotExists()
-
-    // Listen for plot data being stored and re-check
-    const handlePlotDataStored = (event: Event) => {
-      const customEvent = event as CustomEvent<{ docId: string; plotKey: string }>
-      // Check if this event is relevant to our component
-      if (customEvent.detail.docId === docId) {
-        // Check if the stored plot key matches ours (with or without suffix)
-        if (customEvent.detail.plotKey === plotKey) {
-          checkPlotExists()
-        } else {
-          // Check if our plotKey has a suffix and the base matches
-          const underscoreIndex = plotKey.lastIndexOf('_')
-          if (underscoreIndex > 0) {
-            const suffix = plotKey.substring(underscoreIndex + 1)
-            if (/^\d+$/.test(suffix)) {
-              const baseKey = plotKey.substring(0, underscoreIndex)
-              if (customEvent.detail.plotKey === baseKey) {
-                checkPlotExists()
-              }
-            }
-          }
-        }
-      }
+    // Plot data can arrive after mount (the WS relay; a plot index registered after the first
+    // render). `plotKey: '*'` is a whole index being registered.
+    const onStored = (event: Event) => {
+      const d = (event as CustomEvent<{ docId: string; plotKey: string }>).detail
+      if (d.docId !== docId) return
+      if (d.plotKey === '*' || d.plotKey === plotKey || d.plotKey === plotKey.replace(/_\d+$/, '')) check()
     }
-
-    window.addEventListener('paradoc:plot-data-stored', handlePlotDataStored)
-
+    window.addEventListener('paradoc:plot-data-stored', onStored)
     return () => {
-      window.removeEventListener('paradoc:plot-data-stored', handlePlotDataStored)
+      canceled = true
+      window.removeEventListener('paradoc:plot-data-stored', onStored)
     }
   }, [docId, plotKey])
+
+  // Start fetching the plot's data as soon as the reader shows interest in the figure.
+  const prefetch = React.useCallback(() => {
+    if (docId && resolvedKey) void getPlotData(docId, resolvedKey).catch(() => {})
+  }, [docId, resolvedKey])
 
   // If no plot data exists, just render as static figure
   if (!plotExists) {
@@ -106,8 +76,12 @@ export function InteractiveFigure({ figureId, className, plotKey, docId, content
   return (
     <div
       className="relative group"
-      onMouseEnter={() => setIsHovering(true)}
+      onMouseEnter={() => {
+        setIsHovering(true)
+        prefetch()
+      }}
       onMouseLeave={() => setIsHovering(false)}
+      onTouchStart={prefetch}
     >
       {/* Context menu - shown on hover */}
       {isHovering && (
@@ -138,7 +112,7 @@ export function InteractiveFigure({ figureId, className, plotKey, docId, content
       {/* Show either static figure or interactive plot */}
       {showInteractive ? (
         <div className="my-4">
-          <PlotRenderer plotKey={plotKey} docId={docId} />
+          <PlotRenderer plotKey={resolvedKey ?? plotKey} docId={docId} />
           {caption && (
             <figcaption className="text-sm text-gray-600 italic mt-2">
               {caption}

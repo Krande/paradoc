@@ -15,9 +15,19 @@ function readStored(): boolean {
   }
 }
 
+// Zoom of the A4 sheets. `null` fits a sheet to the reader's width (never above 100 %), which is
+// what a phone needs: a 210 mm sheet is about twice a phone's width, and the browser's own pinch
+// zoom cannot go below the device width to show it whole. Not remembered: fit is the right start.
+export const MIN_ZOOM = 0.25
+export const MAX_ZOOM = 3
+export const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z))
+
 type PageViewState = {
   enabled: boolean
   toggle: () => void
+  /** Sheet scale, or null to fit the sheet to the reader's width. */
+  zoom: number | null
+  setZoom: (zoom: number | null) => void
 }
 
 export const usePageViewStore = create<PageViewState>((set, get) => ({
@@ -29,4 +39,6 @@ export const usePageViewStore = create<PageViewState>((set, get) => ({
     } catch {}
     set({ enabled })
   },
+  zoom: null,
+  setZoom: (zoom) => set({ zoom: zoom === null ? null : clampZoom(zoom) }),
 }))

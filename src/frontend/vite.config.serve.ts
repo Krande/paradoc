@@ -7,6 +7,10 @@ import react from '@vitejs/plugin-react'
 // asset files so the browser can cache and parallel-load them.
 export default defineConfig({
   plugins: [react()],
+  define: {
+    // See vite.config.ts: only the single-file build loads plotly from source text.
+    '__PARADOC_SINGLEFILE__': 'false',
+  },
   build: {
     // Split per-route chunks so heavy libs load separately and cache
     // independently of app code. plotly is intentionally NOT pinned —

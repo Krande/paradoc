@@ -6,5 +6,6 @@ include src/paradoc/resources/template_blank.docx
 include src/paradoc/frontend/resources/frontend.zip
 include src/paradoc/frontend/resources/frontend.hash
 include src/paradoc/io/html/js/*.js
+include src/paradoc/io/pdf/*.css
 include src/paradoc/svg/templates/*.svg
 include src/paradoc/svg/templates/titleblocks/*.svg

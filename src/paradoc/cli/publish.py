@@ -80,7 +80,7 @@ def publish(
 ) -> None:
     """Compile ``source_dir`` and upload the resulting bundle.
 
-    Required env: ``PARADOC_VIEWER_URL`` (e.g. ``https://paradoc.krande.no``)
+    Required env: ``PARADOC_VIEWER_URL`` (e.g. ``https://paradoc.example.com``)
     and ``PARADOC_VIEWER_TOKEN`` (a token from ``POST /api/me/tokens``).
     """
     base = _env_required("PARADOC_VIEWER_URL").rstrip("/")

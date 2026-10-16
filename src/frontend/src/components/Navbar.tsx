@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { revealElement, scrollToHeading } from './readerNav'
 
 export type TocItem = {
   id: string
@@ -11,102 +12,6 @@ type NavbarProps = {
   toc: TocItem[]
   open: boolean
   onClose: () => void
-}
-
-/** Gap left above a heading once it has been scrolled to, px. */
-const SCROLL_TOP_GAP = 16
-/** Once on target, how long the layout must stay still before the heading is let go, ms. */
-const SCROLL_HOLD_QUIET_MS = 2500
-/** Upper bound on how long a scroll keeps re-aiming, ms. */
-const SCROLL_MAX_MS = 10000
-
-/**
- * Scroll the reader so `el` sits at the top of it, and keep re-aiming until it stays there.
- *
- * Layout keeps moving under a long scroll. In the web layout, sections render with
- * `content-visibility: auto`, so every section not yet on screen is laid out at a placeholder
- * height, and takes its real height as the scroll passes it. In the page view, lazily loaded
- * images take their height on arrival and the sheets re-paginate around them. Either way a target
- * computed up front goes stale, and a scroll aimed once ends short of the heading -- by more the
- * further down it is. So re-aim each time the scroll settles, and keep holding the heading in place
- * while the content around it is still resizing; stop once it has been still for a moment, the
- * time budget is spent, or the reader takes over the scroll themselves.
- */
-function scrollToHeading(el: HTMLElement) {
-  // Find the reader's overflow-auto container explicitly (it carries `data-search-root`). Scroll
-  // *only* that container -- neither `window.scrollTo` (worked on desktop, triggered the
-  // visual-viewport pinch-zoom heuristic on mobile) nor `scrollIntoView` (walks multiple scroll
-  // ancestors on iOS / Android Chrome, shifting the page chrome and pushing the topbar out of view).
-  const root = el.closest('[data-search-root]') as HTMLElement | null
-  if (!root) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    return
-  }
-  const scroller: HTMLElement = root
-
-  const targetTop = () => {
-    const elRect = el.getBoundingClientRect()
-    const scRect = scroller.getBoundingClientRect()
-    const target = elRect.top - scRect.top + scroller.scrollTop - SCROLL_TOP_GAP
-    return Math.max(0, Math.min(target, scroller.scrollHeight - scroller.clientHeight))
-  }
-
-  let cancelled = false
-  let fallback: number | undefined
-  let quiet: number | undefined
-  const budget = window.setTimeout(() => stop(), SCROLL_MAX_MS)
-
-  // Content resizing while we hold the heading: re-check once the frame has laid out. Not before
-  // the first scroll has settled -- re-aiming mid-flight would cut the smooth scroll short.
-  let settledOnce = false
-  const resized = new ResizeObserver(() => {
-    if (settledOnce) onSettled()
-  })
-  const content = scroller.firstElementChild
-  if (content) resized.observe(content)
-
-  function stop() {
-    cancelled = true
-    window.clearTimeout(fallback)
-    window.clearTimeout(quiet)
-    window.clearTimeout(budget)
-    resized.disconnect()
-    scroller.removeEventListener('scrollend', onSettled)
-    scroller.removeEventListener('wheel', stop)
-    scroller.removeEventListener('touchstart', stop)
-    scroller.removeEventListener('keydown', stop)
-  }
-
-  const go = (behavior: ScrollBehavior) => {
-    window.clearTimeout(fallback)
-    scroller.scrollTo({ top: targetTop(), behavior })
-    // `scrollend` is not everywhere yet, and it does not fire when the scroll had nowhere to go.
-    fallback = window.setTimeout(onSettled, behavior === 'smooth' ? 1200 : 150)
-  }
-
-  function onSettled() {
-    if (cancelled) return
-    settledOnce = true
-    // Let whatever just came on screen lay out before measuring again.
-    requestAnimationFrame(() => {
-      if (cancelled) return
-      const off = Math.abs(targetTop() - scroller.scrollTop)
-      if (off <= 2) {
-        // On target. Hold it there until the content has been still for a moment.
-        window.clearTimeout(quiet)
-        quiet = window.setTimeout(stop, SCROLL_HOLD_QUIET_MS)
-        return
-      }
-      go('auto')
-    })
-  }
-
-  scroller.addEventListener('scrollend', onSettled)
-  // The reader grabbing the scroll mid-flight wins; don't drag them back to the heading.
-  scroller.addEventListener('wheel', stop, { passive: true })
-  scroller.addEventListener('touchstart', stop, { passive: true })
-  scroller.addEventListener('keydown', stop)
-  go('smooth')
 }
 
 /** For each item, whether the next one is nested under it -- i.e. whether it can be collapsed. */
@@ -200,8 +105,10 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
                 href={`#${item.id}`}
                 onClick={(e) => {
                   e.preventDefault()
-                  const el = document.getElementById(item.id)
-                  if (el) scrollToHeading(el)
+                  // A heading in a section the reader has not rendered yet is mounted first.
+                  void revealElement(item.id).then((el) => {
+                    if (el) scrollToHeading(el)
+                  })
                   onClose()
                 }}
                 aria-label={`Go to ${item.text}`}
@@ -232,8 +139,8 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
     <>
       {/* Desktop sidebar */}
       <aside className={`${open ? 'md:flex' : 'md:hidden'} hidden flex-col w-72 shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-gray-950/60 backdrop-blur sticky top-0 h-dvh overflow-auto`}>
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-2">
-          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Outline</div>
+        <div className="px-4 h-14 shrink-0 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-2">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Outline</div>
           {controls}
         </div>
         {NavList}
@@ -264,8 +171,8 @@ export function Navbar({ toc, open, onClose }: NavbarProps) {
           role="dialog"
           aria-modal="true"
         >
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-2">
-            <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Outline</div>
+          <div className="px-4 h-12 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-2">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Outline</div>
             <div className="flex items-center gap-1">
               {controls}
               <button

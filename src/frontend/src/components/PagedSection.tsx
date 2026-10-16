@@ -3,6 +3,8 @@ import React, { useLayoutEffect, useRef, useState } from 'react'
 // A4 portrait, in CSS millimetres (an absolute unit: 1mm is 96/25.4 px regardless of screen).
 const MM = 96 / 25.4
 const PAGE_W_MM = 210
+/** A4 sheet width in CSS pixels, for fitting the sheets to the reader. */
+export const PAGE_WIDTH_PX = PAGE_W_MM * (96 / 25.4)
 const PAGE_H_MM = 297
 const MARGIN_Y_MM = 25
 const MARGIN_X_MM = 20
@@ -10,11 +12,23 @@ const MARGIN_X_MM = 20
 const GAP_MM = 8
 
 const STRIDE = (PAGE_H_MM + GAP_MM) * MM
+/** Height of one sheet plus the gap below it, in CSS pixels at 100 %. */
+export const PAGE_STRIDE_PX = STRIDE
 const USABLE_H = (PAGE_H_MM - 2 * MARGIN_Y_MM) * MM
 const pageTop = (p: number) => p * STRIDE + MARGIN_Y_MM * MM
 const pageBottom = (p: number) => p * STRIDE + (PAGE_H_MM - MARGIN_Y_MM) * MM
 
 const PUSH_ATTR = 'data-page-push'
+
+/**
+ * An element's client rect in the sheet's own (unscaled) CSS pixels. The sheets are drawn with a
+ * `transform: scale(s)` for zoom, which scales client rects but not layout, so every measurement
+ * below is divided by `s` and pagination comes out the same at any zoom.
+ */
+function box(el: Element, s: number) {
+  const r = el.getBoundingClientRect()
+  return { top: r.top / s, bottom: r.bottom / s, height: r.height / s }
+}
 const isHeading = (el: Element) => /^H[1-6]$/.test(el.tagName)
 
 /**
@@ -23,7 +37,7 @@ const isHeading = (el: Element) => /^H[1-6]$/.test(el.tagName)
  * taller than a sheet is left to run across the gap. A heading that would be left at the foot of a
  * sheet moves with the block that follows it. Returns the number of sheets used.
  */
-function paginate(paper: HTMLElement, content: HTMLElement): number {
+function paginate(paper: HTMLElement, content: HTMLElement, s: number): number {
   const blocks = Array.from(content.children) as HTMLElement[]
 
   // Undo the previous pass, so every measurement below is of the natural flow.
@@ -40,10 +54,10 @@ function paginate(paper: HTMLElement, content: HTMLElement): number {
   // blocks and hundreds of page breaks that is seconds of blocked main thread, on every resize of
   // any block in it (a figure switched to its 3D viewer). Only a block the plan put in the wrong
   // place falls through to the measuring pass.
-  if (paginatePlanned(paper, blocks)) {
+  if (paginatePlanned(paper, blocks, s)) {
     const last = blocks[blocks.length - 1]
     if (!last) return 1
-    const bottom = last.getBoundingClientRect().bottom - paper.getBoundingClientRect().top
+    const bottom = box(last, s).bottom - box(paper, s).top
     return Math.max(1, Math.floor(bottom / STRIDE) + 1)
   }
   for (const b of blocks) {
@@ -53,7 +67,7 @@ function paginate(paper: HTMLElement, content: HTMLElement): number {
     }
   }
 
-  const origin = () => paper.getBoundingClientRect().top
+  const origin = () => box(paper, s).top
   /** Move `el` down so its top sits at `target` (px from the paper's top). */
   const pushTo = (el: HTMLElement, target: number) => {
     // Record the author's inline margin once; a block pushed twice in a pass keeps the first.
@@ -61,7 +75,7 @@ function paginate(paper: HTMLElement, content: HTMLElement): number {
     // Aim, measure, correct: the top margin collapses with the previous block's bottom margin, so
     // growing it by d moves the block by less than d whenever that bottom margin was the larger.
     for (let k = 0; k < 3; k++) {
-      const off = target - (el.getBoundingClientRect().top - origin())
+      const off = target - (box(el, s).top - origin())
       if (Math.abs(off) < 0.5) break
       const current = parseFloat(getComputedStyle(el).marginTop) || 0
       el.style.marginTop = `${current + off}px`
@@ -70,7 +84,7 @@ function paginate(paper: HTMLElement, content: HTMLElement): number {
 
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i]
-    const r = b.getBoundingClientRect()
+    const r = box(b, s)
     if (r.height === 0) continue
     const top = r.top - origin()
     const p = Math.floor(top / STRIDE)
@@ -86,7 +100,7 @@ function paginate(paper: HTMLElement, content: HTMLElement): number {
     // Keep a heading with what it introduces: move the heading, then re-check this block below it.
     const prev = blocks[i - 1]
     if (prev && isHeading(prev) && !prev.hasAttribute(PUSH_ATTR)) {
-      const prevTop = prev.getBoundingClientRect().top - origin()
+      const prevTop = box(prev, s).top - origin()
       if (Math.floor(prevTop / STRIDE) === p && prevTop > pageTop(p) + 1) {
         pushTo(prev, pageTop(p + 1))
         i -= 1
@@ -98,7 +112,7 @@ function paginate(paper: HTMLElement, content: HTMLElement): number {
 
   const last = blocks[blocks.length - 1]
   if (!last) return 1
-  const bottom = last.getBoundingClientRect().bottom - origin()
+  const bottom = box(last, s).bottom - origin()
   return Math.max(1, Math.floor(bottom / STRIDE) + 1)
 }
 
@@ -113,15 +127,15 @@ function paginate(paper: HTMLElement, content: HTMLElement): number {
  * collapse outright. That holds for ordinary block siblings; anything else (a margin that does not
  * collapse, a float, a flex parent) shows up in the check and takes the measuring pass.
  */
-function paginatePlanned(paper: HTMLElement, blocks: HTMLElement[]): boolean {
+function paginatePlanned(paper: HTMLElement, blocks: HTMLElement[], s: number): boolean {
   const n = blocks.length
   if (n === 0) return true
-  const originTop = paper.getBoundingClientRect().top
+  const originTop = box(paper, s).top
   const tops = new Float64Array(n)
   const heights = new Float64Array(n)
   const gaps = new Float64Array(n)
   for (let i = 0; i < n; i++) {
-    const r = blocks[i].getBoundingClientRect()
+    const r = box(blocks[i], s)
     tops[i] = r.top - originTop
     heights[i] = r.height
   }
@@ -177,7 +191,7 @@ function paginatePlanned(paper: HTMLElement, blocks: HTMLElement[]): boolean {
     el.style.marginTop = `${gaps[i] + push[i]}px`
   }
   let acc = 0
-  const checkOrigin = paper.getBoundingClientRect().top
+  const checkOrigin = box(paper, s).top
   for (let i = 0; i < n; i++) {
     acc += push[i]
     if (heights[i] === 0) continue
@@ -185,7 +199,7 @@ function paginatePlanned(paper: HTMLElement, blocks: HTMLElement[]): boolean {
     // section (y ~ 98 000 px) a correctly placed block reads ~0.5 px off its planned top. Failing
     // the check on that sent every large report through the slow pass.
     const want = tops[i] + acc
-    if (Math.abs(blocks[i].getBoundingClientRect().top - checkOrigin - want) > 1) return false
+    if (Math.abs(box(blocks[i], s).top - checkOrigin - want) > 1) return false
   }
   return true
 }
@@ -198,10 +212,16 @@ type Props = {
   firstPage: number
   /** Must be stable across renders (a `useCallback`): it is an effect dependency. */
   onPageCount: (index: number, n: number) => void
+  /** Zoom of the sheets (1 = true A4 size). Visual only: layout and pagination are unscaled. */
+  scale?: number
 }
 
 /** One document section on A4 sheets. Starts on a new sheet, like a chapter in the exports. */
-export function PagedSection({ children, index, firstPage, onPageCount }: Props) {
+export function PagedSection({ children, index, firstPage, onPageCount, scale = 1 }: Props) {
+  // Read through a ref: the pagination effect is set up once, and a zoom change must not re-run it
+  // (zoom changes no layout), but a later re-run has to measure with the current scale.
+  const scaleRef = useRef(scale)
+  scaleRef.current = scale
   const paperRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [pages, setPages] = useState(1)
@@ -221,7 +241,7 @@ export function PagedSection({ children, index, firstPage, onPageCount }: Props)
         try {
           // The section's blocks sit one level down, inside the section renderer's wrapper div.
           const flow = (content.firstElementChild as HTMLElement | null) ?? content
-          const n = paginate(paper, flow)
+          const n = paginate(paper, flow, scaleRef.current)
           setPages((prev) => (prev === n ? prev : n))
         } finally {
           running = false
@@ -249,11 +269,20 @@ export function PagedSection({ children, index, firstPage, onPageCount }: Props)
 
   useLayoutEffect(() => onPageCount(index, pages), [index, pages, onPageCount])
 
+  const height = pages * STRIDE - GAP_MM * MM
   return (
+    // The wrapper takes the scaled size in the flow, so the reader scrolls over the zoomed sheets;
+    // the sheets themselves keep their A4 layout and are scaled from the top-left corner.
+    <div className="relative mx-auto my-6" style={{ width: `${PAGE_W_MM * MM * scale}px`, height: `${height * scale}px` }}>
     <div
       ref={paperRef}
-      className="relative mx-auto my-6"
-      style={{ width: `${PAGE_W_MM}mm`, minHeight: `${pages * STRIDE - GAP_MM * MM}px` }}
+      className="relative"
+      style={{
+        width: `${PAGE_W_MM}mm`,
+        minHeight: `${height}px`,
+        transform: scale === 1 ? undefined : `scale(${scale})`,
+        transformOrigin: '0 0',
+      }}
     >
       {/* The sheets, behind the text. */}
       {Array.from({ length: pages }, (_, i) => (
@@ -278,6 +307,7 @@ export function PagedSection({ children, index, firstPage, onPageCount }: Props)
       >
         {children}
       </div>
+    </div>
     </div>
   )
 }

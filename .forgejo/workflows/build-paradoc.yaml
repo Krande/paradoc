@@ -8,7 +8,7 @@ name: Build paradoc image
 on:
   workflow_dispatch:
   push:
-    branches: [feat/figure-sources]
+    branches-ignore: [main]
     paths:
       - 'src/paradoc/**'
       - 'src/frontend/**'
@@ -18,8 +18,14 @@ on:
       - 'pixi.lock'
       - '.forgejo/workflows/build-paradoc.yaml'
 
+concurrency:
+  group: build-image
+  cancel-in-progress: true
+
 jobs:
   build:
+    # The job runs for pushes to the branch named by the repo variable DEV_BRANCH (or a manual dispatch).
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == vars.DEV_BRANCH
     runs-on: docker-build
     steps:
       - uses: actions/checkout@v4

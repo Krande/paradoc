@@ -5,8 +5,8 @@ wraps `[@key, locator]` citations in `<a href>` links to a shelf
 document. Loaded by HTMLExporter and the AST exporter via pandoc's
 ``--filter`` flag.
 
-See ``dap/plan/v1/notes_phase_1b_design.md`` for the contract and
-decisions.
+The contract: a citation resolves to a stable anchor in the cited
+document, falling back to a text find when no anchor is available.
 """
 
 import pathlib

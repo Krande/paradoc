@@ -16,11 +16,19 @@ import json
 import logging
 import os
 import sys
+import threading
+import time
+from collections import OrderedDict
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
 
 from paradoc.docstore import DocStore
+from paradoc.docstore.static_plots import (
+    PLOT_INDEX_FILE,
+    index_from_bulk,
+    plot_file_name,
+)
 
 from .auth import AuthConfig, User
 from .scope import Scope, ScopeParseError, can_access, parse_scope, resolve_project_slug
@@ -352,6 +360,56 @@ def create_app(
             return JSONResponse(content={})
         return Response(content=data, media_type="application/json")
 
+    # Lazy plot loading. The reader fetches the small plot index at load and one plot's figure
+    # when it goes interactive, instead of the whole `plots.json`. Bundles published before the
+    # per-plot split have only `plots.json`: parse it once and serve the index and the single
+    # figures out of that, cached briefly so a reader opening several plots does not refetch and
+    # reparse a multi-megabyte file for each.
+    _bulk_plot_cache: "OrderedDict[tuple[str, str], tuple[float, dict]]" = OrderedDict()
+    _bulk_plot_lock = threading.Lock()
+    _BULK_PLOT_TTL_S = 120.0
+    _BULK_PLOT_MAX = 4
+
+    def _bulk_plots(doc_id: str, scope: Scope) -> Optional[dict]:
+        ck = (scope.prefix(), doc_id)
+        now = time.monotonic()
+        with _bulk_plot_lock:
+            hit = _bulk_plot_cache.get(ck)
+            if hit is not None and now - hit[0] < _BULK_PLOT_TTL_S:
+                _bulk_plot_cache.move_to_end(ck)
+                return hit[1]
+        data = doc_store.get_static_plots_bytes(doc_id, scope=scope)
+        if data is None:
+            return None
+        try:
+            plots = json.loads(data)
+        except ValueError:
+            return None
+        if not isinstance(plots, dict):
+            return None
+        with _bulk_plot_lock:
+            _bulk_plot_cache[ck] = (now, plots)
+            _bulk_plot_cache.move_to_end(ck)
+            while len(_bulk_plot_cache) > _BULK_PLOT_MAX:
+                _bulk_plot_cache.popitem(last=False)
+        return plots
+
+    def _get_plot_index(doc_id: str, scope: Scope):
+        data = doc_store.get_static_file_bytes(doc_id, PLOT_INDEX_FILE, scope=scope)
+        if data is not None:
+            return Response(content=data, media_type="application/json")
+        plots = _bulk_plots(doc_id, scope)
+        return JSONResponse(content=index_from_bulk(plots or {}))
+
+    def _get_plot_figure(doc_id: str, key: str, scope: Scope):
+        data = doc_store.get_static_file_bytes(doc_id, plot_file_name(key), scope=scope)
+        if data is not None:
+            return Response(content=data, media_type="application/json")
+        plots = _bulk_plots(doc_id, scope)
+        if not plots or key not in plots:
+            raise HTTPException(status_code=404, detail=f"plot {key!r} not found")
+        return JSONResponse(content=plots[key])
+
     def _get_all_tables(doc_id: str, scope: Scope):
         data = doc_store.get_static_tables_bytes(doc_id, scope=scope)
         if data is None:
@@ -556,6 +614,14 @@ def create_app(
     def get_all_plots(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_all_plots(doc_id, _shared)
 
+    @app.get("/api/docs/{doc_id}/plots-index")
+    def get_plot_index(doc_id: str, user: User = Depends(auth_module.current_user)):
+        return _get_plot_index(doc_id, _shared)
+
+    @app.get("/api/docs/{doc_id}/plots/{key}/figure")
+    def get_plot_figure(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
+        return _get_plot_figure(doc_id, key, _shared)
+
     @app.get("/api/docs/{doc_id}/tables")
     def get_all_tables(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_all_tables(doc_id, _shared)
@@ -633,6 +699,14 @@ def create_app(
     @app.get("/api/scopes/{scope}/docs/{doc_id}/plots")
     def s_get_all_plots(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_all_plots(doc_id, scope_obj)
+
+    @app.get("/api/scopes/{scope}/docs/{doc_id}/plots-index")
+    def s_get_plot_index(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
+        return _get_plot_index(doc_id, scope_obj)
+
+    @app.get("/api/scopes/{scope}/docs/{doc_id}/plots/{key}/figure")
+    def s_get_plot_figure(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
+        return _get_plot_figure(doc_id, key, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/tables")
     def s_get_all_tables(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
@@ -727,6 +801,27 @@ def create_app(
             )
         return {"status": "ok", "size": len(body)}
 
+    @app.delete("/api/scopes/{scope}/docs/{doc_id}")
+    def s_delete_doc(
+        doc_id: str,
+        scope_obj: Scope = Depends(_scope_dep),
+        user: User = Depends(auth_module.current_user),
+    ) -> dict[str, Any]:
+        # Scope access is the same as for uploads (owner for user:me, members for a project).
+        # Shared docs are writable by any signed-in user, but deleting one is irreversible and
+        # bundles don't record who published them, so that is reserved for admins.
+        if scope_obj.kind == "shared" and not user.is_admin:
+            raise HTTPException(status_code=403, detail="only admins can delete shared documents")
+        try:
+            removed = doc_store.delete_doc(doc_id, scope=scope_obj)
+        except PermissionError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except NotImplementedError:
+            raise HTTPException(status_code=501, detail="this docstore does not support deletes")
+        if removed == 0:
+            raise HTTPException(status_code=404, detail=f"document not found: {doc_id!r}")
+        return {"status": "deleted", "doc_id": doc_id, "files": removed}
+
     # ── Landing aggregator ───────────────────────────────────────────
     #
     # One round-trip backing the landing-page UI. Bundles the
@@ -737,14 +832,20 @@ def create_app(
     # one. `recent` stays empty until we surface per-doc updated_at;
     # the frontend hides the section when it's empty.
 
-    def _doc_entry(doc_id: str, scope: Scope, scope_label: str) -> dict[str, Any]:
+    def _doc_entry(doc_id: str, scope: Scope, scope_label: str, scope_ref: str) -> dict[str, Any]:
         """Build a landing-card entry — id + scope + provenance.
+
+        ``scope_label`` is the coarse card chip (shared/personal/project);
+        ``scope_ref`` is the URL-form scope (``shared``, ``user:me``,
+        ``project:<slug>``) the SPA routes the doc's REST calls through
+        (``/api/scopes/{scope_ref}/docs/{id}/...``) — non-shared docs are
+        unreachable via the unscoped ``/api/docs/{id}/...`` routes.
 
         Reads each doc's bundle manifest so the SPA can show
         published_at + git info on the card. Missing manifest (pre-v2
         bundle, S3 fetch failed, etc.) gracefully degrades to id-only.
         """
-        entry: dict[str, Any] = {"id": doc_id, "scope": scope_label}
+        entry: dict[str, Any] = {"id": doc_id, "scope": scope_label, "scope_ref": scope_ref}
         try:
             bm = doc_store.get_bundle_manifest(doc_id, scope=scope)
         except Exception:
@@ -761,49 +862,86 @@ def create_app(
                 }
         return entry
 
-    def _build_scope_docs(scope: Scope, label: str) -> list[dict[str, Any]]:
-        # list_doc_ids + a get_bundle_manifest per doc — all synchronous S3.
-        # Called via run_in_threadpool from the async /api/landing handler so
-        # this fan-out of blocking calls never sits on the event loop.
-        return [_doc_entry(d, scope, label) for d in doc_store.list_doc_ids(scope)]
+    def _build_scope_docs(scope: Scope, label: str, scope_ref: str, with_sizes: bool = False) -> list[dict[str, Any]]:
+        # list_doc_ids + a get_bundle_manifest per doc (+ a bundle listing per doc with sizes) --
+        # all synchronous S3. Called via run_in_threadpool from the async handlers so this fan-out
+        # of blocking calls never sits on the event loop; the per-doc reads run a few at a time.
+        from concurrent.futures import ThreadPoolExecutor
+
+        def entry(doc_id: str) -> dict[str, Any]:
+            e = _doc_entry(doc_id, scope, label, scope_ref)
+            if with_sizes:
+                try:
+                    files = doc_store.list_bundle_files(doc_id, scope=scope)
+                except Exception:
+                    files = []
+                if files:
+                    e["size"] = sum(f.size for f in files)
+                    e["file_count"] = len(files)
+            return e
+
+        ids = doc_store.list_doc_ids(scope)
+        if len(ids) <= 1:
+            return [entry(d) for d in ids]
+        with ThreadPoolExecutor(max_workers=min(8, len(ids))) as pool:
+            return list(pool.map(entry, ids))
+
+    def _has_personal_scope(user: User) -> bool:
+        # Synthetic local-dev users keep the zero UUID; their bundles
+        # never live under users/<id>/, so skip the listing.
+        return bool(user.id) and not user.id.startswith("00000000")
+
+    async def _accessible_scopes(request: Request, user: User) -> list[dict[str, Any]]:
+        """Every scope ``user`` may read, in display order: personal, shared, then projects.
+
+        Each item: ``kind`` (personal/shared/project), ``ref`` (URL-form scope), ``name``,
+        ``scope`` (the docstore Scope) and ``slug`` for projects. Project scopes come only from the
+        user's memberships, so nobody sees another user's personal docs or a project they are not in.
+        """
+        out: list[dict[str, Any]] = []
+        if _has_personal_scope(user):
+            out.append({"kind": "personal", "ref": "user:me", "name": "Personal", "scope": Scope.user(user.id)})
+        out.append({"kind": "shared", "ref": "shared", "name": "Shared", "scope": Scope.shared()})
+        pool = getattr(request.app.state, "db_pool", None)
+        if pool is not None and _has_personal_scope(user):
+            from . import db as _db
+
+            for p in await _db.list_user_projects(pool, user.id):
+                out.append(
+                    {
+                        "kind": "project",
+                        "ref": f"project:{p.slug}",
+                        "name": p.name,
+                        "slug": p.slug,
+                        "scope": Scope.project(p.id),
+                    }
+                )
+        return out
+
+    async def _scope_docs(sc: dict[str, Any], with_sizes: bool = False) -> list[dict[str, Any]]:
+        try:
+            return await run_in_threadpool(_build_scope_docs, sc["scope"], sc["kind"], sc["ref"], with_sizes)
+        except Exception:
+            if sc["kind"] == "shared":
+                raise
+            return []
 
     @app.get("/api/landing")
     async def get_landing(
         request: Request,
         user: User = Depends(auth_module.current_user),
     ) -> dict[str, Any]:
-        shared_scope = Scope.shared()
-        shared = await run_in_threadpool(_build_scope_docs, shared_scope, "shared")
-
+        shared: list[dict[str, Any]] = []
         personal: list[dict[str, Any]] = []
-        # Synthetic local-dev users keep the zero UUID; their bundles
-        # never live under users/<id>/, so skip the listing.
-        if user.id and not user.id.startswith("00000000"):
-            try:
-                user_scope = Scope.user(user.id)
-                personal = await run_in_threadpool(_build_scope_docs, user_scope, "personal")
-            except Exception:
-                personal = []
-
         projects_out: list[dict[str, Any]] = []
-        pool = getattr(request.app.state, "db_pool", None)
-        if pool is not None and user.id and not user.id.startswith("00000000"):
-            from . import db as _db
-
-            user_projects = await _db.list_user_projects(pool, user.id)
-            for p in user_projects:
-                try:
-                    project_scope = Scope.project(p.id)
-                    docs = await run_in_threadpool(_build_scope_docs, project_scope, "project")
-                except Exception:
-                    docs = []
-                projects_out.append(
-                    {
-                        "slug": p.slug,
-                        "name": p.name,
-                        "docs": docs,
-                    }
-                )
+        for sc in await _accessible_scopes(request, user):
+            docs = await _scope_docs(sc)
+            if sc["kind"] == "shared":
+                shared = docs
+            elif sc["kind"] == "personal":
+                personal = docs
+            else:
+                projects_out.append({"slug": sc["slug"], "name": sc["name"], "docs": docs})
 
         # Recent strip = all accessible docs sorted by published_at desc,
         # capped. We dedupe by (scope, id) so the same doc doesn't appear
@@ -819,6 +957,32 @@ def create_app(
             "shared": shared,
             "projects": projects_out,
         }
+
+    # ── Library listing ──────────────────────────────────────────────
+    #
+    # Flat list of every doc the user can read, across scopes, for the SPA's
+    # landing search and Library view. Same access rules as /api/landing
+    # (personal = the caller's own scope, projects = the caller's
+    # memberships, shared = everyone). `can_delete` per scope mirrors the
+    # DELETE route's rule so the UI only offers what the server allows.
+    # `?sizes=1` adds each bundle's total size + file count -- one bundle
+    # listing per doc, so the landing page leaves it off.
+
+    @app.get("/api/library")
+    async def get_library(
+        request: Request,
+        sizes: bool = False,
+        user: User = Depends(auth_module.current_user),
+    ) -> dict[str, Any]:
+        scopes_out: list[dict[str, Any]] = []
+        docs_out: list[dict[str, Any]] = []
+        for sc in await _accessible_scopes(request, user):
+            can_delete = user.is_admin if sc["kind"] == "shared" else True
+            scopes_out.append({"ref": sc["ref"], "kind": sc["kind"], "name": sc["name"], "can_delete": can_delete})
+            for d in await _scope_docs(sc, with_sizes=sizes):
+                d["scope_name"] = sc["name"]
+                docs_out.append(d)
+        return {"is_admin": user.is_admin, "scopes": scopes_out, "docs": docs_out}
 
     # ── Admin API ────────────────────────────────────────────────────
     #

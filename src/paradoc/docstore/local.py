@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, AsyncIterator, Optional
 from paradoc.db import DbManager
 from paradoc.db.models import PlotData, TableData, ThreeDData
 
-from .base import DocStore, _default_shared_scope
+from .base import DocStore, _default_shared_scope, check_doc_id
 from .manifest import read_manifest
 
 if TYPE_CHECKING:
@@ -156,7 +156,33 @@ class LocalDocStore(DocStore):
         if not target.is_relative_to(bundle_root):
             raise PermissionError(f"rel_path {rel_path!r} escapes bundle root")
         target.parent.mkdir(parents=True, exist_ok=True)
+        if target == (bundle_root / self.db_filename).resolve():
+            # Close the cached connection before the sqlite file is replaced (a re-publish), so the next read
+            # opens the new file instead of serving the previous publish's metadata.
+            manager = self._managers.pop(str(bundle_root), None)
+            if manager is not None:
+                manager.close()
         target.write_bytes(data)
+
+    def delete_doc(self, doc_id: str, *, scope: Optional["Scope"] = None) -> int:
+        import shutil
+
+        s = scope if scope is not None else _default_shared_scope()
+        if self._is_single_doc():
+            raise PermissionError("deletes not supported on single-doc deployments")
+        check_doc_id(doc_id)
+        scope_root = self._scope_root(s)
+        bundle_root = (scope_root / doc_id).resolve()
+        if bundle_root == scope_root or not bundle_root.is_relative_to(scope_root):
+            raise PermissionError(f"doc_id {doc_id!r} escapes scope root")
+        if not bundle_root.is_dir():
+            return 0
+        n = sum(1 for p in bundle_root.rglob("*") if p.is_file())
+        manager = self._managers.pop(str(bundle_root), None)
+        if manager is not None:
+            manager.close()
+        shutil.rmtree(bundle_root)
+        return n
 
     def get_bundle_manifest(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional["BundleManifest"]:
         s = scope if scope is not None else _default_shared_scope()
@@ -276,6 +302,12 @@ class LocalDocStore(DocStore):
     def get_static_tables_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         return self._read_static(doc_id, "tables.json", scope)
 
+    def get_static_file_bytes(self, doc_id: str, rel: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
+        try:
+            return self._read_static(doc_id, rel, scope)
+        except PermissionError:
+            return None
+
     def get_static_images_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         return self._read_static(doc_id, "images.json", scope)
 
@@ -299,7 +331,7 @@ class LocalDocStore(DocStore):
         except FileNotFoundError:
             return None
         path = (bundle / "static" / rel).resolve()
-        if not path.is_relative_to(bundle):
+        if not path.is_relative_to((bundle / "static").resolve()):
             raise PermissionError(f"static path escapes bundle: {rel!r}")
         if not path.is_file():
             return None
