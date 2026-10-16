@@ -80,13 +80,23 @@ def label_chapters(ast: dict) -> dict:
     return ast
 
 
+def _read_ast() -> Any:
+    # pandoc pipes UTF-8 JSON; text-mode stdio would decode it with the locale codec (cp1252 on Windows).
+    return json.loads(sys.stdin.buffer.read().decode("utf-8"))
+
+
+def _write_ast(ast: Any) -> None:
+    sys.stdout.buffer.write(json.dumps(ast, ensure_ascii=False).encode("utf-8"))
+    sys.stdout.buffer.flush()
+
+
 def main() -> int:
     try:
-        ast = json.load(sys.stdin)
-    except json.JSONDecodeError as exc:
+        ast = _read_ast()
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         sys.stderr.write(f"[paradoc-chapters] bad input AST: {exc}\n")
         return 2
-    json.dump(label_chapters(ast), sys.stdout)
+    _write_ast(label_chapters(ast))
     return 0
 
 
