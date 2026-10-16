@@ -356,6 +356,13 @@ class S3DocStore(DocStore):
             raise PermissionError(f"invalid rel_path: {rel_path!r}")
         key = self._key(doc_id, s, *clean.split("/"))
         _obstore.put(self._store, key, data)
+        if clean == self.db_filename:
+            # A re-published doc replaces its sqlite: drop the cached local copy and its connection, or reads
+            # (3D/plot/table metadata such as blob sizes) keep serving the previous publish until a restart.
+            manager = self._db_managers.pop(f"{s.prefix()}/{doc_id}", None)
+            if manager is not None:
+                manager.close()
+            (self.cache_dir / s.prefix() / doc_id / self.db_filename).unlink(missing_ok=True)
 
     def get_bundle_manifest(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[BundleManifest]:
         s = scope if scope is not None else _default_shared_scope()

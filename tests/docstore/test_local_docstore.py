@@ -99,3 +99,36 @@ def test_list_doc_ids_single(tmp_path):
     bundle, doc_id, _ = _build_single_doc_bundle(tmp_path)
     store = LocalDocStore(bundle)
     assert store.list_doc_ids() == [doc_id]
+
+
+def test_republish_replaces_cached_metadata(tmp_path):
+    """Uploading a new sqlite for an existing doc must not keep serving the old 3D metadata from the cached
+    connection (a stale size truncates the streamed blob)."""
+    (tmp_path / "v1").mkdir()
+    (tmp_path / "v2").mkdir()
+    src, doc_id, glb_bytes = _build_single_doc_bundle(tmp_path / "v1")
+    root = tmp_path / "root"
+    root.mkdir()
+    store = LocalDocStore(root)
+    for p in sorted(src.rglob("*")):
+        if p.is_file():
+            store.put_bundle_file(doc_id, p.relative_to(src).as_posix(), p.read_bytes())
+    first = store.get_three_d_meta(doc_id, "fig1")
+    assert first is not None and first.size == len(glb_bytes)
+
+    src2, _, glb2 = _build_single_doc_bundle(tmp_path / "v2")
+    glb2 = glb2 + b"more"
+    (src2 / "assets" / "3d" / "fig1.glb").write_bytes(glb2)
+    db = DbManager(src2 / "paradoc.sqlite")
+    meta = db.get_three_d("fig1")
+    meta.size, meta.sha256 = len(glb2), hashlib.sha256(glb2).hexdigest()
+    db.add_three_d(meta)
+    db.close()
+    for p in sorted(src2.rglob("*")):
+        if p.is_file():
+            store.put_bundle_file(doc_id, p.relative_to(src2).as_posix(), p.read_bytes())
+
+    second = store.get_three_d_meta(doc_id, "fig1")
+    assert second is not None
+    assert second.size == len(glb2)
+    assert second.sha256 == hashlib.sha256(glb2).hexdigest()

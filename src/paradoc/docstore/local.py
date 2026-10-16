@@ -156,6 +156,12 @@ class LocalDocStore(DocStore):
         if not target.is_relative_to(bundle_root):
             raise PermissionError(f"rel_path {rel_path!r} escapes bundle root")
         target.parent.mkdir(parents=True, exist_ok=True)
+        if target == (bundle_root / self.db_filename).resolve():
+            # Close the cached connection before the sqlite file is replaced (a re-publish), so the next read
+            # opens the new file instead of serving the previous publish's metadata.
+            manager = self._managers.pop(str(bundle_root), None)
+            if manager is not None:
+                manager.close()
         target.write_bytes(data)
 
     def delete_doc(self, doc_id: str, *, scope: Optional["Scope"] = None) -> int:

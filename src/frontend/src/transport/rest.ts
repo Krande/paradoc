@@ -116,7 +116,10 @@ export class RESTTransport implements AssetTransport {
     // ("cache hit but local cache missing"). Probing IndexedDB first
     // costs one DB read but keeps the round-trip safe even after the
     // user wipes site data or visits the doc for the first time.
-    const url = this.url(docApiPath(docId, `/3d/${encodeURIComponent(key)}/blob`))
+    // The blob is served `immutable`, so its URL must change when the content does: version it by sha256, or a
+    // re-published asset keeps coming out of the browser's HTTP cache under the old URL.
+    const blobPath = `/3d/${encodeURIComponent(key)}/blob` + (knownSha ? `?v=${encodeURIComponent(knownSha)}` : '')
+    const url = this.url(docApiPath(docId, blobPath))
     const headers: HeadersInit = {}
     const cachedBlob = knownSha
       ? await dbGet<ArrayBuffer>('three_d_blob' as any, knownSha)
