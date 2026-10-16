@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-import obstore
 import pytest
-from obstore.store import MemoryStore
 
-from paradoc.docstore.s3 import S3DocStore
-from paradoc.serve.scope import Scope
+obstore = pytest.importorskip("obstore")
+
+from obstore.store import MemoryStore  # noqa: E402
+
+from paradoc.docstore.s3 import S3DocStore  # noqa: E402
+from paradoc.serve.scope import Scope  # noqa: E402
 
 
 @pytest.fixture
