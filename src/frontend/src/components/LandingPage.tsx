@@ -1,453 +1,332 @@
 import React from 'react'
-import { authedFetch } from '../services/auth/oidc'
-import { getRuntimeConfig } from '../transport'
-import { canDeleteInScope, landingScopeRef } from '../transport/docScope'
+import { useLibrary } from './library/useLibrary'
+import {
+  docKey,
+  formatRelative,
+  mergeRecents,
+  rankDocs,
+  readHistory,
+  type LibraryDoc,
+} from './library/libraryModel'
+import { BrandMark } from './BrandMark'
+import { GitRef, Highlight, Icon, ScopeLabel } from './library/ui'
 
-// Sectioned landing: Recent strip, Personal, Shared, Projects.
+// Landing page: one centred search field over the docs the user can read,
+// "Recent" underneath, and the way into the Library.
 //
-// Backend contract (preferred):
-//   GET /api/landing → {
-//     recent:   LandingDoc[],
-//     personal: LandingDoc[],
-//     shared:   LandingDoc[],
-//     projects: { slug: string, name: string, docs: LandingDoc[] }[],
-//   }
-//
-// Fallback (used until /api/landing ships): hits /api/docs and renders
-// every result under "Shared" — that matches the current behavior of
-// DocList. Personal/Projects sections stay hidden in fallback mode.
-
-interface GitInfo {
-  short_commit: string
-  branch: string
-  is_dirty: boolean
-  remote_url?: string
-}
-
-interface LandingDoc {
-  id: string
-  title?: string
-  /** Legacy field kept for backwards-compat with the /api/docs fallback. */
-  updated_at?: string
-  /** v2 manifest field. The card displays this when present, falling
-   *  back to updated_at then to "no timestamp". */
-  published_at?: string
-  paradoc_version?: string
-  git?: GitInfo
-  scope?: 'shared' | 'personal' | 'project'
-  /** URL-form scope (`shared`, `user:me`, `project:<slug>`) used to
-   *  route the doc's REST calls. Older servers omit it; the SPA then
-   *  derives it from `scope` (+ the project group's slug). */
-  scope_ref?: string
-}
-
-interface ProjectGroup {
-  slug: string
-  name: string
-  docs: LandingDoc[]
-}
-
-interface LandingResponse {
-  recent?: LandingDoc[]
-  personal?: LandingDoc[]
-  shared?: LandingDoc[]
-  projects?: ProjectGroup[]
-}
+// Recent = local open-history merged with server publish times (see
+// mergeRecents). While the user types, ranked search results replace it;
+// arrows move the highlight and Enter opens it (the top hit by default).
+// Deleting lives in the Library view, not here.
 
 type SelectDoc = (docId: string, scope?: string) => void
 
-/** Deletes a doc; resolves when it is gone, rejects with a message to show on the card. */
-type DeleteDoc = (doc: LandingDoc, scopeRef: string) => Promise<void>
-
-
 interface LandingPageProps {
   onSelect: SelectDoc
+  onOpenLibrary: () => void
 }
 
-function joinUrl(base: string, path: string): string {
-  return base.replace(/\/?$/, '') + path
+function readLocalHistory() {
+  try {
+    return readHistory(window.localStorage)
+  } catch {
+    return []
+  }
 }
 
-function formatRelative(iso?: string): string {
-  if (!iso) return ''
-  const t = Date.parse(iso)
-  if (Number.isNaN(t)) return ''
-  const diff = Date.now() - t
-  if (diff < 0) return ''
-  const sec = Math.floor(diff / 1000)
-  if (sec < 60) return 'just now'
-  const min = Math.floor(sec / 60)
-  if (min < 60) return `${min}m ago`
-  const hr = Math.floor(min / 60)
-  if (hr < 24) return `${hr}h ago`
-  const day = Math.floor(hr / 24)
-  if (day < 30) return `${day}d ago`
-  const mon = Math.floor(day / 30)
-  if (mon < 12) return `${mon}mo ago`
-  return `${Math.floor(mon / 12)}y ago`
+interface Row {
+  doc: LibraryDoc
+  ranges: [number, number][]
+  when: string
 }
 
-function ScopeChip({ scope }: { scope?: LandingDoc['scope'] }) {
-  if (!scope) return null
-  const text = scope === 'personal' ? 'me' : scope === 'project' ? 'project' : 'shared'
-  return (
-    <span className="inline-flex items-center text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-      {text}
-    </span>
-  )
-}
-
-function GitFooter({ git, ts }: { git?: GitInfo; ts?: string }) {
-  const branch = git?.branch || ''
-  const sha = git?.short_commit || ''
-  const dirty = git?.is_dirty
-  const rel = ts ? formatRelative(ts) : ''
-  // Footer renders only when we have at least one of git, timestamp.
-  if (!branch && !sha && !rel) return null
-  return (
-    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400 font-mono">
-      {dirty && (
-        <span
-          title="Built from a dirty working tree"
-          className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500"
-        />
-      )}
-      {(branch || sha) && (
-        <span className="truncate min-w-0">
-          {branch ? branch : ''}
-          {branch && sha ? '@' : ''}
-          {sha}
-        </span>
-      )}
-      {(branch || sha) && rel && <span className="text-gray-300 dark:text-gray-700">·</span>}
-      {rel && <span className="whitespace-nowrap">{rel}</span>}
-    </div>
-  )
-}
-
-function DocCard({
-  doc,
-  onSelect,
-  onDelete,
-  isAdmin = false,
-  compact = false,
-  projectSlug,
+function ResultRow({
+  row,
+  active,
+  index,
+  onOpen,
+  onHover,
 }: {
-  doc: LandingDoc
-  onSelect: SelectDoc
-  onDelete?: DeleteDoc
-  isAdmin?: boolean
-  compact?: boolean
-  projectSlug?: string
+  row: Row
+  active: boolean
+  index: number
+  onOpen: () => void
+  onHover: () => void
 }) {
-  const ts = doc.published_at || doc.updated_at
-  const scopeRef = landingScopeRef(doc, projectSlug) || 'shared'
-  const [busy, setBusy] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-  const deletable = !!onDelete && canDeleteInScope(scopeRef, isAdmin)
+  const { doc } = row
+  return (
+    <li role="option" id={`landing-opt-${index}`} aria-selected={active}>
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={onOpen}
+        onMouseMove={onHover}
+        data-testid="landing-row"
+        className={
+          'w-full text-left flex items-center gap-3 px-3 sm:px-4 py-2.5 cursor-pointer transition-colors ' +
+          (active ? 'bg-gray-100 dark:bg-gray-800/80' : 'hover:bg-gray-50 dark:hover:bg-gray-800/40')
+        }
+      >
+        <span className="hidden sm:inline-flex items-center justify-center w-8 h-8 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 shrink-0">
+          <Icon.Doc />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] text-gray-900 dark:text-gray-100">
+            <Highlight text={doc.title} ranges={row.ranges} />
+          </span>
+          <span className="mt-0.5 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 min-w-0">
+            <ScopeLabel doc={doc} className="shrink-0 max-w-full sm:max-w-[60%]" />
+            {(doc.branch || doc.commit) && (
+              <span className="hidden sm:contents">
+                <span className="text-gray-300 dark:text-gray-700">·</span>
+                <GitRef doc={doc} />
+              </span>
+            )}
+          </span>
+        </span>
+        <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0 tabular-nums">{row.when}</span>
+        <Icon.ArrowRight
+          className={'hidden sm:block w-4 h-4 shrink-0 transition ' + (active ? 'text-gray-500 dark:text-gray-400' : 'text-transparent')}
+        />
+      </button>
+    </li>
+  )
+}
 
-  const remove = async () => {
-    if (!onDelete || busy) return
-    const where = scopeRef === 'shared' ? 'the shared scope' : scopeRef === 'user:me' ? 'your personal scope' : scopeRef
-    if (!window.confirm(`Delete "${doc.title || doc.id}" from ${where}?\n\nThis removes the published report and cannot be undone.`)) return
-    setBusy(true)
-    setError(null)
-    try {
-      await onDelete(doc, scopeRef)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'delete failed')
-      setBusy(false)
+export function LandingPage({ onSelect, onOpenLibrary }: LandingPageProps) {
+  const { data, loading, error, ensure } = useLibrary()
+  const [query, setQuery] = React.useState('')
+  const [active, setActive] = React.useState(-1)
+  const [history] = React.useState(readLocalHistory)
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
+  React.useEffect(() => ensure(), [ensure])
+
+  // "/" focuses the search from anywhere on the page.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      e.preventDefault()
+      inputRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const docs = React.useMemo(() => data?.docs || [], [data])
+  const searching = query.trim().length > 0
+  const rows: Row[] = React.useMemo(() => {
+    if (searching) {
+      return rankDocs(query, docs)
+        .slice(0, 12)
+        .map((h) => ({ doc: h.doc, ranges: h.titleRanges, when: formatRelative(h.doc.updatedMs) }))
+    }
+    return mergeRecents(docs, history, 8).map((r) => ({
+      doc: r.doc,
+      ranges: [],
+      when: (r.reason === 'opened' ? 'opened ' : '') + formatRelative(r.at),
+    }))
+  }, [searching, query, docs, history])
+
+  // A query highlights its top hit, so Enter opens it.
+  React.useEffect(() => setActive(searching ? 0 : -1), [query, searching])
+
+  const open = (doc: LibraryDoc) => onSelect(doc.id, doc.scopeRef)
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (rows.length) setActive((i) => (i + 1) % rows.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (rows.length) setActive((i) => (i <= 0 ? rows.length - 1 : i - 1))
+    } else if (e.key === 'Enter') {
+      const row = rows[active]
+      if (row) {
+        e.preventDefault()
+        open(row.doc)
+      }
+    } else if (e.key === 'Escape') {
+      if (query) {
+        e.preventDefault()
+        setQuery('')
+      } else inputRef.current?.blur()
     }
   }
 
+  const total = docs.length
+  const scopeCount = data?.scopes.length || 0
+
   return (
-    // The card holds two sibling buttons -- open (the whole card) and delete (top-right) -- since a
-    // button cannot contain another.
-    <div className={'relative group ' + (compact ? 'w-56 shrink-0' : '')}>
-      <button
-        onClick={() => onSelect(doc.id, scopeRef)}
-        disabled={busy}
-        className={
-          'w-full h-full text-left rounded-lg border border-gray-200 dark:border-gray-800 ' +
-          'bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-600 ' +
-          'hover:shadow-sm transition cursor-pointer disabled:opacity-50 ' +
-          (compact ? 'p-3' : 'p-4')
-        }
-      >
-        <div className={'flex items-start justify-between gap-2 mb-2 ' + (deletable ? 'pr-8' : '')}>
-          <ScopeChip scope={doc.scope} />
+    <div className="flex-1 overflow-auto overscroll-contain bg-gray-50 dark:bg-gray-950" data-testid="landing">
+      <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 pt-[8vh] sm:pt-[13vh] pb-16">
+        <div className="flex flex-col items-center text-center">
+          <div className="inline-flex items-center gap-2.5 text-gray-900 dark:text-gray-100">
+            <BrandMark className="w-6 h-6 sm:w-7 sm:h-7" />
+            <h1 className="font-mono text-2xl sm:text-3xl font-medium uppercase tracking-[0.22em] text-gray-900 dark:text-gray-100">
+              paradoc
+            </h1>
+          </div>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            {data && total > 0
+              ? `${total} document${total === 1 ? '' : 's'} in progress across ${scopeCount} scope${scopeCount === 1 ? '' : 's'}`
+              : 'Documents in progress'}
+          </p>
         </div>
-        <p className="font-medium text-gray-900 dark:text-gray-100 break-words leading-snug">
-          {doc.title || doc.id}
-        </p>
-        {doc.title && doc.title !== doc.id && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-all">{doc.id}</p>
-        )}
-        <GitFooter git={doc.git} ts={ts} />
-        {error && <p className="text-xs text-red-600 dark:text-red-400 mt-2">Could not delete: {error}</p>}
-      </button>
-      {deletable && (
-        <button
-          type="button"
-          onClick={remove}
-          disabled={busy}
-          aria-label={`Delete ${doc.title || doc.id}`}
-          title="Delete this report"
-          className={
-            'absolute top-2 right-2 rounded p-1.5 cursor-pointer text-gray-400 ' +
-            'hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-950/40 ' +
-            // Always visible on touch screens (no hover); on desktop it shows on card hover/focus.
-            'sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100 transition disabled:opacity-50'
-          }
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-4 h-4" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-          </svg>
-        </button>
-      )}
-    </div>
-  )
-}
 
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="text-xs uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-3 mt-8 first:mt-0">
-      {children}
-    </h2>
-  )
-}
+        <div className="mt-7 sm:mt-9">
+          <label htmlFor="landing-search" className="sr-only">
+            Search documents
+          </label>
+          <div
+            className={
+              'flex items-center gap-2.5 rounded-full border bg-white dark:bg-gray-900 px-4 sm:px-5 h-12 shadow-sm transition ' +
+              'border-gray-200 dark:border-gray-800 focus-within:border-gray-400 dark:focus-within:border-gray-600 focus-within:shadow-md'
+            }
+          >
+            <Icon.Search className="w-[18px] h-[18px] text-gray-400 dark:text-gray-500 shrink-0" />
+            <input
+              id="landing-search"
+              ref={inputRef}
+              type="search"
+              autoComplete="off"
+              spellCheck={false}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder="Search documents"
+              role="combobox"
+              aria-expanded={rows.length > 0}
+              aria-controls="landing-list"
+              aria-activedescendant={active >= 0 && rows[active] ? `landing-opt-${active}` : undefined}
+              className="flex-1 min-w-0 bg-transparent text-[16px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 outline-none [&::-webkit-search-cancel-button]:hidden"
+            />
+            {query ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('')
+                  inputRef.current?.focus()
+                }}
+                aria-label="Clear search"
+                className="cursor-pointer -mr-1 p-1 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              >
+                <Icon.Close />
+              </button>
+            ) : (
+              <kbd className="hidden sm:inline-flex items-center justify-center h-6 min-w-6 px-1.5 rounded border border-gray-200 dark:border-gray-700 text-[11px] font-mono text-gray-400 dark:text-gray-500">
+                /
+              </kbd>
+            )}
+          </div>
 
-function ProjectGroupView({
-  group,
-  onSelect,
-  onDelete,
-  isAdmin,
-}: {
-  group: ProjectGroup
-  onSelect: SelectDoc
-  onDelete?: DeleteDoc
-  isAdmin?: boolean
-}) {
-  const [open, setOpen] = React.useState(true)
-  return (
-    <div className="mb-4">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 cursor-pointer mb-2"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className={'w-4 h-4 transition-transform ' + (open ? 'rotate-90' : '')}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-        <span>{group.name}</span>
-        <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">
-          {group.docs.length}
-        </span>
-      </button>
-      {open && (
-        <div className="ml-5">
-          {group.docs.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500 italic">
-              No reports yet.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {group.docs.map((d) => (
-                <DocCard key={d.id} doc={d} onSelect={onSelect} onDelete={onDelete} isAdmin={isAdmin} projectSlug={group.slug} />
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={onOpenLibrary}
+              data-testid="open-library"
+              className={
+                'cursor-pointer inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ' +
+                'text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 ' +
+                'hover:border-gray-400 dark:hover:border-gray-600 hover:text-gray-900 dark:hover:text-white'
+              }
+            >
+              <Icon.Library />
+              Library
+              {total > 0 && <span className="text-gray-400 dark:text-gray-500 font-normal tabular-nums">{total}</span>}
+            </button>
+          </div>
+        </div>
+
+        <section className="mt-10 sm:mt-12" aria-live="polite">
+          <div className="flex items-baseline justify-between px-1 mb-2">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
+              {searching ? 'Results' : 'Recent'}
+            </h2>
+            {searching && rows.length > 0 && (
+              <span className="hidden sm:inline text-xs text-gray-400 dark:text-gray-500">↑↓ to move · Enter to open</span>
+            )}
+          </div>
+
+          {loading && !data ? (
+            <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="px-4 py-3.5">
+                  <div className="h-3.5 w-1/2 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                  <div className="mt-2 h-2.5 w-1/4 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                </div>
               ))}
             </div>
+          ) : error ? (
+            <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-4 py-3">
+              <p className="text-sm font-medium text-red-700 dark:text-red-300">Could not load documents</p>
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+          ) : rows.length > 0 ? (
+            <ul
+              id="landing-list"
+              role="listbox"
+              aria-label={searching ? 'Search results' : 'Recent documents'}
+              className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden"
+            >
+              {rows.map((row, i) => (
+                <ResultRow
+                  key={docKey(row.doc)}
+                  row={row}
+                  index={i}
+                  active={i === active}
+                  onOpen={() => open(row.doc)}
+                  onHover={() => active !== i && setActive(i)}
+                />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState searching={searching} query={query} hasDocs={total > 0} onOpenLibrary={onOpenLibrary} />
           )}
-        </div>
-      )}
+        </section>
+      </div>
     </div>
   )
 }
 
-export function LandingPage({ onSelect }: LandingPageProps) {
-  const [data, setData] = React.useState<LandingResponse | null>(null)
-  const [error, setError] = React.useState<string | null>(null)
-  const [loading, setLoading] = React.useState(true)
-  const [isAdmin, setIsAdmin] = React.useState(false)
-
-  // Only decides whether shared cards show a delete button; the server enforces it regardless.
-  React.useEffect(() => {
-    const apiBase = getRuntimeConfig().apiBase || ''
-    let canceled = false
-    authedFetch(joinUrl(apiBase, '/api/me'), { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((me) => {
-        if (!canceled && me) setIsAdmin(!!me.is_admin)
-      })
-      .catch(() => {})
-    return () => {
-      canceled = true
-    }
-  }, [])
-
-  const deleteDoc: DeleteDoc = React.useCallback(async (doc, scopeRef) => {
-    const apiBase = getRuntimeConfig().apiBase || ''
-    const res = await authedFetch(
-      joinUrl(apiBase, `/api/scopes/${encodeURIComponent(scopeRef)}/docs/${encodeURIComponent(doc.id)}`),
-      { method: 'DELETE' },
-    )
-    if (!res.ok && res.status !== 404) {
-      let detail = `HTTP ${res.status}`
-      try {
-        const body = await res.json()
-        if (body?.detail) detail = String(body.detail)
-      } catch {}
-      throw new Error(detail)
-    }
-    // Gone (or already gone): drop it from every list, Recent included.
-    const keep = (d: LandingDoc, slug?: string) => !(d.id === doc.id && (landingScopeRef(d, slug) || 'shared') === scopeRef)
-    setData((prev) =>
-      prev && {
-        ...prev,
-        recent: prev.recent?.filter((d) => keep(d)),
-        personal: prev.personal?.filter((d) => keep(d)),
-        shared: prev.shared?.filter((d) => keep(d)),
-        projects: prev.projects?.map((p) => ({ ...p, docs: p.docs.filter((d) => keep(d, p.slug)) })),
-      },
-    )
-  }, [])
-
-  React.useEffect(() => {
-    const cfg = getRuntimeConfig()
-    const apiBase = cfg.apiBase || ''
-    let canceled = false
-    ;(async () => {
-      try {
-        const res = await authedFetch(joinUrl(apiBase, '/api/landing'), {
-          cache: 'no-store',
-        })
-        if (res.ok) {
-          const body = (await res.json()) as LandingResponse
-          if (!canceled) {
-            setData(body)
-            setLoading(false)
-          }
-          return
-        }
-        if (res.status !== 404) {
-          throw new Error(`HTTP ${res.status}`)
-        }
-        // Fallback: aggregator not deployed yet → use /api/docs as
-        // "Shared". Personal/Projects sections stay hidden.
-        const flat = await authedFetch(joinUrl(apiBase, '/api/docs'), {
-          cache: 'no-store',
-        })
-        if (!flat.ok) throw new Error(`HTTP ${flat.status}`)
-        const fb = (await flat.json()) as { docs: string[] }
-        if (!canceled) {
-          setData({
-            recent: [],
-            personal: [],
-            shared: (fb.docs || []).map((id) => ({ id, scope: 'shared' as const })),
-            projects: [],
-          })
-          setLoading(false)
-        }
-      } catch (err: any) {
-        if (canceled) return
-        setError(String(err?.message || err))
-        setLoading(false)
-      }
-    })()
-    return () => {
-      canceled = true
-    }
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="flex-1 overflow-auto overscroll-contain px-4 sm:px-8 py-6">
-        <p className="text-sm text-gray-500 dark:text-gray-400">Loading reports…</p>
-      </div>
-    )
-  }
-  if (error) {
-    return (
-      <div className="flex-1 overflow-auto overscroll-contain px-4 sm:px-8 py-6">
-        <div className="border border-red-300 dark:border-red-800 rounded-lg bg-red-50 dark:bg-red-950/30 p-4 max-w-xl">
-          <p className="text-red-700 dark:text-red-300 font-semibold">
-            Could not load reports
-          </p>
-          <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
-        </div>
-      </div>
-    )
-  }
-  if (!data) return null
-
-  const recent = data.recent || []
-  const personal = data.personal || []
-  const shared = data.shared || []
-  const projects = data.projects || []
-  const everythingEmpty =
-    recent.length === 0 &&
-    personal.length === 0 &&
-    shared.length === 0 &&
-    projects.every((p) => p.docs.length === 0)
-
+function EmptyState({
+  searching,
+  query,
+  hasDocs,
+  onOpenLibrary,
+}: {
+  searching: boolean
+  query: string
+  hasDocs: boolean
+  onOpenLibrary: () => void
+}) {
   return (
-    <div className="flex-1 overflow-auto overscroll-contain">
-      <div className="max-w-6xl mx-auto px-4 sm:px-8 py-6">
-        {everythingEmpty ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400 mt-8">
-            No reports yet. Publish a paradoc bundle to your shared, personal,
-            or project scope and it will show up here.
-          </div>
-        ) : (
-          <>
-            {recent.length > 0 && (
-              <section>
-                <SectionHeader>Recent</SectionHeader>
-                <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
-                  {recent.map((d) => (
-                    <DocCard key={`${d.scope_ref || d.scope}:${d.id}`} doc={d} onSelect={onSelect} onDelete={deleteDoc} isAdmin={isAdmin} compact />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {personal.length > 0 && (
-              <section>
-                <SectionHeader>Personal</SectionHeader>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {personal.map((d) => (
-                    <DocCard key={d.id} doc={d} onSelect={onSelect} onDelete={deleteDoc} isAdmin={isAdmin} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {shared.length > 0 && (
-              <section>
-                <SectionHeader>Shared</SectionHeader>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {shared.map((d) => (
-                    <DocCard key={d.id} doc={d} onSelect={onSelect} onDelete={deleteDoc} isAdmin={isAdmin} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {projects.length > 0 && (
-              <section>
-                <SectionHeader>Projects</SectionHeader>
-                {projects.map((p) => (
-                  <ProjectGroupView key={p.slug} group={p} onSelect={onSelect} onDelete={deleteDoc} isAdmin={isAdmin} />
-                ))}
-              </section>
-            )}
-          </>
-        )}
-      </div>
+    <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 px-5 py-8 text-center">
+      {searching ? (
+        <>
+          <p className="text-sm text-gray-700 dark:text-gray-300">No documents match “{query.trim()}”.</p>
+          <button
+            type="button"
+            onClick={onOpenLibrary}
+            className="cursor-pointer mt-2 text-sm text-sky-700 dark:text-sky-400 hover:underline"
+          >
+            Browse the library instead
+          </button>
+        </>
+      ) : hasDocs ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">Documents you open will show up here.</p>
+      ) : (
+        <>
+          <p className="text-sm text-gray-700 dark:text-gray-300">Nothing published yet.</p>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Publish a document with{' '}
+            <code className="font-mono rounded bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5">paradoc publish &lt;doc_dir&gt;</code>{' '}
+            and it appears here.
+          </p>
+        </>
+      )}
     </div>
   )
 }

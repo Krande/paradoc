@@ -862,49 +862,86 @@ def create_app(
                 }
         return entry
 
-    def _build_scope_docs(scope: Scope, label: str, scope_ref: str) -> list[dict[str, Any]]:
-        # list_doc_ids + a get_bundle_manifest per doc — all synchronous S3.
-        # Called via run_in_threadpool from the async /api/landing handler so
-        # this fan-out of blocking calls never sits on the event loop.
-        return [_doc_entry(d, scope, label, scope_ref) for d in doc_store.list_doc_ids(scope)]
+    def _build_scope_docs(scope: Scope, label: str, scope_ref: str, with_sizes: bool = False) -> list[dict[str, Any]]:
+        # list_doc_ids + a get_bundle_manifest per doc (+ a bundle listing per doc with sizes) --
+        # all synchronous S3. Called via run_in_threadpool from the async handlers so this fan-out
+        # of blocking calls never sits on the event loop; the per-doc reads run a few at a time.
+        from concurrent.futures import ThreadPoolExecutor
+
+        def entry(doc_id: str) -> dict[str, Any]:
+            e = _doc_entry(doc_id, scope, label, scope_ref)
+            if with_sizes:
+                try:
+                    files = doc_store.list_bundle_files(doc_id, scope=scope)
+                except Exception:
+                    files = []
+                if files:
+                    e["size"] = sum(f.size for f in files)
+                    e["file_count"] = len(files)
+            return e
+
+        ids = doc_store.list_doc_ids(scope)
+        if len(ids) <= 1:
+            return [entry(d) for d in ids]
+        with ThreadPoolExecutor(max_workers=min(8, len(ids))) as pool:
+            return list(pool.map(entry, ids))
+
+    def _has_personal_scope(user: User) -> bool:
+        # Synthetic local-dev users keep the zero UUID; their bundles
+        # never live under users/<id>/, so skip the listing.
+        return bool(user.id) and not user.id.startswith("00000000")
+
+    async def _accessible_scopes(request: Request, user: User) -> list[dict[str, Any]]:
+        """Every scope ``user`` may read, in display order: personal, shared, then projects.
+
+        Each item: ``kind`` (personal/shared/project), ``ref`` (URL-form scope), ``name``,
+        ``scope`` (the docstore Scope) and ``slug`` for projects. Project scopes come only from the
+        user's memberships, so nobody sees another user's personal docs or a project they are not in.
+        """
+        out: list[dict[str, Any]] = []
+        if _has_personal_scope(user):
+            out.append({"kind": "personal", "ref": "user:me", "name": "Personal", "scope": Scope.user(user.id)})
+        out.append({"kind": "shared", "ref": "shared", "name": "Shared", "scope": Scope.shared()})
+        pool = getattr(request.app.state, "db_pool", None)
+        if pool is not None and _has_personal_scope(user):
+            from . import db as _db
+
+            for p in await _db.list_user_projects(pool, user.id):
+                out.append(
+                    {
+                        "kind": "project",
+                        "ref": f"project:{p.slug}",
+                        "name": p.name,
+                        "slug": p.slug,
+                        "scope": Scope.project(p.id),
+                    }
+                )
+        return out
+
+    async def _scope_docs(sc: dict[str, Any], with_sizes: bool = False) -> list[dict[str, Any]]:
+        try:
+            return await run_in_threadpool(_build_scope_docs, sc["scope"], sc["kind"], sc["ref"], with_sizes)
+        except Exception:
+            if sc["kind"] == "shared":
+                raise
+            return []
 
     @app.get("/api/landing")
     async def get_landing(
         request: Request,
         user: User = Depends(auth_module.current_user),
     ) -> dict[str, Any]:
-        shared_scope = Scope.shared()
-        shared = await run_in_threadpool(_build_scope_docs, shared_scope, "shared", "shared")
-
+        shared: list[dict[str, Any]] = []
         personal: list[dict[str, Any]] = []
-        # Synthetic local-dev users keep the zero UUID; their bundles
-        # never live under users/<id>/, so skip the listing.
-        if user.id and not user.id.startswith("00000000"):
-            try:
-                user_scope = Scope.user(user.id)
-                personal = await run_in_threadpool(_build_scope_docs, user_scope, "personal", "user:me")
-            except Exception:
-                personal = []
-
         projects_out: list[dict[str, Any]] = []
-        pool = getattr(request.app.state, "db_pool", None)
-        if pool is not None and user.id and not user.id.startswith("00000000"):
-            from . import db as _db
-
-            user_projects = await _db.list_user_projects(pool, user.id)
-            for p in user_projects:
-                try:
-                    project_scope = Scope.project(p.id)
-                    docs = await run_in_threadpool(_build_scope_docs, project_scope, "project", f"project:{p.slug}")
-                except Exception:
-                    docs = []
-                projects_out.append(
-                    {
-                        "slug": p.slug,
-                        "name": p.name,
-                        "docs": docs,
-                    }
-                )
+        for sc in await _accessible_scopes(request, user):
+            docs = await _scope_docs(sc)
+            if sc["kind"] == "shared":
+                shared = docs
+            elif sc["kind"] == "personal":
+                personal = docs
+            else:
+                projects_out.append({"slug": sc["slug"], "name": sc["name"], "docs": docs})
 
         # Recent strip = all accessible docs sorted by published_at desc,
         # capped. We dedupe by (scope, id) so the same doc doesn't appear
@@ -920,6 +957,32 @@ def create_app(
             "shared": shared,
             "projects": projects_out,
         }
+
+    # ── Library listing ──────────────────────────────────────────────
+    #
+    # Flat list of every doc the user can read, across scopes, for the SPA's
+    # landing search and Library view. Same access rules as /api/landing
+    # (personal = the caller's own scope, projects = the caller's
+    # memberships, shared = everyone). `can_delete` per scope mirrors the
+    # DELETE route's rule so the UI only offers what the server allows.
+    # `?sizes=1` adds each bundle's total size + file count -- one bundle
+    # listing per doc, so the landing page leaves it off.
+
+    @app.get("/api/library")
+    async def get_library(
+        request: Request,
+        sizes: bool = False,
+        user: User = Depends(auth_module.current_user),
+    ) -> dict[str, Any]:
+        scopes_out: list[dict[str, Any]] = []
+        docs_out: list[dict[str, Any]] = []
+        for sc in await _accessible_scopes(request, user):
+            can_delete = user.is_admin if sc["kind"] == "shared" else True
+            scopes_out.append({"ref": sc["ref"], "kind": sc["kind"], "name": sc["name"], "can_delete": can_delete})
+            for d in await _scope_docs(sc, with_sizes=sizes):
+                d["scope_name"] = sc["name"]
+                docs_out.append(d)
+        return {"is_admin": user.is_admin, "scopes": scopes_out, "docs": docs_out}
 
     # ── Admin API ────────────────────────────────────────────────────
     #

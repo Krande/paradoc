@@ -27,9 +27,30 @@ import {
 import type { DocManifest, SectionBundle } from './ast/types'
 import { VirtualReader } from './components/VirtualReader'
 import { LandingPage } from './components/LandingPage'
+import { LibraryView } from './components/library/LibraryView'
+import { recordOpen } from './components/library/libraryModel'
+import type { ShellView } from './components/Topbar'
 import { calculateHeadingNumbers } from './ast/headingNumbers'
 import { SourceDisplayProvider } from './store/sourceDisplayStore'
 import { ViewerControlsProvider } from './store/viewerControlsStore'
+
+// Query params owned by the Library view (`?view=library&in=..&sort=..&layout=..&q=..`).
+const LIBRARY_PARAMS = ['view', 'in', 'sort', 'layout', 'q']
+
+function readLibraryFlag(): boolean {
+  try {
+    return new URLSearchParams(window.location.search).get('view') === 'library'
+  } catch {
+    return false
+  }
+}
+
+/** Local open-history for the landing page's "Recent". */
+function rememberOpened(id: string, scope?: string) {
+  try {
+    recordOpen(window.localStorage, id, normalizeScope(scope) || 'shared', Date.now())
+  } catch {}
+}
 
 function AppContent() {
   const {
@@ -203,7 +224,31 @@ function AppContent() {
     if (sel) {
       setDocScope(sel.docId, sel.scope)
       setDocId(sel.docId)
+      rememberOpened(sel.docId, sel.scope)
     }
+  }, [])
+
+  // Landing vs Library when no doc is open (REST mode): `?view=library`.
+  const [libraryView, setLibraryView] = React.useState(() => readLibraryFlag())
+
+  // Back / forward: follow the URL's doc + view instead of leaving the old doc on screen.
+  useEffect(() => {
+    // REST only: static / WS docs are not addressed by the URL, and in-page hash
+    // navigation fires popstate too.
+    if (getRuntimeConfig().transport !== 'rest') return
+    const onPop = () => {
+      setLibraryView(readLibraryFlag())
+      const sel = readDocSelection(window.location)
+      const nextId = sel?.docId || ''
+      const current = useAppStore.getState().docId
+      if (nextId !== current || (nextId && normalizeScope(sel?.scope) !== getDocScope(nextId))) {
+        resetSections()
+        if (nextId) setDocScope(nextId, sel?.scope)
+        setDocId(nextId)
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
   }, [])
 
   // Static mode: Load data from static JSON files if available
@@ -322,14 +367,39 @@ function AppContent() {
     resetSections()
     if (id) setDocScope(id, nextScope)
     setDocId(id)
+    if (id) {
+      rememberOpened(id, nextScope)
+      setLibraryView(false)
+    }
     try {
       // Empty id = "back to landing" (clicked the brand mark): drops
       // ?doc= and ?scope= so a refresh stays on the landing page.
-      // Shared docs omit ?scope= so old links keep working.
+      // Shared docs omit ?scope= so old links keep working. Opening a doc
+      // also drops the Library's view state.
       const url = writeDocSelection(new URL(window.location.href), id, nextScope)
+      if (id) for (const k of LIBRARY_PARAMS) url.searchParams.delete(k)
       window.history.pushState({}, '', url.toString())
     } catch {}
   }
+
+  // Leave the open doc (if any) for the landing page or the Library, as one history entry.
+  const showShell = (library: boolean, scope?: string) => {
+    if (getRuntimeConfig().transport !== 'rest') return
+    if (docId) {
+      resetSections()
+      setDocId('')
+    }
+    setLibraryView(library)
+    try {
+      const url = writeDocSelection(new URL(window.location.href), '')
+      for (const k of LIBRARY_PARAMS) url.searchParams.delete(k)
+      if (library) url.searchParams.set('view', 'library')
+      if (library && scope) url.searchParams.set('in', scope)
+      if (url.toString() !== window.location.href) window.history.pushState({}, '', url.toString())
+    } catch {}
+  }
+  const goHome = () => showShell(false)
+  const openLibrary = (scope?: string) => showShell(true, scope)
 
   // Handle global keyboard shortcuts
   useEffect(() => {
@@ -345,6 +415,10 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  const restMode = getRuntimeConfig().transport === 'rest'
+  // Landing / Library replace the reader when no doc is open in REST mode.
+  const view: ShellView = state.manifest || !restMode || docId ? 'reader' : libraryView ? 'library' : 'home'
+
   return (
     // `h-dvh` (dynamic-viewport, not `100vh`) so mobile browsers' URL
     // bar show/hide doesn't leave the layout mis-sized vs the visible
@@ -354,7 +428,7 @@ function AppContent() {
     // and scrolls internally (with `min-h-screen` the root grew to
     // fit content, clientHeight = scrollHeight, wheel was a no-op).
     <div className="flex h-dvh overflow-hidden">
-      <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {view === 'reader' && <Navbar toc={toc} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />}
       {/* `min-w-0` is essential alongside `flex-1`: default flex
           `min-width: auto` lets the column grow to fit content
           (e.g. the 3D viewer's canvas, which is sized from
@@ -362,10 +436,15 @@ function AppContent() {
           past the viewport on narrow screens. */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
         <Topbar
+          view={view}
           connected={connected}
           frontendId={frontendId}
           docId={docId}
+          docScope={(docId && getDocScope(docId)) || 'shared'}
           onSelectDoc={handleSelectDoc}
+          onHome={goHome}
+          onOpenLibrary={openLibrary}
+          onOpenSearch={() => setSearchBarOpen(true)}
           connectedFrontends={connectedFrontends}
           processInfo={processInfo}
           logFilePath={logFilePath}
@@ -374,10 +453,8 @@ function AppContent() {
         {state.manifest ? (
           <VirtualReader key={docId} docId={docId} manifest={state.manifest} sections={state.sections} />
         ) : (() => {
-          const cfg = getRuntimeConfig()
-          if (cfg.transport === 'rest' && !docId) {
-            return <LandingPage onSelect={handleSelectDoc} />
-          }
+          if (view === 'library') return <LibraryView onSelect={handleSelectDoc} />
+          if (view === 'home') return <LandingPage onSelect={handleSelectDoc} onOpenLibrary={() => openLibrary()} />
           return (
             <div className="flex-1 overflow-auto p-6">
               <div className="text-sm text-gray-500 dark:text-gray-400">Waiting for document manifest…</div>
