@@ -1,10 +1,17 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import type { DocManifest, SectionBundle, Header } from '../ast/types'
 import { renderBlock, RenderWithDocId } from '../ast/render'
 import { predictivePrefetch } from '../sections/store'
 import { calculateHeadingNumbers } from '../ast/headingNumbers'
 import { clampZoom, usePageViewStore } from '../store/pageViewStore'
-import { PagedSection, PAGE_WIDTH_PX } from './PagedSection'
+import { PagedSection, PAGE_STRIDE_PX, PAGE_WIDTH_PX } from './PagedSection'
+import { collectIds, estimatePages, mountTarget } from './progressiveMount'
+import { REVEAL_EVENT } from './readerNav'
+import type { RevealDetail } from './readerNav'
+
+/** Height of one estimated page of the scroll (web) layout, px. */
+const SCROLL_PAGE_PX = 1100
 
 interface Props {
   docId: string
@@ -57,6 +64,16 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
 
   // Page view: sheets per section, numbered straight through the document.
   const pageView = usePageViewStore((s) => s.enabled)
+
+  // Progressive mounting: sections [0, mounted) are rendered, the rest are placeholders sized from
+  // an estimate (progressiveMount.ts). Mounting follows the reader's scroll, in document order.
+  const [mounted, setMounted] = useState(1)
+  const mountedRef = useRef(mounted)
+  mountedRef.current = mounted
+  const estPages = useMemo(
+    () => h1Sections.map((s) => estimatePages(sections[s.id]?.doc?.blocks ?? [])),
+    [h1Sections, sections],
+  )
   const [pageCounts, setPageCounts] = useState<Record<number, number>>({})
   const setPageCount = useCallback(
     (i: number, n: number) => setPageCounts((prev) => (prev[i] === n ? prev : { ...prev, [i]: n })),
@@ -67,10 +84,10 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
     let next = 1
     h1Sections.forEach((_, i) => {
       out.push(next)
-      next += pageCounts[i] ?? 1
+      next += pageCounts[i] ?? estPages[i] ?? 1
     })
     return out
-  }, [h1Sections, pageCounts])
+  }, [h1Sections, pageCounts, estPages])
 
   // Sheet zoom: the stored zoom, or fit-to-width (at most 100 %) from the reader's inner width.
   const zoom = usePageViewStore((s) => s.zoom)
@@ -141,6 +158,92 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
     }
   }, [pageView, setZoom])
 
+  // Mount whatever has scrolled within reach: every placeholder whose top is above the bottom of
+  // the viewport plus a look-ahead margin. Runs after each commit (a mounted section changes the
+  // layout) and on scroll, at most once a frame, and one step at a time so each step paints.
+  const checkFrame = useRef(0)
+  const checkMount = useCallback(() => {
+    if (checkFrame.current) return
+    checkFrame.current = requestAnimationFrame(() => {
+      checkFrame.current = 0
+      const root = containerRef.current
+      const m = mountedRef.current
+      if (!root || m >= h1Sections.length) return
+      const r = root.getBoundingClientRect()
+      const coverBottom = r.bottom + Math.max(600, root.clientHeight * 1.5)
+      const tops: number[] = []
+      for (let i = m; i < h1Sections.length; i++) {
+        const el = root.querySelector(`[data-section-index="${i}"]`)
+        if (!el) break
+        const top = el.getBoundingClientRect().top - coverBottom
+        tops.push(top)
+        if (top >= 0) break
+      }
+      const target = mountTarget(m, tops)
+      if (target <= m) return
+      // Filling in below the frontier: one section per step, so the first lines paint early and
+      // no single task builds more than one section. A jump past the frontier (it is above the
+      // viewport) mounts everything up to what is on screen at once.
+      const frontierAbove = tops[0] + coverBottom < r.top
+      setMounted(frontierAbove ? target : m + 1)
+    })
+  }, [h1Sections.length])
+  useEffect(() => {
+    // After the commit has painted: a timer, not a frame, so the browser gets to paint first.
+    const t = window.setTimeout(checkMount, 0)
+    return () => window.clearTimeout(t)
+  }, [mounted, pageCounts, scale, pageView, checkMount])
+  useEffect(() => {
+    const root = containerRef.current
+    if (!root) return
+    root.addEventListener('scroll', checkMount, { passive: true })
+    window.addEventListener('resize', checkMount)
+    return () => {
+      root.removeEventListener('scroll', checkMount)
+      window.removeEventListener('resize', checkMount)
+      cancelAnimationFrame(checkFrame.current)
+      checkFrame.current = 0
+    }
+  }, [checkMount])
+
+  // Navigation to an anchor in a section not rendered yet (cross-reference, TOC sub-heading,
+  // search, print): mount every section up to and including it. Ids are looked up per section,
+  // and a section's id set is built only when a reveal needs it (keyed by the bundle object, so a
+  // section re-sent by the live view is re-indexed).
+  const idSets = useRef(new WeakMap<SectionBundle, Set<string>>())
+  useEffect(() => {
+    const sectionOf = (id: string): number => {
+      for (let i = 0; i < h1Sections.length; i++) {
+        const s = h1Sections[i]
+        if (s.id === id) return i
+        const bundle = sections[s.id]
+        if (!bundle) continue
+        let ids = idSets.current.get(bundle)
+        if (!ids) {
+          ids = collectIds(bundle.doc?.blocks)
+          idSets.current.set(bundle, ids)
+        }
+        if (ids.has(id)) return i
+      }
+      return -1
+    }
+    const onReveal = (e: Event) => {
+      const d = (e as CustomEvent<RevealDetail>).detail || {}
+      const want = d.all ? h1Sections.length : d.id ? sectionOf(d.id) + 1 : 0
+      if (want > mountedRef.current) setMounted(want)
+    }
+    // A browser print of the reader prints what is in the DOM: render it all first.
+    const onPrint = () => {
+      if (mountedRef.current < h1Sections.length) flushSync(() => setMounted(h1Sections.length))
+    }
+    window.addEventListener(REVEAL_EVENT, onReveal)
+    window.addEventListener('beforeprint', onPrint)
+    return () => {
+      window.removeEventListener(REVEAL_EVENT, onReveal)
+      window.removeEventListener('beforeprint', onPrint)
+    }
+  }, [h1Sections, sections])
+
   return (
     <RenderWithDocId docId={docId}>
       <div
@@ -152,6 +255,23 @@ export function VirtualReader({ docId, manifest, sections }: Props) {
         <div className={pageView ? 'w-max min-w-full' : 'max-w-none w-full'}>
           {h1Sections.map((s, i) => {
             const bundle = sections[s.id]
+            if (i >= mounted) {
+              // Not reached yet: a placeholder of about the section's height, so the scrollbar and
+              // the jump-ahead check above see roughly the document's real length.
+              const h = pageView ? estPages[i] * PAGE_STRIDE_PX * scale : estPages[i] * SCROLL_PAGE_PX
+              return (
+                <section
+                  key={s.id}
+                  id={s.id}
+                  data-section-index={i}
+                  data-section-placeholder=""
+                  className={pageView ? 'scroll-mt-14 mx-auto my-6' : 'my-6 scroll-mt-14'}
+                  style={pageView ? { height: `${h}px`, width: `${PAGE_WIDTH_PX * scale}px` } : { height: `${h}px` }}
+                >
+                  <Skeleton title={s.title} pulse={false} />
+                </section>
+              )
+            }
             const body = bundle ? (
               <Section blockKey={s.id} bundle={bundle} headingNumbers={headingNumbers} />
             ) : (
@@ -237,9 +357,9 @@ const Section = React.memo(function Section({ bundle, blockKey, headingNumbers }
   )
 })
 
-function Skeleton({ title }: { title: string }) {
+function Skeleton({ title, pulse = true }: { title: string; pulse?: boolean }) {
   return (
-    <div className="animate-pulse">
+    <div className={pulse ? 'animate-pulse' : undefined} aria-label={title}>
       <div className="h-8 bg-gray-200 w-1/2 rounded mb-4" />
       <div className="h-4 bg-gray-100 w-full rounded mb-2" />
       <div className="h-4 bg-gray-100 w-11/12 rounded mb-2" />

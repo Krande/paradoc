@@ -12,6 +12,8 @@ const MARGIN_X_MM = 20
 const GAP_MM = 8
 
 const STRIDE = (PAGE_H_MM + GAP_MM) * MM
+/** Height of one sheet plus the gap below it, in CSS pixels at 100 %. */
+export const PAGE_STRIDE_PX = STRIDE
 const USABLE_H = (PAGE_H_MM - 2 * MARGIN_Y_MM) * MM
 const pageTop = (p: number) => p * STRIDE + MARGIN_Y_MM * MM
 const pageBottom = (p: number) => p * STRIDE + (PAGE_H_MM - MARGIN_Y_MM) * MM

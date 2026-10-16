@@ -11,6 +11,13 @@ import pypandoc
 
 from paradoc.citation import FILTER_PATH as SHELF_CITATION_FILTER
 from paradoc.config import logger
+from paradoc.docstore.static_plots import (
+    PLOT_DIR,
+    PLOT_INDEX_FILE,
+    compact_json,
+    index_from_bulk,
+    plot_file_name,
+)
 from paradoc.numbering import crossref_args, crossref_filters
 
 if TYPE_CHECKING:
@@ -1023,7 +1030,9 @@ class ASTExporter:
             │   ├── 1.json
             │   └── ...
             ├── images.json         # Embedded images (if embed_images=True)
-            ├── plots.json          # Plot data for Plotly.js
+            ├── plots.json          # Plot data for Plotly.js (all plots, for older readers)
+            ├── plots_index.json    # Plot key → per-plot file, caption, size
+            ├── _plots/<key>.json   # One plot's data, fetched when it goes interactive
             ├── tables.json         # Table data
             ├── three_d.json        # 3D asset metadata (key → camera/caption/sha)
             └── assets/3d/<key>.glb # Copied 3D assets (one per ThreeDData row)
@@ -1081,7 +1090,7 @@ class ASTExporter:
 
             # Write manifest
             manifest_path = output_dir / "manifest.json"
-            manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            manifest_path.write_text(compact_json(manifest), encoding="utf-8")
             logger.info(f"Wrote manifest to {manifest_path}")
 
             # Copy image files into the static bundle and build a
@@ -1109,7 +1118,7 @@ class ASTExporter:
                 if image_mapping:
                     self._rewrite_bundle_image_srcs(bundle, image_mapping)
                 section_path = sections_dir / f"{idx}.json"
-                section_path.write_text(json.dumps(bundle, ensure_ascii=False, indent=2), encoding="utf-8")
+                section_path.write_text(compact_json(bundle), encoding="utf-8")
                 logger.debug(f"Wrote section {idx} to {section_path}")
 
             logger.info(f"Wrote {len(sections)} sections to {sections_dir}")
@@ -1117,15 +1126,25 @@ class ASTExporter:
             # Extract and write plot data
             plot_data_dict = self._extract_plot_data_from_db()
             if plot_data_dict:
+                # One file per plot plus a small index, so the reader fetches a figure's data
+                # only when it goes interactive. The bulk `plots.json` stays for readers and tools
+                # that know only that file.
                 plots_path = output_dir / "plots.json"
-                plots_path.write_text(json.dumps(plot_data_dict, ensure_ascii=False, indent=2), encoding="utf-8")
-                logger.info(f"Wrote {len(plot_data_dict)} plots to {plots_path}")
+                plots_path.write_text(compact_json(plot_data_dict), encoding="utf-8")
+                for key, plot in plot_data_dict.items():
+                    plot_path = output_dir / plot_file_name(key)
+                    plot_path.parent.mkdir(parents=True, exist_ok=True)
+                    plot_path.write_text(compact_json(plot), encoding="utf-8")
+                (output_dir / PLOT_INDEX_FILE).write_text(
+                    compact_json(index_from_bulk(plot_data_dict)), encoding="utf-8"
+                )
+                logger.info(f"Wrote {len(plot_data_dict)} plots to {plots_path} and {output_dir / PLOT_DIR}")
 
             # Extract and write table data
             table_data_dict = self._extract_table_data_from_db()
             if table_data_dict:
                 tables_path = output_dir / "tables.json"
-                tables_path.write_text(json.dumps(table_data_dict, ensure_ascii=False, indent=2), encoding="utf-8")
+                tables_path.write_text(compact_json(table_data_dict), encoding="utf-8")
                 logger.info(f"Wrote {len(table_data_dict)} tables to {tables_path}")
 
             # 3D metadata is always emitted (above as three_d.json); the
@@ -1597,10 +1616,7 @@ class ASTExporter:
 
         if manifest:
             three_d_path = output_dir / "three_d.json"
-            three_d_path.write_text(
-                json.dumps(manifest, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
+            three_d_path.write_text(compact_json(manifest), encoding="utf-8")
             logger.info(f"Wrote {copied} 3D asset(s) → {assets_dir} (skipped {skipped}) and {three_d_path}")
         elif skipped:
             logger.info(f"3D export: {skipped} key(s) skipped, none successfully copied")

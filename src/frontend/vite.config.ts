@@ -16,6 +16,9 @@ export default defineConfig({
   // (which has been inlined by viteSingleFile).
   define: {
     '__VITE_PRELOAD__': '[]',
+    // PlotRenderer: carry plotly as source text and run it on first use, instead of having the
+    // inlined module evaluated at startup.
+    '__PARADOC_SINGLEFILE__': 'true',
   },
   build: {
     // Ensure inlined assets

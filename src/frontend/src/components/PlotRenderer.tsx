@@ -12,12 +12,41 @@ interface PlotRendererProps {
 // Vite emits the pinned `plotly` chunk lazily — modulepreload only kicks
 // in when this component actually mounts. Module-level cache so multiple
 // PlotRenderers share one fetch.
+//
+// The single-file build (static exports) inlines every dynamic import into the one script, and
+// there Rollup evaluates the inlined plotly module at startup -- a quarter second of main-thread
+// time (a second on a phone) on every load, plot or no plot. That build carries plotly's source
+// as a string instead and runs it the first time a plot goes interactive.
 let _plotlyPromise: Promise<any> | null = null
 function loadPlotly(): Promise<any> {
   if (!_plotlyPromise) {
-    _plotlyPromise = import('plotly.js-dist-min').then((m) => (m as any).default || m)
+    _plotlyPromise = __PARADOC_SINGLEFILE__
+      ? import('plotly.js-dist-min/plotly.min.js?raw').then((m) => runPlotlySource(m.default))
+      : import('plotly.js-dist-min').then((m) => (m as any).default || m)
+    _plotlyPromise.catch(() => {
+      _plotlyPromise = null
+    })
   }
   return _plotlyPromise
+}
+
+function runPlotlySource(src: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const w = window as any
+    if (w.Plotly) return resolve(w.Plotly)
+    const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }))
+    const script = document.createElement('script')
+    script.src = url
+    script.onload = () => {
+      URL.revokeObjectURL(url)
+      w.Plotly ? resolve(w.Plotly) : reject(new Error('plotly did not register window.Plotly'))
+    }
+    script.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('failed to load plotly'))
+    }
+    document.head.appendChild(script)
+  })
 }
 
 export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
@@ -107,9 +136,6 @@ export function PlotRenderer({ plotKey, docId }: PlotRendererProps) {
 
       // Create the plot
       plotly.newPlot(plotRef.current, figure.data, layout, config)
-        .then(() => {
-          console.log('Plot rendered successfully:', plotData.key)
-        })
         .catch((err: any) => {
           console.error('Plotly rendering error:', err)
           setError('Failed to render plot')

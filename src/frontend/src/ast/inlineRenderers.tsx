@@ -1,11 +1,25 @@
 import React from 'react'
-import katex from 'katex'
-import 'katex/dist/katex.min.css'
 import type { PandocInline } from './types'
 import { attrs, resolveAssetUrl } from './utils'
 import { useDocId } from './context'
 import { authedFetch } from '../services/auth/oidc'
 import { isDocApiPath } from '../transport/docScope'
+import { revealElement, scrollToHeading } from '../components/readerNav'
+
+// KaTeX (~265 KB of script, plus its stylesheet) is loaded the first time a formula renders, not
+// with the app: most sections, and many documents, have no math at all.
+let katexPromise: Promise<any> | null = null
+function loadKatex(): Promise<any> {
+  if (!katexPromise) {
+    katexPromise = Promise.all([import('katex'), import('katex/dist/katex.min.css')]).then(
+      ([m]) => (m as any).default || m,
+    )
+    katexPromise.catch(() => {
+      katexPromise = null
+    })
+  }
+  return katexPromise
+}
 
 /**
  * Component to render LaTeX math using KaTeX
@@ -14,21 +28,34 @@ export function MathElement({ latex, displayMode }: { latex: string; displayMode
   const elementRef = React.useRef<HTMLSpanElement>(null)
 
   React.useEffect(() => {
-    if (elementRef.current) {
-      try {
-        katex.render(latex, elementRef.current, {
-          displayMode,
-          throwOnError: false,
-          errorColor: '#cc0000',
-          strict: false,
-        })
-      } catch (error) {
-        console.error('KaTeX rendering error:', error)
-        // Fallback: show the raw LaTeX if rendering fails
-        if (elementRef.current) {
-          elementRef.current.textContent = displayMode ? `\\[${latex}\\]` : `\\(${latex}\\)`
+    let canceled = false
+    const el = elementRef.current
+    if (!el) return
+    const fallback = () => {
+      el.textContent = displayMode ? `\\[${latex}\\]` : `\\(${latex}\\)`
+    }
+    loadKatex()
+      .then((katex) => {
+        if (canceled) return
+        try {
+          katex.render(latex, el, {
+            displayMode,
+            throwOnError: false,
+            errorColor: '#cc0000',
+            strict: false,
+          })
+        } catch (error) {
+          console.error('KaTeX rendering error:', error)
+          // Fallback: show the raw LaTeX if rendering fails
+          fallback()
         }
-      }
+      })
+      .catch((error) => {
+        console.error('KaTeX failed to load:', error)
+        if (!canceled) fallback()
+      })
+    return () => {
+      canceled = true
     }
   }, [latex, displayMode])
 
@@ -153,16 +180,16 @@ export function renderInlines(xs: PandocInline[]): React.ReactNode {
         const isInternalLink = href.startsWith('#')
         const handleClick = isInternalLink ? (e: React.MouseEvent<HTMLAnchorElement>) => {
           e.preventDefault()
-          const targetId = href.slice(1) // Remove the '#'
-          // Use querySelector with attribute selector to handle IDs with special characters like colons
-          // This works reliably for IDs like "tbl:table-name", "fig:figure-name", "eq:equation-name"
-          const el = document.querySelector(`[id="${targetId}"]`) as HTMLElement | null
-          if (el) {
-            const topbar = document.getElementById('paradoc-topbar')
-            const offset = topbar ? topbar.getBoundingClientRect().height : 0
-            const top = window.scrollY + el.getBoundingClientRect().top - offset - 8
-            window.scrollTo({ top, behavior: 'smooth' })
-          }
+          let targetId = href.slice(1) // Remove the '#'
+          try {
+            targetId = decodeURIComponent(targetId)
+          } catch {}
+          // The target ("fig:…", "tbl:…", "eq:…", a heading) may sit in a section the reader has
+          // not rendered yet: reveal mounts it, then scroll the reader (not the window, which
+          // does not scroll -- the reader is its own scroll container).
+          void revealElement(targetId).then((el) => {
+            if (el) scrollToHeading(el)
+          })
         } : undefined
         out.push(
           <a

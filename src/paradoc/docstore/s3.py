@@ -387,6 +387,13 @@ class S3DocStore(DocStore):
         s = scope if scope is not None else _default_shared_scope()
         return self._fetch_object(self._key(doc_id, s, "static", "tables.json"))
 
+    def get_static_file_bytes(self, doc_id: str, rel: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
+        parts = rel.split("/")
+        if not rel or any(p in ("", ".", "..") for p in parts) or "\\" in rel:
+            return None
+        s = scope if scope is not None else _default_shared_scope()
+        return self._fetch_object(self._key(doc_id, s, "static", *parts))
+
     def get_static_images_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         s = scope if scope is not None else _default_shared_scope()
         return self._fetch_object(self._key(doc_id, s, "static", "images.json"))

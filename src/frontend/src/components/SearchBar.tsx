@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { revealAll } from './readerNav'
 
 interface SearchBarProps {
   isOpen: boolean
@@ -153,6 +154,13 @@ export function SearchBar({ isOpen, onClose }: SearchBarProps) {
       highlightSearchResults(value)
     }, 300)
   }, [highlightSearchResults])
+
+  // Search walks the reader's DOM, and the reader renders sections as it scrolls to them: render
+  // the whole document when search opens, so a hit in a section not yet reached is found. (The
+  // debounce below gives that render time to land before the first query runs.)
+  useEffect(() => {
+    if (isOpen) revealAll()
+  }, [isOpen])
 
   // Focus input when opened
   useEffect(() => {

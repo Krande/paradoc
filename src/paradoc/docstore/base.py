@@ -238,6 +238,15 @@ class DocStore(ABC):
         """Return the raw bytes of `static/tables.json`."""
         return None
 
+    def get_static_file_bytes(self, doc_id: str, rel: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
+        """Return the raw bytes of `static/<rel>`, or None when absent.
+
+        Generic accessor for the static-export files that have no dedicated method (the plot index
+        and the per-plot files, see `paradoc.docstore.static_plots`). `rel` is bundle-static-relative
+        and must not escape `static/`.
+        """
+        return None
+
     def get_static_images_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         """Return the raw bytes of `static/images.json` (embedded base64 image
         payloads keyed by image path)."""

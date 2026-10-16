@@ -296,6 +296,12 @@ class LocalDocStore(DocStore):
     def get_static_tables_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         return self._read_static(doc_id, "tables.json", scope)
 
+    def get_static_file_bytes(self, doc_id: str, rel: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
+        try:
+            return self._read_static(doc_id, rel, scope)
+        except PermissionError:
+            return None
+
     def get_static_images_bytes(self, doc_id: str, *, scope: Optional["Scope"] = None) -> Optional[bytes]:
         return self._read_static(doc_id, "images.json", scope)
 
@@ -319,7 +325,7 @@ class LocalDocStore(DocStore):
         except FileNotFoundError:
             return None
         path = (bundle / "static" / rel).resolve()
-        if not path.is_relative_to(bundle):
+        if not path.is_relative_to((bundle / "static").resolve()):
             raise PermissionError(f"static path escapes bundle: {rel!r}")
         if not path.is_file():
             return None

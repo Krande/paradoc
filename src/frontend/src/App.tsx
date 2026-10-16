@@ -12,6 +12,7 @@ import { AuthCallback } from './components/auth/AuthCallback'
 import InlineWorker from './ws/worker.ts?worker&inline'
 
 import { useSectionStore, storeEmbeddedImage, storePlotData, storeTableData, isStaticMode, detectStaticMode, loadStaticData } from './sections/store'
+import { registerPlotSource, registerTables } from './sections/dataSources'
 import { initTransport, getRuntimeConfig } from './transport'
 import { loadRestData, RestLoadError } from './transport/loadRestData'
 import type { LoadRestResult } from './transport/loadRestData'
@@ -234,34 +235,17 @@ function AppContent() {
         const data = await loadStaticData()
         const currentDocId = (data.manifest as any).docId || 'static-doc'
 
-        // Set manifest
+        // Plot and table data stay in memory: the plot index now, each plot's data when a reader
+        // switches it to interactive. Writing every plot and table to IndexedDB at load was
+        // seconds of main-thread work on a large report.
+        registerPlotSource(currentDocId, data.plots.index, data.plots.fetch)
+        registerTables(currentDocId, data.tables)
         setManifest(data.manifest)
         setDocId(currentDocId)
 
         // Load all sections
         for (const bundle of data.sections) {
           upsertSection(bundle)
-        }
-
-        // Store images in IndexedDB
-        for (const [path, imgData] of Object.entries(data.images)) {
-          await storeEmbeddedImage(currentDocId, path, imgData.data, imgData.mimeType).catch(err => {
-            console.warn(`Failed to store embedded image ${path}:`, err)
-          })
-        }
-
-        // Store plots in IndexedDB
-        for (const [plotKey, plotData] of Object.entries(data.plots)) {
-          await storePlotData(currentDocId, plotKey, plotData).catch(err => {
-            console.warn(`Failed to store plot data ${plotKey}:`, err)
-          })
-        }
-
-        // Store tables in IndexedDB
-        for (const [tableKey, tableData] of Object.entries(data.tables)) {
-          await storeTableData(currentDocId, tableKey, tableData).catch(err => {
-            console.warn(`Failed to store table data ${tableKey}:`, err)
-          })
         }
 
         console.log('Paradoc: Successfully loaded static document')
@@ -311,29 +295,13 @@ function AppContent() {
           } catch {}
         }
         if (canceled) return
+        // Register the plot index (data fetched per plot, on demand) and the tables so
+        // InteractiveFigure / InteractiveTable can offer the static/interactive toggle.
+        registerPlotSource(docId, data.plots.index, data.plots.fetch)
+        registerTables(docId, data.tables)
         setManifest(data.manifest)
         for (const bundle of data.sections) upsertSection(bundle)
 
-        // Seed IndexedDB with bulk plots/tables/images so InteractiveFigure
-        // and InteractiveTable can detect available data and offer the
-        // static/interactive toggle — same flow the static-mode block above
-        // uses. Without this, the toggle stays hidden because the IndexedDB
-        // probe in those components misses on every island.
-        for (const [path, imgData] of Object.entries(data.images)) {
-          await storeEmbeddedImage(docId, path, imgData.data, imgData.mimeType).catch((err) => {
-            console.warn(`[paradoc] failed to store image ${path}:`, err)
-          })
-        }
-        for (const [plotKey, plotData] of Object.entries(data.plots)) {
-          await storePlotData(docId, plotKey, plotData).catch((err) => {
-            console.warn(`[paradoc] failed to store plot ${plotKey}:`, err)
-          })
-        }
-        for (const [tableKey, tableData] of Object.entries(data.tables)) {
-          await storeTableData(docId, tableKey, tableData).catch((err) => {
-            console.warn(`[paradoc] failed to store table ${tableKey}:`, err)
-          })
-        }
       } catch (err) {
         console.warn('[paradoc] REST load failed', err)
       }
@@ -404,7 +372,7 @@ function AppContent() {
           workerRef={workerRef}
           onToggleSidebar={toggleSidebar} />
         {state.manifest ? (
-          <VirtualReader docId={docId} manifest={state.manifest} sections={state.sections} />
+          <VirtualReader key={docId} docId={docId} manifest={state.manifest} sections={state.sections} />
         ) : (() => {
           const cfg = getRuntimeConfig()
           if (cfg.transport === 'rest' && !docId) {

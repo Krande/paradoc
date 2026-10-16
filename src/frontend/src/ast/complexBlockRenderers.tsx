@@ -25,7 +25,6 @@ export function renderDiv(b: any, renderBlock: (b: any, k?: React.Key, hn?: Head
       // Extract table key from the div ID
       const tableKey = divAttrs.id.substring(4) // Remove 'tbl:' prefix
 
-      console.log('[renderDiv] Detected table wrapper with ID:', divAttrs.id, 'tableKey:', tableKey)
 
       // Render the table content (without wrapping div)
       // The InteractiveTable component will provide its own wrapper
@@ -138,12 +137,6 @@ export function renderFigure(b: any, renderBlock: (b: any, k?: React.Key, hn?: H
     // then trying without numeric suffix
     plotKey = figKey
 
-    console.log('[renderFigure] Figure with ID:', {
-      figureId: figAttrs.id,
-      extractedPlotKey: plotKey,
-      docId: docId,
-      hasDocId: !!docId
-    })
   }
 
   // 3D figures get routed to the lazy-loading Interactive3DFigure first.
@@ -171,7 +164,6 @@ export function renderFigure(b: any, renderBlock: (b: any, k?: React.Key, hn?: H
   if (plotKey && docId) {
     // This is potentially an interactive plot - wrap it with InteractiveFigure component
     // The InteractiveFigure component will check if the plot exists in the database
-    console.log('[renderFigure] Rendering as interactive plot candidate:', { plotKey, figureId: figAttrs.id })
     const caption = captionInlines && captionInlines.length > 0 ? renderInlines(captionInlines as any) : undefined
 
     return (
@@ -315,12 +307,6 @@ export function renderTable(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
     // Remove 'tbl:' prefix to get the table key (possibly with suffix like _1, _2)
     tableKey = tableAttrs.id.substring(4)
 
-    console.log('[renderTable] Table with ID:', {
-      tableId: tableAttrs.id,
-      extractedTableKey: tableKey,
-      docId: docId,
-      hasDocId: !!docId
-    })
   }
 
   // Build the static table content (used in both interactive and non-interactive modes)
@@ -335,7 +321,6 @@ export function renderTable(b: Table, renderBlock: (b: any, k?: React.Key, hn?: 
 
   // If table has a key and docId, try to render as interactive
   if (tableKey && docId) {
-    console.log('[renderTable] Rendering as interactive table candidate:', { tableKey, tableId: tableAttrs.id })
     return (
       <InteractiveTable
         key={key}

@@ -16,11 +16,19 @@ import json
 import logging
 import os
 import sys
+import threading
+import time
+from collections import OrderedDict
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
 
 from paradoc.docstore import DocStore
+from paradoc.docstore.static_plots import (
+    PLOT_INDEX_FILE,
+    index_from_bulk,
+    plot_file_name,
+)
 
 from .auth import AuthConfig, User
 from .scope import Scope, ScopeParseError, can_access, parse_scope, resolve_project_slug
@@ -352,6 +360,56 @@ def create_app(
             return JSONResponse(content={})
         return Response(content=data, media_type="application/json")
 
+    # Lazy plot loading. The reader fetches the small plot index at load and one plot's figure
+    # when it goes interactive, instead of the whole `plots.json`. Bundles published before the
+    # per-plot split have only `plots.json`: parse it once and serve the index and the single
+    # figures out of that, cached briefly so a reader opening several plots does not refetch and
+    # reparse a multi-megabyte file for each.
+    _bulk_plot_cache: "OrderedDict[tuple[str, str], tuple[float, dict]]" = OrderedDict()
+    _bulk_plot_lock = threading.Lock()
+    _BULK_PLOT_TTL_S = 120.0
+    _BULK_PLOT_MAX = 4
+
+    def _bulk_plots(doc_id: str, scope: Scope) -> Optional[dict]:
+        ck = (scope.prefix(), doc_id)
+        now = time.monotonic()
+        with _bulk_plot_lock:
+            hit = _bulk_plot_cache.get(ck)
+            if hit is not None and now - hit[0] < _BULK_PLOT_TTL_S:
+                _bulk_plot_cache.move_to_end(ck)
+                return hit[1]
+        data = doc_store.get_static_plots_bytes(doc_id, scope=scope)
+        if data is None:
+            return None
+        try:
+            plots = json.loads(data)
+        except ValueError:
+            return None
+        if not isinstance(plots, dict):
+            return None
+        with _bulk_plot_lock:
+            _bulk_plot_cache[ck] = (now, plots)
+            _bulk_plot_cache.move_to_end(ck)
+            while len(_bulk_plot_cache) > _BULK_PLOT_MAX:
+                _bulk_plot_cache.popitem(last=False)
+        return plots
+
+    def _get_plot_index(doc_id: str, scope: Scope):
+        data = doc_store.get_static_file_bytes(doc_id, PLOT_INDEX_FILE, scope=scope)
+        if data is not None:
+            return Response(content=data, media_type="application/json")
+        plots = _bulk_plots(doc_id, scope)
+        return JSONResponse(content=index_from_bulk(plots or {}))
+
+    def _get_plot_figure(doc_id: str, key: str, scope: Scope):
+        data = doc_store.get_static_file_bytes(doc_id, plot_file_name(key), scope=scope)
+        if data is not None:
+            return Response(content=data, media_type="application/json")
+        plots = _bulk_plots(doc_id, scope)
+        if not plots or key not in plots:
+            raise HTTPException(status_code=404, detail=f"plot {key!r} not found")
+        return JSONResponse(content=plots[key])
+
     def _get_all_tables(doc_id: str, scope: Scope):
         data = doc_store.get_static_tables_bytes(doc_id, scope=scope)
         if data is None:
@@ -556,6 +614,14 @@ def create_app(
     def get_all_plots(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_all_plots(doc_id, _shared)
 
+    @app.get("/api/docs/{doc_id}/plots-index")
+    def get_plot_index(doc_id: str, user: User = Depends(auth_module.current_user)):
+        return _get_plot_index(doc_id, _shared)
+
+    @app.get("/api/docs/{doc_id}/plots/{key}/figure")
+    def get_plot_figure(doc_id: str, key: str, user: User = Depends(auth_module.current_user)):
+        return _get_plot_figure(doc_id, key, _shared)
+
     @app.get("/api/docs/{doc_id}/tables")
     def get_all_tables(doc_id: str, user: User = Depends(auth_module.current_user)):
         return _get_all_tables(doc_id, _shared)
@@ -633,6 +699,14 @@ def create_app(
     @app.get("/api/scopes/{scope}/docs/{doc_id}/plots")
     def s_get_all_plots(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
         return _get_all_plots(doc_id, scope_obj)
+
+    @app.get("/api/scopes/{scope}/docs/{doc_id}/plots-index")
+    def s_get_plot_index(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
+        return _get_plot_index(doc_id, scope_obj)
+
+    @app.get("/api/scopes/{scope}/docs/{doc_id}/plots/{key}/figure")
+    def s_get_plot_figure(doc_id: str, key: str, scope_obj: Scope = Depends(_scope_dep)):
+        return _get_plot_figure(doc_id, key, scope_obj)
 
     @app.get("/api/scopes/{scope}/docs/{doc_id}/tables")
     def s_get_all_tables(doc_id: str, scope_obj: Scope = Depends(_scope_dep)):
