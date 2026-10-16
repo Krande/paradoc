@@ -210,6 +210,28 @@ def _open_interactive_viewer(page):
     page.wait_for_selector("canvas", timeout=15000)
 
 
+def _reader_wheel_point(page, reader_rect) -> tuple[int, int]:
+    """A point near the reader's bottom-right whose topmost element is reader content.
+
+    Floating controls (the page-view zoom bar) overlay the reader's corner; a wheel
+    over them does not reach the scroll container, so step left/up until the point
+    lands on the reader itself and outside any canvas.
+    """
+    for dy in range(20, int(reader_rect["height"]) // 2, 40):
+        for dx in range(20, int(reader_rect["width"]) // 2, 40):
+            x = int(reader_rect["x"] + reader_rect["width"] - dx)
+            y = int(reader_rect["y"] + reader_rect["height"] - dy)
+            ok = page.evaluate(
+                "([x, y]) => { const r = document.querySelector('[data-search-root]');"
+                " const e = document.elementFromPoint(x, y);"
+                " return !!e && r.contains(e) && !e.closest('canvas'); }",
+                [x, y],
+            )
+            if ok:
+                return x, y
+    raise AssertionError("no point in the reader is free of overlays")
+
+
 def test_static_export_3d_viewer_mounts_without_presets_404(static_bundle, page, wait_for_frontend):
     """The original ada-docs incident: `presets.json` is 404, the
     fallback preset only ships `iso_3`, and the canvas can't frame a
@@ -279,8 +301,7 @@ def test_static_export_3d_viewer_does_not_hijack_page_scroll(static_bundle, page
     page.evaluate("document.querySelector('[data-search-root]').scrollTop = 0")
     initial = page.evaluate("document.querySelector('[data-search-root]').scrollTop")
     # Bottom-right area of the reader, well past the canvas region.
-    wheel_x = int(reader_rect["x"] + reader_rect["width"] - 20)
-    wheel_y = int(reader_rect["y"] + reader_rect["height"] - 20)
+    wheel_x, wheel_y = _reader_wheel_point(page, reader_rect)
     page.mouse.move(wheel_x, wheel_y)
     page.mouse.wheel(0, 400)
     page.wait_for_timeout(200)
@@ -351,12 +372,9 @@ def test_static_export_scroll_survives_showControls_toggle(static_bundle, page, 
         "If the default flipped, this test needs to be inverted."
     )
 
-    # Flip "3D viewer controls" off. It moved out of the old kebab menu
-    # into the Settings cog → Options preferences modal: open the cog,
-    # pick Options, flip the toggle switch, then dismiss the modal.
-    page.locator('button[aria-label="Settings"]').first.click()
-    page.locator('button[role="menuitem"]:has-text("Options")').first.click()
-    page.locator('button[role="switch"]').first.click()
+    # Flip "3D viewer controls" off in the account and options menu, then close it.
+    page.locator('button[aria-label="Account and options"]').first.click()
+    page.locator('button[role="menuitemcheckbox"]:has-text("3D viewer controls")').first.click()
     page.keyboard.press("Escape")
 
     # ThreeDRenderer re-mounts on toggle change. Wait for the EmbedUI
@@ -375,8 +393,7 @@ def test_static_export_scroll_survives_showControls_toggle(static_bundle, page, 
     reader_rect = page.evaluate("() => document.querySelector('[data-search-root]').getBoundingClientRect().toJSON()")
     page.evaluate("document.querySelector('[data-search-root]').scrollTop = 0")
     initial = page.evaluate("document.querySelector('[data-search-root]').scrollTop")
-    wheel_x = int(reader_rect["x"] + reader_rect["width"] - 20)
-    wheel_y = int(reader_rect["y"] + reader_rect["height"] - 20)
+    wheel_x, wheel_y = _reader_wheel_point(page, reader_rect)
     page.mouse.move(wheel_x, wheel_y)
     page.mouse.wheel(0, 400)
     page.wait_for_timeout(200)
