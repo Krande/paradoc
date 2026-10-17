@@ -2,6 +2,13 @@
 
 
 
+## v0.10.1 (2026-10-17)
+
+### Fix
+
+* fix: appendix level-4 numbering restart (#22) and figures without blank line (#20) (#44) ([`43ef098`](https://github.com/Krande/paradoc/commit/43ef098ab730588f8cce0006de408b0d44ddb19f))
+
+
 ## v0.10.0 (2026-10-16)
 
 ### Feature
