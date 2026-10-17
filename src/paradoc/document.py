@@ -19,6 +19,7 @@ from .common import (
     MarkDownFile,
     Table,
     TableFormat,
+    isolate_block_figures,
 )
 from .config import logger
 from .db import (
@@ -1125,6 +1126,8 @@ class OneDoc:
                     new_str = m.group(0)
 
                 md_str = md_str.replace(m.group(0), new_str)
+
+            md_str = isolate_block_figures(md_str)
 
             with open(mdf.build_file, "w", encoding="utf-8") as f:
                 f.write(md_str)
