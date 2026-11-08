@@ -29,14 +29,14 @@ from typing import Literal
 
 import pytest
 
-#: A mounted 3D viewer: the WebGPU canvas, or -- where the browser has no WebGPU (a CI runner) -- the
-#: poster / note the ada-viewer embed shows instead (its `ada-viewer-fallback` element).
-VIEWER = "canvas, .ada-viewer-fallback"
-
 from paradoc import OneDoc
 from paradoc.figure_sources import models as figmod
 from paradoc.figure_sources.filters import register_filter
 from paradoc.figure_sources.filters.base import FigureSourceFilter, RenderResult
+
+#: A mounted 3D viewer: the WebGPU canvas, or -- where the browser has no WebGPU (a CI runner) -- the
+#: poster / note the ada-viewer embed shows instead (its `ada-viewer-fallback` element).
+VIEWER = "canvas, .ada-viewer-fallback"
 
 # Real 1-triangle CAD-shaped GLB so adapy's GLTFLoader + prepareLoadedModel
 # accept it. 4.5KB; checked in under `files/doc_figure_sources/files/`.
