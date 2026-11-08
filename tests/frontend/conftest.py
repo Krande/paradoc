@@ -43,7 +43,11 @@ def browser(request):
     pw_watch = request.config.getoption("--pw-watch")
     with sync_playwright() as p:
         browser = p.chromium.launch(
-            headless=not pw_watch, slow_mo=500 if pw_watch else 0  # Slow down actions by 500ms when watching
+            headless=not pw_watch,
+            slow_mo=500 if pw_watch else 0,  # Slow down actions by 500ms when watching
+            # WebGPU for the 3D figures where the machine has it; without it the ada-viewer embed shows
+            # its fallback, which the tests accept as mounted too.
+            args=["--enable-unsafe-webgpu", "--enable-features=Vulkan", "--ignore-gpu-blocklist"],
         )
         yield browser
         browser.close()

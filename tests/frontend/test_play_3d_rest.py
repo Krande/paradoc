@@ -253,7 +253,8 @@ def test_rest_mode_3d_viewer_mounts(served_bundle, page, wait_for_frontend):
     load_btn = page.locator('button:has-text("Load interactive 3D viewer")').first
     load_btn.wait_for(timeout=15000)
     load_btn.click()
-    page.wait_for_selector("canvas", timeout=15000)
+    # a canvas, or the ada-viewer embed's fallback where the browser has no WebGPU
+    page.wait_for_selector("canvas, .ada-viewer-fallback", timeout=15000)
     page.wait_for_timeout(500)
 
     fallback_warnings = [

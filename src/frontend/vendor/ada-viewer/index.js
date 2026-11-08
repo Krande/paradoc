@@ -1,4 +1,4 @@
-function cA(g) {
+function wA(g) {
   if (g.byteLength < 16)
     throw new Error(`beam-solid warp: too small (${g.byteLength} bytes)`);
   const I = new DataView(g), A = I.getUint32(0, !0);
@@ -29,14 +29,14 @@ function cA(g) {
   }
   return { n_verts: Q, node0: i, node1: c, t: y };
 }
-const wA = 1279411777, z = 1024, $ = 1;
-function NA(g) {
+const NA = 1279411777, z = 1024, $ = 1;
+function oA(g) {
   if (g.byteLength < z)
     throw new Error(
       `field blob too small: ${g.byteLength} bytes, need ${z} for header`
     );
   const I = new DataView(g), A = I.getUint32(0, !0);
-  if (A !== wA)
+  if (A !== NA)
     throw new Error(`field blob: bad magic 0x${A.toString(16)}`);
   const B = I.getUint32(4, !0);
   if (B !== $)
@@ -59,12 +59,12 @@ function NA(g) {
   }
   return { header: C, steps: c };
 }
-const oA = 1195722305, P = 16, AA = 1;
+const RA = 1195722305, P = 16, AA = 1;
 function IA(g) {
   if (g.byteLength < P)
     throw new Error(`mesh edges: too small (${g.byteLength} bytes)`);
   const I = new DataView(g), A = I.getUint32(0, !0);
-  if (A !== oA)
+  if (A !== RA)
     throw new Error(`mesh edges: bad magic 0x${A.toString(16)}`);
   const B = I.getUint32(4, !0);
   if (B !== AA)
@@ -79,12 +79,12 @@ function IA(g) {
     );
   return new Uint32Array(g, P, Q * 2);
 }
-const RA = 1296385601, f = 16, FA = 12, gA = 1;
-function YA(g) {
+const FA = 1296385601, f = 16, YA = 12, gA = 1;
+function sA(g) {
   if (g.byteLength < f)
     throw new Error(`mesh elements: too small (${g.byteLength} bytes)`);
   const I = new DataView(g), A = I.getUint32(0, !0);
-  if (A !== RA)
+  if (A !== FA)
     throw new Error(`mesh elements: bad magic 0x${A.toString(16)}`);
   const B = I.getUint32(4, !0);
   if (B !== gA)
@@ -92,7 +92,7 @@ function YA(g) {
   const Q = I.getUint32(8, !0);
   if (Q === 0)
     return [];
-  const E = Q * FA;
+  const E = Q * YA;
   if (g.byteLength < f + E)
     throw new Error(
       `mesh elements: payload ${g.byteLength - f} bytes, expected ${E}`
@@ -106,8 +106,8 @@ function YA(g) {
     };
   return D;
 }
-const sA = 31;
-function hA(g, I, A, B = sA, Q) {
+const hA = 31;
+function ZA(g, I, A, B = hA, Q) {
   const E = Math.cos(B * Math.PI / 180), C = [], D = (R) => Math.round(R * 1e6), i = /* @__PURE__ */ new Map(), c = [], y = [], G = /* @__PURE__ */ new Map();
   let w = [], h = [], o = [], a = [], l = [], M = [], K = [];
   const d = (R) => {
@@ -142,33 +142,33 @@ function hA(g, I, A, B = sA, Q) {
   }
   return Uint32Array.from(C);
 }
-const ZA = [
+const UA = [
   ["x", "ux", "dx", "u1", "d1", "tx"],
   ["y", "uy", "dy", "u2", "d2", "ty"],
   ["z", "uz", "dz", "u3", "d3", "tz"]
 ];
-function DA(g) {
-  const I = g.components.map((Q) => Q.toLowerCase()), A = ZA.map((Q) => I.findIndex((E) => Q.includes(E)));
+function GA(g) {
+  const I = g.components.map((Q) => Q.toLowerCase()), A = UA.map((Q) => I.findIndex((E) => Q.includes(E)));
   if (A.every((Q) => Q >= 0)) return A;
   const B = g.components.length;
   return [B >= 1 ? 0 : -1, B >= 2 ? 1 : -1, B >= 3 ? 2 : -1];
 }
-const UA = [
+const JA = [
   ["rx", "drx", "ur1", "r1", "rotx", "thx"],
   ["ry", "dry", "ur2", "r2", "roty", "thy"],
   ["rz", "drz", "ur3", "r3", "rotz", "thz"]
 ];
-function JA(g) {
-  const I = g.components.map((B) => B.toLowerCase()), A = UA.map((B) => I.findIndex((Q) => B.includes(Q)));
+function lA(g) {
+  const I = g.components.map((B) => B.toLowerCase()), A = JA.map((B) => I.findIndex((Q) => B.includes(Q)));
   return A.every((B) => B >= 0) ? A : null;
 }
 function W(g, I, A) {
   return A < 0 ? 0 : g[I + A] || 0;
 }
-function lA(g, I, A, B, Q) {
+function SA(g, I, A, B, Q) {
   const E = g.n_verts, C = new Float32Array(E * 3);
   if (!A || !B) return C;
-  const D = A.components.length, i = DA(A), c = A.analysis_kind === "transient" || A.analysis_kind === "static", y = Q ? aA(g, A, B, Q, i, c) : null, G = y && c ? SA(y) : null, w = g.node0, h = g.node1, o = g.t;
+  const D = A.components.length, i = GA(A), c = A.analysis_kind === "transient" || A.analysis_kind === "static", y = Q ? kA(g, A, B, Q, i, c) : null, G = y && c ? MA(y) : null, w = g.node0, h = g.node1, o = g.t;
   for (let a = 0; a < E; a++) {
     const l = o[a], M = 1 - l, K = w[a] * D, d = h[a] * D, S = a * 3;
     if (C[S + 0] = M * W(B, K, i[0]) + l * W(B, d, i[0]), C[S + 1] = M * W(B, K, i[1]) + l * W(B, d, i[1]), C[S + 2] = M * W(B, K, i[2]) + l * W(B, d, i[2]), !y || !Q) continue;
@@ -183,7 +183,7 @@ function lA(g, I, A, B, Q) {
   }
   return C;
 }
-function SA(g) {
+function MA(g) {
   const I = g.length / 3, A = new Float64Array(I * 9);
   for (let B = 0; B < I; B++) {
     const Q = g[B * 3], E = g[B * 3 + 1], C = g[B * 3 + 2], D = B * 9, i = Math.hypot(Q, E, C);
@@ -197,7 +197,7 @@ function SA(g) {
   return A;
 }
 const BA = /* @__PURE__ */ new WeakMap();
-function MA(g) {
+function KA(g) {
   const I = BA.get(g);
   if (I) return I;
   const A = /* @__PURE__ */ new Set(), B = [];
@@ -217,11 +217,11 @@ function MA(g) {
   const y = { start: D, neighbours: c };
   return BA.set(g, y), y;
 }
-const KA = 0.05;
-function aA(g, I, A, B, Q, E) {
+const aA = 0.05;
+function kA(g, I, A, B, Q, E) {
   const C = B.length / 3, D = I.components.length;
   if (A.length < C * D) return null;
-  const i = new Float64Array(C * 3), c = JA(I);
+  const i = new Float64Array(C * 3), c = lA(I);
   if (c) {
     for (let o = 0; o < C; o++) {
       const a = o * D;
@@ -229,9 +229,9 @@ function aA(g, I, A, B, Q, E) {
     }
     return i;
   }
-  const y = MA(g), G = Math.min(C, y.start.length - 1);
+  const y = KA(g), G = Math.min(C, y.start.length - 1);
   if (G <= 0) return null;
-  const w = new kA(), h = new Float64Array(3);
+  const w = new dA(), h = new Float64Array(3);
   for (let o = 0; o < G; o++) {
     const a = y.start[o], l = y.start[o + 1];
     if (a === l) continue;
@@ -254,7 +254,7 @@ function aA(g, I, A, B, Q, E) {
   }
   return i;
 }
-class kA {
+class dA {
   rs = [];
   bs = [];
   reset() {
@@ -269,7 +269,7 @@ class kA {
     const I = this.rs;
     for (let A = 3; A < I.length; A += 3) {
       const B = I[1] * I[A + 2] - I[2] * I[A + 1], Q = I[2] * I[A] - I[0] * I[A + 2], E = I[0] * I[A + 1] - I[1] * I[A];
-      if (Math.hypot(B, Q, E) > KA) return !0;
+      if (Math.hypot(B, Q, E) > aA) return !0;
     }
     return !1;
   }
@@ -297,7 +297,7 @@ class kA {
         const U = A[L] * A[0] + A[L + 1] * A[1] + A[L + 2] * A[2] < 0 ? -1 : 1;
         F += U * A[L], Y += U * A[L + 1], J += U * A[L + 2], k += U * B[L], H += U * B[L + 1], b += U * B[L + 2];
       }
-      return dA(F, Y, J, k, H, b, I);
+      return HA(F, Y, J, k, H, b, I);
     }
     let E = 0, C = 0, D = 0, i = 0, c = 0, y = 0, G = 0, w = 0, h = 0;
     for (let F = 0; F < A.length; F += 3) {
@@ -339,7 +339,7 @@ class kA {
     return I[0] = -d / N * Z, I[1] = -S / N * Z, I[2] = -R / N * Z, !0;
   }
 }
-function dA(g, I, A, B, Q, E, C) {
+function HA(g, I, A, B, Q, E, C) {
   const D = I * E - A * Q, i = A * B - g * E, c = g * Q - I * B, y = Math.hypot(D, i, c), G = g * B + I * Q + A * E;
   if (!(Math.hypot(y, G) > 0)) return !1;
   if (y === 0)
@@ -347,12 +347,12 @@ function dA(g, I, A, B, Q, E, C) {
   const w = Math.atan2(y, G);
   return C[0] = D / y * w, C[1] = i / y * w, C[2] = c / y * w, !0;
 }
-function HA(g) {
+function bA(g) {
   return !isFinite(g) || g < 0 ? 0 : g > 1 ? 1 : g;
 }
-function bA(g) {
+function LA(g) {
   return (I, A, B = 0) => {
-    const Q = HA(I);
+    const Q = bA(I);
     for (let C = 1; C < g.length; C++) {
       const D = g[C];
       if (Q <= D[0]) {
@@ -365,22 +365,22 @@ function bA(g) {
     A[B + 0] = E[1], A[B + 1] = E[2], A[B + 2] = E[3];
   };
 }
-const LA = bA([
+const VA = LA([
   [0, 0, 0, 1],
   [0.25, 0, 1, 1],
   [0.5, 0, 1, 0],
   [0.75, 1, 1, 0],
   [1, 1, 0, 0]
 ]);
-function VA(g) {
+function mA(g) {
   return !g || !Array.isArray(g.fields) ? [] : g.fields.filter((I) => {
     if (!I.blob) return !1;
     const A = (I.name_canonical || "").toUpperCase();
     return I.category === "displacement" || A === "U" || A.startsWith("U[") || A.includes("DEPL") || A.includes("DISPLACEMENT");
   });
 }
-function mA(g, I) {
-  const A = VA(g);
+function WA(g, I) {
+  const A = mA(g);
   if (A.length === 0) return null;
   let B = 0;
   for (const E of A) {
@@ -409,7 +409,7 @@ const O = { Triangles: 0, Lines: 1, Points: 2 }, m = {
   Underlay: 32768
   // lines drawn before the faces, so a coplanar face hides them (a ground grid)
 }, T = Math.PI / 180;
-class WA {
+class XA {
   target = [0, 0, 0];
   azimuth = -135 * T;
   elevation = 30 * T;
@@ -467,11 +467,11 @@ function EA(g) {
   for (let B = 0; B < I.length; B++) A[B] = I.charCodeAt(B);
   return A;
 }
-function XA() {
+function tA() {
   return typeof navigator > "u" ? "no browser" : navigator.gpu ? null : "this browser has no WebGPU";
 }
 let q = null;
-function tA() {
+function pA() {
   return q || (q = (async () => {
     const g = URL.createObjectURL(new Blob([EA(QA.js)], { type: "text/javascript" }));
     try {
@@ -487,8 +487,8 @@ function tA() {
     q = null;
   })), q;
 }
-let pA = 0;
-async function nA(g) {
+let nA = 0;
+async function jA(g) {
   const I = navigator.gpu;
   if (!I) throw new Error("this browser has no WebGPU");
   const A = await I.requestAdapter({ powerPreference: "high-performance" });
@@ -501,15 +501,15 @@ async function nA(g) {
     }
   });
   B.onuncapturederror = (c) => console.error("[ada-viewer-webgpu]", c.error.message);
-  const { factory: Q, compiled: E } = await tA(), D = await Q({ instantiateWasm: (c, y) => (WebAssembly.instantiate(E, c).then(
+  const { factory: Q, compiled: E } = await pA(), D = await Q({ instantiateWasm: (c, y) => (WebAssembly.instantiate(E, c).then(
     (G) => y(G, E),
     (G) => console.error("[ada-viewer-webgpu] instantiating the renderer failed:", G)
   ), {}), preinitializedWebGPUDevice: B });
-  g.id || (g.id = `ada-viewer-webgpu-${++pA}`);
+  g.id || (g.id = `ada-viewer-webgpu-${++nA}`);
   const i = new D.WebRenderer(`#${g.id}`, I.getPreferredCanvasFormat());
   return { module: D, renderer: i, device: B };
 }
-function jA(g, I, A) {
+function zA(g, I, A) {
   const B = I.map((Q) => {
     if (!Q || Q.length === 0) return 0;
     const E = g._malloc(Q.byteLength);
@@ -521,7 +521,7 @@ function jA(g, I, A) {
     for (const Q of B) Q && g._free(Q);
   }
 }
-function zA(g, I, A) {
+function TA(g, I, A) {
   const B = g._malloc(Math.max(1, I.byteLength));
   g.HEAPU8.set(I, B);
   try {
@@ -530,21 +530,22 @@ function zA(g, I, A) {
     g._free(B);
   }
 }
-const TA = xA([248 / 255, 250 / 255, 252 / 255]);
-function xA(g) {
+const xA = uA([248 / 255, 250 / 255, 252 / 255]);
+function uA(g) {
   return g.map((I) => I <= 0.04045 ? I / 12.92 : Math.pow((I + 0.055) / 1.055, 2.4));
 }
-function uA(g, I, A) {
+const DA = "ada-viewer-fallback";
+function qA(g, I, A) {
   if (g.innerHTML = "", I.posterUrl) {
     const Q = document.createElement("img");
-    Q.src = I.posterUrl, Q.alt = I.caption || "3D figure", Q.title = `3D view unavailable: ${A}`, Q.style.cssText = "display:block;max-width:100%;height:auto;margin:auto;", g.appendChild(Q);
+    Q.className = DA, Q.dataset.reason = A, Q.src = I.posterUrl, Q.alt = I.caption || "3D figure", Q.title = `3D view unavailable: ${A}`, Q.style.cssText = "display:block;max-width:100%;height:auto;margin:auto;", g.appendChild(Q);
     return;
   }
   const B = document.createElement("div");
-  B.style.cssText = "display:flex;align-items:center;justify-content:center;width:100%;min-height:200px;color:#64748b;font:13px system-ui;text-align:center;padding:1em;", B.textContent = `3D view unavailable: ${A}`, g.appendChild(B);
+  B.className = DA, B.dataset.reason = A, B.style.cssText = "display:flex;align-items:center;justify-content:center;width:100%;min-height:200px;color:#64748b;font:13px system-ui;text-align:center;padding:1em;", B.textContent = `3D view unavailable: ${A}`, g.appendChild(B);
 }
-class qA {
-  camera = new WA();
+class rA {
+  camera = new XA();
   host;
   canvas;
   ctx = null;
@@ -567,22 +568,22 @@ class qA {
   }
   /** Start WebGPU and the renderer; throws when either is unavailable. */
   async start() {
-    const I = XA();
+    const I = tA();
     if (I) throw new Error(I);
-    if (this.ctx = await nA(this.canvas), this.disposed)
+    if (this.ctx = await jA(this.canvas), this.disposed)
       throw this.release(), new Error("disposed");
-    const [A, B, Q] = TA;
+    const [A, B, Q] = xA;
     this.ctx.renderer.setBackground(A, B, Q), this.matPtr.view = this.ctx.module._malloc(64), this.matPtr.proj = this.ctx.module._malloc(64), this.ctx.device.lost.then((E) => {
       this.disposed || console.error("[ada-viewer-webgpu] device lost:", E.message);
     });
   }
   /** A GLB through adacpp's reader (the posters' own); frames nothing (see `frame`). */
   loadGlb(I, A) {
-    return zA(this.module, I, (B) => this.renderer.loadGlb(B, I.byteLength, A));
+    return TA(this.module, I, (B) => this.renderer.loadGlb(B, I.byteLength, A));
   }
   /** Copy arrays to the heap for one call (see renderer.withHeap). */
   heap(I, A) {
-    return jA(this.module, I, A);
+    return zA(this.module, I, A);
   }
   frame(I, A) {
     const { w: B, h: Q } = this.size();
@@ -651,9 +652,9 @@ class qA {
     }
   }
 }
-const rA = 30, PA = [0, 0, 0, 1], GA = [1, 1, 1, 1], fA = 3, eA = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-function iA(g, I, A) {
-  const B = new qA(g);
+const PA = 30, fA = [0, 0, 0, 1], iA = [1, 1, 1, 1], eA = 3, OA = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+function yA(g, I, A) {
+  const B = new rA(g);
   let Q = !1;
   return (async () => {
     try {
@@ -661,7 +662,7 @@ function iA(g, I, A) {
     } catch (E) {
       if (Q) return;
       const C = E instanceof Error ? E : new Error(String(E));
-      B.dispose(), uA(g, I, C.message), I.onError?.(C);
+      B.dispose(), qA(g, I, C.message), I.onError?.(C);
     }
   })(), {
     dispose: () => {
@@ -669,33 +670,33 @@ function iA(g, I, A) {
     }
   };
 }
-function BI(g, I) {
-  return iA(g, I, async (A) => {
+function CI(g, I) {
+  return yA(g, I, async (A) => {
     const B = A.loadGlb(I.modelBytes, {
-      featureEdgeAngleDeg: rA,
-      lineColor: PA,
+      featureEdgeAngleDeg: PA,
+      lineColor: fA,
       doubleSided: !0
     });
     if (!B.geometries.length) throw new Error("the model has nothing to draw");
     A.onReframe = () => A.frame(B.bounds, I.camera), A.frame(B.bounds, I.camera);
   });
 }
-function CI(g, I) {
-  return iA(g, I, async (A) => {
-    const B = I.manifest, Q = new Uint8Array(await I.fetcher(B.mesh.url)), E = mA(B, Math.max(0, (I.modeIndex ?? 0) | 0));
+function QI(g, I) {
+  return yA(g, I, async (A) => {
+    const B = I.manifest, Q = new Uint8Array(await I.fetcher(B.mesh.url)), E = WA(B, Math.max(0, (I.modeIndex ?? 0) | 0));
     if (!E?.field.blob) throw new Error("the bundle has no displacement field");
-    const C = E.field, D = NA(await I.fetcher(C.blob.url)), i = D.steps[Math.min(E.stepIndex, D.steps.length - 1)], c = A.loadGlb(Q, { keepPositions: !0, doubleSided: !0, pointSize: 4 }), y = c.geometries.find((U) => !U.featureEdges);
+    const C = E.field, D = oA(await I.fetcher(C.blob.url)), i = D.steps[Math.min(E.stepIndex, D.steps.length - 1)], c = A.loadGlb(Q, { keepPositions: !0, doubleSided: !0, pointSize: 4 }), y = c.geometries.find((U) => !U.featureEdges);
     if (!y?.positions) throw new Error("the FEA mesh has nothing to draw");
     const G = y.vertexCount;
     if (G !== D.header.n_points)
       throw new Error(`mesh has ${G} vertices, the displacement field ${D.header.n_points}`);
-    const w = D.header.n_components, h = DA(C), o = new Float32Array(G * 3), a = new Float32Array(G);
+    const w = D.header.n_components, h = GA(C), o = new Float32Array(G * 3), a = new Float32Array(G);
     let l = 0;
     for (let U = 0; U < G; U++) {
       const X = W(i, U * w, h[0]), V = W(i, U * w, h[1]), t = W(i, U * w, h[2]);
       o.set([X, V, t], U * 3), a[U] = Math.hypot(X, V, t), a[U] > l && (l = a[U]);
     }
-    const M = yA(a, l);
+    const M = cA(a, l);
     A.heap([o], ([U]) => A.renderer.updateMorph(y.geometry, U, G)), A.heap([M], ([U]) => A.renderer.updateColors(y.geometry, U, G));
     const K = [], d = y.topology === O.Triangles;
     K.push({
@@ -714,8 +715,8 @@ function CI(g, I) {
     });
     if (B.mesh.edges_url) {
       let U = IA(await I.fetcher(B.mesh.edges_url));
-      if (S && S.length && (U = OA(U, S)), U.length) {
-        const [X, V, t] = GA;
+      if (S && S.length && (U = vA(U, S)), U.length) {
+        const [X, V, t] = iA;
         K.push({ instance: R(U, !1), r: X, g: V, b: t, flags: m.Unlit | m.MorphRelative, lineWidth: 1 });
       }
     }
@@ -725,10 +726,10 @@ function CI(g, I) {
       g: 1,
       b: 1,
       flags: m.VertexColors | m.Unlit | m.MorphRelative,
-      lineWidth: fA
+      lineWidth: eA
     } : null;
     s && K.push(s);
-    const N = await AI(A, B, I.fetcher, C, i, y.positions);
+    const N = await II(A, B, I.fetcher, C, i, y.positions);
     let Z = 0;
     N && (K.push(...N.instances), Z = N.peak);
     const F = (U) => {
@@ -738,7 +739,7 @@ function CI(g, I) {
       }
     };
     F(!!I.beamSolids);
-    const Y = (U) => A.heap([eA], ([X]) => {
+    const Y = (U) => A.heap([OA], ([X]) => {
       for (const V of K)
         A.renderer.setInstance(
           V.instance,
@@ -758,7 +759,7 @@ function CI(g, I) {
         );
     });
     Y(1);
-    const J = N ? II(c.bounds, N.bounds) : c.bounds, k = Math.max(l, Z), H = [
+    const J = N ? gI(c.bounds, N.bounds) : c.bounds, k = Math.max(l, Z), H = [
       J[0] - k,
       J[1] - k,
       J[2] - k,
@@ -766,37 +767,37 @@ function CI(g, I) {
       J[4] + k,
       J[5] + k
     ];
-    A.onReframe = () => A.frame(H, I.camera), A.frame(H, I.camera), vA(A.host, C, E.stepIndex, l);
+    A.onReframe = () => A.frame(H, I.camera), A.frame(H, I.camera), _A(A.host, C, E.stepIndex, l);
     let b = 1;
-    _A(A, (U) => {
+    $A(A, (U) => {
       b = U, Y(U);
-    }), N && gI(A, !!I.beamSolids, (U) => {
+    }), N && BI(A, !!I.beamSolids, (U) => {
       F(U), Y(b), A.invalidate();
     });
   });
 }
-function yA(g, I) {
+function cA(g, I) {
   const A = new Uint32Array(g.length), B = new Float32Array(3), Q = I > 0 ? 1 / I : 0, E = (C) => Math.max(0, Math.min(255, Math.round(C * 255)));
   for (let C = 0; C < g.length; C++)
-    LA(g[C] * Q, B, 0), A[C] = (E(B[0]) | E(B[1]) << 8 | E(B[2]) << 16 | 255 << 24) >>> 0;
+    VA(g[C] * Q, B, 0), A[C] = (E(B[0]) | E(B[1]) << 8 | E(B[2]) << 16 | 255 << 24) >>> 0;
   return A;
 }
-function OA(g, I) {
+function vA(g, I) {
   const A = (E, C) => E < C ? E * 4294967296 + C : C * 4294967296 + E, B = /* @__PURE__ */ new Set();
   for (let E = 0; E + 1 < I.length; E += 2) B.add(A(I[E], I[E + 1]));
   const Q = [];
   for (let E = 0; E + 1 < g.length; E += 2) B.has(A(g[E], g[E + 1])) || Q.push(g[E], g[E + 1]);
   return Uint32Array.from(Q);
 }
-function vA(g, I, A, B) {
+function _A(g, I, A, B) {
   const Q = (I.group_path || []).join(" / ") || I.name_canonical || "Displacement", C = (I.components || []).map((G, w) => ["X", "DX", "U1"].includes(G.toUpperCase()) ? I.component_units?.[w] : void 0).find(Boolean), D = (I.steps || []).find((G) => G.i === A) ?? (I.steps || [])[A], i = document.createElement("div");
   i.style.cssText = "position:absolute;top:8px;right:8px;background:rgba(30,41,59,0.92);color:#e2e8f0;border-radius:6px;padding:6px 8px;font:10px/1.3 system-ui;pointer-events:none;max-width:45%;";
   const c = [`<b>${_(Q)}</b>`, C ? `Magnitude [${_(C)}]` : "Magnitude"];
   D && c.push(`Case: ${_(String(D.label ?? A))}`);
   const y = Array.from({ length: 7 }, (G, w) => B - w * B / 6);
-  i.innerHTML = c.join("<br>") + '<div style="display:flex;gap:6px;margin-top:4px;height:96px"><div style="width:10px;border-radius:2px;background:linear-gradient(to bottom,#f00,#ff0,#0f0,#0ff,#00f)"></div><div style="display:flex;flex-direction:column;justify-content:space-between">' + y.map((G) => `<span>${$A(G)}</span>`).join("") + "</div></div>", g.appendChild(i);
+  i.innerHTML = c.join("<br>") + '<div style="display:flex;gap:6px;margin-top:4px;height:96px"><div style="width:10px;border-radius:2px;background:linear-gradient(to bottom,#f00,#ff0,#0f0,#0ff,#00f)"></div><div style="display:flex;flex-direction:column;justify-content:space-between">' + y.map((G) => `<span>${AI(G)}</span>`).join("") + "</div></div>", g.appendChild(i);
 }
-function _A(g, I) {
+function $A(g, I) {
   const A = document.createElement("button");
   A.type = "button", A.textContent = "▶", A.title = "Animate the mode", A.style.cssText = "position:absolute;left:8px;bottom:8px;width:28px;height:28px;border-radius:14px;border:1px solid #cbd5e1;background:#fff;color:#334155;font:12px system-ui;cursor:pointer;";
   let B = !1, Q = 0;
@@ -808,7 +809,7 @@ function _A(g, I) {
     Q = performance.now(), g.onFrame = (C) => (I(Math.sin((C - Q) / 1600 * 2 * Math.PI)), !0), g.invalidate();
   }), g.host.appendChild(A);
 }
-function $A(g) {
+function AI(g) {
   if (g === 0) return "0";
   const I = Math.abs(g);
   return I >= 1e4 || I < 1e-3 ? g.toExponential(2) : String(Number(g.toPrecision(4)));
@@ -816,20 +817,20 @@ function $A(g) {
 function _(g) {
   return g.replace(/[&<>"]/g, (I) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[I]);
 }
-async function AI(g, I, A, B, Q, E) {
+async function II(g, I, A, B, Q, E) {
   const C = I.mesh.beam_solids_url, D = I.mesh.beam_solids_warp_url;
   if (!C || !D) return null;
-  const [i, c] = await Promise.all([A(C), A(D)]), y = cA(c), G = g.loadGlb(new Uint8Array(i), { keepPositions: !0, doubleSided: !0 }), w = G.geometries.filter((N) => !N.featureEdges && N.topology === O.Triangles && N.positions), h = w.reduce((N, Z) => N + Z.vertexCount, 0);
+  const [i, c] = await Promise.all([A(C), A(D)]), y = wA(c), G = g.loadGlb(new Uint8Array(i), { keepPositions: !0, doubleSided: !0 }), w = G.geometries.filter((N) => !N.featureEdges && N.topology === O.Triangles && N.positions), h = w.reduce((N, Z) => N + Z.vertexCount, 0);
   if (w.length !== 1 || h !== y.n_verts) {
     console.warn(`[ada-viewer-webgpu] beam solids: ${h} vertices in ${w.length} parts, a warp map for ${y.n_verts}; beams as lines`);
     for (const N of G.geometries) g.renderer.removeInstance(N.instance);
     return null;
   }
-  const o = w[0], a = o.positions, l = lA(y, a, B, Q, E), M = y.n_verts, K = new Float32Array(M);
+  const o = w[0], a = o.positions, l = SA(y, a, B, Q, E), M = y.n_verts, K = new Float32Array(M);
   let d = 0;
   for (let N = 0; N < M; N++)
     K[N] = Math.hypot(l[N * 3], l[N * 3 + 1], l[N * 3 + 2]), K[N] > d && (d = K[N]);
-  const S = yA(K, d);
+  const S = cA(K, d);
   g.heap([l], ([N]) => g.renderer.updateMorph(o.geometry, N, M)), g.heap([S], ([N]) => g.renderer.updateColors(o.geometry, N, M));
   const R = [{
     instance: o.instance,
@@ -845,22 +846,22 @@ async function AI(g, I, A, B, Q, E) {
     const Z = I.mesh.beam_solids_elements_url;
     if (Z)
       try {
-        N = YA(await A(Z)).map((Y) => [Y.triStart * 3, Y.triCount * 3]);
+        N = sA(await A(Z)).map((Y) => [Y.triStart * 3, Y.triCount * 3]);
       } catch (Y) {
         console.warn("[ada-viewer-webgpu] beam-solid element ranges:", Y);
       }
-    const F = hA(a, s, N);
+    const F = ZA(a, s, N);
     if (F.length) {
       const Y = g.heap(
         [a, l, F],
         ([b, L, U]) => g.renderer.addInstance(g.renderer.addGeometry(O.Lines, b, M, 0, 0, L, U, F.length, 0, 0, 0))
-      ), [J, k, H] = GA;
+      ), [J, k, H] = iA;
       R.push({ instance: Y, r: J, g: k, b: H, flags: m.Unlit | m.MorphRelative, lineWidth: 1 });
     }
   }
   return { instances: R, bounds: G.bounds, peak: d };
 }
-function II(g, I) {
+function gI(g, I) {
   return [
     Math.min(g[0], I[0]),
     Math.min(g[1], I[1]),
@@ -870,7 +871,7 @@ function II(g, I) {
     Math.max(g[5], I[5])
   ];
 }
-function gI(g, I, A) {
+function BI(g, I, A) {
   const B = document.createElement("button");
   B.type = "button";
   let Q = I;
@@ -882,7 +883,8 @@ function gI(g, I, A) {
   }), g.host.appendChild(B);
 }
 export {
-  CI as mountFeaArtefactViewer,
-  BI as mountViewer,
-  XA as webGpuUnavailableReason
+  DA as FALLBACK_CLASS,
+  QI as mountFeaArtefactViewer,
+  CI as mountViewer,
+  tA as webGpuUnavailableReason
 };

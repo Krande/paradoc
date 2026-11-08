@@ -29,6 +29,10 @@ from typing import Literal
 
 import pytest
 
+#: A mounted 3D viewer: the WebGPU canvas, or -- where the browser has no WebGPU (a CI runner) -- the
+#: poster / note the ada-viewer embed shows instead (its `ada-viewer-fallback` element).
+VIEWER = "canvas, .ada-viewer-fallback"
+
 from paradoc import OneDoc
 from paradoc.figure_sources import models as figmod
 from paradoc.figure_sources.filters import register_filter
@@ -199,7 +203,7 @@ def _open_interactive_viewer(page):
     interactive 3D viewer" button: a hover-gated `Static | Interactive`
     segmented toggle sits in the figure's top-right corner. Hover the
     figure wrapper to reveal it, click `Interactive`, then wait for the
-    canvas to mount (GLB download + adapy ingest).
+    viewer to mount (GLB download + load; a canvas, or the embed's fallback without WebGPU).
     """
     wrapper = page.locator("div.group.relative").first
     wrapper.wait_for(timeout=10000)
@@ -207,7 +211,7 @@ def _open_interactive_viewer(page):
     interactive_btn = wrapper.locator('button:has-text("Interactive")').first
     interactive_btn.wait_for(state="visible", timeout=10000)
     interactive_btn.click()
-    page.wait_for_selector("canvas", timeout=15000)
+    page.wait_for_selector(VIEWER, timeout=15000)
 
 
 def _reader_wheel_point(page, reader_rect) -> tuple[int, int]:
@@ -241,7 +245,7 @@ def test_static_export_3d_viewer_mounts_without_presets_404(static_bundle, page,
       - `assets/presets.json` returns 200 (not 404).
       - No "[ThreeDRenderer] failed to load presets; using fallback"
         console warning.
-      - The viewer mounts (a `<canvas>` is in the DOM).
+      - The viewer mounts (a `<canvas>`, or the embed's fallback without WebGPU).
     """
     console_messages, failed_requests, _ = _attach_recorders(page)
 
@@ -330,11 +334,11 @@ def test_static_export_3d_viewer_canvas_stays_within_container(static_bundle, pa
     # we allow up to 2× viewport just to keep the assertion stable
     # across browsers / pixel ratios).
     rect = page.evaluate(
-        "() => { const c = document.querySelector('canvas'); "
+        f"() => {{ const c = document.querySelector('{VIEWER}'); "
         "if (!c) return null; const r = c.getBoundingClientRect(); "
         "return { width: r.width, height: r.height }; }"
     )
-    assert rect is not None, "no canvas in DOM after mount"
+    assert rect is not None, "no viewer in DOM after mount"
     vh = page.evaluate("window.innerHeight")
     assert rect["height"] < vh * 2, f"canvas exceeds 2× viewport height: {rect['height']}px vs vp {vh}px"
 
@@ -344,17 +348,13 @@ def test_static_export_scroll_survives_showControls_toggle(static_bundle, page, 
     viewer with `showControls` flipped. Either state can have its own
     scroll bug:
 
-      * `showControls: true` (default) mounts adapy's `EmbedUI` overlay
-        on top of the canvas — `absolute inset-0` over the figure
-        container, plus a pointer-handler bound to canvasHost.
-      * `showControls: false` is the canvas-only path.
-
-    Toggling between them shouldn't leave wheel events captured. This
-    test flips the toggle, waits for the re-mount, and asserts the
-    reader still scrolls on wheel events outside the canvas. Default
-    state (controls-on) is already covered by
+    Toggling shouldn't leave wheel events captured. This test flips the
+    toggle, waits for the re-mount (a fresh viewer element), and asserts
+    the reader still scrolls on wheel events outside the viewer. The
+    default state is covered by
     `test_static_export_3d_viewer_does_not_hijack_page_scroll`; this
-    test specifically guards the *toggled* state.
+    test guards the *toggled* state. (The WebGPU embed has no panel
+    overlay; the flag reaches it and changes nothing it draws.)
     """
     page.goto(f"{static_bundle}/")
     wait_for_frontend(page)
@@ -362,29 +362,20 @@ def test_static_export_scroll_survives_showControls_toggle(static_bundle, page, 
     _open_interactive_viewer(page)
     page.wait_for_timeout(500)
 
-    # Snapshot a button title only present when EmbedUI is mounted
-    # (showControls=true). It disappears when we toggle off — we use
-    # that as our "re-mounted in the new state" signal.
-    embed_tree_btn = 'button[title="Show selection tree"]'
-    initial_has_embed = page.locator(embed_tree_btn).count() > 0
-    assert initial_has_embed, (
-        "expected EmbedUI to be mounted by default (showControls=true). "
-        "If the default flipped, this test needs to be inverted."
-    )
+    # Mark the mounted viewer: the re-mount replaces it with an unmarked one.
+    page.evaluate(f"document.querySelector('{VIEWER}').dataset.firstMount = '1'")
 
     # Flip "3D viewer controls" off in the account and options menu, then close it.
     page.locator('button[aria-label="Account and options"]').first.click()
     page.locator('button[role="menuitemcheckbox"]:has-text("3D viewer controls")').first.click()
     page.keyboard.press("Escape")
 
-    # ThreeDRenderer re-mounts on toggle change. Wait for the EmbedUI
-    # button to disappear (now in canvas-only mode) and a fresh canvas
-    # to appear.
+    # ThreeDRenderer re-mounts on toggle change: wait for a fresh viewer element.
     page.wait_for_function(
-        "() => document.querySelectorAll('button[title=\"Show selection tree\"]').length === 0",
+        f"() => {{ const v = [...document.querySelectorAll('{VIEWER}')]; "
+        "return v.length > 0 && v.every((e) => !e.dataset.firstMount); }",
         timeout=15000,
     )
-    page.wait_for_selector("canvas", timeout=15000)
     page.wait_for_timeout(500)
 
     # Scroll test in the toggled state. Wheel from the reader's own
