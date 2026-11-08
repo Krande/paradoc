@@ -2,6 +2,15 @@
 
 
 
+## v0.12.0 (2026-11-08)
+
+### Feature
+
+* feat: the interactive 3D view matches its poster, and gets the current WebGPU viewer (#47)
+
+Co-authored-by: Claude Opus 5.5 &lt;noreply@anthropic.com&gt; ([`6efec38`](https://github.com/Krande/paradoc/commit/6efec38af6a4c05f5997d423744296cb4841d264))
+
+
 ## v0.11.0 (2026-11-08)
 
 ### Feature
