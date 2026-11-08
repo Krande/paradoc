@@ -75,6 +75,31 @@ def _reset_kaleido_scope():
         logger.debug(f"Could not reset kaleido scope: {e}")
 
 
+def _source_marker(marker: str, md_file: Any) -> Dict[str, Any]:
+    """A source-file marker's context: the markdown file, its directory, and its built file's directory
+    (relative paths paradoc writes into the built file, e.g. 3D figure posters, are relative to that)."""
+    build_file = getattr(md_file, "build_file", None)
+    return {
+        "marker": marker,
+        "source_file": str(md_file.path),
+        "source_dir": str(md_file.path.parent),
+        "build_dir": str(pathlib.Path(build_file).parent) if build_file else None,
+    }
+
+
+def _resolve_beside_markdown(img_info: Dict[str, Any], variants) -> "pathlib.Path | None":
+    """The image file relative to the markdown it came from: its built file's directory, then its
+    source directory. None when neither holds it."""
+    for base in (img_info.get("build_dir"), img_info.get("source_dir")):
+        if not base:
+            continue
+        for variant in variants:
+            candidate = pathlib.Path(base) / variant
+            if candidate.is_file():
+                return candidate
+    return None
+
+
 class ASTExporter:
     """
     Exporter that builds a Pandoc JSON AST from the current OneDoc markdown sources
@@ -107,9 +132,7 @@ class ASTExporter:
         # Add main files with markers
         for md_file in one.md_files_main:
             marker = f"<!-- PARADOC_SOURCE_FILE: {md_file.path} -->"
-            source_markers.append(
-                {"marker": marker, "source_file": str(md_file.path), "source_dir": str(md_file.path.parent)}
-            )
+            source_markers.append(_source_marker(marker, md_file))
             md_parts.append(marker)
             md_parts.append(md_file.read_built_file())
 
@@ -119,9 +142,7 @@ class ASTExporter:
         # Add appendix files with markers
         for md_file in one.md_files_app:
             marker = f"<!-- PARADOC_SOURCE_FILE: {md_file.path} -->"
-            source_markers.append(
-                {"marker": marker, "source_file": str(md_file.path), "source_dir": str(md_file.path.parent)}
-            )
+            source_markers.append(_source_marker(marker, md_file))
             md_parts.append(marker)
             md_parts.append(md_file.read_built_file())
 
@@ -180,6 +201,7 @@ class ASTExporter:
                                 current_source = {
                                     "source_file": marker_info["source_file"],
                                     "source_dir": marker_info["source_dir"],
+                                    "build_dir": marker_info.get("build_dir"),
                                 }
                                 marker_indices.append(idx)
                                 break
@@ -466,53 +488,13 @@ class ASTExporter:
 
         for img_info in images_with_context:
             img_path = img_info["path"]
-            source_dir = img_info.get("source_dir")
 
             try:
                 # Normalize path: remove leading ./ if present
                 normalized_path = img_path.replace("./", "", 1) if img_path.startswith("./") else img_path
 
-                # Try to resolve image path
-                resolved_path = None
-
-                # Strategy 1: If we have source_dir info, try relative to the source markdown file
-                if source_dir:
-                    source_dir_path = pathlib.Path(source_dir)
-                    for path_variant in [img_path, normalized_path]:
-                        candidate = source_dir_path / path_variant
-                        if candidate.exists() and candidate.is_file():
-                            resolved_path = candidate
-                            logger.debug(f"Resolved {img_path} using source dir: {source_dir}")
-                            break
-
-                # Strategy 2: Fall back to searching in dist_dir, build_dir, source_dir
+                resolved_path = self._resolve_image(img_info, (img_path, normalized_path))
                 if resolved_path is None:
-                    for base in [self.one_doc.dist_dir, self.one_doc.build_dir, self.one_doc.source_dir]:
-                        for path_variant in [img_path, normalized_path]:
-                            # Try direct path first
-                            candidate = base / path_variant
-                            if candidate.exists() and candidate.is_file():
-                                resolved_path = candidate
-                                break
-
-                            # Try searching in subdirectories (for images in 00-main/images/, etc.)
-                            # Extract just the filename from the path
-                            filename = pathlib.Path(path_variant).name
-                            for subdir_candidate in base.rglob(filename):
-                                if subdir_candidate.is_file():
-                                    resolved_path = subdir_candidate
-                                    logger.debug(f"Resolved {img_path} via recursive search: {subdir_candidate}")
-                                    break
-
-                            if resolved_path:
-                                break
-                        if resolved_path:
-                            break
-
-                if resolved_path is None:
-                    logger.warning(
-                        f"Could not find image file: {img_path} (source_dir: {source_dir}, also tried: {normalized_path})"
-                    )
                     continue
 
                 # Read and encode image (no caching for static images - they're typically small)
@@ -532,6 +514,49 @@ class ASTExporter:
 
         return embedded_images
 
+    def _resolve_image(self, img_info: Dict[str, Any], variants) -> "pathlib.Path | None":
+        """The file an image reference names, or None (with a warning saying why).
+
+        1. Beside the markdown it came from: the built file's directory (paths paradoc writes, e.g.
+           3D figure posters, are relative to it), then the source file's.
+        2. The document's dist / build / source directories.
+        3. Only then a search of those directories by file name, accepted only when it is unique:
+           a common name (``fea.mesh.png`` is every FEA case's poster) must not resolve to an
+           arbitrary file with the same name.
+        """
+        found = _resolve_beside_markdown(img_info, variants)
+        if found is not None:
+            return found
+        bases = [b for b in (self.one_doc.dist_dir, self.one_doc.build_dir, self.one_doc.source_dir) if b]
+        for base in bases:
+            for variant in variants:
+                candidate = pathlib.Path(base) / variant
+                if candidate.is_file():
+                    return candidate
+        name = pathlib.PurePosixPath(variants[0]).name
+        matches = sorted(
+            {
+                m.resolve()
+                for base in bases
+                if pathlib.Path(base).is_dir()
+                for m in pathlib.Path(base).rglob(name)
+                if m.is_file()
+            }
+        )
+        if len(matches) == 1:
+            logger.debug(f"Resolved {variants[0]} by its file name: {matches[0]}")
+            return matches[0]
+        where = img_info.get("build_dir") or img_info.get("source_dir")
+        if matches:
+            shown = ", ".join(str(m) for m in matches[:3]) + (" ..." if len(matches) > 3 else "")
+            logger.warning(
+                f"Image {variants[0]} (from {where}) not found where referenced, and {len(matches)} files are "
+                f"named {name!r} ({shown}): not guessing which"
+            )
+        else:
+            logger.warning(f"Could not find image file: {variants[0]} (referenced from {where})")
+        return None
+
     def _extract_images_with_source(self, blocks: List[Any]) -> List[Dict[str, str]]:
         """
         Recursively extract all image paths from Pandoc blocks along with their source file context.
@@ -539,7 +564,7 @@ class ASTExporter:
         """
         images_with_context = []
 
-        def extract_from_inlines(inlines: List[Any], source_dir: str = None):
+        def extract_from_inlines(inlines: List[Any], source_info: Dict[str, Any]):
             for inline in inlines or []:
                 if isinstance(inline, dict) and inline.get("t") == "Image":
                     try:
@@ -550,47 +575,53 @@ class ASTExporter:
                             if isinstance(src_info, list) and len(src_info) >= 1:
                                 src = src_info[0]
                                 if isinstance(src, str) and not src.startswith(("http://", "https://", "data:")):
-                                    images_with_context.append({"path": src, "source_dir": source_dir})
+                                    images_with_context.append(
+                                        {
+                                            "path": src,
+                                            "source_dir": source_info.get("source_dir"),
+                                            "build_dir": source_info.get("build_dir"),
+                                        }
+                                    )
                     except Exception:
                         pass
 
-        def extract_from_blocks(blks: List[Any]):
+        def extract_from_blocks(blks: List[Any], inherited: Dict[str, Any] | None = None):
             for blk in blks or []:
                 if not isinstance(blk, dict):
                     continue
 
-                # Extract source directory from block metadata
-                source_info = blk.get("_paradoc_source", {})
-                source_dir = source_info.get("source_dir")
+                # Source file context: only top-level blocks are annotated (_map_blocks_to_sources), so a
+                # block nested in a Figure / Div / list takes its parent's.
+                source_info = blk.get("_paradoc_source") or inherited or {}
 
                 t = blk.get("t")
                 c = blk.get("c", [])
 
                 # Handle different block types that might contain images
                 if t == "Para" or t == "Plain":
-                    extract_from_inlines(c, source_dir)
+                    extract_from_inlines(c, source_info)
                 elif t == "Figure":
                     # Figure: c = [Attr, caption, content_blocks]
                     if isinstance(c, list) and len(c) >= 3:
                         content_blocks = c[2]
-                        extract_from_blocks(content_blocks)
+                        extract_from_blocks(content_blocks, source_info)
                 elif t == "Div":
                     # Div: c = [Attr, blocks]
                     if isinstance(c, list) and len(c) >= 2:
-                        extract_from_blocks(c[1])
+                        extract_from_blocks(c[1], source_info)
                 elif t == "BulletList" or t == "OrderedList":
                     # Lists contain list of block lists
                     if t == "BulletList" and isinstance(c, list):
                         for item in c:
                             if isinstance(item, list):
-                                extract_from_blocks(item)
+                                extract_from_blocks(item, source_info)
                     elif t == "OrderedList" and isinstance(c, list) and len(c) >= 2:
                         items = c[1]
                         for item in items:
                             if isinstance(item, list):
-                                extract_from_blocks(item)
+                                extract_from_blocks(item, source_info)
                 elif t == "BlockQuote":
-                    extract_from_blocks(c)
+                    extract_from_blocks(c, source_info)
 
         extract_from_blocks(blocks)
         return images_with_context
@@ -1310,7 +1341,6 @@ class ASTExporter:
         copied = skipped = 0
         for img_info in all_paths:
             img_src = img_info["path"]
-            source_dir = img_info.get("source_dir")
             if img_src in mapping:
                 continue
 
@@ -1318,48 +1348,22 @@ class ASTExporter:
             # `img_src` as the dict key (we rewrite by exact-match).
             normalized = img_src.replace("./", "", 1) if img_src.startswith("./") else img_src
 
-            resolved: pathlib.Path | None = None
-            if source_dir:
-                source_dir_path = pathlib.Path(source_dir)
-                for variant in (img_src, normalized):
-                    candidate = source_dir_path / variant
-                    if candidate.exists() and candidate.is_file():
-                        resolved = candidate
-                        break
+            resolved = self._resolve_image(img_info, (img_src, normalized))
             if resolved is None:
-                for base in (self.one_doc.dist_dir, self.one_doc.build_dir, self.one_doc.source_dir):
-                    for variant in (img_src, normalized):
-                        candidate = base / variant
-                        if candidate.exists() and candidate.is_file():
-                            resolved = candidate
-                            break
-                        # Recursive filename fallback — preserves the
-                        # legacy embed path's behaviour for sphinx-style
-                        # `_images/<name>` refs whose source lives in a
-                        # different subtree on disk.
-                        filename = pathlib.Path(variant).name
-                        for found in base.rglob(filename):
-                            if found.is_file():
-                                resolved = found
-                                break
-                        if resolved is not None:
-                            break
-                    if resolved is not None:
-                        break
-
-            if resolved is None:
-                logger.warning(f"Could not find image file: {img_src} (source_dir: {source_dir})")
                 skipped += 1
                 continue
 
             # Decide the output relpath:
             # * Relative srcs keep their shape so existing markdown refs
             #   line up with the on-disk layout (predictable, debuggable).
-            # * Absolute srcs are flattened under `_images/` with a short
+            # * Absolute srcs, and relative ones that climb out of the
+            #   bundle (`../`), are flattened under `_images/` with a short
             #   content hash to avoid collisions between like-named files
             #   from different source dirs (e.g. `fea.mesh.png` repeats
-            #   under every `_assets/<case>/`).
-            if normalized.startswith("/"):
+            #   under every `_assets/<case>/`). Kept as-is, a `../` path
+            #   would point (and be copied) outside the bundle.
+            outside = normalized.startswith("/") or ".." in pathlib.PurePosixPath(normalized).parts
+            if outside:
                 with open(resolved, "rb") as f:
                     digest = hashlib.sha256(f.read()).hexdigest()[:8]
                 output_relpath = f"_images/{digest}-{resolved.name}"
@@ -1375,9 +1379,9 @@ class ASTExporter:
             # the bundle size and clutter the
             # ``/api/docs/{id}/manifest/files`` payload with phantom
             # duplicates the REST docstore never reads. Absolute paths
-            # still need the copy — they're flattened into ``_images/``
-            # and exist nowhere else in the bundle.
-            if not copy_relative and not normalized.startswith("/"):
+            # and ``../`` paths still need the copy — they're flattened into
+            # ``_images/`` and exist nowhere else in the bundle.
+            if not copy_relative and not outside:
                 continue
 
             dest = output_dir / output_relpath
