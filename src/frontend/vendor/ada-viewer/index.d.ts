@@ -1,4 +1,7 @@
-// Hand-maintained type contract for the embed bundle. The vite build
+// Hand-maintained type contract for the WebGPU-only embed (embed-webgpu/), the three.js embed's
+// API plus `posterUrl` (shown when WebGPU is unavailable) and `webGpuUnavailableReason`.
+//
+// (From the three.js embed's contract:) The vite build
 // produces `dist-embed/index.js`; this file is copied next to it at
 // build time by the `inlineCssAtRuntime` plugin so paradoc gets
 // `vendor/ada-viewer/{index.js, index.d.ts}` together. Keeping this
@@ -26,6 +29,8 @@ export interface MountViewerOptions {
     // info, and group info panels on top of the canvas. Defaults to
     // false (canvas-only).
     showControls?: boolean
+    /** The figure's static poster, shown when WebGPU (or loading) fails. */
+    posterUrl?: string
     onReady?: () => void
     onError?: (err: Error) => void
 }
@@ -51,6 +56,8 @@ export interface MountFeaArtefactViewerOptions {
     /** Start with beam elements drawn as solids (default false: lines).
      *  Only matters for a bundle with beam solids; the controls still toggle. */
     beamSolids?: boolean
+    /** The figure's static poster, shown when WebGPU (or loading) fails. */
+    posterUrl?: string
     onReady?: () => void
     onError?: (err: Error) => void
 }
@@ -64,3 +71,10 @@ export declare function mountFeaArtefactViewer(
     element: HTMLElement,
     opts: MountFeaArtefactViewerOptions,
 ): MountedViewer
+
+/** Why this browser cannot show the 3D view (no WebGPU), or null. */
+export declare function webGpuUnavailableReason(): string | null
+
+/** Without WebGPU (or when a model fails to load) a figure shows its poster, or a note, as an element
+ *  with this class (and the reason in `data-reason`) instead of a canvas. */
+export declare const FALLBACK_CLASS: "ada-viewer-fallback"
