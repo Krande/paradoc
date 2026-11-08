@@ -213,7 +213,8 @@ export function ThreeDRenderer({ threeDKey, docId, caption, style }: ThreeDRende
     // ``height: 100%`` resolved to 0 — mountViewer's old 400-px
     // ``min-height`` floor used to paper over that and then made the
     // canvas overflow its ``overflow: hidden`` ancestor on mobile.
-    <div className="my-4 w-full h-full">
+    // (No margin when the parent sizes it: inside a fixed-height box it would push the bottom out.)
+    <div className={style?.height ? 'w-full h-full' : 'my-4 w-full h-full'}>
       {/* The vendor viewer reads clientWidth/clientHeight to size its
           canvas. Pinning aspect-ratio + max-w-full keeps the canvas
           inside the viewport on mobile.

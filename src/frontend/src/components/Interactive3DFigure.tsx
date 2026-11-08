@@ -45,9 +45,8 @@ export function Interactive3DFigure({
   const [toggleVisible, setToggleVisible] = React.useState(false)
   const [posterUrl, setPosterUrl] = React.useState<string | undefined>(undefined)
   const hideTimerRef = React.useRef<number | null>(null)
-  // Bound the interactive viewer to the static poster's rendered
-  // dimensions on first measurement so it doesn't expand the figure's
-  // visual footprint on wide desktops. After that, a custom pointer-
+  // The interactive viewer takes exactly the static poster's size, so
+  // toggling moves nothing. After that, a custom pointer-
   // event resize handle in the bottom-right corner (outside the embed's
   // canvas) lets the user grow / shrink the viewer independently of
   // the poster. CSS `resize: both` won't do: its drag handle is
@@ -61,7 +60,7 @@ export function Interactive3DFigure({
   // the auto-measured value.
   const userResizedRef = React.useRef(false)
   const resizeStartRef = React.useRef<
-    {pointerId: number; startX: number; startY: number; baseW: number; baseH: number} | null
+    {pointerId: number; startX: number; startY: number; baseW: number; baseH: number; scale: number} | null
   >(null)
 
   React.useEffect(() => {
@@ -69,18 +68,12 @@ export function Interactive3DFigure({
     if (!el) return
     const update = () => {
       if (userResizedRef.current) return
-      const rect = el.getBoundingClientRect()
-      // Keep updating until the user takes over via the resize handle.
-      // The previous ``prev ?? …`` seed-once logic locked viewerSize to
-      // the figure's *placeholder* height (~200 px — dashed box + icon
-      // + caption) because that's what was rendered the first time the
-      // effect ran, before the poster image had loaded. The wrapper
-      // then ended up shorter than mountViewer's 400 px min-height
-      // floor, the canvas overflowed, and the intermediate
-      // ``overflow: hidden`` div clipped its bottom — taking the beam
-      // tip with it.
-      if (rect.width > 0 && rect.height > 0) {
-        setViewerSize({width: Math.round(rect.width), height: Math.round(rect.height)})
+      // The poster image itself, once loaded (the figure around it also holds the padding and the
+      // caption), in layout pixels: getBoundingClientRect gives on-screen ones, which the page's
+      // fit-to-width zoom would then scale a second time when applied as a CSS size.
+      const img = el.querySelector('img')
+      if (img && img.naturalWidth > 0 && img.offsetWidth > 0 && img.offsetHeight > 0) {
+        setViewerSize({width: img.offsetWidth, height: img.offsetHeight})
       }
     }
     update()
@@ -144,12 +137,16 @@ export function Interactive3DFigure({
     // when the pointer leaves it. This is what makes pointer-event
     // resize feel native.
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    // Pointer moves are on-screen pixels, the viewer's size layout ones: the page's zoom between them.
+    const box = (e.currentTarget as HTMLElement).parentElement
+    const scale = box && box.offsetWidth > 0 ? box.getBoundingClientRect().width / box.offsetWidth : 1
     resizeStartRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
       baseW: viewerSize.width,
       baseH: viewerSize.height,
+      scale: scale || 1,
     }
     e.preventDefault()
     e.stopPropagation()
@@ -158,8 +155,8 @@ export function Interactive3DFigure({
   const onResizeMove = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const s = resizeStartRef.current
     if (!s || s.pointerId !== e.pointerId) return
-    const dx = e.clientX - s.startX
-    const dy = e.clientY - s.startY
+    const dx = (e.clientX - s.startX) / s.scale
+    const dy = (e.clientY - s.startY) / s.scale
     setViewerSize({
       width: Math.max(320, Math.round(s.baseW + dx)),
       height: Math.max(240, Math.round(s.baseH + dy)),
@@ -306,14 +303,16 @@ export function Interactive3DFigure({
       </div>
       {hasMounted && (
         <div
-          className="relative mx-auto"
+          className={`${className} my-4 border border-gray-200 rounded bg-gray-50 p-3 flex flex-col items-center text-center`}
+          style={{ display: showInteractive ? 'flex' : 'none' }}
+        >
+        <div
+          className="relative"
           style={{
             width: viewerSize ? `${viewerSize.width}px` : '100%',
             height: viewerSize ? `${viewerSize.height}px` : 'auto',
             maxWidth: '100%',
-            minWidth: '320px',
-            minHeight: '240px',
-            display: showInteractive ? 'block' : 'none',
+            ...(viewerSize ? {} : { minWidth: '320px', minHeight: '240px' }),
           }}
         >
           {/* Bounded to the static poster's rendered dimensions on
@@ -367,6 +366,7 @@ export function Interactive3DFigure({
             </svg>
           </div>
 
+        </div>
           {/* Caption underneath the viewer too — the renderer wraps
               its own canvas without one. */}
           {captionNode}
