@@ -108,6 +108,15 @@ export function ThreeDRenderer({ threeDKey, docId, caption, style }: ThreeDRende
         const camera =
           presets[meta?.cameraPos || 'iso_3'] || Object.values(presets)[0]
 
+        // The ada-viewer embed draws with WebGPU; where it cannot (no WebGPU, or the model fails to
+        // load) it shows the figure's poster itself, so an error is only ours to show when there is
+        // no poster to fall back to.
+        const onViewerError = (poster: string | undefined) => (err: Error) => {
+          if (canceled) return
+          if (poster) console.info(`[paradoc] 3D view of ${threeDKey} shows its poster: ${err.message}`)
+          else setError(err.message)
+        }
+
         const vendor = await import('../../vendor/ada-viewer')
         if (canceled || !containerRef.current) return
         try {
@@ -151,7 +160,8 @@ export function ThreeDRenderer({ threeDKey, docId, caption, style }: ThreeDRende
               showControls,
               modeIndex: meta.feaModeIndex,
               beamSolids: meta.feaBeamSolids,
-              onError: (err) => !canceled && setError(err.message),
+              posterUrl: meta.imageUrl,
+              onError: onViewerError(meta.imageUrl),
             },
           )
           return
@@ -169,7 +179,8 @@ export function ThreeDRenderer({ threeDKey, docId, caption, style }: ThreeDRende
           camera,
           caption: caption || payload.caption,
           showControls,
-          onError: (err) => !canceled && setError(err.message),
+          posterUrl: meta?.imageUrl,
+          onError: onViewerError(meta?.imageUrl),
         })
       } catch (err: any) {
         if (canceled) return
