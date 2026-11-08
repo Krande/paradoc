@@ -2,6 +2,17 @@
 
 
 
+## v0.11.0 (2026-11-08)
+
+### Feature
+
+* feat: WebGPU 3D figures with poster fallback; static export finds and versions images (#46)
+
+Signed-off-by: dependabot[bot] &lt;support@github.com&gt;
+Co-authored-by: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;
+Co-authored-by: dependabot[bot] &lt;49699333+dependabot[bot]@users.noreply.github.com&gt; ([`094ebab`](https://github.com/Krande/paradoc/commit/094ebab03a8fd1ff2169aa9a25b484a84c33eab7))
+
+
 ## v0.10.1 (2026-10-17)
 
 ### Fix
