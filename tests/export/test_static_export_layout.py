@@ -90,3 +90,22 @@ def test_an_unresolved_image_is_not_swapped_for_another_file_with_the_same_name(
     out = tmp_path / "site"
     assert one.export_static(out, include_frontend=False)
     assert not list(out.rglob("fea.mesh.png")) and not (out / "_images").exists()
+
+
+def test_an_image_url_carries_its_content_hash(tmp_path):
+    """Images keep their names across rebuilds; the URL changes with the content, so a browser never
+    shows the previous build's image from its cache."""
+    import hashlib
+
+    from PIL import Image
+
+    src = tmp_path / "doc"
+    (src / "00-main" / "images").mkdir(parents=True)
+    Image.new("RGB", (4, 4), "blue").save(src / "00-main" / "images" / "pic.png")
+    (src / "00-main" / "main.md").write_text("# First\n\n![A picture](images/pic.png){#fig:pic}\n", encoding="utf-8")
+    one = OneDoc(src, work_dir=tmp_path / "work")
+    out = tmp_path / "site"
+    assert one.export_static(out, include_frontend=False)
+    sections = "".join(p.read_text(encoding="utf-8") for p in (out / "sections").glob("*.json"))
+    digest = hashlib.sha256((src / "00-main" / "images" / "pic.png").read_bytes()).hexdigest()[:12]
+    assert f"images/pic.png?v={digest}" in sections

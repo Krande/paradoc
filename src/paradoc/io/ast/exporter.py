@@ -87,6 +87,14 @@ def _source_marker(marker: str, md_file: Any) -> Dict[str, Any]:
     }
 
 
+def _content_hash(path: "pathlib.Path") -> str:
+    """A short content hash of a file, for cache-busting its URL."""
+    import hashlib
+
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()[:12]
+
+
 def _resolve_beside_markdown(img_info: Dict[str, Any], variants) -> "pathlib.Path | None":
     """The image file relative to the markdown it came from: its built file's directory, then its
     source directory. None when neither holds it."""
@@ -1370,7 +1378,9 @@ class ASTExporter:
             else:
                 output_relpath = normalized
 
-            mapping[img_src] = output_relpath
+            # A kept-shape path is the same URL across rebuilds: version it by content, so a changed
+            # image is a new URL to every cache (the hashed `_images/` names already are).
+            mapping[img_src] = output_relpath if outside else f"{output_relpath}?v={_content_hash(resolved)}"
 
             # ``copy_relative=False`` is the REST-bundle case: relative
             # markdown refs already line up with files on disk at
@@ -1553,7 +1563,9 @@ class ASTExporter:
                 poster_dest = assets_dir / f"{key}.png"
                 try:
                     shutil.copyfile(poster_src, poster_dest)
-                    poster_url = f"assets/3d/{key}.png"
+                    # The poster keeps its name across rebuilds; a content hash in the URL makes a
+                    # changed one a new URL, so no browser cache shows the previous build's image.
+                    poster_url = f"assets/3d/{key}.png?v={_content_hash(poster_dest)}"
                 except Exception as exc:
                     logger.warning(f"poster copy {poster_src} → {poster_dest} failed: {exc}")
 
