@@ -11,6 +11,7 @@ from paradoc.io.word.com_api.com_utils import close_word_docs_by_name, docx_upda
 
 from .formatting import fix_headers_after_compose, format_paragraphs_and_headings
 from .models import DocXFigureRef, DocXTableRef, apply_table_format
+from .pandoc_bookmarks import identifiers_in_markdown, restore_pandoc_bookmark_names
 from .reference_helper import ReferenceHelper
 from .utils import (
     add_to_composer,
@@ -120,6 +121,9 @@ class WordExporter:
                 filters=["pandoc-crossref"],
                 sandbox=False,
             )
+            # pandoc >= 3.12 hashes ids like "eq:basic" into bookmark names; the steps below
+            # find equations and cross-references by those ids.
+            restore_pandoc_bookmark_names(mdf.new_file, identifiers_in_markdown(mdf.read_built_file()))
 
         logger.info(f"[WordExporter] Converted {len(one_doc.md_files_main) + len(one_doc.md_files_app)} markdown files")
 

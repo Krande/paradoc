@@ -10,6 +10,7 @@ import pypandoc
 from paradoc import OneDoc
 from paradoc.exceptions import LatexNotInstalled
 from paradoc.io.pdf.config import PdfExportConfig
+from paradoc.numbering import crossref_args, crossref_filters, latex_numbering_header
 from paradoc.utils import copy_figures_to_dist
 
 #: PDF engines pandoc can drive, in the order they are tried. xelatex first because it is what
@@ -60,11 +61,13 @@ def _metadata_keys(metadata_file) -> set[str]:
     return set(re.findall(r"^([A-Za-z][\w-]*)\s*:", text, re.MULTILINE))
 
 
-def pandoc_args(cfg: PdfExportConfig, metadata_file, out_dir: pathlib.Path) -> list[str]:
-    """pandoc arguments for the page, fonts, figures and headings ``cfg`` describes.
+def pandoc_args(
+    cfg: PdfExportConfig, metadata_file, out_dir: pathlib.Path, chapter_numbering: bool = True
+) -> list[str]:
+    """pandoc arguments for the page, fonts, figures, headings and numbering ``cfg`` describes.
 
-    A key the document's metadata file sets itself (``fontsize``, ``mainfont``, ...) is not
-    passed, so the document's value stands.
+    A key the document's metadata file sets itself (``fontsize``, ``mainfont``,
+    ``numbersections``, ...) is not passed, so the document's value stands.
     """
     doc_keys = _metadata_keys(metadata_file)
     main, mono = _SYSTEM_FONTS.get(sys.platform, _SYSTEM_FONTS_OTHER)
@@ -81,6 +84,10 @@ def pandoc_args(cfg: PdfExportConfig, metadata_file, out_dir: pathlib.Path) -> l
     # its figures -- beside the next group, reading as that group's title.
     if cfg.block_headings and "block-headings" not in doc_keys:
         args.append("--variable=block-headings")
+    # Numbered headings, as the web reader and the Word template number them: 1, 1.1, 1.1.1, and
+    # A, A.1, A.1.1 after the \appendix the exporter puts before the appendices.
+    if "numbersections" not in doc_keys:
+        args.append("--number-sections")
 
     # Figures: where they go, and how large they may be. pandoc's template has no variables for
     # either, so a header file does it (added to, not replacing, the document's header-includes).
@@ -96,7 +103,10 @@ def pandoc_args(cfg: PdfExportConfig, metadata_file, out_dir: pathlib.Path) -> l
         f"{cfg.figure_max_width}\\linewidth\\else\\Gin@nat@width\\fi}}\n"
         f"\\def\\maxheight{{\\ifdim\\Gin@nat@height>{cfg.figure_max_height}\\textheight "
         f"{cfg.figure_max_height}\\textheight\\else\\Gin@nat@height\\fi}}\n"
-        "\\makeatother\n",
+        "\\makeatother\n"
+        # Figure / table / equation numbers per top-level heading ("Figure 3.2", "Table A.1"), and
+        # "Appendix A" on a top-level appendix heading, as in the other formats.
+        + latex_numbering_header(chapter_numbering),
         encoding="utf-8",
     )
     args.append(f"--include-in-header={header}")
@@ -129,11 +139,21 @@ function Table(t)
   if MODE == "auto" or (MODE == "content" and longest_cell(t) <= SHORT) then
     for i, spec in ipairs(t.colspecs) do t.colspecs[i] = {{spec[1]}} end
   end
-  return {{
+  local blocks = {{
     pandoc.RawBlock("latex", "\\\\begingroup\\\\" .. SIZE .. "\\\\setlength{{\\\\tabcolsep}}{{" .. SEP .. "}}"),
     t,
     pandoc.RawBlock("latex", "\\\\endgroup"),
   }}
+  -- Whether an uncaptioned longtable steps the table counter depends on the pandoc and longtable
+  -- versions (pandoc < 3.12 writes `\\LTcaptype{{}}`, which current longtable does not honour;
+  -- later pandoc writes `{{none}}`, which it does). Put the counter back to what it was before the
+  -- table either way, or every captioned table after it is numbered one off from the other
+  -- formats, which count captioned tables only.
+  if #t.caption.long == 0 then
+    table.insert(blocks, 1, pandoc.RawBlock("latex", "\\\\xdef\\\\ParadocTableCount{{\\\\the\\\\value{{table}}}}"))
+    table.insert(blocks, pandoc.RawBlock("latex", "\\\\setcounter{{table}}{{\\\\ParadocTableCount}}"))
+  end
+  return blocks
 end
 """
 
@@ -246,9 +266,11 @@ class PdfExporter:
                 f"--pdf-engine={resolve_pdf_engine()}",
                 f"--resource-path={out_dir}",
                 f"--metadata-file={one.metadata_file}",
-                *pandoc_args(cfg, one.metadata_file, out_dir),
+                *crossref_args(one.chapter_numbering),
+                *pandoc_args(cfg, one.metadata_file, out_dir, one.chapter_numbering),
             ],
+            # The same pandoc-crossref pass as the HTML and the web reader (chapter labels first).
             # The table filter runs after pandoc-crossref, which numbers the table captions.
-            filters=["pandoc-crossref", str(table_filter(cfg, out_dir))],
+            filters=[*crossref_filters(one.chapter_numbering), str(table_filter(cfg, out_dir))],
         )
         print(f'Successfully exported PDF to "{dest_file}"')

@@ -38,6 +38,29 @@ jobs:
           key: tectonic-${{ runner.os }}-${{ hashFiles('pixi.lock') }}
           restore-keys: tectonic-${{ runner.os }}-
 
+      # The frontend tests drive Playwright's Chromium. ubuntu-latest is Ubuntu 26.04, which the
+      # locked Playwright does not recognise: `playwright install` refuses it ("does not support
+      # chromium on ubuntu26.04-x64"). Its Ubuntu 24.04 build runs there, and every system package
+      # 24.04 needs for it is in 26.04's archive, so install that one, with those packages. Drop the
+      # override once the lock has a Playwright that supports 26.04.
+      - name: Playwright version
+        if: runner.os == 'Linux'
+        id: playwright
+        run: echo "version=$(pixi run -e test python -c 'import importlib.metadata as m; print(m.version("playwright"))')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright's browsers
+        if: runner.os == 'Linux'
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      - name: Install Playwright's Chromium and its system dependencies
+        if: runner.os == 'Linux'
+        env:
+          PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
+        run: pixi run -e test python -m playwright install --with-deps chromium
+
       - name: Runs Tests
         # Explicit env: the `test` task is also provided by the `e2e`
         # environment (it shares the `test` feature), so a bare

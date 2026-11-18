@@ -1289,8 +1289,19 @@ class ReferenceHelper:
                 figure = one_doc.figures.get(caption_str, None)
 
                 if figure is None:
-                    logger.warning(f'[ReferenceHelper]   Figure with caption "{caption_str}" not found in OneDoc')
-                    continue
+                    # A figure OneDoc did not index from the sources -- made at build time by a
+                    # filter or a figure source, or one of several sharing a caption. Its caption
+                    # still gets the chapter-scoped SEQ numbering ("Figure 3.2", "Figure A.1")
+                    # every other figure and format has, in place of pandoc-crossref's count,
+                    # which restarts with every markdown file. Without an id there is no bookmark
+                    # for a cross-reference to point at.
+                    from paradoc.common import Figure
+
+                    text = caption.text.strip()
+                    m = re.match(r"^Figure\s+[\w.\-]+\s*:\s*", text)
+                    text = text[m.end() :] if m else text
+                    logger.debug(f'[ReferenceHelper]   Figure with caption "{caption_str}" not indexed by OneDoc')
+                    figure = Figure(name=text, caption=text, reference=None, file_path="")
 
                 current_fig = DocXFigureRef(figure, document)
                 current_fig.docx_figure = block

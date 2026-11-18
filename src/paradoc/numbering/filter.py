@@ -10,6 +10,9 @@ The counting matches the heading numbers the web reader shows: every top-level h
 and the appendix lettering starts at "A" at the marker. A heading that already carries a
 ``label`` keeps it (and still counts).
 
+With the metadata flag ``paradoc-number-headings: true`` it also writes every heading's number
+into its text ("1.2 Title", "Appendix A Title"), for writers that cannot number headings (ODT).
+
 Self-contained on purpose: pandoc runs it as a separate process, so it imports nothing from
 paradoc.
 """
@@ -80,6 +83,85 @@ def label_chapters(ast: dict) -> dict:
     return ast
 
 
+#: Metadata key that switches on :func:`number_headings` in the filter script. Formats that
+#: number headings themselves (the web reader, Word's heading styles, LaTeX) leave it off.
+NUMBER_HEADINGS_KEY = "paradoc-number-headings"
+
+#: Text before a top-level appendix heading's letter, as the web reader and the Word template
+#: ("Appendix %1") show it.
+APPENDIX_PREFIX = "Appendix"
+
+
+def _is_unnumbered(attr: list) -> bool:
+    return isinstance(attr[1], list) and "unnumbered" in attr[1]
+
+
+def heading_numbers(blocks: Iterable[Any]) -> Iterator[tuple[dict, str, bool]]:
+    """Yield ``(header_block, number, is_appendix)`` for each numbered heading, in document order.
+
+    The scheme of the web reader and the Word template: "1", "1.1", "1.1.1" in the main body;
+    "A", "A.1", "A.1.1" after the ``\\appendix`` marker, each appendix restarting the sub-counts.
+    A heading with the ``unnumbered`` class (``{-}``) gets no number and does not count, as in
+    LaTeX. A level-1 heading that carries a ``label`` attribute uses it as its number.
+    """
+    main = [0] * 6
+    app = [0] * 6
+    in_appendix = False
+    for block in blocks:
+        if _is_appendix_marker(block):
+            in_appendix = True
+            continue
+        if not (isinstance(block, dict) and block.get("t") == "Header"):
+            continue
+        level, attr = block["c"][0], block["c"][1]
+        if not isinstance(level, int) or not 1 <= level <= 6 or _is_unnumbered(attr):
+            continue
+        counters = app if in_appendix else main
+        counters[level - 1] += 1
+        for i in range(level, 6):
+            counters[i] = 0
+        first = appendix_letter(counters[0]) if in_appendix and counters[0] else str(counters[0])
+        if level == 1:
+            label = next((kv[1] for kv in attr[2] if isinstance(kv, list) and kv and kv[0] == "label"), None)
+            if label:
+                first = label
+        yield block, ".".join([first, *(str(n) for n in counters[1:level])]), in_appendix
+
+
+def number_headings(ast: dict) -> dict:
+    """Write each heading's number in front of its text (in place): "1.2 Title", "A.1 Title",
+    and "Appendix A Title" for a top-level appendix heading.
+
+    For writers that cannot number headings themselves (ODT: pandoc's writer has no section
+    numbering, and an appendix letter is beyond any outline numbering). The number is a ``Span``
+    of class ``header-section-number``, as pandoc's own ``--number-sections`` makes in HTML.
+    """
+    for block, number, is_appendix in heading_numbers(ast.get("blocks") or []):
+        text = f"{APPENDIX_PREFIX} {number}" if is_appendix and block["c"][0] == 1 else number
+        words = text.split(" ")
+        inlines: list = []
+        for i, word in enumerate(words):
+            if i:
+                inlines.append({"t": "Space"})
+            inlines.append({"t": "Str", "c": word})
+        span = {"t": "Span", "c": [["", ["header-section-number"], []], inlines]}
+        block["c"][2] = [span, {"t": "Space"}, *block["c"][2]]
+    return ast
+
+
+def _meta_true(meta: dict, key: str) -> bool:
+    value = meta.get(key)
+    if not isinstance(value, dict):
+        return False
+    if value.get("t") == "MetaBool":
+        return bool(value.get("c"))
+    if value.get("t") == "MetaInlines":  # `-M key=true` on older pandocs
+        return "".join(i.get("c", "") for i in value.get("c", []) if i.get("t") == "Str").lower() in ("true", "yes")
+    if value.get("t") == "MetaString":
+        return str(value.get("c")).lower() in ("true", "yes")
+    return False
+
+
 def _read_ast() -> Any:
     # pandoc pipes UTF-8 JSON; text-mode stdio would decode it with the locale codec (cp1252 on Windows).
     return json.loads(sys.stdin.buffer.read().decode("utf-8"))
@@ -96,7 +178,10 @@ def main() -> int:
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         sys.stderr.write(f"[paradoc-chapters] bad input AST: {exc}\n")
         return 2
-    _write_ast(label_chapters(ast))
+    label_chapters(ast)
+    if _meta_true(ast.get("meta") or {}, NUMBER_HEADINGS_KEY):
+        number_headings(ast)
+    _write_ast(ast)
     return 0
 
 

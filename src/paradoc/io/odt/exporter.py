@@ -2,7 +2,8 @@
 
 The same route as the PDF export -- the built markdown joined into one document, figure and table
 captions numbered by pandoc-crossref -- written with pandoc's own ODT writer. No office suite is
-needed to produce it, and LibreOffice, Word and Google Docs all open it.
+needed to produce it, and LibreOffice, Word and Google Docs all open it. Headings, captions and
+references are numbered as in the other formats (see :mod:`paradoc.numbering`).
 """
 
 import pathlib
@@ -11,6 +12,7 @@ import pypandoc
 
 from paradoc import OneDoc
 from paradoc.io.pdf.exporter import prepare_images
+from paradoc.numbering import NUMBER_HEADINGS_ARGS, crossref_args, crossref_filters
 from paradoc.utils import copy_figures_to_dist
 
 #: Text width of pandoc's default ODT page: US Letter less its 1 in margins.
@@ -59,8 +61,11 @@ class OdtExporter:
         def built(md) -> str:
             return prepare_images(md.read_built_file(), md.build_file.parent, out_dir)
 
-        # No appendix marker: the PDF's is a raw LaTeX \appendix, which the ODT writer drops.
-        combined_str = "\n\n".join(built(md) for md in [*one.md_files_main, *one.md_files_app])
+        # The raw LaTeX \appendix marker, as in the HTML and PDF: the numbering filter letters the
+        # headings after it ("Appendix A", "A.1", "Figure A.1"); the ODT writer then drops it.
+        md_main_str = "\n\n".join(built(md) for md in one.md_files_main)
+        md_app_str = "\n\n".join(built(md) for md in one.md_files_app)
+        combined_str = md_main_str + "\n\n\\appendix\n\n" + md_app_str if md_app_str else md_main_str
 
         pypandoc.convert_text(
             combined_str,
@@ -74,7 +79,10 @@ class OdtExporter:
                 "-RTS",
                 f"--resource-path={out_dir}",
                 f"--metadata-file={one.metadata_file}",
+                *crossref_args(one.chapter_numbering),
+                # pandoc's ODT writer cannot number headings: the filter writes the numbers in.
+                *NUMBER_HEADINGS_ARGS,
             ],
-            filters=["pandoc-crossref", str(image_width_filter(out_dir))],
+            filters=[*crossref_filters(one.chapter_numbering, number_headings=True), str(image_width_filter(out_dir))],
         )
         print(f'Successfully exported ODT to "{dest_file}"')
