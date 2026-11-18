@@ -363,7 +363,12 @@ class OneDoc:
         use_hyperlink_references=True,
         enable_word_com_automation=False,
         use_custom_docx_compile=True,
+        document_properties=None,
     ):
+        """The DOCX exporter. ``main_tmpl`` / ``app_tmpl``: the templates the main part and the
+        appendix are composed into. ``document_properties``: ``{name: value}`` set as the document's
+        custom properties, and shown by every DOCPROPERTY field of the document -- e.g. a template's
+        page header or title page: ``{ DOCPROPERTY DocumentNumber \\* MERGEFORMAT }``."""
         from paradoc.io.word.exporter import WordExporter
 
         return WordExporter(
@@ -373,6 +378,7 @@ class OneDoc:
             use_hyperlink_references=use_hyperlink_references,
             enable_word_com_automation=enable_word_com_automation,
             use_custom_docx_compile=use_custom_docx_compile,
+            document_properties=document_properties,
         )
 
     def send_to_frontend(self, metadata_file=None, embed_images=True, use_static_html=False, frontend_id=None):
