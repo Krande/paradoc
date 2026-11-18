@@ -43,7 +43,11 @@ as you prefer. The document order is simply the alphabetical order of subdirecto
 Figures, tables and equations are numbered per top-level heading, and the counter restarts at
 each new one: "Figure 6.3" is the third figure under heading 6. In the appendix the chapter part
 is the appendix letter: "Figure A.2", "Table B.1". Captions and cross-references use the same
-numbers in the web reader, the HTML and the DOCX. For one running count instead, pass
+numbers in the web reader, the HTML, the DOCX, the ODT and the PDF. Headings are numbered 1, 1.1,
+1.1.1 in the main part and A, A.1, A.1.1 in the appendix ("Appendix A" on a top-level appendix
+heading) in the web reader, the DOCX, the ODT and the PDF (a document whose metadata sets
+`numbersections: false` keeps an unnumbered PDF). For one running count of figures and tables
+instead, pass
 `OneDoc(..., chapter_numbering=False)` or set `chapter_numbering = false` under `[paradoc]` in
 `paradoc.toml`.
 
