@@ -40,8 +40,10 @@ class WordExporter:
         use_hyperlink_references=True,
         enable_word_com_automation=False,
         use_custom_docx_compile=True,
+        document_properties=None,
     ):
         self.one_doc = one_doc
+        self.document_properties = dict(document_properties or {})
         self.main_tmpl = main_tmpl
         self.app_tmpl = app_tmpl
         self.use_custom_docx_compile = use_custom_docx_compile
@@ -187,10 +189,18 @@ class WordExporter:
         # the template's body-text style (large and bold in the default template), unlike every
         # captioned table beside them.
         formatted = {id(t.docx_table._tbl) for t in main_tables + app_tables}
+        # The templates' own tables (a title page's, say) come first and are the template's to style.
+        # Keyed by id but holding the elements: lxml hands out a new proxy (and so a new id) for a
+        # node once no proxy of it is referenced, so ids alone could match nothing, or a stranger.
+        own = {
+            id(t._tbl): t._tbl
+            for doc, tmpl in ((main_doc, self.main_tmpl), (app_doc, self.app_tmpl))
+            for t in doc.tables[: len(Document(str(tmpl)).tables)]
+        }
         n_plain = 0
         for doc in (main_doc, app_doc):
             for tbl in doc.tables:
-                if id(tbl._tbl) in formatted or _is_figure_layout_table(tbl):
+                if id(tbl._tbl) in formatted or id(tbl._tbl) in own or _is_figure_layout_table(tbl):
                     continue
                 apply_table_format(tbl, TableFormat())
                 n_plain += 1
@@ -280,6 +290,13 @@ class WordExporter:
         if check_open_docs and self.enable_word_com_automation:
             close_word_docs_by_name([output_name, f"{output_name}.docx"])
 
+        if self.document_properties:
+            from paradoc.io.word.compose.properties import CustomProperties
+
+            props = CustomProperties(composer.doc)
+            props.set_properties(self.document_properties)
+            for name, value in self.document_properties.items():
+                props.update(name, value)  # the fields' text, before Word updates them
         print(f'Saving Composed Document to "{dest_file}"')
         composer.save(dest_file)
 

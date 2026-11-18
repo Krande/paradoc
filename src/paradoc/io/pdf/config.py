@@ -186,3 +186,19 @@ class PdfExportConfig(BaseModel):
     browser: Optional[str] = None
     #: Keep the print-ready HTML next to the PDF (``<name>.print.html``) for inspection.
     keep_html: bool = True
+
+    # --- chromium engine: a page layout of one's own -------------------------------------------
+    #: The running page header / footer as HTML of one's own, in place of paradoc's: a file
+    #: (relative to the document root) or the HTML itself (anything with a ``<``). Chromium prints
+    #: it without the page's CSS, so its styles are inline. ``${name}`` placeholders are filled from
+    #: ``document`` (``${title}``, ``${document_number}``, ``${revision}``, ``${issue_date}``,
+    #: ``${project}``, ``${company}``, ...); ``${logo}`` is the logo as a data URI and ``${page}`` /
+    #: ``${pages}`` the page number and the page count.
+    header_html: Optional[str] = None
+    footer_html: Optional[str] = None
+    #: The title page as HTML of one's own (a file or the HTML), with the same placeholders --
+    #: there ``${pages}`` is the document's page count -- in place of paradoc's title page.
+    title_page_html: Optional[str] = None
+    #: Whether the title page has the running header and footer. False: it is printed without them,
+    #: in place of the first page, which keeps its number (the second page is page 2).
+    title_page_header_footer: bool = True

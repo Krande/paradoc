@@ -243,7 +243,7 @@ class CustomProperties(object):
 
     def set_properties(self, properties):
         for name, value in properties.items():
-            self.set(name, value)
+            self[name] = value
 
     def find_docprops_in_document(self, name=None):
         """This method searches for all doc-properties in the document and

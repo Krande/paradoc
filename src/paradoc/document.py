@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Callable, Dict, Iterable, Optional
 import pandas as pd
 
 from .common import (
-    GRID_TABLE_PROPS,
     MY_DEFAULT_HTML_CSS,
     MY_DOCX_TMPL,
     MY_DOCX_TMPL_BLANK,
@@ -19,6 +18,7 @@ from .common import (
     MarkDownFile,
     Table,
     TableFormat,
+    grid_table_markdown,
     isolate_block_figures,
 )
 from .config import logger
@@ -363,7 +363,12 @@ class OneDoc:
         use_hyperlink_references=True,
         enable_word_com_automation=False,
         use_custom_docx_compile=True,
+        document_properties=None,
     ):
+        """The DOCX exporter. ``main_tmpl`` / ``app_tmpl``: the templates the main part and the
+        appendix are composed into. ``document_properties``: ``{name: value}`` set as the document's
+        custom properties, and shown by every DOCPROPERTY field of the document -- e.g. a template's
+        page header or title page: ``{ DOCPROPERTY DocumentNumber \\* MERGEFORMAT }``."""
         from paradoc.io.word.exporter import WordExporter
 
         return WordExporter(
@@ -373,6 +378,7 @@ class OneDoc:
             use_hyperlink_references=use_hyperlink_references,
             enable_word_com_automation=enable_word_com_automation,
             use_custom_docx_compile=use_custom_docx_compile,
+            document_properties=document_properties,
         )
 
     def send_to_frontend(self, metadata_file=None, embed_images=True, use_static_html=False, frontend_id=None):
@@ -661,8 +667,7 @@ class OneDoc:
         # This eliminates data corruption and makes the system more robust
 
         # Convert to markdown
-        props = dict(index=show_index, **GRID_TABLE_PROPS)
-        tbl_str = df.to_markdown(**props)
+        tbl_str = grid_table_markdown(df, index=show_index)
 
         # Add caption unless nocaption flag is set
         # NOTE: Do NOT include the annotation in the caption - it's only for transformation
