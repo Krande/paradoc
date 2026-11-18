@@ -11,30 +11,29 @@ from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 
 @pytest.fixture(scope="session", autouse=True)
 def ensure_playwright_installed():
-    """Ensure Playwright browsers are installed before running tests."""
+    """Install Playwright's Chromium if it cannot be launched.
+
+    If the install fails, every frontend test errors with the installer's own output (e.g. an OS
+    the installed Playwright does not support), not just the launch error that follows.
+    """
     try:
-        # Try to launch Chromium to check if it's installed
         with sync_playwright() as p:
-            try:
-                browser = p.chromium.launch(headless=True)
-                browser.close()
-            except Exception:
-                # Chromium not installed, install it now
-                print("\nChromium not found. Installing Playwright browsers...")
-                subprocess.run(
-                    [sys.executable, "-m", "playwright", "install", "chromium"], check=True, capture_output=False
-                )
-                print("Playwright Chromium installed successfully.")
+            p.chromium.launch(headless=True).close()
+        return
     except Exception as e:
-        print(f"Warning: Could not verify Playwright installation: {e}")
-        # Try to install anyway
-        try:
-            subprocess.run(
-                [sys.executable, "-m", "playwright", "install", "chromium"], check=True, capture_output=False
-            )
-        except Exception as install_error:
-            print(f"Failed to install Playwright: {install_error}")
-            raise
+        launch_error = e
+
+    print("\nChromium could not be launched. Installing Playwright's Chromium...")
+    cmd = [sys.executable, "-m", "playwright", "install", "chromium"]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        pytest.fail(
+            f"`{' '.join(cmd[1:])}` exited with {result.returncode}.\n"
+            f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}\n"
+            f"--- launch error before the install ---\n{launch_error}",
+            pytrace=False,
+        )
+    print("Playwright Chromium installed successfully.")
 
 
 @pytest.fixture(scope="session")
