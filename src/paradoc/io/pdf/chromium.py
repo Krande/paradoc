@@ -273,6 +273,21 @@ def _esc(s: str) -> str:
     return html.escape(s or "")
 
 
+def fill_placeholders(
+    template: str, doc: DocumentInfo, logo_uri: Optional[str], page: str = "", pages: str = ""
+) -> str:
+    """``template`` (a header, footer or title page of one's own) with its ``${name}`` placeholders
+    filled: every text field of ``doc`` (escaped; ``${issue_date}`` the resolved one), ``${logo}``
+    the logo's data URI, ``${page}`` and ``${pages}`` as given (HTML). An unknown name is left as
+    it is, and ``$$`` is a dollar sign."""
+    import string
+
+    values = {k: _esc(v) for k, v in doc.model_dump().items() if isinstance(v, str)}
+    values["issue_date"] = _esc(doc.resolved_issue_date())
+    values.update(logo=logo_uri or "", page=page, pages=pages)
+    return string.Template(template).safe_substitute(values)
+
+
 def title_page_html(doc: DocumentInfo, logo_uri: Optional[str], title_logo_uri: Optional[str]) -> str:
     brand = ""
     if title_logo_uri:
@@ -507,7 +522,29 @@ class ChromiumPdfExporter:
         self._missing_images = missing
         return body, headings
 
-    def page_html(self, body: str, headings: list[Heading], pages: Optional[dict[str, int]] = None) -> str:
+    def _own_html(self, source: Optional[str]) -> Optional[str]:
+        """A header, footer or title page of one's own: the file it names (relative to the document
+        root), or the HTML itself."""
+        if not source:
+            return None
+        if "<" in source:
+            return source
+        return self._asset(source).read_text(encoding="utf-8")
+
+    def _fill(self, template: str, page: str, pages: str) -> str:
+        doc = self.config.document
+        logo = self._asset(doc.logo)
+        return fill_placeholders(template, doc, logo and data_uri(logo), page=page, pages=pages)
+
+    def page_html(
+        self,
+        body: str,
+        headings: list[Heading],
+        pages: Optional[dict[str, int]] = None,
+        page_count: Optional[int] = None,
+    ) -> str:
+        """The document as one HTML page to print. ``page_count``: the printed document's, for a
+        title page of one's own (``${pages}``); unknown before the first print."""
         cfg, doc = self.config, self.config.document
         paper, w_mm, h_mm = _PAPER.get(cfg.papersize.lower(), _PAPER["a4"])
         content_h = h_mm - _mm(cfg.margin_top) - _mm(cfg.margin_bottom)
@@ -529,7 +566,11 @@ class ChromiumPdfExporter:
         }
         root = ":root{" + ";".join(f"{k}:{v}" for k, v in variables.items()) + "}"
         front = []
-        if cfg.title_page:
+        own_title = self._own_html(cfg.title_page_html)
+        if cfg.title_page and own_title is not None:
+            filled = self._fill(own_title, "1", str(page_count or ""))
+            front.append(f'<section class="pd-title pd-title-own">{filled}</section>')
+        elif cfg.title_page:
             front.append(title_page_html(doc, logo and data_uri(logo), title_logo and data_uri(title_logo)))
         if cfg.toc:
             front.append(toc_html(headings, cfg.toc_depth, pages))
@@ -543,11 +584,29 @@ class ChromiumPdfExporter:
         )
 
     # -- printing ---------------------------------------------------------------------------
-    def _print(self, browser, html_file: pathlib.Path, pdf_file: pathlib.Path) -> list:
+    def _bands(self) -> tuple[str, str]:
+        """The running header and footer: one's own (``header_html`` / ``footer_html``), else paradoc's."""
         cfg, doc = self.config, self.config.document
-        paper, w_mm, _ = _PAPER.get(cfg.papersize.lower(), _PAPER["a4"])
         logo = self._asset(doc.logo)
+        logo_uri = logo and data_uri(logo)
+        page, pages = '<span class="pageNumber"></span>', '<span class="totalPages"></span>'
+        own_head, own_foot = self._own_html(cfg.header_html), self._own_html(cfg.footer_html)
+        head = self._fill(own_head, page, pages) if own_head is not None else header_template(doc, cfg, logo_uri)
+        foot = self._fill(own_foot, page, pages) if own_foot is not None else footer_template(doc, cfg, logo_uri)
+        return head, foot
+
+    def _print(
+        self,
+        browser,
+        html_file: pathlib.Path,
+        pdf_file: pathlib.Path,
+        header_footer: bool = True,
+        page_ranges: str = "",
+    ) -> list:
+        cfg = self.config
+        paper, w_mm, _ = _PAPER.get(cfg.papersize.lower(), _PAPER["a4"])
         content_w_px = (w_mm - _mm(cfg.margin_left) - _mm(cfg.margin_right)) * 96 / 25.4
+        head, foot = self._bands()
         page = browser.new_page(viewport={"width": int(content_w_px), "height": 1100})
         try:
             page.emulate_media(media="print")
@@ -557,9 +616,9 @@ class ChromiumPdfExporter:
                 path=str(pdf_file),
                 format=paper,
                 print_background=True,
-                display_header_footer=True,
-                header_template=header_template(doc, cfg, logo and data_uri(logo)),
-                footer_template=footer_template(doc, cfg, logo and data_uri(logo)),
+                display_header_footer=header_footer,
+                header_template=head if header_footer else "",
+                footer_template=foot if header_footer else "",
                 margin={
                     "top": cfg.margin_top,
                     "bottom": cfg.margin_bottom,
@@ -568,10 +627,30 @@ class ChromiumPdfExporter:
                 },
                 outline=True,
                 tagged=True,
+                page_ranges=page_ranges,
             )
         finally:
             page.close()
         return fitted
+
+    def _title_page_without_header_footer(self, browser, body, headings, pages, html_file, dest_file) -> None:
+        """Print the title page again without the running header and footer -- with the page count
+        known -- and put it in place of the printed document's first page."""
+        try:
+            from pypdf import PdfReader, PdfWriter
+        except ImportError:
+            logger.warning("PDF export: pypdf is not installed, the title page keeps the running header and footer")
+            return
+        count = len(PdfReader(str(dest_file)).pages)
+        html_file.write_text(self.page_html(body, headings, pages, page_count=count), encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            title_pdf = pathlib.Path(tmp) / "title.pdf"
+            self._print(browser, html_file, title_pdf, header_footer=False, page_ranges="1")
+            writer = PdfWriter(clone_from=str(dest_file))  # its outline and links kept
+            writer.insert_page(PdfReader(str(title_pdf)).pages[0], 0)
+            writer.remove_page(1)
+            with open(dest_file, "wb") as f:
+                writer.write(f)
 
     @staticmethod
     def heading_pages(pdf_file: pathlib.Path, headings: list[Heading]) -> dict[str, int]:
@@ -600,12 +679,15 @@ class ChromiumPdfExporter:
                         continue
 
         walk(reader.outline)
+        # The outline has the headings as printed: a stylesheet's text-transform (capitals) is in it.
+        flat = [(title.casefold(), page) for title, page in flat]
         pages: dict[str, int] = {}
         i = 0
         for h in headings:
-            key = re.sub(r"\s+", "", f"{h.number}{h.text}")
+            key = re.sub(r"\s+", "", f"{h.number}{h.text}").casefold()
+            text = re.sub(r"\s+", "", h.text).casefold()
             for j in range(i, len(flat)):
-                if flat[j][0] == key or flat[j][0].endswith(re.sub(r"\s+", "", h.text)):
+                if flat[j][0] == key or flat[j][0].endswith(text):
                     pages[h.anchor] = flat[j][1]
                     i = j + 1
                     break
@@ -630,6 +712,7 @@ class ChromiumPdfExporter:
         with sync_playwright() as p:
             browser = launch_browser(p, cfg.browser)
             try:
+                pages = None
                 html_file.write_text(self.page_html(body, headings), encoding="utf-8")
                 if not cfg.toc:
                     fitted = self._print(browser, html_file, dest_file)
@@ -640,6 +723,8 @@ class ChromiumPdfExporter:
                         pages = self.heading_pages(first, headings)
                     html_file.write_text(self.page_html(body, headings, pages), encoding="utf-8")
                     fitted = self._print(browser, html_file, dest_file)
+                if cfg.title_page and not cfg.title_page_header_footer:
+                    self._title_page_without_header_footer(browser, body, headings, pages, html_file, dest_file)
             finally:
                 browser.close()
 

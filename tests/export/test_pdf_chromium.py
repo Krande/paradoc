@@ -6,6 +6,8 @@ import pathlib
 import pytest
 
 from paradoc.io.pdf.chromium import (
+    ChromiumPdfExporter,
+    fill_placeholders,
     footer_template,
     header_template,
     layout_tables,
@@ -128,6 +130,38 @@ def test_branding_can_go_in_the_header_instead():
     assert 'class="pageNumber"' in foot and 'class="totalPages"' in foot
 
 
+def test_placeholders_are_filled_from_the_document_data():
+    doc = _doc(title="Loads & checks")
+    out = fill_placeholders(
+        "${title} / ${document_number} rev ${revision}, ${issue_date}; ${page} of ${pages} ${logo} ${unknown} $$5",
+        doc,
+        "data:image/png;base64,AA",
+        page="<i>p</i>",
+        pages="<i>n</i>",
+    )
+    assert out == (
+        "Loads &amp; checks / EX-001 rev B, 2026-02-02; <i>p</i> of <i>n</i> data:image/png;base64,AA ${unknown} $5"
+    )
+
+
+def test_a_header_and_footer_of_ones_own_replace_paradocs():
+    cfg = PdfExportConfig(
+        engine="chromium",
+        document=_doc(),
+        header_html="<div style='font-size:8pt'>${project} | ${title} | Page ${page} of ${pages}</div>",
+        footer_html="<div>${document_number}</div>",
+    )
+    head, foot = ChromiumPdfExporter(None, cfg)._bands()
+    assert head == (
+        "<div style='font-size:8pt'>Bridge retrofit | Design report | Page <span class=\"pageNumber\"></span> of "
+        '<span class="totalPages"></span></div>'
+    )
+    assert foot == "<div>EX-001</div>"
+    # without them, paradoc's own
+    head, foot = ChromiumPdfExporter(None, PdfExportConfig(engine="chromium", document=_doc()))._bands()
+    assert head == header_template(_doc(), PdfExportConfig(engine="chromium"), None)
+
+
 def test_pdf_overrides_merge_over_the_profile():
     from paradoc.tasks.orchestrator import _deep_merge
 
@@ -177,3 +211,40 @@ def test_a_document_prints_with_title_page_toc_and_page_numbers(tmp_path):
     # The TOC's page number for chapter 2 is the page the chapter starts on.
     method_page = next(i + 1 for i, t in enumerate(text) if "2 Method" in t.replace("\n", " ") and i > 1)
     assert f"Method {method_page}" in " ".join(text[1].split()).replace(". ", " ")
+
+
+@pytest.mark.skipif(not _chromium_available(), reason="needs Playwright and a Chromium build")
+def test_a_title_page_of_ones_own_prints_without_the_running_header(tmp_path):
+    pypdf = pytest.importorskip("pypdf")
+    from paradoc import OneDoc
+
+    src = tmp_path / "doc"
+    (src / "00-main").mkdir(parents=True)
+    (src / "00-main" / "01-intro.md").write_text(
+        "# Introduction\n\nSome text.\n\n# Method\n\nText.\n\n# Results\n\nText.\n", encoding="utf-8"
+    )
+    # Chapters in capitals: the outline has them so, and the contents still find their pages.
+    (src / "caps.css").write_text("h1 { text-transform: uppercase; }\n", encoding="utf-8")
+    (src / "title.html").write_text(
+        "<div class='sheet'>SHEET ${document_number} rev ${revision}: page ${page} of ${pages}</div>", encoding="utf-8"
+    )
+    one = OneDoc(src, work_dir=tmp_path / "work")
+    cfg = PdfExportConfig(
+        engine="chromium",
+        document=_doc(),
+        stylesheet="caps.css",
+        header_html="<div style='font-size:8pt;width:100%;text-align:center'>HEAD ${title} ${page}/${pages}</div>",
+        footer_html="<div style='font-size:8pt;width:100%;text-align:center'>FOOT ${document_number}</div>",
+        title_page_html="title.html",
+        title_page_header_footer=False,
+    )
+    one.compile("report", export_format="pdf", pdf_config=cfg)
+
+    reader = pypdf.PdfReader(str(pathlib.Path(one.dist_dir) / "report.pdf"))
+    n = len(reader.pages)
+    text = [" ".join(p.extract_text().split()) for p in reader.pages]
+    assert f"SHEET EX-001 rev B: page 1 of {n}" in text[0]
+    assert "HEAD" not in text[0] and "FOOT" not in text[0]
+    assert all(f"HEAD Design report {i + 1}/{n}" in t and "FOOT EX-001" in t for i, t in enumerate(text[1:], 1))
+    results_page = next(i + 1 for i, t in enumerate(text) if "3 RESULTS" in t and i > 1)
+    assert f"3 Results {results_page}" in text[1].replace(". ", " ")
