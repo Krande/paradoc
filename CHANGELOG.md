@@ -2,6 +2,24 @@
 
 
 
+## v0.12.1 (2026-11-18)
+
+### Chore
+
+* chore: Bump prefix-dev/setup-pixi from 0.11.2 to 0.11.3 in the dependencies group (#48)
+
+Signed-off-by: dependabot[bot] &lt;support@github.com&gt;
+Co-authored-by: dependabot[bot] &lt;49699333+dependabot[bot]@users.noreply.github.com&gt; ([`0e5a06d`](https://github.com/Krande/paradoc/commit/0e5a06d1f29e0292e13a5d2b7591c69bc289de1c))
+
+### Fix
+
+* fix: headings, captions and references are numbered alike in the web reader, DOCX, ODT and PDF (#50)
+
+Signed-off-by: dependabot[bot] &lt;support@github.com&gt;
+Co-authored-by: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;
+Co-authored-by: dependabot[bot] &lt;49699333+dependabot[bot]@users.noreply.github.com&gt; ([`145fa65`](https://github.com/Krande/paradoc/commit/145fa657defe7cff27c96aa300f810bcc37838db))
+
+
 ## v0.12.0 (2026-11-08)
 
 ### Feature
