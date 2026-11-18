@@ -190,8 +190,10 @@ class WordExporter:
         # captioned table beside them.
         formatted = {id(t.docx_table._tbl) for t in main_tables + app_tables}
         # The templates' own tables (a title page's, say) come first and are the template's to style.
+        # Keyed by id but holding the elements: lxml hands out a new proxy (and so a new id) for a
+        # node once no proxy of it is referenced, so ids alone could match nothing, or a stranger.
         own = {
-            id(t._tbl)
+            id(t._tbl): t._tbl
             for doc, tmpl in ((main_doc, self.main_tmpl), (app_doc, self.app_tmpl))
             for t in doc.tables[: len(Document(str(tmpl)).tables)]
         }
