@@ -35,6 +35,7 @@ table numbers match it) is laid out for print and printed by Chromium through Pl
 from __future__ import annotations
 
 import base64
+import functools
 import glob
 import hashlib
 import html
@@ -267,6 +268,26 @@ def layout_tables(body: str, mode: str, short_chars: int) -> str:
 def data_uri(path: pathlib.Path) -> str:
     mime = mimetypes.guess_type(path.name)[0] or ("image/svg+xml" if path.suffix.lower() == ".svg" else "image/png")
     return f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
+
+
+@functools.lru_cache(maxsize=1)
+def mathml_arg() -> str:
+    """pandoc's option for MathML: `--math-method=mathml` where pandoc has it (later releases warn that
+    `--mathml` is deprecated), `--mathml` before."""
+    import subprocess
+
+    from paradoc.pandoc_helper import ensure_pandoc_path
+
+    ensure_pandoc_path()
+    try:
+        import pypandoc
+
+        out = subprocess.run([pypandoc.get_pandoc_path(), "--help"], capture_output=True, text=True, timeout=60)
+        if "--math-method" in out.stdout:
+            return "--math-method=mathml"
+    except Exception:  # noqa: BLE001 -- no answer: the option every pandoc 3 knows
+        pass
+    return "--mathml"
 
 
 def _esc(s: str) -> str:
@@ -512,7 +533,7 @@ class ChromiumPdfExporter:
 
         one, cfg = self.one_doc, self.config
         copy_figures_to_dist(one, out_dir)
-        body = HTMLExporter(one).render_body(extra_pandoc_args=("--mathml",))
+        body = HTMLExporter(one).render_body(extra_pandoc_args=(mathml_arg(),))
         body, headings = number_headings(body, max_level=max(3, cfg.toc_depth))
         body = layout_tables(body, cfg.table_col_widths, cfg.table_short_cell_chars)
         crop = out_dir / "_pdf_images" if cfg.figure_trim_whitespace else None

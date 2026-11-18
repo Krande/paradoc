@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Callable, Dict, Iterable, Optional
 import pandas as pd
 
 from .common import (
-    grid_table_markdown,
     MY_DEFAULT_HTML_CSS,
     MY_DOCX_TMPL,
     MY_DOCX_TMPL_BLANK,
@@ -19,6 +18,7 @@ from .common import (
     MarkDownFile,
     Table,
     TableFormat,
+    grid_table_markdown,
     isolate_block_figures,
 )
 from .config import logger

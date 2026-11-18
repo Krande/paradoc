@@ -11,6 +11,7 @@ from paradoc.io.pdf.chromium import (
     footer_template,
     header_template,
     layout_tables,
+    mathml_arg,
     number_headings,
     resolve_images,
     title_page_html,
@@ -248,3 +249,12 @@ def test_a_title_page_of_ones_own_prints_without_the_running_header(tmp_path):
     assert all(f"HEAD Design report {i + 1}/{n}" in t and "FOOT EX-001" in t for i, t in enumerate(text[1:], 1))
     results_page = next(i + 1 for i, t in enumerate(text) if "3 RESULTS" in t and i > 1)
     assert f"3 Results {results_page}" in text[1].replace(". ", " ")
+
+
+def test_mathml_is_asked_for_in_the_way_the_installed_pandoc_knows():
+    import subprocess
+
+    import pypandoc
+
+    help_text = subprocess.run([pypandoc.get_pandoc_path(), "--help"], capture_output=True, text=True).stdout
+    assert mathml_arg() == ("--math-method=mathml" if "--math-method" in help_text else "--mathml")

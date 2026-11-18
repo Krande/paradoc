@@ -50,7 +50,7 @@ class HTMLExporter:
     def render_body(self, extra_pandoc_args: tuple[str, ...] = ()) -> str:
         """The document body as HTML: every markdown file (appendices after ``\\appendix``)
         through pandoc with cross-references resolved. ``extra_pandoc_args`` are appended to
-        pandoc's arguments (the PDF export passes ``--mathml``)."""
+        pandoc's arguments (the PDF export passes pandoc's MathML option)."""
         one = self.one_doc
 
         md_main_str = "\n\n".join([md.read_built_file() for md in one.md_files_main])
