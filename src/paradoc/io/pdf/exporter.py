@@ -144,11 +144,14 @@ function Table(t)
     t,
     pandoc.RawBlock("latex", "\\\\endgroup"),
   }}
-  -- A longtable steps the table counter whether or not it has a caption. Give an uncaptioned
-  -- table's number back, or every captioned table after it is numbered one ahead of the other
+  -- Whether an uncaptioned longtable steps the table counter depends on the pandoc and longtable
+  -- versions (pandoc < 3.12 writes `\\LTcaptype{{}}`, which current longtable does not honour;
+  -- later pandoc writes `{{none}}`, which it does). Put the counter back to what it was before the
+  -- table either way, or every captioned table after it is numbered one off from the other
   -- formats, which count captioned tables only.
   if #t.caption.long == 0 then
-    table.insert(blocks, pandoc.RawBlock("latex", "\\\\addtocounter{{table}}{{-1}}"))
+    table.insert(blocks, 1, pandoc.RawBlock("latex", "\\\\xdef\\\\ParadocTableCount{{\\\\the\\\\value{{table}}}}"))
+    table.insert(blocks, pandoc.RawBlock("latex", "\\\\setcounter{{table}}{{\\\\ParadocTableCount}}"))
   end
   return blocks
 end
