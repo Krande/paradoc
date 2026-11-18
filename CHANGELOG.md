@@ -2,6 +2,15 @@
 
 
 
+## v0.13.0 (2026-11-18)
+
+### Feature
+
+* feat: a page header, footer and title page of one&#39;s own (Chromium PDF), DOCX document properties, and table/MathML fixes (#51)
+
+Co-authored-by: Claude Opus 5.5 &lt;noreply@anthropic.com&gt; ([`6b41666`](https://github.com/Krande/paradoc/commit/6b41666f0a67957434b62317915429c34cba412e))
+
+
 ## v0.12.1 (2026-11-18)
 
 ### Chore
