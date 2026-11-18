@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Callable, Dict, Iterable, Optional
 import pandas as pd
 
 from .common import (
-    GRID_TABLE_PROPS,
+    grid_table_markdown,
     MY_DEFAULT_HTML_CSS,
     MY_DOCX_TMPL,
     MY_DOCX_TMPL_BLANK,
@@ -667,8 +667,7 @@ class OneDoc:
         # This eliminates data corruption and makes the system more robust
 
         # Convert to markdown
-        props = dict(index=show_index, **GRID_TABLE_PROPS)
-        tbl_str = df.to_markdown(**props)
+        tbl_str = grid_table_markdown(df, index=show_index)
 
         # Add caption unless nocaption flag is set
         # NOTE: Do NOT include the annotation in the caption - it's only for transformation

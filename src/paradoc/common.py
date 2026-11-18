@@ -19,6 +19,30 @@ MY_DEFAULT_HTML_CSS = RESOURCE_DIR / "default_style.css"
 #: arrived as a CodeBlock -- a padded box in the HTML reader, monospace in the DOCX.
 GRID_TABLE_PROPS = dict(tablefmt="grid", numalign="left", stralign="left")
 
+
+def grid_table_markdown(df: pd.DataFrame, index: bool = False, floatfmt=None) -> str:
+    """``df`` as a pandoc grid table (:data:`GRID_TABLE_PROPS`), its text cells as they are written.
+
+    tabulate reads a column of text that looks like numbers as numbers, and writes them its own way: "0.30"
+    came out "0.3", "1.50" "1.5". A column whose cells are all text keeps them as written (numbers --
+    ints, floats -- are formatted as before). And a cell starting with ">" is escaped: in a grid table cell
+    pandoc reads it as a block quote, so "> 0.25" lost its sign and printed as an indented quote.
+    """
+    out = df.copy()
+    text_cols = []
+    for i, col in enumerate(out.columns):
+        values = list(out[col])
+        if values and all(isinstance(v, str) for v in values):
+            text_cols.append(i + (1 if index else 0))
+            out[col] = ["\\" + v if v.lstrip().startswith(">") else v for v in values]
+    props = dict(index=index, **GRID_TABLE_PROPS)
+    if floatfmt is not None:
+        props["floatfmt"] = floatfmt
+    if text_cols:
+        props["disable_numparse"] = text_cols
+    return out.to_markdown(**props)
+
+
 #: A line holding nothing but a `{#fig:...}`-labelled image. Pandoc only makes an image a
 #: Figure when it is alone in its paragraph, so one written directly under a text line
 #: became an inline image of that paragraph and dropped out of the DOCX export (#20).
@@ -97,10 +121,7 @@ class Table:
         # Table identification now uses bookmark/hyperlink anchor system from pandoc-crossref
         # This eliminates the need to corrupt the first cell with a temporary identifier
 
-        props = dict(index=False, **GRID_TABLE_PROPS)
-        if self.format.float_fmt is not None:
-            props["floatfmt"] = self.format.float_fmt
-        tbl_str = df.to_markdown(**props)
+        tbl_str = grid_table_markdown(df, index=False, floatfmt=self.format.float_fmt)
         if flags is not None and TableFlags.NO_CAPTION in flags:
             return tbl_str
         tbl_str += f"\n\nTable: {self.caption}"
