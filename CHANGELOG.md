@@ -2,6 +2,15 @@
 
 
 
+## v0.14.0 (2026-11-19)
+
+### Feature
+
+* feat: OneDoc.add_filter, conditional text, and the web reader&#39;s appendix start from the shown heading (#52)
+
+Co-authored-by: Claude Opus 5.5 &lt;noreply@anthropic.com&gt; ([`4b709c0`](https://github.com/Krande/paradoc/commit/4b709c0cf5ccc6e25e78fcac9472c154ec900971))
+
+
 ## v0.13.0 (2026-11-18)
 
 ### Feature
