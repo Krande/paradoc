@@ -622,6 +622,19 @@ class OneDoc:
         self._uniqueness_check(name)
         self.equations[name] = Equation(name, func, custom_eq_str_compiler=custom_eq_str_compiler, **kwargs)
 
+    def add_filter(self, instance) -> None:
+        """Register a ``Filter`` instance made at run time, so the markdown's ``${ <name>.<attr> }`` (and
+        ``<!-- if <name>.<attr> -->``) resolve against it -- as an instance in the doc root's ``filters.py`` does.
+
+        For values computed by the script that builds the document (one filter per analysed object, say),
+        rather than by a module of its own. The name must be unique: a ``filters.py`` instance of the same name
+        is an error when the document compiles."""
+        from paradoc.filters import Filter
+
+        if not isinstance(instance, Filter):
+            raise TypeError(f"add_filter takes a paradoc.filters.Filter instance, got {type(instance).__name__}")
+        self._filter_registry.register(instance)
+
     def _get_table_markdown_from_db(self, full_reference: str, key_clean: str):
         """
         Generate markdown table from database using annotations.
@@ -1024,7 +1037,9 @@ class OneDoc:
         for mdf in self.md_files_main + self.md_files_app:
             original = mdf.read_original_file()
             self._pre_desugar_md_cache[mdf.path] = original
-            after_figsrc = self._preprocess_figure_sources(original, mdf)
+            # Conditional text first: a dropped branch's substitutions and figure blocks are never resolved.
+            conditioned = self._apply_conditions(original, mdf)
+            after_figsrc = self._preprocess_figure_sources(conditioned, mdf)
             self._desugared_md_cache[mdf.path] = self._desugar_new_syntax(after_figsrc, mdf)
 
         # Pre-render all plots in parallel before substitution
@@ -1136,6 +1151,31 @@ class OneDoc:
 
             with open(mdf.build_file, "w", encoding="utf-8") as f:
                 f.write(md_str)
+
+    def _apply_conditions(self, md_str: str, mdf: MarkDownFile) -> str:
+        """Keep the branch of each `<!-- if ref -->` ... `<!-- endif -->` its reference's truth says
+        (`paradoc.substitution.conditions`): `name.attr` a filter attribute, `name` a document variable."""
+        from paradoc.substitution.conditions import (
+            ConditionError,
+            apply_conditions,
+            has_conditions,
+        )
+
+        if not has_conditions(md_str):
+            return md_str
+        self._discover_filters_once()
+
+        def evaluate(ref: str):
+            if "." in ref:
+                name, attr_name = ref.split(".", 1)
+                if self._filter_registry.get(name) is None:
+                    raise ConditionError(f"no filter registered as {name!r}")
+                return self._filter_registry.call_attr(name, attr_name, {})
+            if ref in self.variables:
+                return self.variables[ref]
+            raise ConditionError(f"{ref!r} is neither a filter attribute (name.attr) nor a document variable")
+
+        return apply_conditions(md_str, evaluate, where=str(mdf.path))
 
     def _desugar_new_syntax(self, md_str: str, mdf: MarkDownFile) -> str:
         """Translate `${...}` substitutions to legacy `{{...}}` form.

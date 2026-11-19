@@ -39,6 +39,38 @@ register `Filter` *classes* — only instances. This forces the named-
 instance pattern so multiple analyses (e.g. `eig_main` and `eig_alt`)
 have unambiguous markdown references.
 
+## Filters made by the build script
+
+A script that builds the document can make filter instances itself (one per analysed object, its values
+computed by the script) and register each under its own name:
+
+```python
+one = OneDoc("report")
+for beam in beams:
+    one.add_filter(BeamResults(name=beam.label, beam=beam))
+one.compile("report", export_format="pdf")
+```
+
+The markdown calls them as any other: `${ b1.utilization:.2f }`. Names must be unique, also against the doc
+root's `filters.py` instances.
+
+## Conditional text
+
+Text that fits some objects only goes between condition markers, each an HTML comment on a line of its own:
+
+```markdown
+<!-- if b1.slender -->
+B1 is slender: its buckling resistance governs.
+<!-- else -->
+B1 is stocky.
+<!-- endif -->
+```
+
+The reference is a filter attribute (`name.attr`, called with no arguments) or a document variable (`name`);
+`not` negates it, and conditions nest. The value's truth decides, so an attribute returning an empty list of
+items drops its branch. A dropped branch is never resolved: its `${ ... }` and figure blocks are not evaluated.
+An unknown reference or markers that do not pair up stop the build. Markers inside a fenced code block are text.
+
 ## Return types
 
 A filter `@attr` may return one of:

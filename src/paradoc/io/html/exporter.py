@@ -1,6 +1,8 @@
 import contextlib
+import html
 import os
 import pathlib
+import re
 import shutil
 
 import pypandoc
@@ -9,6 +11,28 @@ from paradoc import OneDoc
 from paradoc.citation import FILTER_PATH as SHELF_CITATION_FILTER
 from paradoc.numbering import crossref_args, crossref_filters
 from paradoc.utils import copy_figures_to_dist
+
+#: A heading's trailing pandoc attributes (`{#sec:label .class}`), which its rendered text does not show.
+_HEADING_ATTRS_RE = re.compile(r"\s*\{[^{}]*\}\s*$")
+
+
+def appendix_start_text(one: OneDoc) -> str:
+    """The text of the first appendix's top heading, as the web reader shows it: from the markdown after
+    substitution (a heading with a `${ ... }` in it reads as its value), without its pandoc attributes.
+
+    The web reader's navbar letters the appendices from the heading whose text this is; empty when the
+    document has no appendix or its first file has no top heading."""
+    if not one.md_files_app:
+        return ""
+    mdf = one.md_files_app[0]
+    try:
+        text = mdf.read_built_file()
+    except FileNotFoundError:
+        text = mdf.read_original_file()
+    for line in text.splitlines():
+        if line.startswith("# "):
+            return _HEADING_ATTRS_RE.sub("", line[2:]).strip()
+    return ""
 
 
 @contextlib.contextmanager
@@ -89,13 +113,7 @@ class HTMLExporter:
         if include_navbar:
             js_script = "<script>\n" + open(THIS_DIR / "js/navbar.js", "r").read() + "\n</script>"
 
-        app_head_text = ""
-        if len(one.md_files_app) > 0:
-            app_file1 = open(one.md_files_app[0].path, "r").read()
-            for line in app_file1.splitlines():
-                if line.startswith("# "):
-                    app_head_text = line[2:]
-                    break
+        app_head_text = html.escape(appendix_start_text(one), quote=True)
 
         styled_html = f"""<html>
         <head>
