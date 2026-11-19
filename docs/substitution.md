@@ -30,6 +30,17 @@ block-level substitution. Inline placement otherwise. This is what lets
 the same syntax cover scalar inserts and full-block table / figure
 substitution.
 
+## Conditional text
+
+`<!-- if name.attr -->` ... `<!-- else -->` ... `<!-- endif -->` (each on a line of its own, `not` allowed)
+keeps the branch the reference's truth says, before any substitution runs. See
+[Filter authoring](filters.md#conditional-text).
+
+## Headings
+
+A heading may hold substitutions: `# Beam ${ b1.name } {#sec:b1}`. The web reader letters the appendices from
+the first appendix heading as it shows it, i.e. after substitution and without its `{#...}` attributes.
+
 ## Migrating from legacy `{{__key__}}` syntax
 
 The previous syntax (`{{__key__}}{tbl:...}` / `{{__key__}}{plt:...}`)
