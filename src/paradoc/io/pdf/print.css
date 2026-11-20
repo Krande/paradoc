@@ -107,17 +107,21 @@ caption {
 }
 
 /* --- tables ------------------------------------------------------------------------------- */
+/* One pixel short of the text width: with collapsed borders, a table as wide as the content area
+   has its right border painted past the area's clip, and viewers drop the sliver left when zoomed
+   out. A wide table starts on the left margin, so the pixel comes off its right side. */
 table {
   border-collapse: collapse;
   margin: 0.6em auto 1em auto;
   font-size: var(--pd-table-font);
-  max-width: 100%;
+  max-width: calc(100% - 1px);
   width: auto;
   break-inside: auto;
 }
 
 table.pd-wide {
-  width: 100%;
+  width: calc(100% - 1px);
+  margin-left: 0;
 }
 
 table caption {

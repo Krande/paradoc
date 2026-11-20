@@ -214,6 +214,70 @@ def test_a_document_prints_with_title_page_toc_and_page_numbers(tmp_path):
     assert f"Method {method_page}" in " ".join(text[1].split()).replace(". ", " ")
 
 
+def _rules_past_the_clip(page) -> list[tuple[float, float]]:
+    """(right edge, clip's right edge) of each table rule on ``page`` that is painted past the clip around it.
+
+    Chromium paints a cell border as a thin filled rectangle (``re f``) inside a clip of the page's content area
+    (``re W n``); this follows both, with the transformation in effect, in page space.
+    """
+    found: list[tuple[float, float]] = []
+    clip: list = [None]
+    saved: list = []
+    pending: list[tuple[float, float, float, float]] = []
+
+    def box(cm, x, y, w, h):
+        a, b, c, d, e, f = cm
+        xs = [a * px + c * py + e for px, py in ((x, y), (x + w, y), (x, y + h), (x + w, y + h))]
+        ys = [b * px + d * py + f for px, py in ((x, y), (x + w, y), (x, y + h), (x + w, y + h))]
+        return min(xs), min(ys), max(xs), max(ys)
+
+    def visit(op, args, cm, tm):
+        if op == b"q":
+            saved.append(clip[0])
+        elif op == b"Q":
+            clip[0] = saved.pop() if saved else None
+        elif op == b"re":
+            pending.append(box(cm, *(float(v) for v in args)))
+        elif op in (b"W", b"W*") and pending:
+            r, c = pending[-1], clip[0]
+            clip[0] = r if c is None else (max(r[0], c[0]), max(r[1], c[1]), min(r[2], c[2]), min(r[3], c[3]))
+        elif op in (b"f", b"f*", b"F"):
+            for x0, y0, x1, y1 in pending:
+                c = clip[0]
+                if c and x1 - x0 < 2 and y1 - y0 > 4 and x1 > c[2] + 0.01:  # a vertical rule poking out
+                    found.append((x1, c[2]))
+            pending.clear()
+        elif op == b"n":
+            pending.clear()
+
+    page.extract_text(visitor_operand_before=visit)
+    return found
+
+
+@pytest.mark.skipif(not _chromium_available(), reason="needs Playwright and a Chromium build")
+def test_a_wide_tables_right_border_is_printed_inside_the_page(tmp_path):
+    """A table spanning the text width had its right border painted almost wholly past the content area's clip
+    (0.7 of its 0.75 pt), so viewers showed the table without its right edge once zoomed out."""
+    pypdf = pytest.importorskip("pypdf")
+    from paradoc import OneDoc
+
+    src = tmp_path / "doc"
+    (src / "00-main").mkdir(parents=True)
+    rows = "\n".join(f"| {i} | {'a long cell that wraps across the column ' * 2} | {i * 0.1:.2f} |" for i in range(5))
+    (src / "00-main" / "01-results.md").write_text(
+        "# Results\n\n| Case | Description | Utilization |\n|---|---|---|\n" + rows + "\n\nTable: Results {#tbl:res}\n",
+        encoding="utf-8",
+    )
+    one = OneDoc(src, work_dir=tmp_path / "work")
+    one.compile("report", export_format="pdf", pdf_config=PdfExportConfig(engine="chromium", document=_doc()))
+
+    reader = pypdf.PdfReader(str(pathlib.Path(one.dist_dir) / "report.pdf"))
+    assert 'class="pd-wide"' in layout_tables(
+        "<table><tr><td>" + "word " * 20 + "</td></tr></table>", "content", 24
+    )  # the table above is a wide one
+    assert [r for page in reader.pages for r in _rules_past_the_clip(page)] == []
+
+
 @pytest.mark.skipif(not _chromium_available(), reason="needs Playwright and a Chromium build")
 def test_a_title_page_of_ones_own_prints_without_the_running_header(tmp_path):
     pypdf = pytest.importorskip("pypdf")
