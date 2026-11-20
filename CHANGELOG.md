@@ -2,6 +2,13 @@
 
 
 
+## v0.14.1 (2026-11-20)
+
+### Fix
+
+* fix(pdf): a wide table&#39;s right border is printed inside the page (#53) ([`2bbb0b4`](https://github.com/Krande/paradoc/commit/2bbb0b4b0861dba02d848f85236dfc905f188d80))
+
+
 ## v0.14.0 (2026-11-19)
 
 ### Feature
